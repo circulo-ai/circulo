@@ -1,11 +1,13 @@
+import { renderMagicLinkEmail } from "@/components/emails";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { getBaseURL } from "@/lib/auth-client";
+import { sendEmail } from "@/lib/email/mailer";
 import { betterAuth } from "better-auth";
 import { telegram } from "better-auth-telegram";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
-import { customSession, oneTimeToken } from "better-auth/plugins";
+import { customSession, magicLink, oneTimeToken } from "better-auth/plugins";
 import { headers } from "next/headers";
 import { env } from "./env";
 
@@ -75,6 +77,17 @@ export const auth = betterAuth({
     freshAge: 60 * 60, // 1 hour (or set to 0 to disable completely)
   },
   plugins: [
+    magicLink({
+      sendMagicLink: async ({ email, token, url }, request) => {
+        await sendEmail({
+          from: "onboarding@resend.dev",
+          to: email,
+          subject: "Sign in",
+          html: await renderMagicLinkEmail(url, email, "sign-in"),
+          emailType: "transactional",
+        });
+      },
+    }),
     oneTimeToken({
       expiresIn: 24 * 60 * 60, // 24 hours - Socket.IO handles connection persistence with heartbeats
     }),
