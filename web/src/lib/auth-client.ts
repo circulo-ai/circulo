@@ -4,6 +4,7 @@ import { telegramClient } from "better-auth-telegram/client";
 import {
   apiKeyClient,
   customSessionClient,
+  magicLinkClient,
   oneTimeTokenClient,
 } from "better-auth/client/plugins";
 import { nextCookies } from "better-auth/next-js";
@@ -24,6 +25,7 @@ export const authClient = createAuthClient({
     nextCookies(),
     customSessionClient<typeof auth>(),
     apiKeyClient(),
+    magicLinkClient(),
   ],
   fetchOptions: {
     onError(e) {

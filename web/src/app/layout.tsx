@@ -1,6 +1,11 @@
+import { AuthClientProvider } from "@/providers/auth-client-provider";
+import { SessionProvider } from "@/providers/session-provider";
+import { ThemeProvider } from "@/providers/theme-provider";
+import { ZoomPrevention } from "@/providers/zoom-prevention";
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { ReactNode } from "react";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 const fontSans = Geist({
@@ -16,7 +21,15 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body className={fontSans.variable}>{children}</body>
+      <body className={fontSans.variable}>
+        <ThemeProvider>
+          <SessionProvider>
+            <ZoomPrevention />
+            <AuthClientProvider>{children}</AuthClientProvider>
+            <Toaster />
+          </SessionProvider>
+        </ThemeProvider>
+      </body>
     </html>
   );
 }

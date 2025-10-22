@@ -19,6 +19,10 @@ export const env = createEnv({
     // Telegram
     BOT_TOKEN: z.string(),
 
+    // Email
+    RESEND_API_KEY: z.string().min(1).optional(), // Resend API key for transactional emails
+    AZURE_ACS_CONNECTION_STRING: z.string().optional(), // Azure Communication Services connection string
+
     // Core Database & Authentication
     DATABASE_URL: z.string().url(), // Primary database connection string
     BETTER_AUTH_URL: z.string().url(), // Base URL for Better Auth service
