@@ -1,3 +1,5 @@
+import { FieldDescription } from "@/components/ui/field";
+import { cn } from "@/lib/utils";
 import { AuthView } from "@daveyplate/better-auth-ui";
 import { authViewPaths } from "@daveyplate/better-auth-ui/server";
 
@@ -15,8 +17,16 @@ export default async function AuthPage({
   const { path } = await params;
 
   return (
-    <main className="flex min-h-svh grow flex-col items-center justify-center self-center p-4 md:p-6">
-      <AuthView path={path} />
-    </main>
+    <div className={cn("flex w-full flex-col gap-6")}>
+      <AuthView
+        socialLayout={"vertical"}
+        className={"flex flex-col gap-6"}
+        path={path}
+      />
+      <FieldDescription className="px-6 text-center">
+        By clicking continue, you agree to our <a href="#">Terms of Service</a>{" "}
+        and <a href="#">Privacy Policy</a>.
+      </FieldDescription>
+    </div>
   );
 }

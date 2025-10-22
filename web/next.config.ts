@@ -10,10 +10,6 @@ const nextConfig: NextConfig = {
   turbopack: {
     resolveExtensions: [".tsx", ".ts", ".jsx", ".js", ".mjs", ".json"],
   },
-  experimental: {
-    optimizeCss: true,
-    turbopackSourceMaps: false,
-  },
   transpilePackages: [
     "prettier",
     "@t3-oss/env-nextjs",
