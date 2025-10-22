@@ -15,6 +15,7 @@ export function AuthClientProvider({ children }: { children: ReactNode }) {
       account
       persistClient
       deleteUser
+      magicLink={true}
       organization={true}
       optimistic={true}
       multiSession={false}
