@@ -120,3 +120,20 @@
     @apply bg-background text-foreground font-sans antialiased;
   }
 }
+
+@theme {
+  --animate-down: down 3000ms ease-in-out infinite;
+
+  @keyframes down {
+    0% {
+      top: 50%;
+      opacity: 0;
+    }
+    50% {
+      opacity: 1;
+    }
+    100% {
+      top: 100%;
+    }
+  }
+}
