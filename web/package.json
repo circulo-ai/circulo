@@ -10,7 +10,8 @@
     "db:generate": "npx drizzle-kit generate",
     "db:migrate": "npx drizzle-kit migrate",
     "db:push": "npx drizzle-kit push",
-    "db:studio": "npx drizzle-kit studio"
+    "db:studio": "npx drizzle-kit studio",
+    "inngest:dev": "npx inngest-cli@latest dev"
   },
   "dependencies": {
     "@ai-sdk/deepseek": "^1.0.23",
@@ -52,6 +53,7 @@
     "drizzle-orm": "^0.44.6",
     "embla-carousel-react": "^8.6.0",
     "inngest": "^3.44.3",
+    "ioredis": "^5.8.2",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "nanoid": "^5.1.6",

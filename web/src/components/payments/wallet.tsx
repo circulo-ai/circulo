@@ -1,4 +1,5 @@
-// app/wallet/page.tsx
+"use client";
+
 import {
   DepositForm,
   PaymentHistory,

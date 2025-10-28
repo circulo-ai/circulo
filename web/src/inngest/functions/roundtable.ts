@@ -3,8 +3,7 @@ import { inngest } from "@/inngest/client";
 import { calculateCostFromUsage, generateId } from "@/lib/server-utils";
 import { emitStreamEvent } from "@/lib/sse";
 import { google } from "@ai-sdk/google";
-import type { ModelMessage } from "ai";
-import { generateText } from "ai";
+import { streamText } from "ai";
 import { and, asc, eq, sql } from "drizzle-orm";
 
 function getProviderModel(model: string) {
@@ -12,8 +11,10 @@ function getProviderModel(model: string) {
   throw new Error(`Unsupported model provider for model: ${model}`);
 }
 
-function buildMessages(agent: any, contextMessages: any[]): ModelMessage[] {
-  const messages: ModelMessage[] = [
+type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
+
+function buildMessages(agent: any, contextMessages: any[]): ChatMessage[] {
+  const messages: ChatMessage[] = [
     {
       role: "system",
       content: agent.systemPrompt ?? "",
@@ -31,6 +32,12 @@ function buildMessages(agent: any, contextMessages: any[]): ModelMessage[] {
   return messages;
 }
 
+function countTokensApprox(text: string): number {
+  // Very rough heuristic: ~4 chars per token (English)
+  const len = (text ?? "").trim().length;
+  return Math.max(0, Math.ceil(len / 4));
+}
+
 export const chatRoundtable = inngest.createFunction(
   {
     id: "chat-roundtable",
@@ -41,14 +48,17 @@ export const chatRoundtable = inngest.createFunction(
     const { chatId, userId, userMessage } = event.data;
 
     // STEP 1: Save user message
-    await step.run("save-user-message", async () => {
+    const userMsg = await step.run("save-user-message", async () => {
+      const id = generateId();
+      const createdAt = new Date();
       await db.insert(message).values({
-        id: generateId(),
+        id,
         chatId,
         userId,
         content: userMessage,
-        createdAt: new Date(),
+        createdAt,
       });
+      return { id, createdAt };
     });
 
     // STEP 2: Check wallet
@@ -74,118 +84,151 @@ export const chatRoundtable = inngest.createFunction(
     let remainingBalance = Number(userWallet.balance);
 
     // STEP 4: Sequentially process agents
-    let contextMessages = await db.query.message.findMany({
-      where: eq(message.chatId, chatId),
-      orderBy: [asc(message.createdAt)], // chronological
-    });
+    let contextMessages: Array<{ userId?: string | null; content: string }> = [
+      { userId, content: userMessage },
+    ];
+    let previousMessageId: string | null = userMsg.id;
 
     for (const ca of agents) {
-      const agent = ca.agent;
-      const result = await step.run(`agent-${agent.id}`, async () => {
-        const messages = buildMessages(agent, contextMessages);
+      const agentInfo = ca.agent;
+      const agentResult: { cost: number; tokens: number } = await step.run(
+        `agent-${agentInfo.id}`,
+        async () => {
+          const messages = buildMessages(agentInfo, contextMessages);
+          const providerModel = getProviderModel(agentInfo.model);
+          const messageId = generateId();
 
-        // --- Prepare provider ---
-        const providerModel = getProviderModel(agent.model);
-
-        // --- Call AI SDK generateText ---
-        const response = await generateText({
-          model: providerModel,
-          messages,
-          temperature: parseFloat(agent.temperature || "0") || undefined,
-          maxOutputTokens: agent.maxTokens
-            ? Number(agent.maxTokens)
-            : undefined,
-        });
-
-        const content = response.text;
-        const usage = response.totalUsage || response.usage;
-
-        const inputTokens = usage?.inputTokens ?? 0;
-        const outputTokens = usage?.outputTokens ?? 0;
-        const totalTokens = usage?.totalTokens ?? inputTokens + outputTokens;
-
-        // --- Calculate cost manually ---
-        const cost = calculateCostFromUsage(
-          agent.model,
-          inputTokens,
-          outputTokens,
-        );
-
-        // --- Ensure sufficient funds ---
-        if (remainingBalance < cost) {
-          throw new Error(`Insufficient balance for agent ${agent.name}`);
-        }
-        remainingBalance -= cost;
-
-        for await (const step of response.steps) {
-          // TODO
+          // Emit message start event
           await emitStreamEvent(chatId, {
-            type: "stream",
-            agentId: chatAgent.agentId,
-            content: ""
+            type: "message-start",
+            messageId,
+            agentId: agentInfo.id,
+            role: "assistant",
           });
-        }
 
-        // Save the agent’s message
-        const msg = {
-          id: generateId(),
-          chatId,
-          agentId: agent.id,
-          content,
-          tokenCount: totalTokens,
-          cost: cost.toString(),
-          toolCalls: response.toolCalls ?? [],
-          createdAt: new Date(),
-        };
-        await db.insert(message).values(msg);
+          // Call AI SDK streamText
+          const stream = streamText({
+            model: providerModel,
+            messages,
+            temperature: parseFloat(agentInfo.temperature || "0") || undefined,
+            maxOutputTokens: agentInfo.maxTokens
+              ? Number(agentInfo.maxTokens)
+              : undefined,
+          });
 
-        // Add DB-style message (no role) to context for the next agent
-        contextMessages.push({
-          ...msg,
-          userId: null,
-          quotedMessageId: null,
-        });
+          let generatedText = "";
+          let chunkIndex = 0;
 
-        // Emit completion event
-        await emitStreamEvent(chatId, {
-          type: "complete",
-          agentId: chatAgent.agentId,
-          messageId: msg.id,
-        });
+          // Stream UI message chunks
+          for await (const chunk of stream.toUIMessageStream()) {
+            // Emit the UI chunk directly
+            await emitStreamEvent(chatId, {
+              type: "ui-chunk",
+              messageId,
+              agentId: agentInfo.id,
+              chunkIndex: chunkIndex++,
+              chunk,
+            });
 
-        return { cost, tokens: totalTokens };
-      });
+            // Accumulate text for database storage
+            if (chunk.type === "text-delta") {
+              generatedText += chunk.delta;
+            }
+          }
 
-      costs.push(result);
+          // Get final response
+          const final = await stream.response;
+          const content = generatedText;
+
+          // Calculate tokens and cost
+          const inputText = messages.map((m) => m.content).join("\n\n");
+          const inputTokens =
+            (final as any)?.usage?.inputTokens ?? countTokensApprox(inputText);
+          const outputTokens =
+            (final as any)?.usage?.outputTokens ?? countTokensApprox(content);
+          const totalTokens =
+            (final as any)?.usage?.totalTokens ?? inputTokens + outputTokens;
+
+          const cost = calculateCostFromUsage(
+            agentInfo.model,
+            inputTokens,
+            outputTokens,
+          );
+
+          if (remainingBalance < cost) {
+            throw new Error(`Insufficient balance for agent ${agentInfo.name}`);
+          }
+          remainingBalance -= cost;
+
+          // Save the agent's message
+          const msg = {
+            id: messageId,
+            chatId,
+            agentId: agentInfo.id,
+            content,
+            tokenCount: totalTokens,
+            cost: cost.toString(),
+            toolCalls: [],
+            quotedMessageId: previousMessageId,
+            createdAt: new Date(),
+          };
+          await db.insert(message).values(msg);
+
+          contextMessages.push({ userId: null, content });
+          previousMessageId = msg.id;
+
+          // Emit message complete event
+          await emitStreamEvent(chatId, {
+            type: "message-complete",
+            messageId: msg.id,
+            agentId: agentInfo.id,
+            usage: {
+              inputTokens,
+              outputTokens,
+              totalTokens,
+            },
+            cost,
+          });
+
+          return { cost, tokens: totalTokens };
+        },
+      );
+
+      costs.push(agentResult);
       if (ca !== agents[agents.length - 1]) {
         await step.sleep("delay", 1000);
       }
     }
 
-    // STEP 5: Deduct total cost & record transaction atomically
+    // STEP 5: Deduct total cost & record transaction
     await step.run("charge-user", async () => {
       const totalCost = costs.reduce((sum, c) => sum + c.cost, 0);
       const totalTokens = costs.reduce((sum, c) => sum + c.tokens, 0);
 
-      const currentWallet = await db.query.wallet.findFirst({
-        where: eq(wallet.userId, userId),
-      });
-
-      if (!currentWallet) throw new Error("Wallet not found");
-      if (Number(currentWallet.balance) < totalCost)
-        throw new Error("Insufficient wallet balance before deduction");
-
-      const balanceBefore = Number(currentWallet.balance);
-      const balanceAfter = balanceBefore - totalCost;
-
       await db.transaction(async (tx) => {
-        await tx
+        const updated = await tx
           .update(wallet)
           .set({
-            balance: balanceAfter.toString(),
+            balance: sql`${wallet.balance} - ${totalCost}`,
             updatedAt: new Date(),
           })
-          .where(eq(wallet.userId, userId));
+          .where(
+            and(
+              eq(wallet.userId, userId),
+              sql`${wallet.balance} >= ${totalCost}`,
+            ),
+          )
+          .returning({ id: wallet.id, balance: wallet.balance });
+
+        if (updated.length === 0) {
+          throw new Error(
+            "Insufficient wallet balance or concurrent spend detected",
+          );
+        }
+
+        const walletRow = updated[0];
+        const balanceAfter = Number(walletRow.balance);
+        const balanceBefore = balanceAfter + totalCost;
 
         await tx
           .update(chat)
@@ -200,12 +243,12 @@ export const chatRoundtable = inngest.createFunction(
         await tx.insert(transaction).values({
           id: generateId(),
           userId,
-          walletId: currentWallet.id,
+          walletId: walletRow.id,
           type: "chat_usage",
           status: "completed",
-          amount: totalCost.toString(),
-          balanceBefore: balanceBefore.toString(),
-          balanceAfter: balanceAfter.toString(),
+          amount: totalCost.toFixed(4),
+          balanceBefore: balanceBefore.toFixed(2),
+          balanceAfter: balanceAfter.toFixed(2),
           chatId,
           description: "Chat roundtable execution",
           metadata: { agents: agents.map((a) => a.agentId), totalTokens },

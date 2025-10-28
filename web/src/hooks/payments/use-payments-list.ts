@@ -1,3 +1,4 @@
+"use client"
 import { useSWR } from "@/lib/swr";
 import type { Payment } from "./types";
 
