@@ -1,33 +1,17 @@
-import { useEffect, useState } from "react";
+import { useSWR } from "@/lib/swr";
+import type { Payment } from "./types";
 
 export function usePaymentStatus(paymentId: string | null) {
-  const [payment, setPayment] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const shouldFetch = Boolean(paymentId);
 
-  useEffect(() => {
-    if (!paymentId) return;
+  const { data, error, isLoading, mutate } = useSWR<Payment>(
+    shouldFetch ? `/api/v1/payments/${paymentId}` : null,
+  );
 
-    const fetchPayment = async () => {
-      setLoading(true);
-      try {
-        const response = await fetch(`/api/v1/payments/${paymentId}`);
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || "Failed to fetch payment");
-        }
-
-        setPayment(data.data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An error occurred");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPayment();
-  }, [paymentId]);
-
-  return { payment, loading, error };
+  return {
+    payment: data ?? null,
+    loading: isLoading,
+    error: error ? (error as Error).message : null,
+    refresh: mutate,
+  };
 }

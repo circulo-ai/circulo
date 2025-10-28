@@ -1,16 +1,6 @@
+import { fetcher, globalMutate } from "@/lib/swr";
 import { useState } from "react";
-
-interface CreatePaymentParams {
-  amount: number;
-  metadata?: Record<string, any>;
-}
-
-interface PaymentResult {
-  paymentId: string;
-  token: string;
-  gatewayUrl: string;
-  orderId: string;
-}
+import type { CreatePaymentParams, Payment, PaymentResult } from "./types";
 
 export function usePayment() {
   const [loading, setLoading] = useState(false);
@@ -23,21 +13,20 @@ export function usePayment() {
     setError(null);
 
     try {
-      const response = await fetch("/api/v1/payments/create", {
+      const data = await fetcher<PaymentResult>("/api/v1/payments/create", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(params),
       });
 
-      const data = await response.json();
+      // Optimistically update payment list cache
+      await globalMutate(
+        (key: string) => key.startsWith("/api/v1/payments"),
+        (existing?: Payment[]) => (existing ? [...existing] : undefined),
+        false,
+      );
 
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to create payment");
-      }
-
-      return data.data;
+      return data;
     } catch (err) {
       const message = err instanceof Error ? err.message : "An error occurred";
       setError(message);
@@ -51,26 +40,30 @@ export function usePayment() {
     window.location.href = gatewayUrl;
   };
 
-  const verifyPayment = async (token: string) => {
+  const verifyPayment = async (token: string): Promise<Payment | null> => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch("/api/v1/payments/verify", {
+      const verified = await fetcher<Payment>("/api/v1/payments/verify", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token }),
       });
 
-      const data = await response.json();
+      // Optimistically update both payment list and status caches
+      await globalMutate(
+        (key: string) => key.startsWith("/api/v1/payments"),
+        (existing?: Payment[]) =>
+          existing
+            ? existing.map((p) => (p.id === verified.id ? verified : p))
+            : existing,
+        false,
+      );
 
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to verify payment");
-      }
+      await globalMutate(`/api/v1/payments/${verified.id}`, verified, false);
 
-      return data;
+      return verified;
     } catch (err) {
       const message = err instanceof Error ? err.message : "An error occurred";
       setError(message);
@@ -81,10 +74,10 @@ export function usePayment() {
   };
 
   return {
+    createPayment,
+    verifyPayment,
+    redirectToGateway,
     loading,
     error,
-    createPayment,
-    redirectToGateway,
-    verifyPayment,
   };
 }
