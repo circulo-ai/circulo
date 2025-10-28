@@ -21,11 +21,14 @@ function getProviderModel(model: string) {
 
 type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 
-function buildMessages(agent: any, contextMessages: any[]): ChatMessage[] {
+function buildMessages(
+  systemPrompt: string,
+  contextMessages: any[],
+): ChatMessage[] {
   const messages: ChatMessage[] = [
     {
       role: "system",
-      content: agent.systemPrompt ?? "",
+      content: systemPrompt,
     },
   ];
 
@@ -70,10 +73,10 @@ function countTokensApprox(text: string): number {
   return Math.max(0, Math.ceil(len / 4));
 }
 
-// Minimal, generic aggregator: convert UIMessageChunk events into UIMessage.parts
-// Avoids custom per-tool naming or UI heuristics; keeps parts as-is.
+// Aggregate UIMessageChunk events into UIMessage parts
 function appendChunkToParts(parts: any[], chunk: UIMessageChunk): any[] {
-  const next = parts.slice();
+  const next = [...parts];
+
   switch (chunk.type) {
     case "text-start": {
       const last = next[next.length - 1];
@@ -82,6 +85,7 @@ function appendChunkToParts(parts: any[], chunk: UIMessageChunk): any[] {
       }
       break;
     }
+
     case "text-delta": {
       const last = next[next.length - 1];
       if (!last || last.type !== "text") {
@@ -91,45 +95,83 @@ function appendChunkToParts(parts: any[], chunk: UIMessageChunk): any[] {
       }
       break;
     }
+
     case "tool-input-available": {
+      const toolChunk = chunk as any;
       next.push({
-        type: "dynamic-tool",
+        type: "tool-input-available",
         state: "input-available",
-        input: (chunk as any).input,
-        toolCallId: (chunk as any).toolCallId,
-        toolName: (chunk as any).toolName,
-      } as any);
+        input: toolChunk.input,
+        toolCallId: toolChunk.toolCallId,
+        toolName: toolChunk.toolName,
+      });
       break;
     }
+
     case "tool-output-available": {
-      const callId = (chunk as any).toolCallId;
+      const toolChunk = chunk as any;
+      const callId = toolChunk.toolCallId;
       let matched = false;
+
+      // Find and update the corresponding tool input part
       for (let i = next.length - 1; i >= 0; i--) {
-        const p = next[i] as any;
-        if (p && p.type === "dynamic-tool" && p.toolCallId === callId) {
+        const p = next[i];
+        if (p && p.toolCallId === callId) {
+          p.type = "tool-output-available";
           p.state = "output-available";
-          p.output = (chunk as any).output;
+          p.output = toolChunk.output;
           p.errorText = undefined;
           matched = true;
           break;
         }
       }
+
+      // If no matching input found, add as standalone output
       if (!matched) {
         next.push({
-          type: "dynamic-tool",
+          type: "tool-output-available",
           state: "output-available",
-          output: (chunk as any).output,
+          output: toolChunk.output,
           errorText: undefined,
           toolCallId: callId,
-        } as any);
+        });
       }
       break;
     }
-    default: {
-      // ignore other chunk types
+
+    case "tool-output-error": {
+      const toolChunk = chunk as any;
+      const callId = toolChunk.toolCallId;
+      let matched = false;
+
+      // Find and update the corresponding tool part
+      for (let i = next.length - 1; i >= 0; i--) {
+        const p = next[i];
+        if (p && p.toolCallId === callId) {
+          p.type = "tool-output-available";
+          p.state = "output-error";
+          p.errorText = toolChunk.errorText || "Tool execution failed";
+          matched = true;
+          break;
+        }
+      }
+
+      if (!matched) {
+        next.push({
+          type: "tool-output-available",
+          state: "output-error",
+          errorText: toolChunk.errorText || "Tool execution failed",
+          toolCallId: callId,
+        });
+      }
       break;
     }
+
+    default:
+      // Ignore other chunk types
+      break;
   }
+
   return next;
 }
 
@@ -146,23 +188,27 @@ export const chatRoundtable = inngest.createFunction(
     const userMsg = await step.run("save-user-message", async () => {
       const id = generateId();
       const createdAt = new Date();
+      const uiMessage: UIMessage = {
+        id,
+        parts: [{ type: "text", text: userMessage }],
+        role: "user",
+      };
+
       await db.insert(message).values({
         id,
         chatId,
         userId,
         content: userMessage,
-        uiMessage: {
-          id: id,
-          parts: [
-            {
-              type: "text",
-              text: userMessage,
-            },
-          ],
-          role: "user",
-        } satisfies UIMessage,
+        uiMessage,
         createdAt,
       });
+
+      await emitStreamEvent(chatId, {
+        type: "message-complete",
+        messageId: id,
+        message: uiMessage,
+      });
+
       return { id, createdAt };
     });
 
@@ -185,50 +231,58 @@ export const chatRoundtable = inngest.createFunction(
       });
     });
 
-    // STEP 3.5: Load full chat history
+    if (agents.length === 0) {
+      throw new Error("No enabled agents found for this chat");
+    }
+
+    // STEP 4: Load full chat history
     const historyRows = await step.run("load-chat-history", async () => {
       return await db.query.message.findMany({
         where: eq(message.chatId, chatId),
         orderBy: [asc(message.createdAt)],
       });
     });
-    const historyMessages: Array<{ userId?: string | null; content: string }> =
-      historyRows.map((m: any) => ({
-        userId: m.userId,
-        content: m.content ?? "",
-      }));
+
+    const historyMessages = historyRows.map((m: any) => ({
+      userId: m.userId,
+      content: m.content ?? "",
+    }));
 
     const costs: { cost: number; tokens: number }[] = [];
     let remainingBalance = Number(userWallet.balance);
 
-    // STEP 4: Sequentially process agents
+    // STEP 5: Sequentially process agents
     const roundMessages: Array<{ userId?: string | null; content: string }> =
       [];
     const previousAgentsInRound: Array<{ id: string; name?: string }> = [];
     let previousMessageId: string | null = userMsg.id;
 
-    for (const ca of agents) {
+    for (let i = 0; i < agents.length; i++) {
+      const ca = agents[i];
       const agentInfo = ca.agent;
+
       const agentResult = await step.run(
-        `agent-${agentInfo.id}`,
+        `agent-${agentInfo.id}-${i}`,
         async (): Promise<{ cost: number; tokens: number }> => {
           const systemPrompt = composeSystemPrompt(agentInfo, {
             previousAgents: previousAgentsInRound,
           });
 
-          const inputMessages = buildMessages({ ...agentInfo, systemPrompt }, [
+          const inputMessages = buildMessages(systemPrompt, [
             ...historyMessages,
             ...roundMessages,
           ]);
+
           const messageId = generateId();
 
-          // Emit message start event with initial UIMessage
+          // Emit message start event
           const initialUIMessage: UIMessage & { agentId?: string } = {
             id: messageId,
             role: "assistant",
             parts: [],
             agentId: agentInfo.id,
-          } as any;
+          };
+
           await emitStreamEvent(chatId, {
             type: "message-start",
             messageId,
@@ -249,59 +303,84 @@ export const chatRoundtable = inngest.createFunction(
             messages: inputMessages,
           });
 
-          // toUIMessageStream() returns AsyncIterableStream<UIMessageChunk>
-          let finalUIMessage: UIMessage | null = null;
-          let finishResolve: (msg: UIMessage | null) => void = () => {};
-          const finishPromise = new Promise<UIMessage | null>((resolve) => {
-            finishResolve = resolve;
-          });
-          const uiMessageStream = stream.toUIMessageStream({
-            onFinish: async ({ responseMessage }) => {
-              finalUIMessage = responseMessage;
-              finishResolve(responseMessage);
-            },
-          });
+          // Process stream and build UIMessage
+          const uiMessageStream = stream.toUIMessageStream();
 
-          // Build parts incrementally and emit UIMessage updates
           let currentParts: any[] = [];
+          let finalUIMessage: UIMessage | undefined;
+
+          // Stream chunks and emit updates (throttled)
+          let lastEmitTime = 0;
+          const EMIT_INTERVAL_MS = 10; // Emit at most every 10ms
+
           for await (const chunk of uiMessageStream) {
             currentParts = appendChunkToParts(currentParts, chunk);
-            const partialMessage: UIMessage & { agentId?: string } = {
-              id: messageId,
-              role: "assistant",
-              parts: currentParts,
-              agentId: agentInfo.id,
-            } as any;
-            await emitStreamEvent(chatId, {
-              type: "message-update",
-              messageId,
-              agentId: agentInfo.id,
-              message: partialMessage,
-            });
+
+            const now = Date.now();
+            const shouldEmit = now - lastEmitTime >= EMIT_INTERVAL_MS;
+
+            if (shouldEmit) {
+              lastEmitTime = now;
+
+              const partialMessage: UIMessage & { agentId?: string } = {
+                id: messageId,
+                role: "assistant",
+                parts: currentParts,
+                agentId: agentInfo.id,
+              };
+
+              await emitStreamEvent(chatId, {
+                type: "message-update",
+                messageId,
+                agentId: agentInfo.id,
+                message: partialMessage,
+              });
+            }
           }
 
-          // Get final response
-          await finishPromise; // ensure finalUIMessage is available
+          // Emit final state after loop completes
+          const partialMessage: UIMessage & { agentId?: string } = {
+            id: messageId,
+            role: "assistant",
+            parts: currentParts,
+            agentId: agentInfo.id,
+          };
+
+          await emitStreamEvent(chatId, {
+            type: "message-update",
+            messageId,
+            agentId: agentInfo.id,
+            message: partialMessage,
+          });
+
+          finalUIMessage = {
+            id: messageId,
+            role: "assistant",
+            parts: currentParts,
+          };
+
+          // Get final response and usage
           const response = await stream.response;
-          // Prefer the model-provided final text; fallback to accumulated text parts
-          const uiParts: any[] = Array.isArray((finalUIMessage as any)?.parts)
-            ? (((finalUIMessage as any).parts as any[]) ?? [])
-            : [];
-          const content =
-            (response as any)?.text ??
-            uiParts
+          const usage = (response as any)?.usage || {};
+
+          // Extract text content from finalUIMessage parts or response
+          let content = "";
+          if (finalUIMessage && finalUIMessage.parts) {
+            content = finalUIMessage.parts
               .filter((p: any) => p?.type === "text")
               .map((p: any) => p?.text || "")
               .join("\n\n");
+          }
+
+          if (!content && (response as any)?.text) {
+            content = (response as any).text;
+          }
 
           // Calculate tokens and cost
           const inputText = inputMessages.map((m) => m.content).join("\n\n");
-          const inputTokens =
-            content?.usage?.inputTokens ?? countTokensApprox(inputText);
-          const outputTokens =
-            content?.usage?.outputTokens ?? countTokensApprox(content);
-          const totalTokens =
-            content?.usage?.totalTokens ?? inputTokens + outputTokens;
+          const inputTokens = usage.inputTokens ?? countTokensApprox(inputText);
+          const outputTokens = usage.outputTokens ?? countTokensApprox(content);
+          const totalTokens = usage.totalTokens ?? inputTokens + outputTokens;
 
           const cost = calculateCostFromUsage(
             agentInfo.model,
@@ -315,7 +394,16 @@ export const chatRoundtable = inngest.createFunction(
           remainingBalance -= cost;
 
           const toolCalls = await stream.toolCalls;
-          const msg = {
+
+          // Build final UIMessage with proper structure
+          const finalMessage: UIMessage = finalUIMessage || {
+            id: messageId,
+            role: "assistant",
+            parts: currentParts,
+          };
+
+          // Save message to database
+          const msg: Message = {
             id: messageId,
             chatId,
             userId: null,
@@ -325,12 +413,13 @@ export const chatRoundtable = inngest.createFunction(
             cost: cost.toString(),
             toolCalls,
             quotedMessageId: previousMessageId,
-            uiMessage: finalUIMessage ?? null,
+            uiMessage: finalMessage,
             createdAt: new Date(),
-          } satisfies Message;
+          };
+
           await db.insert(message).values(msg);
 
-          // Accumulate this agent's contribution
+          // Accumulate agent contribution
           roundMessages.push({ userId: null, content });
           previousAgentsInRound.push({
             id: agentInfo.id,
@@ -338,11 +427,12 @@ export const chatRoundtable = inngest.createFunction(
           });
           previousMessageId = msg.id;
 
+          // Emit completion event
           await emitStreamEvent(chatId, {
             type: "message-complete",
             messageId: msg.id,
             agentId: agentInfo.id,
-            message: finalUIMessage,
+            message: finalMessage,
             usage: {
               inputTokens,
               outputTokens,
@@ -356,12 +446,14 @@ export const chatRoundtable = inngest.createFunction(
       );
 
       costs.push(agentResult);
-      if (ca !== agents[agents.length - 1]) {
-        await step.sleep("delay", 1000);
+
+      // Add delay between agents (except after last agent)
+      if (i < agents.length - 1) {
+        await step.sleep("agent-delay", 1000);
       }
     }
 
-    // STEP 5: Deduct total cost & record transaction
+    // STEP 6: Deduct total cost & record transaction
     await step.run("charge-user", async () => {
       const totalCost = costs.reduce((sum, c) => sum + c.cost, 0);
       const totalTokens = costs.reduce((sum, c) => sum + c.tokens, 0);

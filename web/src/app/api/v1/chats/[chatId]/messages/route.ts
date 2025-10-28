@@ -1,6 +1,7 @@
 import { chat, db, message } from "@/db";
 import { inngest } from "@/inngest/client";
 import { getSession } from "@/lib/auth";
+import { emitStreamEvent } from "@/lib/sse";
 import { asc, eq } from "drizzle-orm";
 
 export async function GET(

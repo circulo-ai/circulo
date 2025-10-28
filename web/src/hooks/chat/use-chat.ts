@@ -19,20 +19,16 @@ interface UseChatReturn {
 }
 
 export function useChat({ chatId, onError }: UseChatOptions): UseChatReturn {
-  // State management
   const [messages, setMessages] = useState<Message[]>([]);
-  const [streamingMessages, setStreamingMessages] = useState<
-    Map<string, StreamingMessage>
-  >(new Map());
+  const [streamingMessages, setStreamingMessages] = useState<StreamingMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
 
-  // Refs for cleanup and tracking
   const eventSourceRef = useRef<EventSource | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const optimisticUserIdRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
+  const refreshTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load initial messages
   useEffect(() => {
@@ -88,6 +84,12 @@ export function useChat({ chatId, onError }: UseChatOptions): UseChatReturn {
     const eventSource = new EventSource(`/api/v1/chats/${chatId}/stream`);
     eventSourceRef.current = eventSource;
 
+    let completedMessageIds = new Set<string>();
+
+    eventSource.onopen = () => {
+      console.log("[SSE] Connected to chat stream:", chatId);
+    };
+
     eventSource.onmessage = (e) => {
       if (!mountedRef.current) return;
 
@@ -97,79 +99,157 @@ export function useChat({ chatId, onError }: UseChatOptions): UseChatReturn {
         switch (data.type) {
           case "message-start": {
             const msg = data.message as StreamingMessage;
+            
             setStreamingMessages((prev) => {
-              const next = new Map(prev);
-              next.set(data.messageId, msg);
-              return next;
+              // Deduplicate: check if already exists
+              const exists = prev.some((m) => m.id === data.messageId);
+              if (exists) {
+                return prev;
+              }
+              return [...prev, msg];
             });
             break;
           }
 
           case "message-update": {
             const msg = data.message as StreamingMessage;
+            
             setStreamingMessages((prev) => {
-              const next = new Map(prev);
-              next.set(data.messageId, msg);
-              return next;
+              const exists = prev.some((m) => m.id === data.messageId);
+              
+              if (exists) {
+                // Update existing message
+                return prev.map((m) => (m.id === data.messageId ? msg : m));
+              } else {
+                // Add if not exists (missed the start event)
+                return [...prev, msg];
+              }
             });
             break;
           }
 
           case "message-complete": {
-            setStreamingMessages((prev) => {
-              const next = new Map(prev);
-              next.delete(data.messageId);
-              return next;
-            });
+            const messageId = data.messageId;
+            const completedUIMessage = data.message as StreamingMessage;
 
-            // Refresh messages list to get the completed message
-            fetch(`/api/v1/chats/${chatId}/messages`)
-              .then((res) => {
-                if (!res.ok) {
-                  throw new Error(
-                    `Failed to refresh messages: ${res.statusText}`,
-                  );
-                }
-                return res.json();
-              })
-              .then((result) => {
-                if (mountedRef.current && result.success) {
-                  setMessages(result.data);
-                }
-              })
-              .catch((err) => {
-                console.error("Failed to refresh messages:", err);
-                if (onError && err instanceof Error) {
-                  onError(err);
-                }
-              });
+            const finalMessageObject: Message = {
+                id: messageId,
+                chatId,
+                userId: completedUIMessage.role === 'user' ? null : data.agentId, // need to infer/provide
+                agentId: data.agentId || null,
+                content: completedUIMessage.parts.map((p: any) => p.text || '').join('\n\n'), // Simplified content extraction
+                tokenCount: data.usage?.totalTokens || 0,
+                cost: data.cost ? String(data.cost) : '0',
+                toolCalls: null, // need to retrieve/pass
+                quotedMessageId: null, // need to retrieve/pass
+                uiMessage: completedUIMessage,
+                createdAt: new Date(),
+            } as Message;
+
+            // TODO: uncomment the code below
+            // if (refreshTimeoutRef.current) {
+            //   clearTimeout(refreshTimeoutRef.current);
+            // }
+
+            // refreshTimeoutRef.current = setTimeout(() => {
+            //   if (!mountedRef.current) return;
+              
+            //   // Refresh messages once after all completions settle
+            //   fetch(`/api/v1/chats/${chatId}/messages`)
+            //     .then((res) => {
+            //       if (!res.ok) {
+            //         throw new Error(`Failed to refresh: ${res.statusText}`);
+            //       }
+            //       return res.json();
+            //     })
+            //     .then((result) => {
+            //       if (mountedRef.current && result.success) {
+            //         // 4. Update main messages
+            //         setMessages(result.data);
+                    
+            //         // 5. Remove *all* streaming messages, since they are now in `messages`.
+            //         setStreamingMessages([]); 
+            //         // completedMessageIds.clear(); // not needed anymore
+            //       }
+            //     })
+            //     .catch((err) => {
+            //       console.error("Failed to refresh messages:", err);
+            //     });
+            // }, 500); // Wait 500ms for batch completions + allow UI to settle.
+
+            break;
+          }
+
+          // case "message-complete": {
+          //   const messageId = data.messageId;
+            
+          //   // Mark as completed
+          //   completedMessageIds.add(messageId);
+            
+          //   // Remove from streaming immediately
+          //   setStreamingMessages((prev) =>
+          //     prev.filter((m) => m.id !== messageId)
+          //   );
+
+          //   // Debounce refresh: wait for multiple completions
+          //   if (refreshTimeoutRef.current) {
+          //     clearTimeout(refreshTimeoutRef.current);
+          //   }
+
+          //   refreshTimeoutRef.current = setTimeout(() => {
+          //     if (!mountedRef.current) return;
+              
+          //     // Refresh messages once after all completions settle
+          //     fetch(`/api/v1/chats/${chatId}/messages`)
+          //       .then((res) => {
+          //         if (!res.ok) {
+          //           throw new Error(`Failed to refresh: ${res.statusText}`);
+          //         }
+          //         return res.json();
+          //       })
+          //       .then((result) => {
+          //         if (mountedRef.current && result.success) {
+          //           setMessages(result.data);
+          //           completedMessageIds.clear();
+          //         }
+          //       })
+          //       .catch((err) => {
+          //         console.error("Failed to refresh messages:", err);
+          //       });
+          //   }, 500); // Wait 500ms for batch completions
+            
+          //   break;
+          // }
+
+          case "connected": {
+            console.log("[SSE] Connection acknowledged");
             break;
           }
 
           default:
-            console.warn("Unknown SSE event type:", data.type);
+            console.warn("[SSE] Unknown event type:", data.type);
         }
       } catch (err) {
-        console.error("Failed to parse SSE data:", err);
-        if (onError && err instanceof Error) {
-          onError(err);
-        }
+        console.error("[SSE] Failed to parse event data:", err);
       }
     };
 
     eventSource.onerror = (err) => {
-      console.error("SSE connection error:", err);
-      eventSource.close();
-
-      if (mountedRef.current && onError) {
-        onError(new Error("Stream connection lost"));
-      }
+      console.error("[SSE] Connection error:", err, {
+        readyState: eventSource.readyState,
+      });
+      // Don't manually close - EventSource auto-reconnects
     };
 
     return () => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
       eventSource.close();
+      eventSourceRef.current = null;
+      completedMessageIds.clear();
     };
-  }, [chatId, onError]);
+  }, [chatId]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -178,14 +258,16 @@ export function useChat({ chatId, onError }: UseChatOptions): UseChatReturn {
     return () => {
       mountedRef.current = false;
 
-      // Abort any ongoing requests
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
 
-      // Close SSE connection
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
+      }
+
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
       }
     };
   }, []);
@@ -208,27 +290,6 @@ export function useChat({ chatId, onError }: UseChatOptions): UseChatReturn {
         setIsSending(true);
         setError(null);
 
-        // Add optimistic user message
-        const optimisticId = `optimistic-user-${Date.now()}`;
-        optimisticUserIdRef.current = optimisticId;
-
-        const optimisticMsg: StreamingMessage = {
-          id: optimisticId,
-          role: "user",
-          parts: [
-            {
-              type: "text",
-              text: content,
-            },
-          ],
-        };
-
-        setStreamingMessages((prev) => {
-          const next = new Map(prev);
-          next.set(optimisticId, optimisticMsg);
-          return next;
-        });
-
         const response = await fetch(`/api/v1/chats/${chatId}/messages`, {
           method: "POST",
           headers: {
@@ -248,58 +309,16 @@ export function useChat({ chatId, onError }: UseChatOptions): UseChatReturn {
           throw new Error(result.error || "Server returned error");
         }
 
-        // Refresh messages to show the user's message
-        try {
-          const res = await fetch(`/api/v1/chats/${chatId}/messages`, {
-            signal: abortController.signal,
-          });
-
-          if (!res.ok) {
-            throw new Error(`Failed to refresh messages: ${res.statusText}`);
-          }
-
-          const data = await res.json();
-
-          if (mountedRef.current && data.success) {
-            setMessages(data.data);
-          }
-        } catch (err) {
-          if (err instanceof Error && err.name !== "AbortError") {
-            console.error("Failed to refresh messages after send:", err);
-          }
-        }
-
-        // Remove optimistic message
-        setStreamingMessages((prev) => {
-          const next = new Map(prev);
-          if (optimisticUserIdRef.current) {
-            next.delete(optimisticUserIdRef.current);
-          }
-          return next;
-        });
-
-        optimisticUserIdRef.current = null;
+        // User message and agent responses will appear via SSE
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") {
-          // Request was aborted, ignore
           return;
         }
 
         const errorMessage =
           err instanceof Error ? err.message : "Failed to send message";
-        console.error("Send message error:", err);
+        console.error("[Chat] Send message error:", err);
         setError(errorMessage);
-
-        // Remove optimistic message on error
-        setStreamingMessages((prev) => {
-          const next = new Map(prev);
-          if (optimisticUserIdRef.current) {
-            next.delete(optimisticUserIdRef.current);
-          }
-          return next;
-        });
-
-        optimisticUserIdRef.current = null;
 
         if (onError && err instanceof Error) {
           onError(err);
@@ -316,15 +335,12 @@ export function useChat({ chatId, onError }: UseChatOptions): UseChatReturn {
         }
       }
     },
-    [chatId, onError],
+    [chatId]
   );
-
-  // Convert streaming messages to array for rendering
-  const streamingMessagesList = Array.from(streamingMessages.values());
 
   return {
     messages,
-    streamingMessages: streamingMessagesList,
+    streamingMessages,
     isLoading,
     error,
     sendMessage,

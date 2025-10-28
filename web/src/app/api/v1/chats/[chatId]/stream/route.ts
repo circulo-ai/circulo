@@ -24,18 +24,30 @@ export async function GET(
   }
 
   const encoder = new TextEncoder();
+
   const stream = new ReadableStream({
-    start(controller) {
-      const unsubscribe = subscribeToStream(chatId, (data: any) => {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+    async start(controller) {
+      // Send connection established
+      controller.enqueue(
+        encoder.encode(`data: ${JSON.stringify({ type: "connected" })}\n\n`),
+      );
+
+      const unsubscribe = await subscribeToStream(chatId, (data) => {
+        try {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify(data)}\n\n`),
+          );
+        } catch (error) {
+          console.error("Error sending SSE:", error);
+        }
       });
 
-      request.signal.addEventListener("abort", async () => {
+      // Cleanup on abort
+      request.signal.addEventListener("abort", () => {
+        unsubscribe();
         try {
-          (await unsubscribe)();
-        } finally {
           controller.close();
-        }
+        } catch {}
       });
     },
   });
@@ -43,7 +55,7 @@ export async function GET(
   return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
+      "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
     },
   });
