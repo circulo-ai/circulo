@@ -96,17 +96,17 @@ export const auth = betterAuth({
       session,
     })),
     nextCookies(),
-    telegram({
-      botToken: env.BOT_TOKEN,
-      allowUserToLink: true,
-      autoCreateUser: true,
-      miniApp: {
-        enabled: true,
-        allowAutoSignin: true,
-        validateInitData: true,
-      },
-      botUsername: "IntelliSenseBot", // TODO: replace with real telegram bot username
-    }),
+    // telegram({
+    //   botToken: env.BOT_TOKEN,
+    //   allowUserToLink: true,
+    //   autoCreateUser: true,
+    //   miniApp: {
+    //     enabled: true,
+    //     allowAutoSignin: true,
+    //     validateInitData: true,
+    //   },
+    //   botUsername: "IntelliSenseBot", // TODO: replace with real telegram bot username
+    // }),
   ],
 });
 

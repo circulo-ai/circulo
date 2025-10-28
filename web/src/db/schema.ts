@@ -1,4 +1,4 @@
-import { SQL, sql } from "drizzle-orm";
+import { relations, SQL, sql } from "drizzle-orm";
 import { 
   pgTable, 
   text, 
@@ -475,6 +475,168 @@ export const auditLog = pgTable('audit_log', {
 // In your migration, add: 
 // ALTER TABLE message ADD CONSTRAINT message_quoted_message_id_fk 
 // FOREIGN KEY (quoted_message_id) REFERENCES message(id) ON DELETE SET NULL;
+
+// User relations
+export const userRelations = relations(user, ({ many, one }) => ({
+  sessions: many(session),
+  accounts: many(account),
+  wallet: one(wallet),
+  agents: many(agent),
+  knowledgeBases: many(knowledgeBase),
+  chats: many(chat),
+  messages: many(message),
+  transactions: many(transaction),
+  auditLogs: many(auditLog),
+}));
+
+// Session relations
+export const sessionRelations = relations(session, ({ one }) => ({
+  user: one(user, {
+    fields: [session.userId],
+    references: [user.id],
+  }),
+}));
+
+// Account relations
+export const accountRelations = relations(account, ({ one }) => ({
+  user: one(user, {
+    fields: [account.userId],
+    references: [user.id],
+  }),
+}));
+
+export const walletRelations = relations(wallet, ({ one, many }) => ({
+  user: one(user, {
+    fields: [wallet.userId],
+    references: [user.id],
+  }),
+  transactions: many(transaction),
+}));
+
+// Transaction relations
+export const transactionRelations = relations(transaction, ({ one }) => ({
+  user: one(user, {
+    fields: [transaction.userId],
+    references: [user.id],
+  }),
+  wallet: one(wallet, {
+    fields: [transaction.walletId],
+    references: [wallet.id],
+  }),
+  chat: one(chat, {
+    fields: [transaction.chatId],
+    references: [chat.id],
+  }),
+}));
+
+// Agent relations
+export const agentRelations = relations(agent, ({ one, many }) => ({
+  user: one(user, {
+    fields: [agent.userId],
+    references: [user.id],
+  }),
+  chatAgents: many(chatAgent),
+  messages: many(message),
+}));
+
+// Knowledge Base relations
+export const knowledgeBaseRelations = relations(knowledgeBase, ({ one, many }) => ({
+  user: one(user, {
+    fields: [knowledgeBase.userId],
+    references: [user.id],
+  }),
+  documents: many(document),
+  chatKnowledgeBases: many(chatKnowledgeBase),
+}));
+
+// Document relations
+export const documentRelations = relations(document, ({ one, many }) => ({
+  knowledgeBase: one(knowledgeBase, {
+    fields: [document.knowledgeBaseId],
+    references: [knowledgeBase.id],
+  }),
+  embeddings: many(embedding),
+}));
+
+// Embedding relations
+export const embeddingRelations = relations(embedding, ({ one }) => ({
+  knowledgeBase: one(knowledgeBase, {
+    fields: [embedding.knowledgeBaseId],
+    references: [knowledgeBase.id],
+  }),
+  document: one(document, {
+    fields: [embedding.documentId],
+    references: [document.id],
+  }),
+}));
+
+// Chat relations
+export const chatRelations = relations(chat, ({ one, many }) => ({
+  user: one(user, {
+    fields: [chat.userId],
+    references: [user.id],
+  }),
+  messages: many(message),
+  chatAgents: many(chatAgent),
+  chatKnowledgeBases: many(chatKnowledgeBase),
+  transactions: many(transaction),
+}));
+
+// ChatAgent (junction table) relations
+export const chatAgentRelations = relations(chatAgent, ({ one }) => ({
+  chat: one(chat, {
+    fields: [chatAgent.chatId],
+    references: [chat.id],
+  }),
+  agent: one(agent, {
+    fields: [chatAgent.agentId],
+    references: [agent.id],
+  }),
+}));
+
+// ChatKnowledgeBase (junction table) relations
+export const chatKnowledgeBaseRelations = relations(chatKnowledgeBase, ({ one }) => ({
+  chat: one(chat, {
+    fields: [chatKnowledgeBase.chatId],
+    references: [chat.id],
+  }),
+  knowledgeBase: one(knowledgeBase, {
+    fields: [chatKnowledgeBase.knowledgeBaseId],
+    references: [knowledgeBase.id],
+  }),
+}));
+
+// Message relations
+export const messageRelations = relations(message, ({ one, many }) => ({
+  chat: one(chat, {
+    fields: [message.chatId],
+    references: [chat.id],
+  }),
+  user: one(user, {
+    fields: [message.userId],
+    references: [user.id],
+  }),
+  agent: one(agent, {
+    fields: [message.agentId],
+    references: [agent.id],
+  }),
+  quotedMessage: one(message, {
+    fields: [message.quotedMessageId],
+    references: [message.id],
+    relationName: 'messageQuotes',
+  }),
+  quotes: many(message, {
+    relationName: 'messageQuotes',
+  }),
+}));
+
+// Audit Log relations
+export const auditLogRelations = relations(auditLog, ({ one }) => ({
+  user: one(user, {
+    fields: [auditLog.userId],
+    references: [user.id],
+  }),
+}));
 
 // ============================================================================
 // TYPE EXPORTS
