@@ -6,8 +6,12 @@ import {
   ConversationEmptyState,
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
-import { Message as AIMessage, MessageAvatar, MessageContent } from "@/components/ai-elements/message";
 import { Loader } from "@/components/ai-elements/loader";
+import {
+  Message,
+  MessageAvatar,
+  MessageContent,
+} from "@/components/ai-elements/message";
 import {
   PromptInput,
   PromptInputBody,
@@ -26,12 +30,9 @@ import {
   ToolOutput,
 } from "@/components/ai-elements/tool";
 import { Badge } from "@/components/ui/badge";
-import type { Message } from "@/db/schema";
 import { useChat } from "@/hooks/chat/use-chat";
-import { cn } from "@/lib/utils";
 import { MessageSquareIcon } from "lucide-react";
 import { use, useState } from "react";
-import type { UIMessage } from "ai";
 
 type PageProps = { params: Promise<{ chatId: string }> };
 
@@ -106,14 +107,188 @@ export default function ChatPage({ params }: PageProps) {
               icon={<MessageSquareIcon className="h-12 w-12" />}
             />
           ) : (
-            <div className="mx-auto max-w-4xl space-y-6">
-              {messages.map((m) => (
+            <div className="mx-auto max-w-4xl space-y-6 pb-6">
+              {/* {messages.map((m) => (
                 <MessageBubble key={m.id} message={m} />
-              ))}
+              ))} */}
 
-              {streamingMessages.map((m) => (
-                <StreamingMessageBubble key={m.id} message={m} />
-              ))}
+              {messages.map((e, index) => {
+                const message = e.uiMessage;
+                if (!message) return null;
+                const isUser = message.role === "user";
+                const displayName = isUser
+                  ? "You"
+                  : e.agentId
+                    ? `Agent ${String(e.agentId).slice(0, 4)}`
+                    : "AI";
+
+                const parts = Array.isArray(message.parts) ? message.parts : [];
+
+                return (
+                  <Message from={message.role} key={`${message.id}-${index}`}>
+                    <MessageAvatar src="" name={displayName} />
+                    <MessageContent>
+                      {parts.map((part, i) => {
+                        const partKey = `${message.id}-${part.type}-${i}`;
+                        switch (part.type) {
+                          case "text":
+                            return (
+                              <Response key={partKey}>
+                                {(part as any).text}
+                              </Response>
+                            );
+                          default:
+                            if (
+                              (part.type.startsWith("tool-") ||
+                                part.type === "dynamic-tool") &&
+                              "state" in part &&
+                              "input" in part
+                            ) {
+                              const toolName =
+                                part.type === "dynamic-tool"
+                                  ? "toolName" in part
+                                    ? (part as any).toolName
+                                    : "Dynamic Tool"
+                                  : part.type
+                                      .replace("tool-", "")
+                                      .split(/(?=[A-Z])/)
+                                      .map(
+                                        (word) =>
+                                          word.charAt(0).toUpperCase() +
+                                          word.slice(1),
+                                      )
+                                      .join(" ");
+
+                              const toolPart = part as any;
+                              const isKnowledgeBase =
+                                toolName
+                                  .toLowerCase()
+                                  .includes("information") ||
+                                toolName.toLowerCase().includes("knowledge");
+
+                              return (
+                                <Tool
+                                  key={partKey}
+                                  defaultOpen={
+                                    toolPart.state === "output-available" &&
+                                    isKnowledgeBase
+                                  }
+                                >
+                                  <ToolHeader
+                                    title={toolName}
+                                    type={toolPart.type}
+                                    state={toolPart.state}
+                                  />
+                                  <ToolContent>
+                                    <ToolInput input={toolPart.input} />
+                                    {(toolPart.state === "output-available" ||
+                                      toolPart.state === "output-error") && (
+                                      <ToolOutput
+                                        output={toolPart.output}
+                                        errorText={toolPart.errorText}
+                                      />
+                                    )}
+                                  </ToolContent>
+                                </Tool>
+                              );
+                            }
+                            return null;
+                        }
+                      })}
+                    </MessageContent>
+                  </Message>
+                );
+              })}
+
+              {streamingMessages.map((streams, index) =>
+                streams.map((message) => {
+                  const isUser = message.role === "user";
+                  const displayName = isUser
+                    ? "You"
+                    : (message as any).agentId
+                      ? `Agent ${String((message as any).agentId).slice(0, 4)}`
+                      : "AI";
+
+                  const parts = Array.isArray(message.parts)
+                    ? message.parts
+                    : [];
+
+                  return (
+                    <Message from={message.role} key={`${message.id}-${index}`}>
+                      <MessageAvatar src="" name={displayName} />
+                      <MessageContent>
+                        {parts.map((part, i) => {
+                          const partKey = `${message.id}-${part.type}-${i}`;
+                          switch (part.type) {
+                            case "text":
+                              return (
+                                <Response key={partKey}>
+                                  {(part as any).text}
+                                </Response>
+                              );
+                            default:
+                              if (
+                                (part.type.startsWith("tool-") ||
+                                  part.type === "dynamic-tool") &&
+                                "state" in part &&
+                                "input" in part
+                              ) {
+                                const toolName =
+                                  part.type === "dynamic-tool"
+                                    ? "toolName" in part
+                                      ? (part as any).toolName
+                                      : "Dynamic Tool"
+                                    : part.type
+                                        .replace("tool-", "")
+                                        .split(/(?=[A-Z])/)
+                                        .map(
+                                          (word) =>
+                                            word.charAt(0).toUpperCase() +
+                                            word.slice(1),
+                                        )
+                                        .join(" ");
+
+                                const toolPart = part as any;
+                                const isKnowledgeBase =
+                                  toolName
+                                    .toLowerCase()
+                                    .includes("information") ||
+                                  toolName.toLowerCase().includes("knowledge");
+
+                                return (
+                                  <Tool
+                                    key={partKey}
+                                    defaultOpen={
+                                      toolPart.state === "output-available" &&
+                                      isKnowledgeBase
+                                    }
+                                  >
+                                    <ToolHeader
+                                      title={toolName}
+                                      type={toolPart.type}
+                                      state={toolPart.state}
+                                    />
+                                    <ToolContent>
+                                      <ToolInput input={toolPart.input} />
+                                      {(toolPart.state === "output-available" ||
+                                        toolPart.state === "output-error") && (
+                                        <ToolOutput
+                                          output={toolPart.output}
+                                          errorText={toolPart.errorText}
+                                        />
+                                      )}
+                                    </ToolContent>
+                                  </Tool>
+                                );
+                              }
+                              return null;
+                          }
+                        })}
+                      </MessageContent>
+                    </Message>
+                  );
+                }),
+              )}
             </div>
           )}
         </ConversationContent>
@@ -150,107 +325,5 @@ export default function ChatPage({ params }: PageProps) {
         </div>
       </div>
     </div>
-  );
-}
-
-function MessageBubble({ message }: { message: Message }) {
-  const isUser = Boolean(message.userId);
-
-  return (
-    <AIMessage from={isUser ? "user" : "assistant"}>
-      <MessageAvatar src="" name={isUser ? "You" : message.agentId ? `A${message.agentId}` : "AI"} />
-      <MessageContent>
-        <Response>{message.content}</Response>
-        {!isUser && message.cost && Number(message.cost) > 0 && (
-          <div className="text-muted-foreground mt-2 flex items-center gap-3 text-xs">
-            <span>💰 ${Number(message.cost).toFixed(6)}</span>
-            <span>•</span>
-            <span>🪙 {message.tokenCount} tokens</span>
-          </div>
-        )}
-      </MessageContent>
-    </AIMessage>
-  );
-}
-
-function StreamingMessageBubble({
-  message,
-}: {
-  message: {
-    id: string;
-    agentId: string;
-    uiMessages: UIMessage[];
-  };
-}) {
-  return (
-    <AIMessage from="assistant">
-      <MessageAvatar src="" name={`A${message.agentId}`} />
-      <MessageContent>
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary" className="gap-1.5">
-            <Loader size={10} />
-            Typing
-          </Badge>
-        </div>
-
-        <div className="mt-2 space-y-3">
-          {message.uiMessages.map((ui, uiIdx) => (
-            <div key={`${message.id}-ui-${uiIdx}`} className="space-y-3">
-              {ui.parts.map((part, i) => {
-                switch (part.type) {
-                  case "text":
-                    return (
-                      <div
-                        key={`${message.id}-text-${uiIdx}-${i}`}
-                        className="bg-muted rounded-lg px-4 py-3"
-                      >
-                        <Response>{part.text}</Response>
-                      </div>
-                    );
-                  case "tool-call": {
-                    const toolName = part.toolName ?? "tool";
-                    return (
-                      <Tool
-                        key={`${message.id}-tool-${uiIdx}-${i}`}
-                        defaultOpen={false}
-                      >
-                        <ToolHeader
-                          title={toolName}
-                          type={`tool-${toolName}` as any}
-                          state={"input-available"}
-                        />
-                        <ToolContent>
-                          <ToolInput input={part.args} />
-                        </ToolContent>
-                      </Tool>
-                    );
-                  }
-                  case "tool-result": {
-                    const toolName = part.toolName ?? "tool";
-                    return (
-                      <Tool
-                        key={`${message.id}-tool-result-${uiIdx}-${i}`}
-                        defaultOpen={false}
-                      >
-                        <ToolHeader
-                          title={`${toolName} result`}
-                          type={`tool-${toolName}` as any}
-                          state={"output-available"}
-                        />
-                        <ToolContent>
-                          <ToolOutput output={part.result} errorText={undefined} />
-                        </ToolContent>
-                      </Tool>
-                    );
-                  }
-                  default:
-                    return null;
-                }
-              })}
-            </div>
-          ))}
-        </div>
-      </MessageContent>
-    </AIMessage>
   );
 }

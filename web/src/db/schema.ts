@@ -1,3 +1,4 @@
+import { UIMessage } from "ai";
 import { relations, SQL, sql } from "drizzle-orm";
 import {
   boolean,
@@ -341,6 +342,8 @@ export const agent = pgTable(
     // Usage stats
     usageCount: integer("usage_count").notNull().default(0),
 
+    deleted: boolean("deleted").notNull().default(false),
+
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
@@ -597,6 +600,9 @@ export const message = pgTable(
 
     // Tool calls and results
     toolCalls: jsonb("tool_calls").default("[]"),
+
+    // UI representation of the message (e.g., for streaming)
+    uiMessage: jsonb("ui_message").$type<UIMessage>(),
 
     // References for quotes/replies (self-reference)
     quotedMessageId: text("quoted_message_id"),

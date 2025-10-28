@@ -1,13 +1,13 @@
-import { subscribeToStream } from "@/lib/sse";
-import { db, chat } from "@/db";
+import { chat, db } from "@/db";
 import { getSession } from "@/lib/auth";
+import { subscribeToStream } from "@/lib/sse";
 import { eq } from "drizzle-orm";
 
 export async function GET(
   request: Request,
-  { params }: { params: { chatId: string } },
+  { params }: { params: Promise<{ chatId: string }> },
 ) {
-  const { chatId } = params;
+  const { chatId } = await params;
 
   // Require authenticated user
   const session = await getSession();
