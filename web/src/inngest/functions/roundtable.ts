@@ -11,7 +11,7 @@ import { inngest } from "@/inngest/client";
 import { calculateCostFromUsage, generateId } from "@/lib/server-utils";
 import { emitStreamEvent } from "@/lib/sse";
 import { google } from "@ai-sdk/google";
-import { Experimental_Agent as Agent, UIMessage } from "ai";
+import { Experimental_Agent as Agent, UIMessage, UIMessageChunk } from "ai";
 import { and, asc, eq, sql } from "drizzle-orm";
 
 function getProviderModel(model: string) {
@@ -68,6 +68,69 @@ function composeSystemPrompt(
 function countTokensApprox(text: string): number {
   const len = (text ?? "").trim().length;
   return Math.max(0, Math.ceil(len / 4));
+}
+
+// Minimal, generic aggregator: convert UIMessageChunk events into UIMessage.parts
+// Avoids custom per-tool naming or UI heuristics; keeps parts as-is.
+function appendChunkToParts(parts: any[], chunk: UIMessageChunk): any[] {
+  const next = parts.slice();
+  switch (chunk.type) {
+    case "text-start": {
+      const last = next[next.length - 1];
+      if (!last || last.type !== "text") {
+        next.push({ type: "text", text: "" });
+      }
+      break;
+    }
+    case "text-delta": {
+      const last = next[next.length - 1];
+      if (!last || last.type !== "text") {
+        next.push({ type: "text", text: chunk.delta });
+      } else {
+        last.text += chunk.delta;
+      }
+      break;
+    }
+    case "tool-input-available": {
+      next.push({
+        type: "dynamic-tool",
+        state: "input-available",
+        input: (chunk as any).input,
+        toolCallId: (chunk as any).toolCallId,
+        toolName: (chunk as any).toolName,
+      } as any);
+      break;
+    }
+    case "tool-output-available": {
+      const callId = (chunk as any).toolCallId;
+      let matched = false;
+      for (let i = next.length - 1; i >= 0; i--) {
+        const p = next[i] as any;
+        if (p && p.type === "dynamic-tool" && p.toolCallId === callId) {
+          p.state = "output-available";
+          p.output = (chunk as any).output;
+          p.errorText = undefined;
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) {
+        next.push({
+          type: "dynamic-tool",
+          state: "output-available",
+          output: (chunk as any).output,
+          errorText: undefined,
+          toolCallId: callId,
+        } as any);
+      }
+      break;
+    }
+    default: {
+      // ignore other chunk types
+      break;
+    }
+  }
+  return next;
 }
 
 export const chatRoundtable = inngest.createFunction(
@@ -146,9 +209,9 @@ export const chatRoundtable = inngest.createFunction(
 
     for (const ca of agents) {
       const agentInfo = ca.agent;
-      const agentResult: { cost: number; tokens: number } = await step.run(
+      const agentResult = await step.run(
         `agent-${agentInfo.id}`,
-        async () => {
+        async (): Promise<{ cost: number; tokens: number }> => {
           const systemPrompt = composeSystemPrompt(agentInfo, {
             previousAgents: previousAgentsInRound,
           });
@@ -159,12 +222,18 @@ export const chatRoundtable = inngest.createFunction(
           ]);
           const messageId = generateId();
 
-          // Emit message start event
+          // Emit message start event with initial UIMessage
+          const initialUIMessage: UIMessage & { agentId?: string } = {
+            id: messageId,
+            role: "assistant",
+            parts: [],
+            agentId: agentInfo.id,
+          } as any;
           await emitStreamEvent(chatId, {
             type: "message-start",
             messageId,
             agentId: agentInfo.id,
-            role: "assistant",
+            message: initialUIMessage,
           });
 
           const agent = new Agent({
@@ -193,40 +262,46 @@ export const chatRoundtable = inngest.createFunction(
             },
           });
 
-          let generatedText = "";
-
-          // Stream individual UIMessageChunk objects
+          // Build parts incrementally and emit UIMessage updates
+          let currentParts: any[] = [];
           for await (const chunk of uiMessageStream) {
-            // Emit each chunk immediately for real-time streaming
+            currentParts = appendChunkToParts(currentParts, chunk);
+            const partialMessage: UIMessage & { agentId?: string } = {
+              id: messageId,
+              role: "assistant",
+              parts: currentParts,
+              agentId: agentInfo.id,
+            } as any;
             await emitStreamEvent(chatId, {
-              type: "ui-message-chunk",
+              type: "message-update",
               messageId,
               agentId: agentInfo.id,
-              chunk,
+              message: partialMessage,
             });
-
-            // Accumulate text for database storage
-            if (chunk.type === "text-delta") {
-              generatedText += chunk.delta;
-            } else if (chunk.type === "text-start") {
-              // Initialize text accumulation
-              generatedText += "";
-            }
           }
 
           // Get final response
           await finishPromise; // ensure finalUIMessage is available
-          const final = await stream.response;
-          const content = generatedText;
+          const response = await stream.response;
+          // Prefer the model-provided final text; fallback to accumulated text parts
+          const uiParts: any[] = Array.isArray((finalUIMessage as any)?.parts)
+            ? (((finalUIMessage as any).parts as any[]) ?? [])
+            : [];
+          const content =
+            (response as any)?.text ??
+            uiParts
+              .filter((p: any) => p?.type === "text")
+              .map((p: any) => p?.text || "")
+              .join("\n\n");
 
           // Calculate tokens and cost
           const inputText = inputMessages.map((m) => m.content).join("\n\n");
           const inputTokens =
-            (final as any)?.usage?.inputTokens ?? countTokensApprox(inputText);
+            content?.usage?.inputTokens ?? countTokensApprox(inputText);
           const outputTokens =
-            (final as any)?.usage?.outputTokens ?? countTokensApprox(content);
+            content?.usage?.outputTokens ?? countTokensApprox(content);
           const totalTokens =
-            (final as any)?.usage?.totalTokens ?? inputTokens + outputTokens;
+            content?.usage?.totalTokens ?? inputTokens + outputTokens;
 
           const cost = calculateCostFromUsage(
             agentInfo.model,
@@ -267,6 +342,7 @@ export const chatRoundtable = inngest.createFunction(
             type: "message-complete",
             messageId: msg.id,
             agentId: agentInfo.id,
+            message: finalUIMessage,
             usage: {
               inputTokens,
               outputTokens,

@@ -1,39 +1,86 @@
 import type { Message } from "@/db/schema";
-import type { UIMessage, UIMessageChunk } from "ai";
+import type { UIMessage } from "ai";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-type StreamingSessionMessage = UIMessage & {
-  agentId?: string;
-};
+type StreamingMessage = UIMessage & { agentId?: string };
 
-export function useChat(chatId: string) {
+interface UseChatOptions {
+  chatId: string;
+  onError?: (error: Error) => void;
+}
+
+interface UseChatReturn {
+  messages: Message[];
+  streamingMessages: StreamingMessage[];
+  isLoading: boolean;
+  error: string | null;
+  sendMessage: (content: string) => Promise<void>;
+  isSending: boolean;
+}
+
+export function useChat({ chatId, onError }: UseChatOptions): UseChatReturn {
+  // State management
   const [messages, setMessages] = useState<Message[]>([]);
   const [streamingMessages, setStreamingMessages] = useState<
-    Map<string, StreamingSessionMessage[]>
+    Map<string, StreamingMessage>
   >(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
+
+  // Refs for cleanup and tracking
   const eventSourceRef = useRef<EventSource | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const optimisticUserIdRef = useRef<string | null>(null);
+  const mountedRef = useRef(true);
 
   // Load initial messages
   useEffect(() => {
+    let cancelled = false;
+
     const loadMessages = async () => {
       try {
         setIsLoading(true);
+        setError(null);
+
         const response = await fetch(`/api/v1/chats/${chatId}/messages`);
+
+        if (!response.ok) {
+          throw new Error(`Failed to load messages: ${response.statusText}`);
+        }
+
         const data = await response.json();
+
+        if (cancelled) return;
+
         if (data.success) {
           setMessages(data.data);
+        } else {
+          throw new Error(data.error || "Failed to load messages");
         }
       } catch (err) {
+        if (cancelled) return;
+
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to load messages";
         console.error("Failed to load messages:", err);
-        setError("Failed to load messages");
+        setError(errorMessage);
+
+        if (onError && err instanceof Error) {
+          onError(err);
+        }
       } finally {
-        setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
     };
 
     loadMessages();
+
+    return () => {
+      cancelled = true;
+    };
   }, [chatId]);
 
   // Set up SSE connection
@@ -42,181 +89,234 @@ export function useChat(chatId: string) {
     eventSourceRef.current = eventSource;
 
     eventSource.onmessage = (e) => {
+      if (!mountedRef.current) return;
+
       try {
         const data = JSON.parse(e.data);
 
-        if (data.type === "message-start") {
-          // Initialize a new streaming message
-          setStreamingMessages((prev) => {
-            const next = new Map(prev);
-            next.set(data.messageId, [
-              {
-                id: data.messageId,
-                role: "assistant",
-                parts: [],
-                // attach agent id for UI display convenience
-                agentId: data.agentId,
-              },
-            ]);
-            return next;
-          });
-        }
+        switch (data.type) {
+          case "message-start": {
+            const msg = data.message as StreamingMessage;
+            setStreamingMessages((prev) => {
+              const next = new Map(prev);
+              next.set(data.messageId, msg);
+              return next;
+            });
+            break;
+          }
 
-        if (data.type === "ui-message-chunk") {
-          const chunk = data.chunk as UIMessageChunk;
+          case "message-update": {
+            const msg = data.message as StreamingMessage;
+            setStreamingMessages((prev) => {
+              const next = new Map(prev);
+              next.set(data.messageId, msg);
+              return next;
+            });
+            break;
+          }
 
-          // Update streaming message with new chunk
-          setStreamingMessages((prev) => {
-            const next = new Map(prev);
-            const messages = next.get(data.messageId);
-            if (!messages || messages.length === 0) return prev;
+          case "message-complete": {
+            setStreamingMessages((prev) => {
+              const next = new Map(prev);
+              next.delete(data.messageId);
+              return next;
+            });
 
-            const assistantMsg = messages[0];
-            const parts = Array.isArray(assistantMsg.parts)
-              ? assistantMsg.parts
-              : [];
-
-            switch (chunk.type) {
-              case "text-start": {
-                // begin a new text part if last is not text
-                const last = parts[parts.length - 1];
-                if (!last || last.type !== "text") {
-                  parts.push({ type: "text", text: "" });
+            // Refresh messages list to get the completed message
+            fetch(`/api/v1/chats/${chatId}/messages`)
+              .then((res) => {
+                if (!res.ok) {
+                  throw new Error(
+                    `Failed to refresh messages: ${res.statusText}`,
+                  );
                 }
-                break;
-              }
-              case "text-delta": {
-                const last = parts[parts.length - 1];
-                if (!last || last.type !== "text") {
-                  parts.push({ type: "text", text: chunk.delta });
-                } else {
-                  last.text += chunk.delta;
+                return res.json();
+              })
+              .then((result) => {
+                if (mountedRef.current && result.success) {
+                  setMessages(result.data);
                 }
-                break;
-              }
-              case "tool-input-available": {
-                parts.push({
-                  type: "dynamic-tool",
-                  toolName: (chunk as any).toolName,
-                  state: "input-available",
-                  input: (chunk as any).input,
-                  toolCallId: (chunk as any).toolCallId,
-                } as any);
-                break;
-              }
-              case "tool-output-available": {
-                // Try to find matching tool input by toolCallId and update it
-                const callId = (chunk as any).toolCallId;
-                let updated = false;
-                for (let i = parts.length - 1; i >= 0; i--) {
-                  const p = parts[i] as any;
-                  if (
-                    p &&
-                    p.type === "dynamic-tool" &&
-                    p.toolCallId === callId
-                  ) {
-                    p.state = "output-available";
-                    p.output = (chunk as any).output;
-                    p.errorText = undefined;
-                    updated = true;
-                    break;
-                  }
+              })
+              .catch((err) => {
+                console.error("Failed to refresh messages:", err);
+                if (onError && err instanceof Error) {
+                  onError(err);
                 }
+              });
+            break;
+          }
 
-                if (!updated) {
-                  // Fallback: append a new output part without toolName
-                  parts.push({
-                    type: "dynamic-tool",
-                    state: "output-available",
-                    output: (chunk as any).output,
-                    errorText: undefined,
-                    toolCallId: callId,
-                  } as any);
-                }
-                break;
-              }
-              default: {
-                // ignore other chunk types for now
-                break;
-              }
-            }
-
-            assistantMsg.parts = parts;
-            messages[0] = assistantMsg;
-            next.set(data.messageId, messages);
-            return next;
-          });
-        }
-
-        if (data.type === "message-complete") {
-          // Remove from streaming and refresh messages from server
-          setStreamingMessages((prev) => {
-            const next = new Map(prev);
-            next.delete(data.messageId);
-            return next;
-          });
-
-          // Refresh messages list to get the completed message
-          fetch(`/api/v1/chats/${chatId}/messages`)
-            .then((res) => res.json())
-            .then((result) => {
-              if (result.success) {
-                setMessages(result.data);
-              }
-            })
-            .catch((err) => console.error("Failed to refresh messages:", err));
+          default:
+            console.warn("Unknown SSE event type:", data.type);
         }
       } catch (err) {
         console.error("Failed to parse SSE data:", err);
+        if (onError && err instanceof Error) {
+          onError(err);
+        }
       }
     };
 
     eventSource.onerror = (err) => {
       console.error("SSE connection error:", err);
       eventSource.close();
+
+      if (mountedRef.current && onError) {
+        onError(new Error("Stream connection lost"));
+      }
     };
 
     return () => {
       eventSource.close();
     };
-  }, [chatId]);
+  }, [chatId, onError]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    mountedRef.current = true;
+
+    return () => {
+      mountedRef.current = false;
+
+      // Abort any ongoing requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      // Close SSE connection
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+    };
+  }, []);
 
   const sendMessage = useCallback(
     async (content: string) => {
+      if (!content.trim()) {
+        return;
+      }
+
+      // Abort any previous request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
+
       try {
+        setIsSending(true);
+        setError(null);
+
+        // Add optimistic user message
+        const optimisticId = `optimistic-user-${Date.now()}`;
+        optimisticUserIdRef.current = optimisticId;
+
+        const optimisticMsg: StreamingMessage = {
+          id: optimisticId,
+          role: "user",
+          parts: [
+            {
+              type: "text",
+              text: content,
+            },
+          ],
+        };
+
+        setStreamingMessages((prev) => {
+          const next = new Map(prev);
+          next.set(optimisticId, optimisticMsg);
+          return next;
+        });
+
         const response = await fetch(`/api/v1/chats/${chatId}/messages`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ content }),
+          signal: abortController.signal,
         });
 
         if (!response.ok) {
-          throw new Error("Failed to send message");
+          throw new Error(`Failed to send message: ${response.statusText}`);
         }
 
         const result = await response.json();
+
         if (!result.success) {
-          throw new Error("Server returned error");
+          throw new Error(result.error || "Server returned error");
         }
 
-        // Immediately refresh messages so the user's message appears
+        // Refresh messages to show the user's message
         try {
-          const res = await fetch(`/api/v1/chats/${chatId}/messages`);
+          const res = await fetch(`/api/v1/chats/${chatId}/messages`, {
+            signal: abortController.signal,
+          });
+
+          if (!res.ok) {
+            throw new Error(`Failed to refresh messages: ${res.statusText}`);
+          }
+
           const data = await res.json();
-          if (data.success) {
+
+          if (mountedRef.current && data.success) {
             setMessages(data.data);
           }
         } catch (err) {
-          console.error("Failed to refresh messages after send:", err);
+          if (err instanceof Error && err.name !== "AbortError") {
+            console.error("Failed to refresh messages after send:", err);
+          }
         }
+
+        // Remove optimistic message
+        setStreamingMessages((prev) => {
+          const next = new Map(prev);
+          if (optimisticUserIdRef.current) {
+            next.delete(optimisticUserIdRef.current);
+          }
+          return next;
+        });
+
+        optimisticUserIdRef.current = null;
       } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") {
+          // Request was aborted, ignore
+          return;
+        }
+
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to send message";
         console.error("Send message error:", err);
+        setError(errorMessage);
+
+        // Remove optimistic message on error
+        setStreamingMessages((prev) => {
+          const next = new Map(prev);
+          if (optimisticUserIdRef.current) {
+            next.delete(optimisticUserIdRef.current);
+          }
+          return next;
+        });
+
+        optimisticUserIdRef.current = null;
+
+        if (onError && err instanceof Error) {
+          onError(err);
+        }
+
         throw err;
+      } finally {
+        if (mountedRef.current) {
+          setIsSending(false);
+        }
+
+        if (abortControllerRef.current === abortController) {
+          abortControllerRef.current = null;
+        }
       }
     },
-    [chatId],
+    [chatId, onError],
   );
 
   // Convert streaming messages to array for rendering
@@ -228,5 +328,6 @@ export function useChat(chatId: string) {
     isLoading,
     error,
     sendMessage,
+    isSending,
   };
 }
