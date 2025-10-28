@@ -8,6 +8,13 @@
       "when": 1761603123339,
       "tag": "0000_purple_invaders",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1761651146233,
+      "tag": "0001_wealthy_hydra",
+      "breakpoints": true
     }
   ]
 }

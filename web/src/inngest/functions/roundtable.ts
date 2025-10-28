@@ -4,7 +4,7 @@ import { calculateCostFromUsage, generateId } from "@/lib/server-utils";
 import { emitStreamEvent } from "@/lib/sse";
 import { google } from "@ai-sdk/google";
 import type { ModelMessage } from "ai";
-import { createUIMessageStream, createUIMessageStreamResponse, generateText } from "ai";
+import { generateText } from "ai";
 import { and, asc, eq, sql } from "drizzle-orm";
 
 function getProviderModel(model: string) {
