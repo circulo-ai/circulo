@@ -1,5 +1,5 @@
 import type { Message } from "@/db/schema";
-import { UIMessage } from "ai";
+import type { UIMessage } from "ai";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type StreamingMessage = {
@@ -7,6 +7,7 @@ type StreamingMessage = {
   agentId: string;
   role: "assistant";
   content: string;
+  uiMessages: UIMessage[];
   toolCalls: Array<{
     id: string;
     name: string;
@@ -63,42 +64,25 @@ export function useChat(chatId: string) {
               agentId: data.agentId,
               role: "assistant",
               content: "",
+              uiMessages: [],
               toolCalls: [],
             });
             return next;
           });
         }
 
-        if (data.type === "ui-chunk") {
-          const chunk: UIMessage = data.chunk;
+        if (data.type === "ui-messages") {
+          const messagesBatch: UIMessage[] = Array.isArray(data.messages)
+            ? (data.messages as UIMessage[])
+            : [];
 
           setStreamingMessages((prev) => {
             const next = new Map(prev);
             const msg = next.get(data.messageId);
             if (!msg) return prev;
 
-            if (chunk.type === "text-delta" && chunk.textDelta) {
-              msg.content += chunk.textDelta;
-            } else if (chunk.type === "tool-call") {
-              // Check if tool call already exists to avoid duplicates
-              const exists = msg.toolCalls.some(
-                (tc) => tc.id === chunk.toolCallId,
-              );
-              if (!exists) {
-                msg.toolCalls.push({
-                  id: chunk.toolCallId!,
-                  name: chunk.toolName!,
-                  args: chunk.args,
-                });
-              }
-            } else if (chunk.type === "tool-result") {
-              const toolCall = msg.toolCalls.find(
-                (tc) => tc.id === chunk.toolCallId,
-              );
-              if (toolCall) {
-                toolCall.result = chunk.result;
-              }
-            }
+            // Append raw UIMessage batch for UI rendering; no interpretation here
+            msg.uiMessages.push(...messagesBatch);
 
             next.set(data.messageId, msg);
             return next;

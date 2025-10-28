@@ -6,6 +6,7 @@ import {
   ConversationEmptyState,
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
+import { Message as AIMessage, MessageAvatar, MessageContent } from "@/components/ai-elements/message";
 import { Loader } from "@/components/ai-elements/loader";
 import {
   PromptInput,
@@ -28,8 +29,9 @@ import { Badge } from "@/components/ui/badge";
 import type { Message } from "@/db/schema";
 import { useChat } from "@/hooks/chat/use-chat";
 import { cn } from "@/lib/utils";
-import { BotIcon, MessageSquareIcon, UserIcon } from "lucide-react";
+import { MessageSquareIcon } from "lucide-react";
 import { use, useState } from "react";
+import type { UIMessage } from "ai";
 
 type PageProps = { params: Promise<{ chatId: string }> };
 
@@ -155,47 +157,19 @@ function MessageBubble({ message }: { message: Message }) {
   const isUser = Boolean(message.userId);
 
   return (
-    <div className={cn("flex gap-4", isUser ? "flex-row-reverse" : "flex-row")}>
-      <div className="bg-background flex h-8 w-8 shrink-0 items-center justify-center rounded-full border">
-        {isUser ? (
-          <UserIcon className="h-4 w-4" />
-        ) : (
-          <BotIcon className="h-4 w-4" />
-        )}
-      </div>
-
-      <div className="flex-1 space-y-2">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">
-            {isUser
-              ? "You"
-              : message.agentId
-                ? `Agent ${message.agentId}`
-                : "Assistant"}
-          </span>
-          <span className="text-muted-foreground text-xs">
-            {new Date(message.createdAt).toLocaleTimeString()}
-          </span>
-        </div>
-
-        <div
-          className={cn(
-            "rounded-lg px-4 py-3",
-            isUser ? "bg-primary text-primary-foreground" : "bg-muted",
-          )}
-        >
-          <Response>{message.content}</Response>
-        </div>
-
+    <AIMessage from={isUser ? "user" : "assistant"}>
+      <MessageAvatar src="" name={isUser ? "You" : message.agentId ? `A${message.agentId}` : "AI"} />
+      <MessageContent>
+        <Response>{message.content}</Response>
         {!isUser && message.cost && Number(message.cost) > 0 && (
-          <div className="text-muted-foreground flex items-center gap-3 text-xs">
+          <div className="text-muted-foreground mt-2 flex items-center gap-3 text-xs">
             <span>💰 ${Number(message.cost).toFixed(6)}</span>
             <span>•</span>
             <span>🪙 {message.tokenCount} tokens</span>
           </div>
         )}
-      </div>
-    </div>
+      </MessageContent>
+    </AIMessage>
   );
 }
 
@@ -205,58 +179,78 @@ function StreamingMessageBubble({
   message: {
     id: string;
     agentId: string;
-    content: string;
-    toolCalls: Array<{ id: string; name: string; args: any; result?: any }>;
+    uiMessages: UIMessage[];
   };
 }) {
   return (
-    <div className="flex gap-4">
-      <div className="bg-background flex h-8 w-8 shrink-0 items-center justify-center rounded-full border">
-        <BotIcon className="h-4 w-4" />
-      </div>
-
-      <div className="flex-1 space-y-2">
+    <AIMessage from="assistant">
+      <MessageAvatar src="" name={`A${message.agentId}`} />
+      <MessageContent>
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">Agent {message.agentId}</span>
           <Badge variant="secondary" className="gap-1.5">
             <Loader size={10} />
             Typing
           </Badge>
         </div>
 
-        {message.content ? (
-          <div className="bg-muted rounded-lg px-4 py-3">
-            <Response>{message.content}</Response>
-          </div>
-        ) : (
-          <div className="bg-muted rounded-lg px-4 py-3">
-            <div className="text-muted-foreground flex items-center gap-2 text-sm">
-              <Loader size={14} />
-              Thinking...
+        <div className="mt-2 space-y-3">
+          {message.uiMessages.map((ui, uiIdx) => (
+            <div key={`${message.id}-ui-${uiIdx}`} className="space-y-3">
+              {ui.parts.map((part, i) => {
+                switch (part.type) {
+                  case "text":
+                    return (
+                      <div
+                        key={`${message.id}-text-${uiIdx}-${i}`}
+                        className="bg-muted rounded-lg px-4 py-3"
+                      >
+                        <Response>{part.text}</Response>
+                      </div>
+                    );
+                  case "tool-call": {
+                    const toolName = part.toolName ?? "tool";
+                    return (
+                      <Tool
+                        key={`${message.id}-tool-${uiIdx}-${i}`}
+                        defaultOpen={false}
+                      >
+                        <ToolHeader
+                          title={toolName}
+                          type={`tool-${toolName}` as any}
+                          state={"input-available"}
+                        />
+                        <ToolContent>
+                          <ToolInput input={part.args} />
+                        </ToolContent>
+                      </Tool>
+                    );
+                  }
+                  case "tool-result": {
+                    const toolName = part.toolName ?? "tool";
+                    return (
+                      <Tool
+                        key={`${message.id}-tool-result-${uiIdx}-${i}`}
+                        defaultOpen={false}
+                      >
+                        <ToolHeader
+                          title={`${toolName} result`}
+                          type={`tool-${toolName}` as any}
+                          state={"output-available"}
+                        />
+                        <ToolContent>
+                          <ToolOutput output={part.result} errorText={undefined} />
+                        </ToolContent>
+                      </Tool>
+                    );
+                  }
+                  default:
+                    return null;
+                }
+              })}
             </div>
-          </div>
-        )}
-
-        {message.toolCalls.length > 0 && (
-          <div className="space-y-2">
-            {message.toolCalls.map((tc) => (
-              <Tool key={tc.id} defaultOpen={false}>
-                <ToolHeader
-                  title={tc.name}
-                  type={`tool-${tc.name}` as any}
-                  state={tc.result ? "output-available" : "input-available"}
-                />
-                <ToolContent>
-                  <ToolInput input={tc.args} />
-                  {tc.result && (
-                    <ToolOutput output={tc.result} errorText={undefined} />
-                  )}
-                </ToolContent>
-              </Tool>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+          ))}
+        </div>
+      </MessageContent>
+    </AIMessage>
   );
 }

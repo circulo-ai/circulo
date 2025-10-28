@@ -3,7 +3,7 @@ import { inngest } from "@/inngest/client";
 import { calculateCostFromUsage, generateId } from "@/lib/server-utils";
 import { emitStreamEvent } from "@/lib/sse";
 import { google } from "@ai-sdk/google";
-import { streamText } from "ai";
+import { Experimental_Agent as Agent } from "ai";
 import { and, asc, eq, sql } from "drizzle-orm";
 
 function getProviderModel(model: string) {
@@ -106,33 +106,43 @@ export const chatRoundtable = inngest.createFunction(
             role: "assistant",
           });
 
-          // Call AI SDK streamText
-          const stream = streamText({
-            model: providerModel,
-            messages,
+          const agent = new Agent({
+            model: getProviderModel(agentInfo.model),
+            system: agentInfo.systemPrompt ?? "You are a helpful assistant",
             temperature: parseFloat(agentInfo.temperature || "0") || undefined,
             maxOutputTokens: agentInfo.maxTokens
               ? Number(agentInfo.maxTokens)
               : undefined,
           });
 
-          let generatedText = "";
-          let chunkIndex = 0;
+          // Call AI SDK streamText
+          const stream = agent.stream({
+            messages,
+          });
 
-          // Stream UI message chunks
-          for await (const chunk of stream.toUIMessageStream()) {
-            // Emit the UI chunk directly
+          const uiMessageStream = stream.toUIMessageStream();
+
+          let generatedText = "";
+          let batchIndex = 0;
+
+          // Stream UI messages in batches (UIMessage[])
+          for await (const messages of uiMessageStream as any) {
+            // Emit the UI messages batch directly
             await emitStreamEvent(chatId, {
-              type: "ui-chunk",
+              type: "ui-messages",
               messageId,
               agentId: agentInfo.id,
-              chunkIndex: chunkIndex++,
-              chunk,
+              batchIndex: batchIndex++,
+              messages,
             });
 
             // Accumulate text for database storage
-            if (chunk.type === "text-delta") {
-              generatedText += chunk.delta;
+            for (const m of messages) {
+              if (m.type === "text-delta") {
+                // Support both new "textDelta" and legacy "delta" fields
+                const delta = (m.textDelta ?? m.delta) as string | undefined;
+                if (delta) generatedText += delta;
+              }
             }
           }
 
