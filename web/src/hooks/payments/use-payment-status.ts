@@ -11,7 +11,7 @@ export function usePaymentStatus(paymentId: string | null) {
     const fetchPayment = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`/api/payments/${paymentId}`);
+        const response = await fetch(`/api/v1/payments/${paymentId}`);
         const data = await response.json();
 
         if (!response.ok) {

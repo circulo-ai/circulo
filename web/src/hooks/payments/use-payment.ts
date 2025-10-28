@@ -23,7 +23,7 @@ export function usePayment() {
     setError(null);
 
     try {
-      const response = await fetch("/api/payments/create", {
+      const response = await fetch("/api/v1/payments/create", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -56,7 +56,7 @@ export function usePayment() {
     setError(null);
 
     try {
-      const response = await fetch("/api/payments/verify", {
+      const response = await fetch("/api/v1/payments/verify", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

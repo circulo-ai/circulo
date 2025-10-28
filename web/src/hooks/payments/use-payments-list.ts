@@ -18,7 +18,7 @@ export function usePaymentList(limit = 10) {
   useEffect(() => {
     const fetchPayments = async () => {
       try {
-        const response = await fetch(`/api/payments?limit=${limit}`);
+        const response = await fetch(`/api/v1/payments?limit=${limit}`);
         const data = await response.json();
 
         if (!response.ok) {

@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     const result = await paymentService.createPayment({
       userId: session.user.id,
       amount: validated.amount,
-      callbackUrl: `${baseUrl}/api/payments/callback`,
+      callbackUrl: `${baseUrl}/api/v1/payments/callback`,
       metadata: validated.metadata,
     });
 

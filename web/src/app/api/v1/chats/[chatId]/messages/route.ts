@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 
 export async function POST(
   request: Request,
-  { params }: { params: { chatId: string } }
+  { params }: { params: { chatId: string } },
 ) {
   const { chatId } = params;
   const session = await getSession();
@@ -11,12 +11,12 @@ export async function POST(
 
   // Trigger Inngest workflow
   await inngest.send({
-    name: 'chat/roundtable.start',
+    name: "chat/roundtable.start",
     data: {
       chatId,
       userId: session?.user.id,
       userMessage: content,
-    }
+    },
   });
 
   return Response.json({ success: true });
@@ -31,7 +31,7 @@ function ChatRoom({ chatId }) {
 
   useEffect(() => {
     // Connect to SSE
-    const eventSource = new EventSource(`/api/chats/${chatId}/stream`);
+    const eventSource = new EventSource(`/api/v1/chats/${chatId}/stream`);
     
     eventSource.onmessage = (e) => {
       const data = JSON.parse(e.data);
@@ -56,7 +56,7 @@ function ChatRoom({ chatId }) {
   }, [chatId]);
 
   const sendMessage = async (content) => {
-    await fetch(`/api/chats/${chatId}/messages`, {
+    await fetch(`/api/v1/chats/${chatId}/messages`, {
       method: 'POST',
       body: JSON.stringify({ content }),
     });
