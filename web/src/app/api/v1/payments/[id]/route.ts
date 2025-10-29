@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const session = await getSession();
@@ -22,7 +22,8 @@ export async function GET(
     });
 
     const paymentService = new PaymentService(sizpayClient);
-    const payment = await paymentService.getPayment(params.id);
+    const resolvedParams = await params;
+    const payment = await paymentService.getPayment(resolvedParams.id);
 
     if (!payment) {
       return NextResponse.json({ error: "Payment not found" }, { status: 404 });

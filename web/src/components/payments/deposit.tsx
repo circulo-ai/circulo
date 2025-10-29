@@ -208,7 +208,7 @@ const statusLabels = {
 export function PaymentHistory() {
   const { payments, loading, error } = usePaymentList(20);
 
-  const formatDate = (date: Date) => {
+  const formatDate = (date: string | Date) => {
     return new Date(date).toLocaleDateString("fa-IR", {
       year: "numeric",
       month: "long",

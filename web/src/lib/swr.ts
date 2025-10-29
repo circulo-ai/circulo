@@ -13,7 +13,7 @@ export const fetcher = async <T>(
     throw new Error(json.error || "An error occurred while fetching data");
   }
 
-  return json.data ?? json;
+  return json;
 };
 
 export const swrConfig: SWRConfiguration = {

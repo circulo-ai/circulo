@@ -886,6 +886,14 @@ export type NewEmbedding = typeof embedding.$inferInsert;
 export type Chat = typeof chat.$inferSelect;
 export type NewChat = typeof chat.$inferInsert;
 
+export type ChatWithRelations = Chat & {
+  user: User;
+  messages: Message[];
+  chatAgents: (ChatAgent & { agent: Agent })[];
+  chatKnowledgeBases: (ChatKnowledgeBase & { knowledgeBase: KnowledgeBase })[];
+  transactions: Transaction[];
+};
+
 export type ChatVisibility = (typeof chatVisibilityEnum.enumValues)[number];
 export type ChatStyle = (typeof chatStyleEnum.enumValues)[number];
 

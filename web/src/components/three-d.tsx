@@ -7,7 +7,7 @@ import * as THREE from "three";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
 
 /** simple in-view hook */
-function useInView(ref: React.RefObject<HTMLElement>, rootMargin = "0px") {
+function useInView(ref: React.RefObject<HTMLElement | null>, rootMargin = "0px") {
   const [inView, setInView] = useState(false);
   useEffect(() => {
     if (!ref.current) return;

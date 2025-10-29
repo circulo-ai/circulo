@@ -10,6 +10,9 @@
 !.yarn/releases
 !.yarn/versions
 
+trigger.dev/*
+.trigger
+
 # testing
 /coverage
 
