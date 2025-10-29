@@ -368,49 +368,96 @@ export function ChatInterface({ chatId, className }: ChatInterfaceProps) {
     const dbMessages = messages || [];
     const streamingMessages: any[] = [];
 
-    // Build UI messages from streaming parts
-    const uiMessageParts = new Map<string, any[]>();
+    // Sort events by timestamp to ensure proper ordering
+    const sortedEvents = [...streamState.events].sort((a, b) => {
+      const timeA = new Date(a.timestamp).getTime();
+      const timeB = new Date(b.timestamp).getTime();
+      return timeA - timeB;
+    });
+
+    // Build UI messages from streaming parts with proper ordering
+    const uiMessageParts = new Map<string, {
+      parts: any[];
+      startTime: number;
+      lastUpdateTime: number;
+      agentName?: string;
+    }>();
     
-    streamState.events.forEach(event => {
+    sortedEvents.forEach(event => {
       if (event.type === "ui_message_part" && event.messagePart && event.agentId) {
         const messageKey = `streaming-${event.agentId}`;
+        const eventTime = new Date(event.timestamp).getTime();
+        
         if (!uiMessageParts.has(messageKey)) {
-          uiMessageParts.set(messageKey, []);
-        }
-        uiMessageParts.get(messageKey)!.push(event.messagePart);
-      }
-    });
-
-    // Convert UI message parts to display messages
-    uiMessageParts.forEach((parts, messageKey) => {
-      const agentId = messageKey.replace('streaming-', '');
-      const lastEvent = streamState.events
-        .filter(e => e.agentId === agentId)
-        .pop();
-
-      if (lastEvent) {
-        // Check if this message is already in the database
-        const existsInDb = dbMessages.some(msg => 
-          msg.agentId === agentId && 
-          msg.uiMessage && 
-          JSON.stringify(msg.uiMessage.parts) === JSON.stringify(parts)
-        );
-
-        if (!existsInDb) {
-          streamingMessages.push({
-            id: messageKey,
-            agentId: agentId,
-            uiMessage: { parts }, // Use modern uiMessage structure
-            createdAt: lastEvent.timestamp,
-            isStreaming: true,
+          uiMessageParts.set(messageKey, {
+            parts: [],
+            startTime: eventTime,
+            lastUpdateTime: eventTime,
+            agentName: event.agentName
           });
         }
+        
+        const messageData = uiMessageParts.get(messageKey)!;
+        messageData.parts.push(event.messagePart);
+        messageData.lastUpdateTime = eventTime;
+        messageData.agentName = event.agentName || messageData.agentName;
       }
     });
 
-    return [...dbMessages, ...streamingMessages].sort((a, b) => 
-      new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    );
+    // Convert UI message parts to display messages with better deduplication
+    uiMessageParts.forEach((messageData, messageKey) => {
+      const agentId = messageKey.replace('streaming-', '');
+      
+      // More robust deduplication: check if we have a recent message from this agent
+      // that might be the same content (within last 30 seconds)
+      const recentThreshold = messageData.startTime - 30000; // 30 seconds ago
+      const existsInDb = dbMessages.some(msg => {
+        if (msg.agentId !== agentId) return false;
+        if (!msg.uiMessage?.parts) return false;
+        
+        const msgTime = new Date(msg.createdAt).getTime();
+        if (msgTime < recentThreshold) return false;
+        
+        // Compare part count and types as a quick check
+        const dbParts = msg.uiMessage.parts;
+        const streamParts = messageData.parts;
+        
+        if (dbParts.length !== streamParts.length) return false;
+        
+        // Check if the parts have similar structure (same types in same order)
+        return dbParts.every((dbPart: any, index: number) => {
+          const streamPart = streamParts[index];
+          return dbPart.type === streamPart.type;
+        });
+      });
+
+      if (!existsInDb) {
+        streamingMessages.push({
+          id: messageKey,
+          agentId: agentId,
+          agentName: messageData.agentName,
+          uiMessage: { parts: messageData.parts },
+          createdAt: new Date(messageData.startTime).toISOString(),
+          isStreaming: true,
+          _sortTime: messageData.startTime, // Add numeric sort key
+        });
+      }
+    });
+
+    // Combine and sort all messages using numeric timestamps for reliable ordering
+    const allMessages = [...dbMessages, ...streamingMessages];
+    
+    return allMessages.sort((a, b) => {
+      const timeA = a._sortTime || new Date(a.createdAt).getTime();
+      const timeB = b._sortTime || new Date(b.createdAt).getTime();
+      
+      // If times are very close (within 100ms), maintain original order
+      if (Math.abs(timeA - timeB) < 100) {
+        return 0;
+      }
+      
+      return timeA - timeB;
+    });
   }, [messages, streamState.events]);
 
   if (chatError) {
