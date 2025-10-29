@@ -488,28 +488,65 @@ export class ChatService {
     agentId: string,
     content: string,
     usage?: UsageMetrics,
-    toolCalls?: any[]
+    toolCalls?: any[],
+    uiMessageParts?: any[]
   ): Promise<Message> {
-    return await db.transaction(async (tx) => {
-      const messageId = generateId();
+    logger.info("ChatService.addAgentMessage called", {
+      chatId,
+      agentId,
+      contentLength: content.length,
+      hasUsage: !!usage,
+      hasToolCalls: !!toolCalls,
+      hasUiMessageParts: !!uiMessageParts,
+      uiMessagePartsCount: uiMessageParts?.length || 0
+    });
 
-      // Create UI message
-      const uiMessage: UIMessage = {
-        id: messageId,
-        role: "assistant",
-        parts: [
-          { type: "text", text: content },
-          ...(toolCalls || []).map((toolCall: any) => ({
-            type: `tool-${toolCall.toolName}` as const,
-            toolCallId: toolCall.toolCallId,
-            state: "output-available" as const,
-            input: toolCall.args,
-            output: toolCall.result,
-          }))
-        ],
-      };
+    return await db.transaction(async (tx) => {
+      logger.info("Starting database transaction for agent message", { chatId, agentId });
+      
+      const messageId = generateId();
+      logger.info("Generated message ID", { messageId, chatId, agentId });
+
+      // Create UI message - use provided parts if available, otherwise create from content
+      const uiMessage: UIMessage = uiMessageParts && uiMessageParts.length > 0 
+        ? {
+            id: messageId,
+            role: "assistant",
+            parts: uiMessageParts,
+          }
+        : {
+            id: messageId,
+            role: "assistant",
+            parts: [
+              { type: "text", text: content },
+              ...(toolCalls || []).map((toolCall: any) => ({
+                type: `tool-${toolCall.toolName}` as const,
+                toolCallId: toolCall.toolCallId,
+                state: "output-available" as const,
+                input: toolCall.args,
+                output: toolCall.result,
+              }))
+            ],
+          };
+
+      logger.info("Created UI message structure", { 
+        messageId, 
+        chatId, 
+        agentId, 
+        uiMessagePartsUsed: uiMessageParts && uiMessageParts.length > 0,
+        uiMessagePartsCount: uiMessage.parts.length
+      });
 
       // Insert message
+      logger.info("Inserting message into database", {
+        messageId,
+        chatId,
+        agentId,
+        contentLength: content.length,
+        tokenCount: usage ? usage.inputTokens + usage.outputTokens : 0,
+        cost: usage?.cost.toFixed(6) || "0.000000"
+      });
+
       const [newMessage] = await tx
         .insert(message)
         .values({
@@ -524,7 +561,15 @@ export class ChatService {
         })
         .returning();
 
+      logger.info("Message inserted successfully", {
+        messageId: newMessage.id,
+        chatId: newMessage.chatId,
+        agentId: newMessage.agentId,
+        insertedAt: newMessage.createdAt
+      });
+
       // Update chat message count
+      logger.info("Updating chat message count", { chatId });
       await tx
         .update(chat)
         .set({
@@ -533,7 +578,15 @@ export class ChatService {
         })
         .where(eq(chat.id, chatId));
 
+      logger.info("Chat message count updated successfully", { chatId });
       logger.info(`Agent ${agentId} responded to chat ${chatId}`);
+      
+      logger.info("Transaction completed successfully", {
+        messageId: newMessage.id,
+        chatId,
+        agentId
+      });
+      
       return newMessage;
     });
   }

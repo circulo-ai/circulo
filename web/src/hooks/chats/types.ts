@@ -51,7 +51,9 @@ export interface StreamEvent {
     | "agent_error"
     | "processing_complete"
     | "processing_error"
-    | "ui_message_part";
+    | "ui_message_part"
+    | "balance_reserved"
+    | "balance_released";
   timestamp: string;
   agentId?: string;
   agentName?: string;
