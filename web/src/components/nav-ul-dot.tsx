@@ -26,7 +26,7 @@ export function NavUlDot({ ulId }: NavUlDotProps) {
 
     setX((navUlItems[finalCurrentIndex] as HTMLElement).offsetLeft);
 
-    setAnchorSilently(navItems[currentIndex].href.replace("#", ""));
+    setAnchorSilently(navItems[currentIndex].href);
   }, [currentIndex]);
 
   useActiveByClass("main-section", ({ index }) => {

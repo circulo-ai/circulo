@@ -1,3 +1,4 @@
+import { FaqsList } from "./faqs-list";
 import { Button } from "./ui/button";
 
 export function FaqSection() {
@@ -17,7 +18,7 @@ export function FaqSection() {
         </p>
       </div>
 
-      <div className="col-span-2"></div>
+      <FaqsList className="col-span-2" />
     </section>
   );
 }
