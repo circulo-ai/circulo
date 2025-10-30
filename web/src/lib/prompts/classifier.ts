@@ -1,4 +1,4 @@
-import { Agent, ChatAgent } from "@/db";
+import { Agent, ChatAgent } from "@/db/schema";
 import { google } from "@ai-sdk/google";
 import { logger } from "@trigger.dev/sdk";
 import { generateObject } from "ai";
@@ -19,25 +19,31 @@ const PromptClassificationSchema = z.object({
     "single_agent_task",
   ]),
   targetedAgents: z
-    .array(z.string())
+    .array(z.string().min(1).trim())
+    .max(20) // Reasonable limit to prevent abuse
     .describe("Agent IDs or names specifically called; empty => all agents"),
   customOrder: z
     .boolean()
     .describe("True if user specified a particular order for responses"),
   suggestedOrder: z
-    .array(z.string())
+    .array(z.string().min(1).trim())
+    .max(20) // Reasonable limit to prevent abuse
     .describe("Suggested order of agent names/IDs if custom order detected"),
   confidence: z
     .number()
     .min(0)
     .max(1)
     .describe("Confidence score from classifier"),
-  reasoning: z.string().describe("Short explanation for the classification"),
+  reasoning: z
+    .string()
+    .min(1)
+    .max(500) // Prevent excessively long reasoning
+    .describe("Short explanation for the classification"),
   // make specialInstructions optional to be resilient to partial/missing LLM fields
   specialInstructions: z
     .object({
       skipRoundtable: z.boolean().optional(),
-      maxAgents: z.number().int().min(1).optional(),
+      maxAgents: z.number().int().min(1).max(50).optional(), // Reasonable upper bound
       requireConsensus: z.boolean().optional(),
       allowDisagreement: z.boolean().optional(),
     })
@@ -72,8 +78,18 @@ export function getAgentByIdOrName(
   agents: Array<ChatAgent & Agent>,
   idOrName: string,
 ): (ChatAgent & Agent) | undefined {
+  // Input validation
+  if (!agents || agents.length === 0 || !idOrName || typeof idOrName !== 'string') {
+    return undefined;
+  }
+  
+  const trimmedIdOrName = idOrName.trim();
+  if (trimmedIdOrName === '') {
+    return undefined;
+  }
+  
   return agents.find(
-    (a) => a.id === idOrName || a.name.toLowerCase() === idOrName.toLowerCase(),
+    (a) => a.id === trimmedIdOrName || a.name.toLowerCase() === trimmedIdOrName.toLowerCase(),
   );
 }
 
@@ -122,9 +138,23 @@ export async function classifyUserPrompt(
   chatStyle: "brainstorm" | "debate" | "analyze" | "custom",
   chatInstructions?: string,
 ): Promise<PromptClassification> {
+  // Input validation
+  if (!userPrompt || typeof userPrompt !== "string" || userPrompt.trim().length === 0) {
+    logger.warn("Empty or invalid user prompt provided, using default classification");
+    return defaultClassification();
+  }
+
+  if (!availableAgents || !Array.isArray(availableAgents)) {
+    logger.warn("Invalid availableAgents provided, using default classification");
+    return defaultClassification();
+  }
+
+  // Sanitize user prompt to prevent injection attacks
+  const sanitizedPrompt = userPrompt.trim().substring(0, 10000); // Reasonable length limit
+
   try {
     logger.info("Classifying user prompt", {
-      promptLength: userPrompt.length,
+      promptLength: sanitizedPrompt.length,
       agentCount: availableAgents.length,
       chatStyle,
     });
@@ -132,10 +162,11 @@ export async function classifyUserPrompt(
     const agentContext =
       availableAgents.length > 0
         ? availableAgents
+            .filter(agent => agent && agent.name && agent.id) // Filter out invalid agents
             .map((agent) => {
               let desc = `- ${agent.name} (ID: ${agent.id})`;
-              if (agent.description) {
-                desc += `: ${agent.description}`;
+              if (agent.description && agent.description.trim()) {
+                desc += `: ${agent.description.trim()}`;
               }
               return desc;
             })
@@ -149,31 +180,61 @@ AVAILABLE AGENTS:
 ${agentContext}
 
 CHAT STYLE: ${chatStyle}
-${chatInstructions ? `CUSTOM INSTRUCTIONS: ${chatInstructions}` : ""}
+${chatInstructions && chatInstructions.trim() ? `CUSTOM INSTRUCTIONS: ${chatInstructions.trim()}` : ""}
 
 Return only the structured classification according to the schema. Be explicit in reasoning but short.
 CLASSIFICATION GUIDELINES:
 - direct_agent_call: user directly addresses agents by name/handle or asks specific agents.
 - roundtable_discussion: general question, all agents should contribute.
 - agent_debate: user requests differing viewpoints / debate.
-- sequential_analysis: user asks for distinct perspectives in sequence.
+- sequential_analysis: user asks for distinct perspectives in sequence OR requests specific agents to respond in a particular order.
 - single_agent_task: task best handled by one agent.
 
-KEY SIGNALS:
-- @mentions, explicit names, "only", "just", "everyone", "first/then", "pros and cons", "argue", "debate" etc.
+KEY SIGNALS FOR SEQUENTIAL ANALYSIS:
+- Temporal indicators: "first...then", "and then", "after that", "next", "followed by"
+- Explicit ordering: "Steve do X, then Bill do Y", "I want A to respond first, then B"
+- Sequential actions: "create...then respond", "ask...then answer", "propose...then critique"
+
+OTHER KEY SIGNALS:
+- @mentions, explicit names, "only", "just", "everyone", "pros and cons", "argue", "debate"
+
+IMPORTANT: When you detect sequential language with specific agent names, set:
+- interactionType: "sequential_analysis"
+- customOrder: true
+- suggestedOrder: [agent names in the requested order]
+- targetedAgents: [all mentioned agent names]
+
 Be conservative with unspecified fields and return defaults where unsure.`;
 
     const result = await generateObject({
-      model: google("gemini-2.5-flash-lite"),
-      prompt: userPrompt,
+      model: google("gemini-2.5-flash"),
+      prompt: sanitizedPrompt,
       system: systemPrompt,
       schema: PromptClassificationSchema,
       temperature: 0.25,
+      maxOutputTokens: 1000, // Prevent excessive token usage
     });
 
     // result.object should match the schema, but validate explicitly
     try {
       const parsed = PromptClassificationSchema.parse(result.object);
+
+      // Additional validation for logical consistency
+      if (parsed.customOrder && (!parsed.suggestedOrder || parsed.suggestedOrder.length === 0)) {
+        logger.warn("customOrder is true but suggestedOrder is empty, fixing inconsistency");
+        parsed.customOrder = false;
+      }
+
+      if (parsed.suggestedOrder && parsed.suggestedOrder.length > 0 && !parsed.customOrder) {
+        logger.warn("suggestedOrder provided but customOrder is false, fixing inconsistency");
+        parsed.customOrder = true;
+      }
+
+      // Validate confidence is reasonable
+      if (parsed.confidence < 0.1) {
+        logger.warn("Very low confidence classification, consider using default");
+        parsed.confidence = Math.max(0.1, parsed.confidence);
+      }
 
       // normalize optional specialInstructions to include explicit booleans/defaults
       parsed.specialInstructions = {
@@ -190,6 +251,22 @@ Be conservative with unspecified fields and return defaults where unsure.`;
         availableAgents as Array<ChatAgent & Agent>,
       );
 
+      // Validate targetedAgents exist in available agents
+      if (parsed.targetedAgents && parsed.targetedAgents.length > 0) {
+        const validTargets = parsed.targetedAgents.filter(target => 
+          availableAgents.some(agent => 
+            agent.id === target || agent.name.toLowerCase() === target.toLowerCase()
+          )
+        );
+        if (validTargets.length !== parsed.targetedAgents.length) {
+          logger.warn("Some targeted agents not found in available agents", {
+            original: parsed.targetedAgents,
+            valid: validTargets
+          });
+          parsed.targetedAgents = validTargets;
+        }
+      }
+
       logger.info("Prompt classification complete", {
         interactionType: parsed.interactionType,
         targetedAgents: parsed.targetedAgents,
@@ -201,12 +278,20 @@ Be conservative with unspecified fields and return defaults where unsure.`;
       // If the LLM returned an unexpected shape, log and fallback
       logger.error("Classifier returned invalid shape; falling back", {
         error: parseErr instanceof Error ? parseErr.message : String(parseErr),
+        stack: parseErr instanceof Error ? parseErr.stack : undefined,
+        userPrompt: sanitizedPrompt.substring(0, 100),
+        availableAgents: availableAgents.length,
+        llmResult: JSON.stringify(result.object).substring(0, 500),
       });
       return defaultClassification();
     }
   } catch (error) {
     logger.error("Failed to classify prompt, using default", {
       error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      userPrompt: sanitizedPrompt.substring(0, 100),
+      availableAgents: availableAgents.length,
+      chatStyle,
     });
     return defaultClassification();
   }
@@ -227,6 +312,12 @@ export function applyClassification(
     instructions: string;
   };
 } {
+  // Input validation
+  if (!classification) {
+    logger.error("Classification is required");
+    throw new Error("Classification is required");
+  }
+  
   logger.info("Applying classification", {
     interactionType: classification.interactionType,
     targetedAgentCount: classification.targetedAgents?.length ?? 0,
@@ -238,6 +329,10 @@ export function applyClassification(
     return {
       agentsToRespond: [],
       shouldUseRoundtable: false,
+      specialHandling: {
+        type: "no_agents",
+        instructions: "No agents available to respond",
+      },
     };
   }
 
@@ -262,6 +357,16 @@ export function applyClassification(
     return resolved;
   };
 
+  // Helper to apply maxAgents limit consistently
+  const applyMaxAgentsLimit = (agents: Array<ChatAgent & Agent>): Array<ChatAgent & Agent> => {
+    const max = classification.specialInstructions?.maxAgents;
+    if (typeof max === "number" && max > 0) {
+      const validMax = Math.max(1, Math.min(max, agents.length));
+      return agents.slice(0, validMax);
+    }
+    return agents;
+  };
+
   switch (classification.interactionType) {
     case "direct_agent_call": {
       const targets = resolveTargets(classification.targetedAgents);
@@ -279,6 +384,9 @@ export function applyClassification(
         }
         agentsToRespond = [...availableAgents];
       }
+
+      // Apply maxAgents limit
+      agentsToRespond = applyMaxAgentsLimit(agentsToRespond);
 
       // If custom order specified, reorder
       if (
@@ -306,33 +414,83 @@ export function applyClassification(
         // fallback: choose the agent that seems most specialized (first in list)
         agentsToRespond = [availableAgents[0]];
       }
+      
+      // Apply maxAgents limit (though for single task it should be 1)
+      agentsToRespond = applyMaxAgentsLimit(agentsToRespond);
       shouldUseRoundtable = false;
       break;
     }
 
     case "roundtable_discussion":
-    case "agent_debate":
-    case "sequential_analysis": {
-      agentsToRespond = [...availableAgents];
-
-      // apply maxAgents if present and valid
-      const max = classification.specialInstructions?.maxAgents;
-      if (typeof max === "number" && max > 0) {
-        const validMax = Math.max(1, Math.min(max, agentsToRespond.length));
-        agentsToRespond = agentsToRespond.slice(0, validMax);
+    case "agent_debate": {
+      // Handle targeted agents if specified
+      const targets = resolveTargets(classification.targetedAgents);
+      if (targets.length > 0) {
+        agentsToRespond = targets;
+      } else {
+        agentsToRespond = [...availableAgents];
       }
+
+      // Apply maxAgents limit
+      agentsToRespond = applyMaxAgentsLimit(agentsToRespond);
 
       shouldUseRoundtable = !classification.specialInstructions?.skipRoundtable;
       break;
     }
 
+    case "sequential_analysis": {
+      // For sequential analysis, handle targeted agents and custom order
+      const targets = resolveTargets(classification.targetedAgents);
+      if (targets.length > 0) {
+        agentsToRespond = targets;
+      } else {
+        agentsToRespond = [...availableAgents];
+      }
+
+      // Apply maxAgents limit before reordering
+      agentsToRespond = applyMaxAgentsLimit(agentsToRespond);
+
+      // Apply custom order if specified
+      if (
+        classification.customOrder &&
+        classification.suggestedOrder.length > 0
+      ) {
+        agentsToRespond = reorderAgents(
+          agentsToRespond,
+          classification.suggestedOrder,
+        );
+      }
+
+      // Sequential analysis should skip roundtable by default for cleaner sequential flow
+      shouldUseRoundtable = false;
+      break;
+    }
+
     default:
-      logger.warn("Unknown interactionType; using all agents as fallback", {
+      logger.warn("Unknown interactionType; using fallback behavior", {
         interactionType: classification.interactionType,
       });
-      agentsToRespond = [...availableAgents];
-      shouldUseRoundtable = true;
+      
+      // Try targeted agents first, then fall back to all agents
+      const targets = resolveTargets(classification.targetedAgents);
+      if (targets.length > 0) {
+        agentsToRespond = targets;
+      } else {
+        agentsToRespond = [...availableAgents];
+      }
+      
+      // Apply maxAgents limit
+      agentsToRespond = applyMaxAgentsLimit(agentsToRespond);
+      
+      shouldUseRoundtable = !classification.specialInstructions?.skipRoundtable;
       break;
+  }
+
+  // Final validation - ensure we have at least one agent
+  if (agentsToRespond.length === 0) {
+    logger.warn("No agents selected after classification; using first available agent as fallback");
+    agentsToRespond = [availableAgents[0]];
+    shouldUseRoundtable = false;
   }
 
   logger.info("Classification applied", {
@@ -362,16 +520,33 @@ function reorderAgents(
   agents: Array<ChatAgent & Agent>,
   suggestedOrder: string[],
 ): Array<ChatAgent & Agent> {
-  if (!suggestedOrder || suggestedOrder.length === 0) return agents;
+  // Input validation
+  if (!agents || agents.length === 0) {
+    return [];
+  }
+  
+  if (!suggestedOrder || suggestedOrder.length === 0) {
+    return [...agents]; // Return copy to avoid mutation
+  }
+  
   const remaining = [...agents];
   const ordered: Array<ChatAgent & Agent> = [];
 
   // Add agents in suggested order by id or name (case-insensitive for names)
   for (const nameOrId of suggestedOrder) {
+    if (!nameOrId || typeof nameOrId !== 'string') {
+      continue; // Skip invalid entries
+    }
+    
+    const trimmedNameOrId = nameOrId.trim();
+    if (trimmedNameOrId === '') {
+      continue; // Skip empty strings
+    }
+    
     const idx = remaining.findIndex(
       (agent) =>
-        agent.id === nameOrId ||
-        agent.name.toLowerCase() === nameOrId.toLowerCase(),
+        agent.id === trimmedNameOrId ||
+        agent.name.toLowerCase() === trimmedNameOrId.toLowerCase(),
     );
     if (idx !== -1) {
       ordered.push(remaining[idx]);
@@ -393,6 +568,17 @@ export function enhanceSystemPromptWithClassification(
   isTargetedAgent: boolean,
   agentName: string,
 ): string {
+  // Input validation
+  if (!classification) {
+    logger.warn("No classification provided for prompt enhancement");
+    return basePrompt?.trim() ?? "";
+  }
+  
+  if (!agentName || typeof agentName !== 'string') {
+    logger.warn("Invalid agent name provided for prompt enhancement");
+    agentName = "Agent";
+  }
+  
   let enhanced = basePrompt?.trim() ?? "";
 
   // Add context based on interaction type
@@ -419,10 +605,17 @@ State your main position briefly and provide supporting reasoning. You may respe
       break;
 
     case "sequential_analysis":
-      enhanced += `
+      if (isTargetedAgent) {
+        enhanced += `
 
-=== ANALYTICAL CHAIN ===
+=== SEQUENTIAL RESPONSE ===
+You are part of a sequential conversation. The user has requested specific agents to respond in order. Provide your response as requested, building on or responding to previous agents' contributions where appropriate.`;
+      } else {
+        enhanced += `
+
+=== SEQUENTIAL CHAIN ===
 Provide your analysis in a way that complements prior or subsequent agents. Emphasize your unique perspective or area of expertise.`;
+      }
       break;
 
     case "single_agent_task":

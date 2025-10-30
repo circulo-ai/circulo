@@ -1,4 +1,4 @@
-import { Agent } from "@/db";
+import { Agent } from "@/db/schema";
 import {
   applyClassification,
   classifyUserPrompt,
