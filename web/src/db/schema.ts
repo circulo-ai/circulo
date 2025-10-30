@@ -8,6 +8,7 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgEnum,
   pgTable,
   pgView,
@@ -324,9 +325,13 @@ export const agent = pgTable(
 
     // Model configuration
     model: text("model").notNull().default("gpt-4"),
-    temperature: decimal("temperature", { precision: 3, scale: 2 }).default(
-      "0.7",
-    ),
+    temperature: numeric("temperature", {
+      precision: 3,
+      scale: 2,
+      mode: "number",
+    })
+      .notNull()
+      .default(0.7),
     maxTokens: integer("max_tokens").default(2000),
 
     // Avatar and styling
@@ -886,13 +891,16 @@ export type NewEmbedding = typeof embedding.$inferInsert;
 export type Chat = typeof chat.$inferSelect;
 export type NewChat = typeof chat.$inferInsert;
 
-export type ChatWithRelations = Chat & {
-  user: User;
-  messages: Message[];
-  chatAgents: (ChatAgent & { agent: Agent })[];
-  chatKnowledgeBases: (ChatKnowledgeBase & { knowledgeBase: KnowledgeBase })[];
-  transactions: Transaction[];
+export type MessageWithAgent = Message & {
+  agent: Agent | null;
 };
+
+export interface ChatWithRelations extends Chat {
+  agents: (Agent & ChatAgent)[];
+  knowledgeBases: { id: string; name: string; enabled: boolean }[];
+  messages: MessageWithAgent[];
+  user: { id: string; name: string; email: string };
+}
 
 export type ChatVisibility = (typeof chatVisibilityEnum.enumValues)[number];
 export type ChatStyle = (typeof chatStyleEnum.enumValues)[number];

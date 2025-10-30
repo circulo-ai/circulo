@@ -1,38 +1,26 @@
-import { db } from "@/db";
+import { ChatWithRelations, db, Wallet } from "@/db";
 import {
+  agent,
+  auditLog,
   chat,
   chatAgent,
   chatKnowledgeBase,
-  message,
-  agent,
   knowledgeBase,
+  message,
+  transaction,
   user,
   wallet,
-  transaction,
-  auditLog,
   type Chat,
-  type NewChat,
   type Message,
-  type NewMessage,
-  type Agent,
   type Transaction,
-  type NewTransaction,
-  type NewAuditLog,
 } from "@/db/schema";
-import { generateId, calculateCostFromUsage } from "@/lib/server-utils";
-import { acquireLock, releaseLock } from "@/lib/redis";
 import { createLogger } from "@/lib/logs/console/logger";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { acquireLock, releaseLock } from "@/lib/redis";
+import { generateId } from "@/lib/server-utils";
 import type { FileUIPart, UIMessage } from "ai";
+import { desc, eq, sql } from "drizzle-orm";
 
 const logger = createLogger("ChatService");
-
-export interface ChatWithRelations extends Chat {
-  agents: (Agent & { speakOrder: number; enabled: boolean })[];
-  knowledgeBases: { id: string; name: string; enabled: boolean }[];
-  messages: Message[];
-  user: { id: string; name: string; email: string };
-}
 
 export interface CreateChatParams {
   userId: string;
@@ -142,10 +130,10 @@ export class ChatService {
    */
   static async getChatById(
     chatId: string,
-    userId?: string
+    userId?: string,
   ): Promise<ChatWithRelations | null> {
     try {
-      // Get chat with user info
+      // 1. Get chat with user info
       const chatData = await db
         .select({
           chat: chat,
@@ -175,7 +163,7 @@ export class ChatService {
         throw new Error("Access denied to private chat");
       }
 
-      // Get agents
+      // 2. Get agents (No change needed)
       const agentsData = await db
         .select({
           agent: agent,
@@ -187,7 +175,7 @@ export class ChatService {
         .where(eq(chatAgent.chatId, chatId))
         .orderBy(chatAgent.speakOrder);
 
-      // Get knowledge bases
+      // 3. Get knowledge bases (No change needed)
       const knowledgeBasesData = await db
         .select({
           id: knowledgeBase.id,
@@ -197,14 +185,19 @@ export class ChatService {
         .from(chatKnowledgeBase)
         .innerJoin(
           knowledgeBase,
-          eq(chatKnowledgeBase.knowledgeBaseId, knowledgeBase.id)
+          eq(chatKnowledgeBase.knowledgeBaseId, knowledgeBase.id),
         )
         .where(eq(chatKnowledgeBase.chatId, chatId));
 
-      // Get messages
+      // 4. Get messages and LEFT JOIN with agent
+      // We use a LEFT JOIN because agentId is optional (messages can be from the user)
       const messagesData = await db
-        .select()
+        .select({
+          message: message,
+          agent: agent, // Select all agent fields
+        })
         .from(message)
+        .leftJoin(agent, eq(message.agentId, agent.id)) // LEFT JOIN on agentId
         .where(eq(message.chatId, chatId))
         .orderBy(message.createdAt);
 
@@ -217,10 +210,37 @@ export class ChatService {
           enabled: item.enabled,
         })),
         knowledgeBases: knowledgeBasesData,
-        messages: messagesData,
-      };
+        // FIXED: Map the joined result into the desired MessageWithAgent format
+        messages: messagesData.map((item) => ({
+          ...item.message,
+          agent: item.agent, // Drizzle correctly maps null when it's a LEFT JOIN and no match is found
+        })),
+      } as ChatWithRelations; // Cast to ensure correct final type
     } catch (error) {
-      logger.error(`Failed to get chat ${chatId}:`, { error });
+      // You'll need to make sure 'logger' is defined in this scope
+      // logger.error(`Failed to get chat ${chatId}:`, { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Get user's wallet
+   */
+  static async getUserWallet(userId: string): Promise<Wallet> {
+    try {
+      const [userWallet] = await db
+        .select()
+        .from(wallet)
+        .where(eq(wallet.userId, userId))
+        .limit(1);
+
+      if (!userWallet) {
+        throw new Error("User wallet not found");
+      }
+
+      return userWallet;
+    } catch (error) {
+      logger.error(`Failed to get wallet for user ${userId}:`, { error });
       throw error;
     }
   }
@@ -244,10 +264,7 @@ export class ChatService {
       const uiMessage: UIMessage = {
         id: messageId,
         role: "user",
-        parts: [
-          { type: "text", text: content },
-          ...(files || [])
-        ],
+        parts: [{ type: "text", text: content }, ...(files || [])],
       };
 
       // Insert message
@@ -292,7 +309,7 @@ export class ChatService {
    */
   static async checkUserBalance(
     userId: string,
-    estimatedCost: number
+    estimatedCost: number,
   ): Promise<boolean> {
     try {
       const userWallet = await db
@@ -319,7 +336,7 @@ export class ChatService {
   static async processUsage(
     userId: string,
     chatId: string,
-    usage: UsageMetrics
+    usage: UsageMetrics,
   ): Promise<Transaction> {
     const lockKey = `wallet:${userId}`;
     const lockValue = generateId();
@@ -408,7 +425,7 @@ export class ChatService {
         });
 
         logger.info(
-          `Processed usage for user ${userId}: $${cost} (${usage.inputTokens}+${usage.outputTokens} tokens)`
+          `Processed usage for user ${userId}: $${cost} (${usage.inputTokens}+${usage.outputTokens} tokens)`,
         );
 
         return newTransaction;
@@ -425,7 +442,7 @@ export class ChatService {
     chatId: string,
     agentId: string,
     uiMessageParts: any[],
-    usage?: UsageMetrics
+    usage?: UsageMetrics,
   ): Promise<Message> {
     return await db.transaction(async (tx) => {
       const messageId = generateId();
@@ -438,14 +455,14 @@ export class ChatService {
       };
 
       // Extract text content for legacy content field
-      const textParts = uiMessageParts.filter(part => part.type === 'text');
-      const content = textParts.map(part => part.text).join('');
+      const textParts = uiMessageParts.filter((part) => part.type === "text");
+      const content = textParts.map((part) => part.text).join("");
 
       // Extract tool calls for legacy toolCalls field
       const toolCalls = uiMessageParts
-        .filter(part => part.type?.startsWith('tool-'))
-        .map(part => ({
-          toolName: part.type?.replace('tool-', ''),
+        .filter((part) => part.type?.startsWith("tool-"))
+        .map((part) => ({
+          toolName: part.type?.replace("tool-", ""),
           toolCallId: part.toolCallId,
           args: part.input,
           result: part.output,
@@ -489,7 +506,7 @@ export class ChatService {
     content: string,
     usage?: UsageMetrics,
     toolCalls?: any[],
-    uiMessageParts?: any[]
+    uiMessageParts?: any[],
   ): Promise<Message> {
     logger.info("ChatService.addAgentMessage called", {
       chatId,
@@ -498,43 +515,47 @@ export class ChatService {
       hasUsage: !!usage,
       hasToolCalls: !!toolCalls,
       hasUiMessageParts: !!uiMessageParts,
-      uiMessagePartsCount: uiMessageParts?.length || 0
+      uiMessagePartsCount: uiMessageParts?.length || 0,
     });
 
     return await db.transaction(async (tx) => {
-      logger.info("Starting database transaction for agent message", { chatId, agentId });
-      
+      logger.info("Starting database transaction for agent message", {
+        chatId,
+        agentId,
+      });
+
       const messageId = generateId();
       logger.info("Generated message ID", { messageId, chatId, agentId });
 
       // Create UI message - use provided parts if available, otherwise create from content
-      const uiMessage: UIMessage = uiMessageParts && uiMessageParts.length > 0 
-        ? {
-            id: messageId,
-            role: "assistant",
-            parts: uiMessageParts,
-          }
-        : {
-            id: messageId,
-            role: "assistant",
-            parts: [
-              { type: "text", text: content },
-              ...(toolCalls || []).map((toolCall: any) => ({
-                type: `tool-${toolCall.toolName}` as const,
-                toolCallId: toolCall.toolCallId,
-                state: "output-available" as const,
-                input: toolCall.args,
-                output: toolCall.result,
-              }))
-            ],
-          };
+      const uiMessage: UIMessage =
+        uiMessageParts && uiMessageParts.length > 0
+          ? {
+              id: messageId,
+              role: "assistant",
+              parts: uiMessageParts,
+            }
+          : {
+              id: messageId,
+              role: "assistant",
+              parts: [
+                { type: "text", text: content },
+                ...(toolCalls || []).map((toolCall: any) => ({
+                  type: `tool-${toolCall.toolName}` as const,
+                  toolCallId: toolCall.toolCallId,
+                  state: "output-available" as const,
+                  input: toolCall.args,
+                  output: toolCall.result,
+                })),
+              ],
+            };
 
-      logger.info("Created UI message structure", { 
-        messageId, 
-        chatId, 
-        agentId, 
+      logger.info("Created UI message structure", {
+        messageId,
+        chatId,
+        agentId,
         uiMessagePartsUsed: uiMessageParts && uiMessageParts.length > 0,
-        uiMessagePartsCount: uiMessage.parts.length
+        uiMessagePartsCount: uiMessage.parts.length,
       });
 
       // Insert message
@@ -544,7 +565,7 @@ export class ChatService {
         agentId,
         contentLength: content.length,
         tokenCount: usage ? usage.inputTokens + usage.outputTokens : 0,
-        cost: usage?.cost.toFixed(6) || "0.000000"
+        cost: usage?.cost.toFixed(6) || "0.000000",
       });
 
       const [newMessage] = await tx
@@ -565,7 +586,7 @@ export class ChatService {
         messageId: newMessage.id,
         chatId: newMessage.chatId,
         agentId: newMessage.agentId,
-        insertedAt: newMessage.createdAt
+        insertedAt: newMessage.createdAt,
       });
 
       // Update chat message count
@@ -580,13 +601,13 @@ export class ChatService {
 
       logger.info("Chat message count updated successfully", { chatId });
       logger.info(`Agent ${agentId} responded to chat ${chatId}`);
-      
+
       logger.info("Transaction completed successfully", {
         messageId: newMessage.id,
         chatId,
-        agentId
+        agentId,
       });
-      
+
       return newMessage;
     });
   }
@@ -597,7 +618,7 @@ export class ChatService {
   static async getUserChats(
     userId: string,
     limit: number = 20,
-    offset: number = 0
+    offset: number = 0,
   ): Promise<Chat[]> {
     try {
       return await db
