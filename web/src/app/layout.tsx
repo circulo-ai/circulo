@@ -1,7 +1,6 @@
 import { AuthClientProvider } from "@/providers/auth-client-provider";
 import { SessionProvider } from "@/providers/session-provider";
 import { ThemeProvider } from "@/providers/theme-provider";
-import { TriggerProvider } from "@/providers/trigger-provider";
 import { ZoomPrevention } from "@/providers/zoom-prevention";
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
@@ -25,11 +24,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className={fontSans.variable}>
         <ThemeProvider>
           <SessionProvider>
-            <TriggerProvider>
-              <ZoomPrevention />
-              <AuthClientProvider>{children}</AuthClientProvider>
-              <Toaster />
-            </TriggerProvider>
+            <ZoomPrevention />
+            <AuthClientProvider>{children}</AuthClientProvider>
+            <Toaster />
           </SessionProvider>
         </ThemeProvider>
       </body>
