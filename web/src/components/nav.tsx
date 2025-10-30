@@ -1,7 +1,7 @@
 import { navItems } from "@/consts/nav";
 import { ArrowUpRight, Phone, User } from "lucide-react";
-import { EnhancedLink } from "./EnhancedLink";
-import GradualBlur from "./GradualBlur";
+import { EnhancedLink } from "./enhanced-link";
+import GradualBlur from "./gradual-blur";
 import { Logo } from "./logo";
 import { Button } from "./ui/button";
 

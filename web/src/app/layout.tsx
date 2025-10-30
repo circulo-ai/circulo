@@ -21,7 +21,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html
       lang="en"
       suppressHydrationWarning
-      className="scroll-pt-20 scroll-smooth"
+      className="snap-y snap-mandatory scroll-smooth"
     >
       <body className={fontSans.variable}>
         <ThemeProvider>

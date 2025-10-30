@@ -1,7 +1,7 @@
 import { colorPattern, tailwindColorMap } from "@/consts/hero-section";
 import { cn } from "@/lib/utils";
 import { ArrowRight, ArrowUpRight, Phone } from "lucide-react";
-import { EnhancedLink } from "./EnhancedLink";
+import { EnhancedLink } from "./enhanced-link";
 import { Logo } from "./logo";
 import { Button } from "./ui/button";
 
