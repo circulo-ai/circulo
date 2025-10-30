@@ -29,6 +29,13 @@
       "when": 1761670994480,
       "tag": "0003_smart_prima",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1761857894399,
+      "tag": "0004_curly_union_jack",
+      "breakpoints": true
     }
   ]
 }
