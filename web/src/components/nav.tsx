@@ -1,5 +1,5 @@
 import { navItems } from "@/consts/nav";
-import { ArrowUpRight, User } from "lucide-react";
+import { ArrowUpRight, Phone, User } from "lucide-react";
 import { EnhancedLink } from "./EnhancedLink";
 import GradualBlur from "./GradualBlur";
 import { Logo } from "./logo";
@@ -42,6 +42,14 @@ export function Nav() {
           >
             Docs <ArrowUpRight className="size-3" />
           </EnhancedLink>
+        </li>
+
+        <li className="-ms-2">
+          <Button asChild variant="primary" size="icon-xs" rounded="full">
+            <a href="#contact-us">
+              <Phone />
+            </a>
+          </Button>
         </li>
       </ul>
 

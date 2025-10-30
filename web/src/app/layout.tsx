@@ -18,7 +18,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className="scroll-pt-20 scroll-smooth"
+    >
       <body className={fontSans.variable}>
         <ThemeProvider>
           <SessionProvider>

@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { ArrowRight, ArrowUpRight, Phone } from "lucide-react";
 import { EnhancedLink } from "./EnhancedLink";
 import { Logo } from "./logo";
+import { Button } from "./ui/button";
 
 export function HeroSection() {
   return (
@@ -97,17 +98,17 @@ export function HeroSection() {
           </div>
 
           <div className="flex items-center gap-2">
-            <EnhancedLink
-              href="/contact-us"
-              buttonProps={{
-                variant: "highlightedText",
-                rounded: "full",
-                size: "lg-wider",
-              }}
+            <Button
+              asChild
+              variant="highlightedText"
+              rounded="full"
+              size="lg-wider"
             >
-              <Phone />
-              Contact us
-            </EnhancedLink>
+              <a href="#contact-us">
+                <Phone />
+                Contact us
+              </a>
+            </Button>
             <EnhancedLink
               href="/auth/sign-in"
               buttonProps={{
