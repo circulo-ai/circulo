@@ -7,7 +7,7 @@ import { Button } from "./ui/button";
 
 export function HeroSection() {
   return (
-    <section id="home" className="h-screen-fix flex flex-col">
+    <section id="home" className="main-section flex flex-col">
       <div className="relative mx-8 mb-4 grid grow grid-cols-2 grid-rows-1 overflow-hidden rounded-4xl">
         {/* stars */}
         <div className="absolute inset-0">

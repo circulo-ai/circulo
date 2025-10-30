@@ -139,24 +139,24 @@
 }
 
 @layer utilities {
-  .h-screen-fix:not(:first-of-type) {
+  .main-section:not(:first-of-type) {
     height: 100vh;
     padding-top: 5rem;
   }
-  .h-screen-fix:first-of-type {
+  .main-section:first-of-type {
     height: calc(100vh - 5rem);
     scroll-margin-top: 5rem;
   }
-  .h-screen-fix {
+  .main-section {
     scroll-snap-align: start;
     scroll-snap-stop: always;
   }
 
   @supports (height: 100lvh) {
-    .h-screen-fix:not(:first-of-type) {
+    .main-section:not(:first-of-type) {
       height: 100lvh;
     }
-    .h-screen-fix:first-of-type {
+    .main-section:first-of-type {
       height: calc(100lvh - 5rem);
     }
   }
