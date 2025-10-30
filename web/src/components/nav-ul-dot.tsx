@@ -1,6 +1,8 @@
 "use client";
 
+import { navItems } from "@/consts/nav";
 import { useActiveByClass } from "@/hooks/use-active-by-class";
+import { setAnchorSilently } from "@/lib/set-anchor-silently";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 
@@ -23,6 +25,8 @@ export function NavUlDot({ ulId }: NavUlDotProps) {
     navUlItems[finalCurrentIndex].setAttribute("data-active", "true");
 
     setX((navUlItems[finalCurrentIndex] as HTMLElement).offsetLeft);
+
+    setAnchorSilently(navItems[currentIndex].href.replace("#", ""));
   }, [currentIndex]);
 
   useActiveByClass("main-section", ({ index }) => {

@@ -30,18 +30,21 @@ export function Nav() {
         id={ulId}
         className="fixed inset-x-0 mx-auto flex w-fit items-center gap-4 rounded-full border-2 border-teal-50/5 bg-teal-50/5 p-2 ps-4"
       >
-        {navItems.map((navItem) => (
-          <li key={navItem.label}>
-            <Button
-              asChild
-              variant="text"
-              size="text"
-              className="duration-300 data-active:translate-x-1"
-            >
-              <a href={navItem.href}>{navItem.label}</a>
-            </Button>
-          </li>
-        ))}
+        {navItems.map(
+          (navItem) =>
+            navItem.hidden !== true && (
+              <li key={navItem.label}>
+                <Button
+                  asChild
+                  variant="text"
+                  size="text"
+                  className="duration-300 data-active:translate-x-1"
+                >
+                  <a href={navItem.href}>{navItem.label}</a>
+                </Button>
+              </li>
+            ),
+        )}
 
         <NavUlDot ulId={ulId} />
 
