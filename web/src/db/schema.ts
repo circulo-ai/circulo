@@ -68,6 +68,31 @@ export const paymentStatusEnum = pgEnum("payment_status", [
 
 export const paymentProviderEnum = pgEnum("payment_provider", ["sizpay"]);
 
+// Billing enums for subscriptions and invoices
+export const billingIntervalEnum = pgEnum("billing_interval", [
+  "day",
+  "week",
+  "month",
+  "year",
+]);
+
+export const subscriptionStatusEnum = pgEnum("subscription_status", [
+  "trialing",
+  "active",
+  "past_due",
+  "paused",
+  "cancelled",
+  "expired",
+]);
+
+export const invoiceStatusEnum = pgEnum("invoice_status", [
+  "draft",
+  "open",
+  "paid",
+  "void",
+  "uncollectible",
+]);
+
 // ============================================================================
 // EXISTING AUTH TABLES (from your minimal schema)
 // ============================================================================
@@ -286,6 +311,186 @@ export const payment = pgTable(
       table.userId,
       table.status,
     ),
+  }),
+);
+
+// ============================================================================
+// BILLING: PLANS, SUBSCRIPTIONS, INVOICES, USAGE
+// ============================================================================
+
+export const subscriptionPlan = pgTable(
+  "subscription_plan",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    description: text("description"),
+    amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+    currency: text("currency").notNull().default("IRR"),
+    interval: billingIntervalEnum("interval").notNull().default("month"),
+    intervalCount: integer("interval_count").notNull().default(1),
+    trialPeriodDays: integer("trial_period_days"),
+    features: jsonb("features").notNull().default("{}"),
+    metadata: jsonb("metadata").default("{}"),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => ({
+    activeIdx: index("subscription_plan_active_idx").on(table.active),
+    intervalIdx: index("subscription_plan_interval_idx").on(table.interval),
+    amountIdx: index("subscription_plan_amount_idx").on(table.amount),
+    nameIdx: index("subscription_plan_name_idx").on(table.name),
+  }),
+);
+
+export const subscription = pgTable(
+  "subscription",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    planId: text("plan_id")
+      .notNull()
+      .references(() => subscriptionPlan.id, { onDelete: "restrict" }),
+    status: subscriptionStatusEnum("status").notNull().default("active"),
+    currentPeriodStart: timestamp("current_period_start").notNull(),
+    currentPeriodEnd: timestamp("current_period_end").notNull(),
+    canceledAt: timestamp("canceled_at"),
+    trialStart: timestamp("trial_start"),
+    trialEnd: timestamp("trial_end"),
+    metadata: jsonb("metadata").default("{}"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => ({
+    userIdx: index("subscription_user_id_idx").on(table.userId),
+    planIdx: index("subscription_plan_id_idx").on(table.planId),
+    statusIdx: index("subscription_status_idx").on(table.status),
+    periodIdx: index("subscription_period_idx").on(
+      table.currentPeriodStart,
+      table.currentPeriodEnd,
+    ),
+  }),
+);
+
+export const invoice = pgTable(
+  "invoice",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    subscriptionId: text("subscription_id").references(() => subscription.id, {
+      onDelete: "set null",
+    }),
+    number: text("number").notNull(),
+    status: invoiceStatusEnum("status").notNull().default("draft"),
+    subtotalAmount: decimal("subtotal_amount", {
+      precision: 10,
+      scale: 2,
+    }).notNull(),
+    subtotalCurrency: text("subtotal_currency").notNull().default("IRR"),
+    taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }),
+    taxCurrency: text("tax_currency"),
+    totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
+    totalCurrency: text("total_currency").notNull().default("IRR"),
+    dueDate: timestamp("due_date"),
+    paidAt: timestamp("paid_at"),
+    metadata: jsonb("metadata").default("{}"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => ({
+    userIdx: index("invoice_user_id_idx").on(table.userId),
+    subIdx: index("invoice_subscription_id_idx").on(table.subscriptionId),
+    statusIdx: index("invoice_status_idx").on(table.status),
+    numberUniqueIdx: index("invoice_number_idx").on(table.number),
+    createdAtIdx: index("invoice_created_at_idx").on(table.createdAt),
+  }),
+);
+
+export const invoiceLineItem = pgTable(
+  "invoice_line_item",
+  {
+    id: text("id").primaryKey(),
+    invoiceId: text("invoice_id")
+      .notNull()
+      .references(() => invoice.id, { onDelete: "cascade" }),
+    description: text("description").notNull(),
+    quantity: integer("quantity").notNull().default(1),
+    unitAmount: decimal("unit_amount", { precision: 10, scale: 2 }).notNull(),
+    unitCurrency: text("unit_currency").notNull().default("IRR"),
+    amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+    currency: text("currency").notNull().default("IRR"),
+    metadata: jsonb("metadata").default("{}"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    invoiceIdx: index("invoice_line_item_invoice_id_idx").on(table.invoiceId),
+    createdAtIdx: index("invoice_line_item_created_at_idx").on(
+      table.createdAt,
+    ),
+  }),
+);
+
+export const paymentMethod = pgTable(
+  "payment_method",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    providerId: text("provider_id").notNull(),
+    providerMethodId: text("provider_method_id").notNull(),
+    isDefault: boolean("is_default").notNull().default(false),
+    lastFour: text("last_four"),
+    expiryMonth: integer("expiry_month"),
+    expiryYear: integer("expiry_year"),
+    metadata: jsonb("metadata").default("{}"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => ({
+    userIdx: index("payment_method_user_id_idx").on(table.userId),
+    providerIdx: index("payment_method_provider_id_idx").on(table.providerId),
+    defaultIdx: index("payment_method_default_idx").on(table.isDefault),
+  }),
+);
+
+export const usageRecord = pgTable(
+  "usage_record",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    subscriptionId: text("subscription_id")
+      .notNull()
+      .references(() => subscription.id, { onDelete: "cascade" }),
+    metric: text("metric").notNull(),
+    quantity: integer("quantity").notNull(),
+    timestamp: timestamp("timestamp").notNull().defaultNow(),
+    metadata: jsonb("metadata").default("{}"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    subIdx: index("usage_record_subscription_id_idx").on(table.subscriptionId),
+    metricIdx: index("usage_record_metric_idx").on(table.metric),
+    periodIdx: index("usage_record_period_idx").on(table.timestamp),
   }),
 );
 
@@ -730,6 +935,64 @@ export const transactionRelations = relations(transaction, ({ one }) => ({
   }),
 }));
 
+// Billing relations
+export const subscriptionPlanRelations = relations(
+  subscriptionPlan,
+  ({ many }) => ({
+    subscriptions: many(subscription),
+  }),
+);
+
+export const subscriptionRelations = relations(subscription, ({ one, many }) => ({
+  user: one(user, {
+    fields: [subscription.userId],
+    references: [user.id],
+  }),
+  plan: one(subscriptionPlan, {
+    fields: [subscription.planId],
+    references: [subscriptionPlan.id],
+  }),
+  invoices: many(invoice),
+  usageRecords: many(usageRecord),
+}));
+
+export const invoiceRelations = relations(invoice, ({ one, many }) => ({
+  user: one(user, {
+    fields: [invoice.userId],
+    references: [user.id],
+  }),
+  subscription: one(subscription, {
+    fields: [invoice.subscriptionId],
+    references: [subscription.id],
+  }),
+  lineItems: many(invoiceLineItem),
+}));
+
+export const invoiceLineItemRelations = relations(invoiceLineItem, ({ one }) => ({
+  invoice: one(invoice, {
+    fields: [invoiceLineItem.invoiceId],
+    references: [invoice.id],
+  }),
+}));
+
+export const paymentMethodRelations = relations(paymentMethod, ({ one }) => ({
+  user: one(user, {
+    fields: [paymentMethod.userId],
+    references: [user.id],
+  }),
+}));
+
+export const usageRecordRelations = relations(usageRecord, ({ one }) => ({
+  user: one(user, {
+    fields: [usageRecord.userId],
+    references: [user.id],
+  }),
+  subscription: one(subscription, {
+    fields: [usageRecord.subscriptionId],
+    references: [subscription.id],
+  }),
+}));
+
 // Agent relations
 export const agentRelations = relations(agent, ({ one, many }) => ({
   user: one(user, {
@@ -924,3 +1187,21 @@ export type Payment = typeof payment.$inferSelect;
 export type NewPayment = typeof payment.$inferInsert;
 export type PaymentStatus = (typeof paymentStatusEnum.enumValues)[number];
 export type PaymentProvider = (typeof paymentProviderEnum.enumValues)[number];
+
+// Billing types
+export type SubscriptionPlan = typeof subscriptionPlan.$inferSelect;
+export type NewSubscriptionPlan = typeof subscriptionPlan.$inferInsert;
+export type Subscription = typeof subscription.$inferSelect;
+export type NewSubscription = typeof subscription.$inferInsert;
+export type SubscriptionStatus =
+  (typeof subscriptionStatusEnum.enumValues)[number];
+export type BillingInterval = (typeof billingIntervalEnum.enumValues)[number];
+export type Invoice = typeof invoice.$inferSelect;
+export type NewInvoice = typeof invoice.$inferInsert;
+export type InvoiceStatus = (typeof invoiceStatusEnum.enumValues)[number];
+export type InvoiceLineItem = typeof invoiceLineItem.$inferSelect;
+export type NewInvoiceLineItem = typeof invoiceLineItem.$inferInsert;
+export type PaymentMethod = typeof paymentMethod.$inferSelect;
+export type NewPaymentMethod = typeof paymentMethod.$inferInsert;
+export type UsageRecord = typeof usageRecord.$inferSelect;
+export type NewUsageRecord = typeof usageRecord.$inferInsert;

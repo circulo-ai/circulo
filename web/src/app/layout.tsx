@@ -1,4 +1,5 @@
 import { AuthClientProvider } from "@/providers/auth-client-provider";
+import { SwrProvider } from "@/providers/swr-provider";
 import { SessionProvider } from "@/providers/session-provider";
 import { ThemeProvider } from "@/providers/theme-provider";
 import { ZoomPrevention } from "@/providers/zoom-prevention";
@@ -24,9 +25,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className={fontSans.variable}>
         <ThemeProvider>
           <SessionProvider>
-            <ZoomPrevention />
-            <AuthClientProvider>{children}</AuthClientProvider>
-            <Toaster />
+            <SwrProvider>
+              <ZoomPrevention />
+              <AuthClientProvider>{children}</AuthClientProvider>
+              <Toaster />
+            </SwrProvider>
           </SessionProvider>
         </ThemeProvider>
       </body>

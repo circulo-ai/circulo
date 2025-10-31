@@ -4,7 +4,7 @@ import type { Payment } from "./types";
 
 export function usePaymentList(limit = 10) {
   const { data, error, isLoading, mutate } = useSWR<Payment[]>(
-    `/api/v1/payments?limit=${limit}`,
+    `/api/v1/billing/payments?limit=${limit}`,
   );
 
   return {

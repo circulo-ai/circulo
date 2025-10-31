@@ -19,6 +19,7 @@ export class SizPayClient {
       ...config,
       apiMode: config.apiMode || SizPayApiMode.REST,
     };
+    this.validateCryptoConfig();
   }
 
   /**
@@ -241,6 +242,18 @@ export class SizPayClient {
     encrypted += cipher.final("base64");
 
     return encrypted;
+  }
+
+  /**
+   * Validate crypto config (key/iv) length requirements
+   */
+  private validateCryptoConfig() {
+    const key = Buffer.from(this.config.username, "base64");
+    const iv = Buffer.from(this.config.password, "base64");
+    if (key.length !== 32 || iv.length !== 16) {
+      const msg = `SizPay crypto config invalid: expected base64-encoded key (username) to be 32 bytes and IV (password) to be 16 bytes. Got key=${key.length} bytes, iv=${iv.length} bytes.`;
+      throw new Error(msg);
+    }
   }
 
   /**

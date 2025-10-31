@@ -6,7 +6,7 @@ export function usePaymentStatus(paymentId: string | null) {
   const shouldFetch = Boolean(paymentId);
 
   const { data, error, isLoading, mutate } = useSWR<Payment>(
-    shouldFetch ? `/api/v1/payments/${paymentId}` : null,
+    shouldFetch ? `/api/v1/billing/payments/${paymentId}` : null,
   );
 
   return {

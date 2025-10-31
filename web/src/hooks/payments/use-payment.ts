@@ -13,7 +13,7 @@ export function usePayment() {
     setError(null);
 
     try {
-      const data = await fetcher<PaymentResult>("/api/v1/payments/create", {
+      const data = await fetcher<PaymentResult>("/api/v1/billing/deposits/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(params),
@@ -21,7 +21,7 @@ export function usePayment() {
 
       // Optimistically update payment list cache
       await globalMutate(
-        (key: string) => key.startsWith("/api/v1/payments"),
+        (key: string) => key.startsWith("/api/v1/billing/payments"),
         (existing?: Payment[]) => (existing ? [...existing] : undefined),
         false,
       );
@@ -45,7 +45,7 @@ export function usePayment() {
     setError(null);
 
     try {
-      const verified = await fetcher<Payment>("/api/v1/payments/verify", {
+      const verified = await fetcher<Payment>("/api/v1/billing/payments/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token }),
@@ -53,7 +53,7 @@ export function usePayment() {
 
       // Optimistically update both payment list and status caches
       await globalMutate(
-        (key: string) => key.startsWith("/api/v1/payments"),
+        (key: string) => key.startsWith("/api/v1/billing/payments"),
         (existing?: Payment[]) =>
           existing
             ? existing.map((p) => (p.id === verified.id ? verified : p))
@@ -61,7 +61,7 @@ export function usePayment() {
         false,
       );
 
-      await globalMutate(`/api/v1/payments/${verified.id}`, verified, false);
+      await globalMutate(`/api/v1/billing/payments/${verified.id}`, verified, false);
 
       return verified;
     } catch (err) {
