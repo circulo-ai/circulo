@@ -31,6 +31,8 @@ const nextConfig: NextConfig = {
       "localhost:3000",
     ],
   }),
+  // No rewrites needed for API; expose under app/api as re-exports
+  rewrites: async () => [],
 };
 
 export default withWorkflow(nextConfig);

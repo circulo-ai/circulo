@@ -26,6 +26,7 @@
     "@ai-sdk/react": "^2.0.82",
     "@azure/communication-email": "^1.1.0",
     "@daveyplate/better-auth-ui": "^3.2.7",
+    "@mhbdev/bdk": "^0.1.0",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-collapsible": "^1.1.12",
     "@radix-ui/react-dialog": "^1.1.15",

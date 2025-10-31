@@ -32,6 +32,9 @@ importers:
       '@daveyplate/better-auth-ui':
         specifier: ^3.2.7
         version: 3.2.7(d79b85ea1709b4bf3ecdb7fc4262a68f)
+      '@mhbdev/bdk':
+        specifier: ^0.1.0
+        version: 0.1.0(drizzle-orm@0.44.7(@opentelemetry/api@1.9.0)(@types/pg@8.6.1)(better-sqlite3@12.4.1)(kysely@0.28.8)(postgres@3.4.7))
       '@radix-ui/react-avatar':
         specifier: ^1.1.10
         version: 1.1.10(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -1192,6 +1195,11 @@ packages:
 
   '@mermaid-js/parser@0.6.3':
     resolution: {integrity: sha512-lnjOhe7zyHjc+If7yT4zoedx2vo4sHaTmtkl1+or8BRTnCtDmcTpAjpzDSfCZrshM5bCoz0GyidzadJAH1xobA==}
+
+  '@mhbdev/bdk@0.1.0':
+    resolution: {integrity: sha512-RqqatWvS9U4m96SodMdgrbE6MWBM0hADBkbPqdVX3XVw6oh8su/4jdufFpW7sxaRL9rWJRGF+HxEYXbWOBS6lA==}
+    peerDependencies:
+      drizzle-orm: ^0.44.7
 
   '@microsoft/fetch-event-source@2.0.1':
     resolution: {integrity: sha512-W6CLUJ2eBMw3Rec70qrsEW0jOm/3twwJv21mrmj2yORiaVmVYGS4sSS5yUwvQc1ZlDLYGPnClVWmUUMagKNsfA==}
@@ -7935,6 +7943,10 @@ snapshots:
   '@mermaid-js/parser@0.6.3':
     dependencies:
       langium: 3.3.1
+
+  '@mhbdev/bdk@0.1.0(drizzle-orm@0.44.7(@opentelemetry/api@1.9.0)(@types/pg@8.6.1)(better-sqlite3@12.4.1)(kysely@0.28.8)(postgres@3.4.7))':
+    dependencies:
+      drizzle-orm: 0.44.7(@opentelemetry/api@1.9.0)(@types/pg@8.6.1)(better-sqlite3@12.4.1)(kysely@0.28.8)(postgres@3.4.7)
 
   '@microsoft/fetch-event-source@2.0.1': {}
 
