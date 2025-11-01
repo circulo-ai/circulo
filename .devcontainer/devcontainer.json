@@ -1,0 +1,79 @@
+// DevContainer configuration optimized for JetBrains IDEs
+// For WebStorm/IntelliJ users: use this version
+// For VS Code users: use devcontainer-vscode.json instead
+{
+  "name": "Web Next.js DevContainer (WebStorm)",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "workspaceFolder": "/workspaces/web",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/web,type=bind,consistency=cached",
+
+  "customizations": {
+    "jetbrains": {
+      "backend": "IntelliJ",
+      "plugins": [
+        "com.intellij.plugins.prettier",
+        "com.intellij.css.tailwind"
+      ]
+    }
+  },
+
+  "forwardPorts": [3000, 5432, 6379, 8030],
+  "portsAttributes": {
+    "3000": {
+      "label": "Next.js App",
+      "onAutoForward": "notify"
+    },
+    "5432": {
+      "label": "PostgreSQL",
+      "onAutoForward": "silent"
+    },
+    "6379": {
+      "label": "Redis",
+      "onAutoForward": "silent"
+    },
+    "8030": {
+      "label": "Trigger.dev",
+      "onAutoForward": "silent"
+    }
+  },
+
+  "onCreateCommand": {
+    "install": "pnpm install"
+  },
+
+  "postStartCommand": "echo '✅ Dev container ready. Note: Start PostgreSQL and Redis separately using docker compose'",
+
+  "remoteEnv": {
+    "NEXT_TELEMETRY_DISABLED": "1",
+    "NODE_ENV": "development",
+    "NEXT_PUBLIC_APP_URL": "http://localhost:3000",
+    "NEXT_PUBLIC_API_URL": "http://localhost:3000/api",
+    "NEXT_PUBLIC_TRIGGER_API_URL": "http://localhost:8030",
+
+    // Point to host services (started separately)
+    "DATABASE_URL": "postgres://postgres:postgres@host.docker.internal:5432/app",
+    "REDIS_URL": "redis://host.docker.internal:6379",
+
+    "BETTER_AUTH_URL": "http://localhost:3000",
+    "BETTER_AUTH_SECRET": "dev_better_auth_secret_32_chars_minimum________",
+    "ENCRYPTION_KEY": "dev_encryption_key_32_chars_minimum______________",
+    "INTERNAL_API_SECRET": "dev_internal_api_secret_32_chars_minimum_______",
+    "TRIGGER_SECRET_KEY": "dev_trigger_secret_key_32_chars_minimum________",
+
+    "GOOGLE_CLIENT_ID": "local-google-client-id",
+    "GOOGLE_CLIENT_SECRET": "local-google-client-secret",
+
+    "NEXT_PUBLIC_DEPOSIT_ADDRESS": "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+  },
+
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {
+      "version": "latest"
+    }
+  },
+
+  "remoteUser": "node"
+}

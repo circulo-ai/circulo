@@ -7,9 +7,11 @@ export async function chat(messages: UIMessage[]) {
 
   const writable = getWritable<UIMessageChunk>();
 
+  step1();
+
   const agent = new DurableAgent({
     tools: {},
-    model: "gemini-2.5-flash",
+    model: "google/gemini-2.5-flash",
     system: `You are a helpful assistant.`,
   });
 
@@ -17,4 +19,10 @@ export async function chat(messages: UIMessage[]) {
     messages: convertToModelMessages(messages),
     writable,
   });
+}
+
+async function step1() {
+  "use step";
+
+  console.log("hello");
 }

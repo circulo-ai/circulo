@@ -1,10 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
-import { getSession } from "@/lib/auth";
-import { initializeSizPay } from "@/lib/sizpay/client";
 import SizpayProvider from "@/lib/billing/providers/sizpay-provider";
 import DrizzlePaymentService from "@/lib/billing/services/payment-service";
-import { fetchUsdToIrrRate, irrToUsd, fxExpiry } from "@/lib/fx/rates";
+import { fetchUsdToIrrRate, fxExpiry, irrToUsd } from "@/lib/fx/rates";
+import { Errors } from "@/lib/server/errors";
+import { createRoute } from "@/lib/server/handler";
+import { authMiddleware } from "@/lib/server/middlewares";
+import { ApiResponseBuilder } from "@/lib/server/response";
+import { initializeSizPay } from "@/lib/sizpay/client";
+import { z } from "zod";
 
 const bodySchema = z.object({
   amount: z.number().min(100000), // IRR amount (Rial) minimum
@@ -12,15 +14,13 @@ const bodySchema = z.object({
   description: z.string().optional(),
 });
 
-export async function POST(req: NextRequest) {
-  try {
-    const session = await getSession();
-    if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-
+export const POST = createRoute({
+  middleware: [authMiddleware] as const,
+  handler: async (req, { session }) => {
     const json = await req.json();
     const parsed = bodySchema.safeParse(json);
     if (!parsed.success) {
-      return NextResponse.json({ error: "invalid_body", details: parsed.error.flatten() }, { status: 400 });
+      return ApiResponseBuilder.error(Errors.badRequest("Invalid JSON"));
     }
     const { amount, currency, description } = parsed.data;
 
@@ -64,9 +64,6 @@ export async function POST(req: NextRequest) {
     );
 
     const gatewayUrl = String(payment.metadata?.gatewayUrl || "");
-    return NextResponse.json({ paymentId: payment.id, gatewayUrl });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "unknown_error";
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
-}
+    return ApiResponseBuilder.success({ paymentId: payment.id, gatewayUrl });
+  },
+});

@@ -4,7 +4,6 @@ import * as schema from "@/db/schema";
 import { getBaseURL } from "@/lib/auth-client";
 import { sendEmail } from "@/lib/email/mailer";
 import { betterAuth } from "better-auth";
-import { telegram } from "better-auth-telegram";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { customSession, magicLink, oneTimeToken } from "better-auth/plugins";
@@ -110,10 +109,10 @@ export const auth = betterAuth({
   ],
 });
 
+type SessionResponse = Awaited<ReturnType<typeof auth.api.getSession>>;
+export type Session = NonNullable<SessionResponse>;
+
 // Server-side auth helpers
-export async function getSession() {
-  const hdrs = await headers();
-  return await auth.api.getSession({
-    headers: hdrs,
-  });
+export async function getSession(): Promise<SessionResponse> {
+  return await auth.api.getSession({ headers: await headers() });
 }

@@ -1,0 +1,68 @@
+services:
+  app:
+    container_name: dnd-web-app
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    volumes:
+      - ../web:/workspaces/web:cached
+      - /workspaces/web/node_modules  # Prevent overwriting node_modules
+      - /workspaces/web/.next          # Prevent overwriting .next
+    command: sleep infinity
+    environment:
+      - SHELL=/bin/bash
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - dnd-network
+
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: dnd-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: app
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../web/docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d app"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - dnd-network
+
+  redis:
+    image: redis:7
+    container_name: dnd-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - dnd-network
+
+networks:
+  dnd-network:
+    driver: bridge
+
+volumes:
+  pgdata:
+  redisdata:

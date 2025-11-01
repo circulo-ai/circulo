@@ -1,29 +1,30 @@
-import { getSession } from "@/lib/auth";
 import { db } from "@/db";
-import { invoice, subscription } from "@/db/schema";
+import { invoice } from "@/db/schema";
+import { authMiddleware } from "@/lib/server";
+import { createRoute } from "@/lib/server/handler";
+import { ApiResponseBuilder } from "@/lib/server/response";
 import { eq } from "drizzle-orm";
-import { NextResponse } from "next/server";
 
-export async function GET() {
-  try {
-    const session = await getSession();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
+export const GET = createRoute({
+  middleware: [authMiddleware] as const,
+  handler: async (req, { session }) => {
     const invoices = await db.query.invoice.findMany({
       where: eq(invoice.userId, session.user.id),
       orderBy: (i, { desc }) => [desc(i.createdAt)],
     });
 
     // Optionally include subscription info
-    const subIds = Array.from(new Set(invoices.map((i) => i.subscriptionId).filter(Boolean))) as string[];
+    const subIds = Array.from(
+      new Set(invoices.map((i) => i.subscriptionId).filter(Boolean)),
+    ) as string[];
     const subs = subIds.length
-      ? await db.query.subscription.findMany({ where: (s, { inArray }) => inArray(s.id, subIds) })
+      ? await db.query.subscription.findMany({
+          where: (s, { inArray }) => inArray(s.id, subIds),
+        })
       : [];
     const subById = new Map(subs.map((s) => [s.id, s] as const));
 
-    return NextResponse.json(
+    return ApiResponseBuilder.success(
       invoices.map((i) => ({
         id: i.id,
         number: i.number,
@@ -39,11 +40,10 @@ export async function GET() {
         createdAt: i.createdAt,
         updatedAt: i.updatedAt,
         subscriptionId: i.subscriptionId ?? undefined,
-        subscription: i.subscriptionId ? subById.get(i.subscriptionId) ?? undefined : undefined,
-      }))
+        subscription: i.subscriptionId
+          ? (subById.get(i.subscriptionId) ?? undefined)
+          : undefined,
+      })),
     );
-  } catch (error) {
-    console.error("List invoices error:", error);
-    return NextResponse.json({ error: "Failed to list invoices" }, { status: 500 });
-  }
-}
+  },
+});

@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { subscriptionPlan } from "@/db/schema";
-import { nanoid } from "nanoid";
+import { env } from "@/lib/env";
+import { NextResponse } from "next/server";
 
 /**
  * Dev-only seed endpoint to populate default subscription plans.
@@ -9,14 +9,19 @@ import { nanoid } from "nanoid";
  */
 export async function POST() {
   try {
-    if (process.env.NODE_ENV === "production") {
-      return NextResponse.json({ error: "Forbidden in production" }, { status: 403 });
+    if (env.NODE_ENV === "production") {
+      return NextResponse.json(
+        { error: "Forbidden in production" },
+        { status: 403 },
+      );
     }
 
     // If any plan exists, skip seeding
     const existing = await db.select().from(subscriptionPlan).limit(1);
     if (existing.length > 0) {
-      return NextResponse.json({ message: "Plans already exist — seeding skipped" });
+      return NextResponse.json({
+        message: "Plans already exist — seeding skipped",
+      });
     }
 
     const now = new Date();
@@ -31,8 +36,26 @@ export async function POST() {
         interval: "month",
         intervalCount: 1,
         trialPeriodDays: 7,
-        features: { list: ["Basic chat access", "Community support", "Up to 3 saved agents"] },
-        metadata: { tier: "starter", version: 1 },
+        features: {
+          list: [
+            "Basic chat access",
+            "Community support",
+            "Up to 3 saved agents",
+          ],
+        },
+        metadata: {
+          tier: "starter",
+          version: 2,
+          overagePolicy: "hard",
+          profitMultiplier: 1.2,
+          rates: {
+            chat_tokens: { included: 500_000, unitPriceUSD: 0.000002 },
+            image_requests: { included: 100, unitPriceUSD: 0.05 },
+            embeddings_calls: { included: 200, unitPriceUSD: 0.001 },
+            assistant_calls: { included: 1_000, unitPriceUSD: 0.0005 },
+            audio_minutes: { included: 60, unitPriceUSD: 0.006 },
+          },
+        },
         active: true,
         createdAt: now,
         updatedAt: now,
@@ -46,8 +69,27 @@ export async function POST() {
         interval: "month",
         intervalCount: 1,
         trialPeriodDays: 7,
-        features: { list: ["Priority chat", "Advanced prompts", "Up to 10 saved agents", "Basic usage analytics"] },
-        metadata: { tier: "adventurer", version: 1 },
+        features: {
+          list: [
+            "Priority chat",
+            "Advanced prompts",
+            "Up to 10 saved agents",
+            "Basic usage analytics",
+          ],
+        },
+        metadata: {
+          tier: "adventurer",
+          version: 2,
+          overagePolicy: "hard",
+          profitMultiplier: 1.15,
+          rates: {
+            chat_tokens: { included: 1_000_000, unitPriceUSD: 0.000002 },
+            image_requests: { included: 250, unitPriceUSD: 0.045 },
+            embeddings_calls: { included: 500, unitPriceUSD: 0.001 },
+            assistant_calls: { included: 2_000, unitPriceUSD: 0.00045 },
+            audio_minutes: { included: 120, unitPriceUSD: 0.0055 },
+          },
+        },
         active: true,
         createdAt: now,
         updatedAt: now,
@@ -61,8 +103,28 @@ export async function POST() {
         interval: "month",
         intervalCount: 1,
         trialPeriodDays: 7,
-        features: { list: ["Faster responses", "Custom agents", "Unlimited saved agents", "Advanced analytics", "Email summaries"] },
-        metadata: { tier: "hero", version: 1 },
+        features: {
+          list: [
+            "Faster responses",
+            "Custom agents",
+            "Unlimited saved agents",
+            "Advanced analytics",
+            "Email summaries",
+          ],
+        },
+        metadata: {
+          tier: "hero",
+          version: 2,
+          overagePolicy: "hard",
+          profitMultiplier: 1.1,
+          rates: {
+            chat_tokens: { included: 2_500_000, unitPriceUSD: 0.000002 },
+            image_requests: { included: 750, unitPriceUSD: 0.04 },
+            embeddings_calls: { included: 1_500, unitPriceUSD: 0.0009 },
+            assistant_calls: { included: 5_000, unitPriceUSD: 0.0004 },
+            audio_minutes: { included: 300, unitPriceUSD: 0.005 },
+          },
+        },
         active: true,
         createdAt: now,
         updatedAt: now,
@@ -76,8 +138,28 @@ export async function POST() {
         interval: "month",
         intervalCount: 1,
         trialPeriodDays: 14,
-        features: { list: ["Team features", "SSO-ready", "Priority support", "Usage API", "Audit logs"] },
-        metadata: { tier: "legend", version: 1 },
+        features: {
+          list: [
+            "Team features",
+            "SSO-ready",
+            "Priority support",
+            "Usage API",
+            "Audit logs",
+          ],
+        },
+        metadata: {
+          tier: "legend",
+          version: 2,
+          overagePolicy: "soft",
+          profitMultiplier: 1.05,
+          rates: {
+            chat_tokens: { included: 5_000_000, unitPriceUSD: 0.000002 },
+            image_requests: { included: 2_000, unitPriceUSD: 0.035 },
+            embeddings_calls: { included: 3_000, unitPriceUSD: 0.0008 },
+            assistant_calls: { included: 10_000, unitPriceUSD: 0.00035 },
+            audio_minutes: { included: 1_000, unitPriceUSD: 0.0045 },
+          },
+        },
         active: true,
         createdAt: now,
         updatedAt: now,
@@ -89,6 +171,9 @@ export async function POST() {
     return NextResponse.json({ success: true, count: plans.length });
   } catch (error) {
     console.error("Seed plans error:", error);
-    return NextResponse.json({ error: "Failed to seed plans" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to seed plans" },
+      { status: 500 },
+    );
   }
 }

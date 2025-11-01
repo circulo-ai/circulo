@@ -1,0 +1,95 @@
+// DevContainer configuration for the Next.js web app
+// Optimized for VS Code with Docker Compose
+// Reference: https://containers.dev/implementors/json_reference
+{
+  "name": "Web Next.js DevContainer",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspaces/web",
+
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": "explicit"
+        },
+        "files.eol": "\n",
+        "typescript.tsdk": "node_modules/typescript/lib"
+      },
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "bradlc.vscode-tailwindcss",
+        "ms-azuretools.vscode-docker",
+        "prisma.prisma"
+      ]
+    }
+  },
+
+  "forwardPorts": [3000, 5432, 6379, 8030],
+  "portsAttributes": {
+    "3000": {
+      "label": "Next.js App",
+      "onAutoForward": "notify"
+    },
+    "5432": {
+      "label": "PostgreSQL",
+      "onAutoForward": "silent"
+    },
+    "6379": {
+      "label": "Redis",
+      "onAutoForward": "silent"
+    },
+    "8030": {
+      "label": "Trigger.dev",
+      "onAutoForward": "silent"
+    }
+  },
+
+  // Run once when container is created
+  "onCreateCommand": {
+    "install": "pnpm install"
+  },
+
+  // Run every time the container starts
+  "postStartCommand": "echo '✅ Dev container ready. Services: PostgreSQL (5432), Redis (6379), Next.js (3000), Trigger.dev (8030)'",
+
+  // Environment variables for the container
+  "remoteEnv": {
+    "NEXT_TELEMETRY_DISABLED": "1",
+    "NODE_ENV": "development",
+    "NEXT_PUBLIC_APP_URL": "http://localhost:3000",
+    "NEXT_PUBLIC_API_URL": "http://localhost:3000/api",
+    "NEXT_PUBLIC_TRIGGER_API_URL": "http://localhost:8030",
+
+    "DATABASE_URL": "postgres://postgres:postgres@postgres:5432/app",
+    "REDIS_URL": "redis://redis:6379",
+
+    // Secrets for local-only dev; replace for production as needed
+    "BETTER_AUTH_URL": "http://localhost:3000",
+    "BETTER_AUTH_SECRET": "dev_better_auth_secret_32_chars_minimum________",
+    "ENCRYPTION_KEY": "dev_encryption_key_32_chars_minimum______________",
+    "INTERNAL_API_SECRET": "dev_internal_api_secret_32_chars_minimum_______",
+    "TRIGGER_SECRET_KEY": "dev_trigger_secret_key_32_chars_minimum________",
+
+    // OAuth placeholders to prevent runtime errors when not configured
+    "GOOGLE_CLIENT_ID": "local-google-client-id",
+    "GOOGLE_CLIENT_SECRET": "local-google-client-secret",
+
+    // Required shared client variable
+    "NEXT_PUBLIC_DEPOSIT_ADDRESS": "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+  },
+
+  // Additional features
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {
+      "version": "latest"
+    }
+  },
+
+  // Default user for devcontainers images
+  "remoteUser": "vscode"
+}

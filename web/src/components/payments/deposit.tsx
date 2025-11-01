@@ -144,8 +144,9 @@ export function PaymentStatus() {
 
   if (!status) return null;
 
-  const formatNumber = (num: string) => {
-    return parseInt(num).toLocaleString("fa-IR");
+  const formatNumber = (num: string | number) => {
+    const n = typeof num === "string" ? parseFloat(num) : num;
+    return n.toLocaleString("fa-IR");
   };
 
   if (status === "success") {
@@ -218,8 +219,9 @@ export function PaymentHistory() {
     });
   };
 
-  const formatNumber = (num: string) => {
-    return parseFloat(num).toLocaleString("fa-IR");
+  const formatNumber = (num: string | number) => {
+    const n = typeof num === "string" ? parseFloat(num) : num;
+    return n.toLocaleString("fa-IR");
   };
 
   if (loading) {
