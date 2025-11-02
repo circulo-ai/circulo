@@ -1,22 +1,30 @@
-// DevContainer configuration optimized for JetBrains IDEs
-// For WebStorm/IntelliJ users: use this version
-// For VS Code users: use devcontainer-vscode.json instead
 {
-  "name": "Web Next.js DevContainer (WebStorm)",
-  "build": {
-    "dockerfile": "Dockerfile",
-    "context": ".."
-  },
-  "workspaceFolder": "/workspaces/web",
-  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/web,type=bind,consistency=cached",
-
+  "name": "Circulo Dev Environment",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspace",
+  
   "customizations": {
-    "jetbrains": {
-      "backend": "IntelliJ",
-      "plugins": [
-        "com.intellij.plugins.prettier",
-        "com.intellij.css.tailwind"
-      ]
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "bradlc.vscode-tailwindcss",
+        "ms-azuretools.vscode-docker",
+        "ms-vscode.vscode-typescript-next",
+        "usernamehw.errorlens",
+        "christian-kohler.path-intellisense",
+        "formulahendry.auto-rename-tag",
+        "cweijan.vscode-postgresql-client2"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": "explicit"
+        }
+      }
     }
   },
 
@@ -27,53 +35,31 @@
       "onAutoForward": "notify"
     },
     "5432": {
-      "label": "PostgreSQL",
-      "onAutoForward": "silent"
+      "label": "PostgreSQL"
     },
     "6379": {
-      "label": "Redis",
-      "onAutoForward": "silent"
+      "label": "Redis"
     },
     "8030": {
-      "label": "Trigger.dev",
-      "onAutoForward": "silent"
+      "label": "Trigger API"
     }
   },
 
-  "onCreateCommand": {
-    "install": "pnpm install"
-  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "postStartCommand": "bash .devcontainer/post-start.sh",
 
-  "postStartCommand": "echo '✅ Dev container ready. Note: Start PostgreSQL and Redis separately using docker compose'",
-
-  "remoteEnv": {
-    "NEXT_TELEMETRY_DISABLED": "1",
-    "NODE_ENV": "development",
-    "NEXT_PUBLIC_APP_URL": "http://localhost:3000",
-    "NEXT_PUBLIC_API_URL": "http://localhost:3000/api",
-    "NEXT_PUBLIC_TRIGGER_API_URL": "http://localhost:8030",
-
-    // Point to host services (started separately)
-    "DATABASE_URL": "postgres://postgres:postgres@host.docker.internal:5432/app",
-    "REDIS_URL": "redis://host.docker.internal:6379",
-
-    "BETTER_AUTH_URL": "http://localhost:3000",
-    "BETTER_AUTH_SECRET": "dev_better_auth_secret_32_chars_minimum________",
-    "ENCRYPTION_KEY": "dev_encryption_key_32_chars_minimum______________",
-    "INTERNAL_API_SECRET": "dev_internal_api_secret_32_chars_minimum_______",
-    "TRIGGER_SECRET_KEY": "dev_trigger_secret_key_32_chars_minimum________",
-
-    "GOOGLE_CLIENT_ID": "local-google-client-id",
-    "GOOGLE_CLIENT_SECRET": "local-google-client-secret",
-
-    "NEXT_PUBLIC_DEPOSIT_ADDRESS": "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-  },
-
+  "remoteUser": "node",
   "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "installOhMyZsh": true,
+      "upgradePackages": true,
+      "username": "node",
+      "userUid": "1000",
+      "userGid": "1000"
+    },
     "ghcr.io/devcontainers/features/git:1": {
-      "version": "latest"
+      "version": "latest",
+      "ppa": true
     }
-  },
-
-  "remoteUser": "node"
-}
+  }

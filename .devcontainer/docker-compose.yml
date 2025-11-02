@@ -1,68 +1,51 @@
 services:
   app:
-    container_name: dnd-web-app
     build:
       context: ..
       dockerfile: .devcontainer/Dockerfile
     volumes:
-      - ../web:/workspaces/web:cached
-      - /workspaces/web/node_modules  # Prevent overwriting node_modules
-      - /workspaces/web/.next          # Prevent overwriting .next
+      - ../..:/workspaces:cached
     command: sleep infinity
+    network_mode: service:postgres
     environment:
-      - SHELL=/bin/bash
+      - DATABASE_URL=postgresql://postgres:postgres@localhost:5432/app
+      - REDIS_URL=redis://localhost:6379
+      - NODE_ENV=development
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    networks:
-      - dnd-network
 
   postgres:
     image: pgvector/pgvector:pg17
-    container_name: dnd-postgres
+    restart: unless-stopped
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ../docker/initdb:/docker-entrypoint-initdb.d:ro
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: app
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ../web/docker/initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d app"]
       interval: 5s
       timeout: 3s
       retries: 10
-      start_period: 10s
-    restart: unless-stopped
-    networks:
-      - dnd-network
 
   redis:
     image: redis:7
-    container_name: dnd-redis
+    restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
-    ports:
-      - "6379:6379"
     volumes:
-      - redisdata:/data
+      - redis-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 10
-      start_period: 5s
-    restart: unless-stopped
-    networks:
-      - dnd-network
-
-networks:
-  dnd-network:
-    driver: bridge
+    network_mode: service:postgres
 
 volumes:
-  pgdata:
-  redisdata:
+  postgres-data:
+  redis-data:

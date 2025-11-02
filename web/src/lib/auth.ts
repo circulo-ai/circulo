@@ -11,7 +11,7 @@ import { headers } from "next/headers";
 import { env } from "./env";
 
 export const auth = betterAuth({
-  appName: "dnd",
+  appName: "circulo",
   baseURL: getBaseURL(),
   trustedOrigins: [env.NEXT_PUBLIC_APP_URL as string].filter(Boolean),
   database: drizzleAdapter(db, {

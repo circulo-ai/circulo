@@ -1,25 +1,29 @@
-FROM mcr.microsoft.com/devcontainers/typescript-node:1-20-bookworm
+FROM node:20-bullseye
 
-# Install essential tools
-RUN apt-get update && apt-get install -y \
+# Install additional OS packages
+RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
+    && apt-get -y install --no-install-recommends \
+    postgresql-client \
+    redis-tools \
     git \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
-# Enable corepack and activate the exact pnpm version from packageManager
-RUN corepack enable && corepack prepare pnpm@10.4.1 --activate
+# Set up non-root user
+ARG USERNAME=node
+ARG USER_UID=1000
+ARG USER_GID=$USER_UID
 
-# Verify pnpm installation
-RUN pnpm --version
+# Configure node user
+RUN if [ "$USER_GID" != "1000" ] || [ "$USER_UID" != "1000" ]; then \
+    groupmod --gid $USER_GID $USERNAME \
+    && usermod --uid $USER_UID --gid $USER_GID $USERNAME \
+    && chown -R $USER_UID:$USER_GID /home/$USERNAME; \
+    fi
 
-# Create workspace directory (source is mounted via docker-compose)
-RUN mkdir -p /workspaces/web && chown -R node:node /workspaces/web
+# Install global npm packages
+RUN npm install -g pnpm@latest drizzle-kit@latest
 
-# Set working directory
-WORKDIR /workspaces/web
+USER $USERNAME
 
-# Switch to node user
-USER node
-
-# Default shell
-SHELL ["/bin/bash", "-lc"]
+WORKDIR /workspace

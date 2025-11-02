@@ -1,7 +1,7 @@
 services:
   postgres:
     image: pgvector/pgvector:pg17
-    container_name: dnd-postgres
+    container_name: circulo-postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -20,7 +20,7 @@ services:
 
   redis:
     image: redis:7
-    container_name: dnd-redis
+    container_name: circulo-redis
     command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "6379:6379"
