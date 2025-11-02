@@ -1,14 +1,15 @@
 services:
   app:
     build:
-      context: .
+      context: ..
       dockerfile: .devcontainer/Dockerfile
     volumes:
-      - .:/workspace:cached
+      - ..:/workspace:cached
       # Cache node_modules for faster rebuilds
       - node_modules:/workspace/web/node_modules
       - pnpm-store:/home/node/.local/share/pnpm/store
     command: sleep infinity
+    working_dir: /workspace/web
     network_mode: service:postgres
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@localhost:5432/app
@@ -25,7 +26,7 @@ services:
     restart: unless-stopped
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+      - ../docker/initdb:/docker-entrypoint-initdb.d:ro
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
