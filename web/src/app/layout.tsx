@@ -1,4 +1,5 @@
 import { AuthClientProvider } from "@/providers/auth-client-provider";
+import { PointerProvider } from "@/providers/pointer-provider";
 import { SessionProvider } from "@/providers/session-provider";
 import { ThemeProvider } from "@/providers/theme-provider";
 import type { Metadata } from "next";
@@ -26,8 +27,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className={fontSans.variable}>
         <ThemeProvider>
           <SessionProvider>
-            <AuthClientProvider>{children}</AuthClientProvider>
-            <Toaster />
+            <PointerProvider>
+              <AuthClientProvider>{children}</AuthClientProvider>
+              <Toaster />
+            </PointerProvider>
           </SessionProvider>
         </ThemeProvider>
       </body>
