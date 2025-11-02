@@ -142,6 +142,7 @@
   .main-section:not(:first-of-type) {
     height: 100vh;
     padding-top: 5rem;
+    margin-bottom: 5rem;
   }
   .main-section:first-of-type {
     height: calc(100vh - 5rem);

@@ -11,7 +11,7 @@ import { ReactNode, useRef, useState } from "react";
  */
 export function AnimatedList<T extends string | number>(props: {
   ids: T[];
-  renderItem: (id: T) => ReactNode;
+  renderItem: (id: T, index: number) => ReactNode;
   className?: string;
   itemClassName?: string;
   /**
@@ -40,7 +40,7 @@ export function AnimatedList<T extends string | number>(props: {
       initial={false}
     >
       <AnimatePresence mode="popLayout">
-        {ids.map((id) => (
+        {ids.map((id, index) => (
           <motion.li
             key={id}
             layout
@@ -56,7 +56,7 @@ export function AnimatedList<T extends string | number>(props: {
               exit={{ height: 0, opacity: 0 }}
               transition={{ type: "spring", bounce: 0, duration: 0.35 }}
             >
-              {renderItem(id)}
+              {renderItem(id, index)}
             </motion.div>
           </motion.li>
         ))}

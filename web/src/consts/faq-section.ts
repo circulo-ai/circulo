@@ -12,14 +12,16 @@ import {
   Users,
 } from "lucide-react";
 
-const tags = ["General", "Pricing", "Dashboard", "API"] as const;
+export const tags = ["General", "Pricing", "Dashboard", "API"] as const;
+
+export type Tag = (typeof tags)[number];
 
 interface Faq {
   question: string;
   answer: string;
   index: number;
   icon: Icon;
-  tags: (typeof tags)[number][];
+  tags: Tag[];
 }
 
 export const faqs: Faq[] = [
@@ -45,7 +47,7 @@ export const faqs: Faq[] = [
       "Yes. You can select, rename, and fine-tune each AI’s tone, domain expertise, and visual identity within your dashboard.",
     index: 3,
     icon: Settings,
-    tags: ["Dashboard"],
+    tags: ["General", "Dashboard"],
   },
   {
     question: "How do pricing plans work?",
@@ -53,7 +55,7 @@ export const faqs: Faq[] = [
       "Circulo offers usage-based tiers. You pay only for active AI sessions or token usage. Team and enterprise plans include additional API access and analytics.",
     index: 4,
     icon: DollarSign,
-    tags: ["Pricing"],
+    tags: ["General", "Pricing"],
   },
   {
     question: "Does Circulo provide an API?",
@@ -61,7 +63,7 @@ export const faqs: Faq[] = [
       "Yes. Developers can use the Circulo API to embed multi-agent conversations in their own products or automate decision-making workflows.",
     index: 5,
     icon: Code,
-    tags: ["API"],
+    tags: ["General", "API"],
   },
   {
     question: "Can Circulo run offline or locally?",
@@ -85,7 +87,7 @@ export const faqs: Faq[] = [
       "Yes. Multi-user mode lets several participants join the same round table, enabling collaborative brainstorming or design critiques.",
     index: 8,
     icon: Globe,
-    tags: ["Dashboard"],
+    tags: ["General", "Dashboard"],
   },
   {
     question: "How do AI personalities interact with each other?",

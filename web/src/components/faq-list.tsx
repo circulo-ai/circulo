@@ -1,0 +1,63 @@
+"use client";
+
+import { faqs } from "@/consts/faq-section";
+import { cn } from "@/lib/utils";
+import { useFaq } from "@/providers/faq-provider";
+import { ComponentProps, useMemo } from "react";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "./ui/accordion";
+import { AnimatedList } from "./ui/animated-list";
+import { ScrollArea } from "./ui/scroll-area";
+
+export function FaqList({
+  className,
+  ...props
+}: ComponentProps<typeof ScrollArea>) {
+  const [{ selectedTag }] = useFaq();
+  const filteredFaqs = useMemo(
+    () => faqs.filter((faq) => faq.tags.includes(selectedTag)),
+    [selectedTag],
+  );
+
+  return (
+    <ScrollArea className={cn("", className)} {...props}>
+      <div className="from-background pointer-events-none absolute inset-x-0 top-0 z-10 h-16 bg-linear-to-b to-transparent" />
+      <Accordion
+        type="single"
+        collapsible={true}
+        className="my-16"
+        defaultValue={faqs[0].index.toString()}
+      >
+        <AnimatedList
+          ids={filteredFaqs.map((faq) => faq.index)}
+          renderItem={(id) => {
+            const faq = faqs.find((faq) => faq.index === id);
+            if (!faq) return;
+            return (
+              <AccordionItem
+                className="pr-4"
+                value={faq.index.toString()}
+                key={faq.index}
+              >
+                <AccordionTrigger className="items-center underline-offset-6">
+                  <div className="rounded-md border-2 border-teal-50/10 p-2">
+                    <faq.icon className="text-foreground/75 size-4" />
+                  </div>
+                  <h4 className="font-semibold">{faq.question}</h4>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <p className="text-foreground/75 ms-13">{faq.answer}</p>
+                </AccordionContent>
+              </AccordionItem>
+            );
+          }}
+        />
+      </Accordion>
+      <div className="from-background pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-linear-to-t to-transparent" />
+    </ScrollArea>
+  );
+}
