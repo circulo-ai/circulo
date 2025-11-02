@@ -11,8 +11,6 @@ services:
       - /workspace/web/node_modules
       - /workspace/web/.next
       - pnpm-store:/home/node/.local/share/pnpm/store
-      # Git credential helper cache
-      - git-credential-cache:/home/node/.git-credential-cache
     command: sleep infinity
     working_dir: /workspace/web
     environment:
@@ -21,7 +19,6 @@ services:
       - NODE_ENV=development
       - DB_HOST=postgres
       - REDIS_HOST=redis
-      - GIT_CREDENTIAL_HELPER=cache
       # Enable file watching in Docker (hot reload fix)
       - WATCHPACK_POLLING=true
       - CHOKIDAR_USEPOLLING=true
@@ -83,7 +80,6 @@ volumes:
   postgres-data:
   redis-data:
   pnpm-store:
-  git-credential-cache:
 
 networks:
   devnet:

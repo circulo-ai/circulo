@@ -87,7 +87,7 @@
     }
   },
 
-  "forwardPorts": [5432, 6379],
+  "forwardPorts": [5432, 6379, 3456, 3000],
   "portsAttributes": {
     "3000": {
       "label": "Next.js App",
@@ -120,13 +120,6 @@
       "username": "node",
       "userUid": "1000",
       "userGid": "1000"
-    },
-    "ghcr.io/devcontainers/features/git:1": {
-      "version": "latest",
-      "ppa": true
-    },
-    "ghcr.io/devcontainers/features/sshd:1": {
-      "version": "latest"
     }
   },
 
