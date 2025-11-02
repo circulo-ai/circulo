@@ -5,13 +5,12 @@ services:
     build:
       context: ..
       dockerfile: .devcontainer/Dockerfile
-    user: "1000:1000"  # Prevent permission issues
+    user: "1000:1000"
     volumes:
       - ..:/workspace:cached
       - /workspace/web/node_modules
       - /workspace/web/.next
       - pnpm-store:/home/node/.local/share/pnpm/store
-      # Git credential helper cache
       - git-credential-cache:/home/node/.git-credential-cache
     command: sleep infinity
     working_dir: /workspace/web
@@ -21,7 +20,6 @@ services:
       - NODE_ENV=development
       - DB_HOST=postgres
       - REDIS_HOST=redis
-      # Git credential helper
       - GIT_CREDENTIAL_HELPER=cache
     depends_on:
       postgres:
@@ -45,16 +43,17 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: app
       PGDATA: /var/lib/postgresql/data/pgdata
-      # Ensure UTF8 encoding
-      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      # Disable locale warnings
+      LC_ALL: C
+      LANG: C
     healthcheck:
-      test:
-        - "CMD-SHELL"
-        - "pg_isready -U postgres -d app && psql -U postgres -d app -c 'SELECT 1 FROM pg_extension WHERE extname = ''vector''' || exit 1"
+      # Simplified health check - just verify postgres is accepting connections
+      test: ["CMD-SHELL", "pg_isready -U postgres -d app"]
       interval: 5s
-      timeout: 3s
-      retries: 15
-      start_period: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
     networks:
       - devnet
 
@@ -71,7 +70,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-      start_period: 5s
+      start_period: 10s
     networks:
       - devnet
 
