@@ -130,11 +130,13 @@
     }
   },
 
-  "mounts": [
-    "source=${localEnv:USERPROFILE}${localEnv:HOME}/.gitconfig,target=/home/node/.gitconfig,type=bind,consistency=cached"
-  ],
+  "mounts": [],
 
   "containerEnv": {
     "GIT_EDITOR": "code --wait"
-  }
+  },
+
+  "initializeCommand": "echo 'Initializing devcontainer...'",
+
+  "postAttachCommand": "echo 'Container attached successfully!'"
 }

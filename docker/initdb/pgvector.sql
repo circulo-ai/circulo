@@ -1,19 +1,20 @@
--- This file runs automatically when the postgres container is first created
--- It runs as the postgres superuser, so it has permission to create extensions
+-- Create database if it doesn't exist (this is handled by POSTGRES_DB env var)
+-- Enable required PostgreSQL extensions
 
--- Enable pgvector extension
+-- pgvector extension for vector embeddings
 CREATE EXTENSION IF NOT EXISTS vector;
 
--- Enable other useful extensions
+-- uuid-ossp for UUID generation
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 
--- Grant necessary permissions to the postgres user
-GRANT ALL PRIVILEGES ON DATABASE app TO postgres;
+-- pg_trgm for trigram text search
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
--- Output confirmation
+-- Verify extensions are installed
 DO $$
 BEGIN
-    RAISE NOTICE 'Extensions initialized successfully';
-    RAISE NOTICE 'pgvector version: %', (SELECT extversion FROM pg_extension WHERE extname = 'vector');
+    RAISE NOTICE 'Installed extensions:';
+    RAISE NOTICE '- vector: %', (SELECT extversion FROM pg_extension WHERE extname = 'vector');
+    RAISE NOTICE '- uuid-ossp: %', (SELECT extversion FROM pg_extension WHERE extname = 'uuid-ossp');
+    RAISE NOTICE '- pg_trgm: %', (SELECT extversion FROM pg_extension WHERE extname = 'pg_trgm');
 END $$;
