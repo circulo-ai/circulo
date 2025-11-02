@@ -795,7 +795,7 @@ export type PromptInputTextareaProps = ComponentProps<
 export const PromptInputTextarea = ({
   onChange,
   className,
-  placeholder = "why",
+  placeholder = "Ask something from AI?",
   ...props
 }: PromptInputTextareaProps) => {
   const controller = useOptionalPromptInputController();

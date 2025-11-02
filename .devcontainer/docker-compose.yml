@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   app:
     build:
@@ -5,10 +7,11 @@ services:
       dockerfile: .devcontainer/Dockerfile
     user: "1000:1000"
     volumes:
-      - ..:/workspace:cached
+      - ..:/workspace:delegated # Changed from 'cached' to 'delegated' for better file sync
       - /workspace/web/node_modules
       - /workspace/web/.next
       - pnpm-store:/home/node/.local/share/pnpm/store
+      # Git credential helper cache
       - git-credential-cache:/home/node/.git-credential-cache
     command: sleep infinity
     working_dir: /workspace/web
@@ -19,6 +22,10 @@ services:
       - DB_HOST=postgres
       - REDIS_HOST=redis
       - GIT_CREDENTIAL_HELPER=cache
+      # Enable file watching in Docker (hot reload fix)
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
+      - CHOKIDAR_INTERVAL=1000
     depends_on:
       postgres:
         condition: service_healthy

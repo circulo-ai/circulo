@@ -49,7 +49,7 @@ import { Fragment, useState } from "react";
 
 const models = [
   {
-    name: "GPT 4o",
+    name: "gemini-2.5-flash",
     value: "openai/gpt-4o",
   },
   {
@@ -192,6 +192,7 @@ const ChatBotDemo = () => {
           </PromptInputHeader>
           <PromptInputBody>
             <PromptInputTextarea
+              placeholder="asdasd"
               onChange={(e) => setInput(e.target.value)}
               value={input}
             />
