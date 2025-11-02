@@ -11,6 +11,8 @@ services:
       - /workspace/web/node_modules
       - /workspace/web/.next
       - pnpm-store:/home/node/.local/share/pnpm/store
+      # Git credential helper cache
+      - git-credential-cache:/home/node/.git-credential-cache
     command: sleep infinity
     working_dir: /workspace/web
     environment:
@@ -19,6 +21,8 @@ services:
       - NODE_ENV=development
       - DB_HOST=postgres
       - REDIS_HOST=redis
+      # Git credential helper
+      - GIT_CREDENTIAL_HELPER=cache
     depends_on:
       postgres:
         condition: service_healthy
@@ -34,17 +38,22 @@ services:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      # Mount init scripts - they run on first container creation
       - ../docker/initdb:/docker-entrypoint-initdb.d:ro
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: app
       PGDATA: /var/lib/postgresql/data/pgdata
+      # Ensure UTF8 encoding
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d app"]
+      test:
+        - "CMD-SHELL"
+        - "pg_isready -U postgres -d app && psql -U postgres -d app -c 'SELECT 1 FROM pg_extension WHERE extname = ''vector''' || exit 1"
       interval: 5s
       timeout: 3s
-      retries: 10
+      retries: 15
       start_period: 10s
     networks:
       - devnet
@@ -70,6 +79,7 @@ volumes:
   postgres-data:
   redis-data:
   pnpm-store:
+  git-credential-cache:
 
 networks:
   devnet:
