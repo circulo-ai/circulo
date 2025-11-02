@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   app:
     build:
@@ -5,25 +7,27 @@ services:
       dockerfile: .devcontainer/Dockerfile
     volumes:
       - ..:/workspace:cached
-      # Use anonymous volume for node_modules (better for Windows)
       - /workspace/web/node_modules
       - pnpm-store:/home/node/.local/share/pnpm/store
     command: sleep infinity
     working_dir: /workspace/web
-    network_mode: service:postgres
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@localhost:5432/app
-      - REDIS_URL=redis://localhost:6379
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/app
+      - REDIS_URL=redis://redis:6379
       - NODE_ENV=development
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - devnet
 
   postgres:
     image: pgvector/pgvector:pg17
     restart: unless-stopped
+    ports:
+      - "5432:5432"                # ✅ Expose Postgres to host
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ../docker/initdb:/docker-entrypoint-initdb.d:ro
@@ -36,10 +40,14 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    networks:
+      - devnet
 
   redis:
     image: redis:7
     restart: unless-stopped
+    ports:
+      - "6379:6379"                # ✅ Expose Redis to host
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redis-data:/data
@@ -48,9 +56,13 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-    network_mode: service:postgres
+    networks:
+      - devnet
 
 volumes:
   postgres-data:
   redis-data:
   pnpm-store:
+
+networks:
+  devnet:
