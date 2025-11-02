@@ -5,9 +5,6 @@ import { withWorkflow } from "workflow/next";
 
 const nextConfig: NextConfig = {
   /* config options here */
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   turbopack: {
     resolveExtensions: [".tsx", ".ts", ".jsx", ".js", ".mjs", ".json"],
   },
@@ -17,6 +14,15 @@ const nextConfig: NextConfig = {
     "@t3-oss/env-core",
     "@ton/ton",
   ],
+  webpack: (config, { isDev }) => {
+    if (isDev && process.env.CHOKIDAR_USEPOLLING) {
+      config.watchOptions = {
+        poll: 1000, // Check for changes every second
+        aggregateTimeout: 300, // Delay before rebuilding
+      };
+    }
+    return config;
+  },
   ...(isDev && {
     allowedDevOrigins: [
       ...(env.NEXT_PUBLIC_APP_URL
