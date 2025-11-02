@@ -5,9 +5,10 @@ echo "Starting post-create setup..."
 
 echo "Setting safe Git defaults for devcontainer..."
 if git rev-parse --show-toplevel > /dev/null 2>&1; then
-  git config --global core.autocrlf input
-  git config --global core.fileMode false
-  git config --global core.eol lf
+  # Use --local instead of --global to avoid issues with mounted .gitconfig
+  git config --local core.autocrlf input 2>/dev/null || echo "Note: Could not set core.autocrlf (git config may be read-only)"
+  git config --local core.fileMode false 2>/dev/null || echo "Note: Could not set core.fileMode (git config may be read-only)"
+  git config --local core.eol lf 2>/dev/null || echo "Note: Could not set core.eol (git config may be read-only)"
 else
   echo "WARNING: Not inside a git repository - skipping git config setup."
 fi
@@ -61,6 +62,9 @@ fi
 DB_HOST=${DB_HOST:-postgres}
 REDIS_HOST=${REDIS_HOST:-redis}
 
+# Set PostgreSQL password for non-interactive commands
+export PGPASSWORD=postgres
+
 # Wait for postgres to be fully ready with better error handling
 echo "Waiting for PostgreSQL to be ready..."
 max_attempts=60
@@ -79,12 +83,26 @@ done
 
 echo "PostgreSQL is ready!"
 
-# Verify database exists
-echo "Verifying database 'app' exists..."
-if ! psql -h "$DB_HOST" -U postgres -lqt | cut -d \| -f 1 | grep -qw app; then
-    echo "Creating database 'app'..."
-    psql -h "$DB_HOST" -U postgres -c "CREATE DATABASE app;" || echo "Database might already exist"
+# Verify database 'app' exists and is accessible
+echo "Verifying database connection..."
+if psql -h "$DB_HOST" -U postgres -d app -c "SELECT 1;" > /dev/null 2>&1; then
+    echo "✅ Database 'app' is accessible"
+else
+    echo "⚠️  Database 'app' might not exist, attempting to create..."
+    psql -h "$DB_HOST" -U postgres -c "CREATE DATABASE app;" 2>/dev/null || echo "Database creation skipped (might already exist)"
+
+    # Verify again
+    if psql -h "$DB_HOST" -U postgres -d app -c "SELECT 1;" > /dev/null 2>&1; then
+        echo "✅ Database 'app' is now accessible"
+    else
+        echo "❌ Could not access database 'app'"
+        unset PGPASSWORD
+        exit 1
+    fi
 fi
+
+# Clean up password variable
+unset PGPASSWORD
 
 # Wait for Redis to be ready
 echo "Waiting for Redis to be ready..."

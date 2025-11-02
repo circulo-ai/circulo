@@ -10,26 +10,43 @@ else
   exit 1
 fi
 
+# Set PostgreSQL password for non-interactive commands
+export PGPASSWORD=postgres
+
 # Verify PostgreSQL connection (use service name, not localhost)
 if pg_isready -h postgres -p 5432 -U postgres > /dev/null 2>&1; then
-    echo "PostgreSQL is running"
+    echo "✅ PostgreSQL is running"
+
+    # Try to connect to the app database
+    if psql -h postgres -U postgres -d app -c "SELECT 1;" > /dev/null 2>&1; then
+        echo "✅ Database 'app' is accessible"
+    else
+        echo "⚠️  Database 'app' is not accessible"
+    fi
 else
-    echo "WARNING: PostgreSQL is not accessible"
+    echo "⚠️  PostgreSQL is not accessible"
 fi
 
 # Verify Redis connection (use service name, not localhost)
 if redis-cli -h redis ping > /dev/null 2>&1; then
-    echo "Redis is running"
+    echo "✅ Redis is running"
 else
-    echo "WARNING: Redis is not accessible"
+    echo "⚠️  Redis is not accessible"
 fi
+
+# Clean up password variable
+unset PGPASSWORD
 
 # Check if .env exists
 if [ -f ".env" ]; then
-    echo ".env file exists"
+    echo "✅ .env file exists"
 else
-    echo "WARNING: .env file not found - copy from .env.example"
+    echo "⚠️  .env file not found - copy from .env.example"
 fi
 
-echo "Container is ready for development!"
-echo "Run 'cd web && pnpm dev' to start the development server"
+echo ""
+echo "=========================================="
+echo "🚀 Container is ready for development!"
+echo "=========================================="
+echo ""
+echo "Run 'pnpm dev' to start the development server"
