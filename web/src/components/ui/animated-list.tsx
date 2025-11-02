@@ -25,10 +25,8 @@ export function AnimatedList<T extends string | number>(props: {
     className,
     itemClassName,
     layoutTransition = {
-      type: "spring",
-      damping: 30,
-      stiffness: 400,
-      mass: 0.6,
+      duration: 0.15,
+      ease: [0.4, 0, 0.2, 1],
     },
   } = props;
 

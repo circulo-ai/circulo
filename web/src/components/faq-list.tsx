@@ -1,9 +1,8 @@
 "use client";
 
 import { faqs } from "@/consts/faq-section";
-import { cn } from "@/lib/utils";
 import { useFaq } from "@/providers/faq-provider";
-import { ComponentProps, useMemo } from "react";
+import { ComponentProps, useEffect, useMemo, useRef } from "react";
 import {
   Accordion,
   AccordionContent,
@@ -13,18 +12,22 @@ import {
 import { AnimatedList } from "./ui/animated-list";
 import { ScrollArea } from "./ui/scroll-area";
 
-export function FaqList({
-  className,
-  ...props
-}: ComponentProps<typeof ScrollArea>) {
+export function FaqList(props: ComponentProps<typeof ScrollArea>) {
   const [{ selectedTag }] = useFaq();
   const filteredFaqs = useMemo(
     () => faqs.filter((faq) => faq.tags.includes(selectedTag)),
     [selectedTag],
   );
 
+  const viewportRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    el.scrollTo({ top: 0, behavior: "instant" });
+  }, [selectedTag]);
+
   return (
-    <ScrollArea className={cn("", className)} {...props}>
+    <ScrollArea viewportRef={viewportRef} {...props}>
       <div className="from-background pointer-events-none absolute inset-x-0 top-0 z-10 h-16 bg-linear-to-b to-transparent" />
       <Accordion
         type="single"
