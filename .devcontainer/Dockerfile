@@ -21,9 +21,17 @@ RUN if [ "$USER_GID" != "1000" ] || [ "$USER_UID" != "1000" ]; then \
     && chown -R $USER_UID:$USER_GID /home/$USERNAME; \
     fi
 
-# Install global npm packages
+# Install global npm packages as root
 RUN npm install -g pnpm@latest drizzle-kit@latest
+
+# Create directories with proper ownership BEFORE switching user
+RUN mkdir -p /workspace/web && \
+    mkdir -p /home/$USERNAME/.local/share/pnpm/store && \
+    mkdir -p /home/$USERNAME/.local/share/pnpm/.tools && \
+    mkdir -p /home/$USERNAME/.cache && \
+    chown -R $USERNAME:$USERNAME /workspace && \
+    chown -R $USERNAME:$USERNAME /home/$USERNAME
 
 USER $USERNAME
 
-WORKDIR /workspace
+WORKDIR /workspace/web
