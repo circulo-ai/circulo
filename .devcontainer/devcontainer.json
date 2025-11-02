@@ -2,7 +2,7 @@
   "name": "DnD Dev Environment",
   "dockerComposeFile": "docker-compose.yml",
   "service": "app",
-  "workspaceFolder": "/workspace/web",
+  "workspaceFolder": "/workspace",
 
   "customizations": {
     "vscode": {

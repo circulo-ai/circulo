@@ -4,11 +4,19 @@ set -e
 echo "🚀 Starting post-create setup..."
 
 # Navigate to web directory
-cd /workspace/web
+if [ -d "/workspace/web" ]; then
+  cd /workspace/web
+fi
+
 
 echo "⚙️  Setting safe Git defaults for devcontainer..."
-git config core.autocrlf input
-git config core.fileMode false
+if git rev-parse --show-toplevel > /dev/null 2>&1; then
+  git config core.autocrlf input
+  git config core.fileMode false
+else
+  echo "⚠️  Not inside a git repository — skipping git config setup."
+fi
+
 
 # Fix permissions for the workspace (needed for Windows mounts)
 if [ ! -f "/tmp/.chown-done" ]; then
