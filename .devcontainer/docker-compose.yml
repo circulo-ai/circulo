@@ -5,9 +5,11 @@ services:
     build:
       context: ..
       dockerfile: .devcontainer/Dockerfile
+    user: "1000:1000"  # Prevent permission issues
     volumes:
       - ..:/workspace:cached
       - /workspace/web/node_modules
+      - /workspace/web/.next
       - pnpm-store:/home/node/.local/share/pnpm/store
     command: sleep infinity
     working_dir: /workspace/web
@@ -15,6 +17,8 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/app
       - REDIS_URL=redis://redis:6379
       - NODE_ENV=development
+      - DB_HOST=postgres
+      - REDIS_HOST=redis
     depends_on:
       postgres:
         condition: service_healthy
@@ -27,7 +31,7 @@ services:
     image: pgvector/pgvector:pg17
     restart: unless-stopped
     ports:
-      - "5432:5432"                # ✅ Expose Postgres to host
+      - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ../docker/initdb:/docker-entrypoint-initdb.d:ro
@@ -35,20 +39,22 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: app
+      PGDATA: /var/lib/postgresql/data/pgdata
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d app"]
       interval: 5s
       timeout: 3s
       retries: 10
+      start_period: 10s
     networks:
       - devnet
 
   redis:
-    image: redis:7
+    image: redis:7-alpine
     restart: unless-stopped
     ports:
-      - "6379:6379"                # ✅ Expose Redis to host
-    command: ["redis-server", "--appendonly", "yes"]
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
     volumes:
       - redis-data:/data
     healthcheck:
@@ -56,6 +62,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+      start_period: 5s
     networks:
       - devnet
 
@@ -66,3 +73,4 @@ volumes:
 
 networks:
   devnet:
+    driver: bridge

@@ -20,14 +20,13 @@
       ],
       "settings": {
         "terminal.integrated.defaultProfile.linux": "zsh",
+        "terminal.integrated.cwd": "/workspace/web",
 
-        // Prettier settings
         "editor.formatOnSave": true,
         "editor.formatOnPaste": false,
         "editor.formatOnType": false,
         "editor.defaultFormatter": "esbenp.prettier-vscode",
 
-        // ESLint settings
         "eslint.enable": true,
         "eslint.validate": [
           "javascript",
@@ -36,14 +35,13 @@
           "typescriptreact"
         ],
         "eslint.format.enable": false,
+        "eslint.workingDirectories": ["/workspace/web"],
 
-        // Code actions on save
         "editor.codeActionsOnSave": {
           "source.fixAll.eslint": "explicit",
           "source.organizeImports": "never"
         },
 
-        // File-specific formatters
         "[javascript]": {
           "editor.defaultFormatter": "esbenp.prettier-vscode"
         },
@@ -75,17 +73,21 @@
           "editor.defaultFormatter": "esbenp.prettier-vscode"
         },
 
-        // Additional helpful settings
         "files.eol": "\n",
         "files.insertFinalNewline": true,
         "files.trimTrailingWhitespace": true,
-        "typescript.tsdk": "node_modules/typescript/lib",
-        "typescript.enablePromptUseWorkspaceTsdk": true
+        "typescript.tsdk": "web/node_modules/typescript/lib",
+        "typescript.enablePromptUseWorkspaceTsdk": true,
+
+        "search.exclude": {
+          "**/node_modules": true,
+          "**/.next": true
+        }
       }
     }
   },
 
-"forwardPorts": [3000, 5432, 6379],
+  "forwardPorts": [3000, 5432, 6379],
   "portsAttributes": {
     "3000": {
       "label": "Next.js App",
@@ -96,23 +98,20 @@
     },
     "6379": {
       "label": "Redis"
-    },
-    "8030": {
-      "label": "Trigger API"
     }
   },
 
   "postCreateCommand": "bash /workspace/.devcontainer/post-create.sh",
   "postStartCommand": "bash /workspace/.devcontainer/post-start.sh",
 
-  "waitFor": "onCreateCommand",
+  "waitFor": "postCreateCommand",
 
   "overrideCommand": false,
 
-  // Skip post-create on subsequent starts for speed
-  "updateContentCommand": "echo '✨ Container updated - dependencies already installed'",
+  "updateContentCommand": "echo 'Container updated - dependencies already installed'",
 
   "remoteUser": "node",
+
   "features": {
     "ghcr.io/devcontainers/features/common-utils:2": {
       "installZsh": true,
