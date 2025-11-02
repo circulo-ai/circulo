@@ -3,6 +3,9 @@ set -e
 
 echo "🔄 Running post-start checks..."
 
+# Navigate to web directory
+cd /workspace/web
+
 # Verify PostgreSQL connection
 if pg_isready -h localhost -p 5432 -U postgres > /dev/null 2>&1; then
     echo "✅ PostgreSQL is running"

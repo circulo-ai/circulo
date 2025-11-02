@@ -1,8 +1,8 @@
 {
-  "name": "Circulo Dev Environment",
+  "name": "DnD Dev Environment",
   "dockerComposeFile": "docker-compose.yml",
   "service": "app",
-  "workspaceFolder": "/workspace",
+  "workspaceFolder": "/workspace/web",
   
   "customizations": {
     "vscode": {
@@ -15,15 +15,72 @@
         "usernamehw.errorlens",
         "christian-kohler.path-intellisense",
         "formulahendry.auto-rename-tag",
-        "cweijan.vscode-postgresql-client2"
+        "cweijan.vscode-postgresql-client2",
+        "rvest.vs-code-prettier-eslint"
       ],
       "settings": {
         "terminal.integrated.defaultProfile.linux": "zsh",
+        
+        // Prettier settings
         "editor.formatOnSave": true,
+        "editor.formatOnPaste": false,
+        "editor.formatOnType": false,
         "editor.defaultFormatter": "esbenp.prettier-vscode",
+        
+        // ESLint settings
+        "eslint.enable": true,
+        "eslint.validate": [
+          "javascript",
+          "javascriptreact",
+          "typescript",
+          "typescriptreact"
+        ],
+        "eslint.format.enable": false,
+        
+        // Code actions on save
         "editor.codeActionsOnSave": {
-          "source.fixAll.eslint": "explicit"
-        }
+          "source.fixAll.eslint": "explicit",
+          "source.organizeImports": "never"
+        },
+        
+        // File-specific formatters
+        "[javascript]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[javascriptreact]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[typescript]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[typescriptreact]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[json]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[jsonc]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[css]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[scss]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[html]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[markdown]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        
+        // Additional helpful settings
+        "files.eol": "\n",
+        "files.insertFinalNewline": true,
+        "files.trimTrailingWhitespace": true,
+        "typescript.tsdk": "node_modules/typescript/lib",
+        "typescript.enablePromptUseWorkspaceTsdk": true
       }
     }
   },
@@ -48,6 +105,9 @@
   "postCreateCommand": "bash .devcontainer/post-create.sh",
   "postStartCommand": "bash .devcontainer/post-start.sh",
 
+  // Skip post-create on subsequent starts for speed
+  "updateContentCommand": "echo '✨ Container updated - dependencies already installed'",
+
   "remoteUser": "node",
   "features": {
     "ghcr.io/devcontainers/features/common-utils:2": {
@@ -63,3 +123,4 @@
       "ppa": true
     }
   }
+}

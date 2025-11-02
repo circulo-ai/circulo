@@ -3,6 +3,15 @@ set -e
 
 echo "🚀 Starting post-create setup..."
 
+# Navigate to web directory
+cd /workspace/web
+
+# Check if setup was already done (for rebuild scenarios)
+if [ -f "/tmp/.devcontainer-setup-done" ]; then
+    echo "✅ Setup already completed previously, skipping..."
+    exit 0
+fi
+
 # Check if we're in the right directory
 if [ ! -f "package.json" ]; then
     echo "❌ Error: package.json not found. Are you in the project root?"
@@ -80,6 +89,9 @@ if [ -f "drizzle.config.ts" ]; then
 else
     echo "⚠️  drizzle.config.ts not found, skipping migrations"
 fi
+
+# Mark setup as complete
+touch /tmp/.devcontainer-setup-done
 
 echo "✨ Post-create setup complete!"
 echo ""
