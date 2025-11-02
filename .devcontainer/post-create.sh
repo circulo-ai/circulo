@@ -48,11 +48,14 @@ if [ ! -f ".env" ] && [ -f ".env.example" ]; then
     echo "⚠️  Remember to update your .env file with actual values!"
 fi
 
+DB_HOST=${DB_HOST:-postgres}
+REDIS_HOST=${REDIS_HOST:-redis}
+
 # Wait for postgres to be fully ready
 echo "⏳ Waiting for PostgreSQL to be ready..."
 max_attempts=30
 attempt=0
-until pg_isready -h localhost -p 5432 -U postgres > /dev/null 2>&1 || [ $attempt -eq $max_attempts ]; do
+until pg_isready -h "$DB_HOST" -p 5432 -U postgres > /dev/null 2>&1 || [ $attempt -eq $max_attempts ]; do
     attempt=$((attempt + 1))
     echo "Waiting for PostgreSQL... (attempt $attempt/$max_attempts)"
     sleep 2
@@ -69,7 +72,7 @@ echo "✅ PostgreSQL is ready!"
 echo "⏳ Waiting for Redis to be ready..."
 max_attempts=30
 attempt=0
-until redis-cli -h localhost ping > /dev/null 2>&1 || [ $attempt -eq $max_attempts ]; do
+until redis-cli -h "$REDIS_HOST" ping > /dev/null 2>&1 || [ $attempt -eq $max_attempts ]; do
     attempt=$((attempt + 1))
     echo "Waiting for Redis... (attempt $attempt/$max_attempts)"
     sleep 2
