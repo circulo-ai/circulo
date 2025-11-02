@@ -24,6 +24,11 @@ RUN if [ "$USER_GID" != "1000" ] || [ "$USER_UID" != "1000" ]; then \
 # Install global npm packages as root
 RUN npm install -g pnpm@latest drizzle-kit@latest
 
+# Install sudo for permission fixes
+RUN apt-get update && apt-get install -y sudo && \
+    echo "node ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers && \
+    apt-get clean -y && rm -rf /var/lib/apt/lists/*
+
 # Create directories with proper ownership BEFORE switching user
 RUN mkdir -p /workspace/web && \
     mkdir -p /home/$USERNAME/.local/share/pnpm/store && \

@@ -6,6 +6,10 @@ echo "🚀 Starting post-create setup..."
 # Navigate to web directory
 cd /workspace/web
 
+# Fix permissions for the workspace (needed for Windows mounts)
+echo "🔧 Fixing permissions..."
+sudo chown -R node:node /workspace/web
+
 # Check if setup was already done (for rebuild scenarios)
 if [ -f "/tmp/.devcontainer-setup-done" ]; then
     echo "✅ Setup already completed previously, skipping..."

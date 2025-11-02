@@ -122,5 +122,13 @@
       "version": "latest",
       "ppa": true
     }
+  },
+
+  "mounts": [
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.gitconfig,target=/home/node/.gitconfig,type=bind,consistency=cached"
+  ],
+
+  "containerEnv": {
+    "GIT_EDITOR": "code --wait"
   }
 }
