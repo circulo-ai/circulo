@@ -6,9 +6,16 @@ echo "🚀 Starting post-create setup..."
 # Navigate to web directory
 cd /workspace/web
 
+echo "⚙️  Setting safe Git defaults for devcontainer..."
+git config core.autocrlf input
+git config core.fileMode false
+
 # Fix permissions for the workspace (needed for Windows mounts)
-echo "🔧 Fixing permissions..."
-sudo chown -R node:node /workspace/web
+if [ ! -f "/tmp/.chown-done" ]; then
+    echo "🔧 Fixing permissions..."
+    sudo chown -R node:node /workspace/web
+    touch /tmp/.chown-done
+fi
 
 # Check if setup was already done (for rebuild scenarios)
 if [ -f "/tmp/.devcontainer-setup-done" ]; then
@@ -78,17 +85,17 @@ echo "✅ Redis is ready!"
 # Run Drizzle migrations
 if [ -f "drizzle.config.ts" ]; then
     echo "🗄️  Running Drizzle migrations..."
-    
+
     # Generate migrations if the migrations folder doesn't exist or is empty
     if [ ! -d "src/db/migrations" ] || [ -z "$(ls -A src/db/migrations 2>/dev/null)" ]; then
         echo "📝 Generating initial migrations..."
         pnpm drizzle-kit generate || npm run drizzle-kit generate || drizzle-kit generate
     fi
-    
+
     # Push/migrate the schema
     echo "⬆️  Pushing schema to database..."
     pnpm drizzle-kit push || npm run drizzle-kit push || drizzle-kit push
-    
+
     echo "✅ Database migrations completed!"
 else
     echo "⚠️  drizzle.config.ts not found, skipping migrations"

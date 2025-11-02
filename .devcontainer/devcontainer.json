@@ -105,6 +105,10 @@
   "postCreateCommand": "bash /workspace/.devcontainer/post-create.sh",
   "postStartCommand": "bash /workspace/.devcontainer/post-start.sh",
 
+  "waitFor": "onCreateCommand",
+  
+  "overrideCommand": false,
+
   // Skip post-create on subsequent starts for speed
   "updateContentCommand": "echo '✨ Container updated - dependencies already installed'",
 
