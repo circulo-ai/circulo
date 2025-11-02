@@ -5,8 +5,8 @@ services:
       dockerfile: .devcontainer/Dockerfile
     volumes:
       - ..:/workspace:cached
-      # Cache node_modules for faster rebuilds
-      - node_modules:/workspace/web/node_modules
+      # Use anonymous volume for node_modules (better for Windows)
+      - /workspace/web/node_modules
       - pnpm-store:/home/node/.local/share/pnpm/store
     command: sleep infinity
     working_dir: /workspace/web
@@ -53,5 +53,4 @@ services:
 volumes:
   postgres-data:
   redis-data:
-  node_modules:
   pnpm-store:
