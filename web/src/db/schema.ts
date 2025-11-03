@@ -1,21 +1,22 @@
+import { UIMessage } from "ai";
 import { relations, SQL, sql } from "drizzle-orm";
-import { 
-  pgTable, 
-  text, 
-  timestamp, 
-  boolean, 
-  integer,
-  decimal,
-  json,
-  jsonb,
-  index,
-  uniqueIndex,
-  vector,
-  customType,
-  pgEnum,
-  pgView,
-  uuid,
+import {
+  boolean,
   check,
+  customType,
+  decimal,
+  index,
+  integer,
+  jsonb,
+  numeric,
+  pgEnum,
+  pgTable,
+  pgView,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+  vector,
 } from "drizzle-orm/pg-core";
 
 // ============================================================================
@@ -32,20 +33,64 @@ export const tsvector = customType<{ data: string }>({
 // ENUMS
 // ============================================================================
 
-export const chatVisibilityEnum = pgEnum('chat_visibility', ['public', 'private']);
-export const chatStyleEnum = pgEnum('chat_style', ['brainstorm', 'debate', 'analyze', 'custom']);
-export const transactionTypeEnum = pgEnum('transaction_type', [
-  'deposit',
-  'withdrawal', 
-  'chat_usage',
-  'embedding_usage',
-  'refund'
+export const chatVisibilityEnum = pgEnum("chat_visibility", [
+  "public",
+  "private",
 ]);
-export const transactionStatusEnum = pgEnum('transaction_status', [
-  'pending',
-  'completed',
-  'failed',
-  'cancelled'
+export const chatStyleEnum = pgEnum("chat_style", [
+  "brainstorm",
+  "debate",
+  "analyze",
+  "custom",
+]);
+export const transactionTypeEnum = pgEnum("transaction_type", [
+  "deposit",
+  "withdrawal",
+  "chat_usage",
+  "embedding_usage",
+  "refund",
+]);
+export const transactionStatusEnum = pgEnum("transaction_status", [
+  "pending",
+  "completed",
+  "failed",
+  "cancelled",
+]);
+
+export const paymentStatusEnum = pgEnum("payment_status", [
+  "pending",
+  "awaiting_payment",
+  "completed",
+  "failed",
+  "cancelled",
+  "refunded",
+]);
+
+export const paymentProviderEnum = pgEnum("payment_provider", ["sizpay"]);
+
+// Billing enums for subscriptions and invoices
+export const billingIntervalEnum = pgEnum("billing_interval", [
+  "day",
+  "week",
+  "month",
+  "year",
+]);
+
+export const subscriptionStatusEnum = pgEnum("subscription_status", [
+  "trialing",
+  "active",
+  "past_due",
+  "paused",
+  "cancelled",
+  "expired",
+]);
+
+export const invoiceStatusEnum = pgEnum("invoice_status", [
+  "draft",
+  "open",
+  "paid",
+  "void",
+  "uncollectible",
 ]);
 
 // ============================================================================
@@ -67,413 +112,774 @@ export const user = pgTable("user", {
   telegramUsername: text("telegram_username"),
 });
 
-export const session = pgTable("session", {
-  id: text("id").primaryKey(),
-  expiresAt: timestamp("expires_at").notNull(),
-  token: text("token").notNull().unique(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at")
-    .$onUpdate(() => new Date())
-    .notNull(),
-  ipAddress: text("ip_address"),
-  userAgent: text("user_agent"),
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-}, (table) => ({
-  userIdIdx: index('session_user_id_idx').on(table.userId),
-  tokenIdx: index('session_token_idx').on(table.token),
-}));
+export const session = pgTable(
+  "session",
+  {
+    id: text("id").primaryKey(),
+    expiresAt: timestamp("expires_at").notNull(),
+    token: text("token").notNull().unique(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .$onUpdate(() => new Date())
+      .notNull(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+  },
+  (table) => ({
+    userIdIdx: index("session_user_id_idx").on(table.userId),
+    tokenIdx: index("session_token_idx").on(table.token),
+  }),
+);
 
-export const account = pgTable("account", {
-  id: text("id").primaryKey(),
-  accountId: text("account_id").notNull(),
-  providerId: text("provider_id").notNull(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-  accessToken: text("access_token"),
-  refreshToken: text("refresh_token"),
-  idToken: text("id_token"),
-  accessTokenExpiresAt: timestamp("access_token_expires_at"),
-  refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
-  scope: text("scope"),
-  password: text("password"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at")
-    .$onUpdate(() => new Date())
-    .notNull(),
-  telegramId: text("telegram_id"),
-  telegramUsername: text("telegram_username"),
-}, (table) => ({
-  userIdIdx: index('account_user_id_idx').on(table.userId),
-}));
+export const account = pgTable(
+  "account",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("account_id").notNull(),
+    providerId: text("provider_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    accessToken: text("access_token"),
+    refreshToken: text("refresh_token"),
+    idToken: text("id_token"),
+    accessTokenExpiresAt: timestamp("access_token_expires_at"),
+    refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
+    scope: text("scope"),
+    password: text("password"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .$onUpdate(() => new Date())
+      .notNull(),
+    telegramId: text("telegram_id"),
+    telegramUsername: text("telegram_username"),
+  },
+  (table) => ({
+    userIdIdx: index("account_user_id_idx").on(table.userId),
+  }),
+);
 
-export const verification = pgTable("verification", {
-  id: text("id").primaryKey(),
-  identifier: text("identifier").notNull(),
-  value: text("value").notNull(),
-  expiresAt: timestamp("expires_at").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at")
-    .defaultNow()
-    .$onUpdate(() => new Date())
-    .notNull(),
-}, (table) => ({
-  identifierIdx: index('verification_identifier_idx').on(table.identifier),
-}));
+export const verification = pgTable(
+  "verification",
+  {
+    id: text("id").primaryKey(),
+    identifier: text("identifier").notNull(),
+    value: text("value").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => ({
+    identifierIdx: index("verification_identifier_idx").on(table.identifier),
+  }),
+);
 
 // ============================================================================
 // WALLET & TRANSACTIONS
 // ============================================================================
 
-export const wallet = pgTable('wallet', {
-  id: text('id').primaryKey(),
-  userId: text('user_id')
-    .notNull()
-    .references(() => user.id, { onDelete: 'cascade' })
-    .unique(),
-  balance: decimal('balance', { precision: 10, scale: 2 }).notNull().default('0.00'),
-  currency: text('currency').notNull().default('USD'),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-}, (table) => ({
-  userIdIdx: index('wallet_user_id_idx').on(table.userId),
-}));
+export const wallet = pgTable(
+  "wallet",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" })
+      .unique(),
+    balance: decimal("balance", { precision: 10, scale: 2 })
+      .notNull()
+      .default("0.00"),
+    currency: text("currency").notNull().default("USD"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index("wallet_user_id_idx").on(table.userId),
+  }),
+);
 
-export const transaction = pgTable('transaction', {
-  id: text('id').primaryKey(),
-  userId: text('user_id')
-    .notNull()
-    .references(() => user.id, { onDelete: 'cascade' }),
-  walletId: text('wallet_id')
-    .notNull()
-    .references(() => wallet.id, { onDelete: 'cascade' }),
-  type: transactionTypeEnum('type').notNull(),
-  status: transactionStatusEnum('status').notNull().default('pending'),
-  amount: decimal('amount', { precision: 10, scale: 4 }).notNull(),
-  balanceBefore: decimal('balance_before', { precision: 10, scale: 2 }).notNull(),
-  balanceAfter: decimal('balance_after', { precision: 10, scale: 2 }).notNull(),
-  
-  // Reference to related entities
-  chatId: text('chat_id').references(() => chat.id, { onDelete: 'set null' }),
-  
-  description: text('description'),
-  metadata: jsonb('metadata').default('{}'),
-  
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-}, (table) => ({
-  userIdIdx: index('transaction_user_id_idx').on(table.userId),
-  walletIdIdx: index('transaction_wallet_id_idx').on(table.walletId),
-  chatIdIdx: index('transaction_chat_id_idx').on(table.chatId),
-  typeIdx: index('transaction_type_idx').on(table.type),
-  statusIdx: index('transaction_status_idx').on(table.status),
-  createdAtIdx: index('transaction_created_at_idx').on(table.createdAt),
-  userCreatedAtIdx: index('transaction_user_created_at_idx').on(table.userId, table.createdAt),
-}));
+export const transaction = pgTable(
+  "transaction",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    walletId: text("wallet_id")
+      .notNull()
+      .references(() => wallet.id, { onDelete: "cascade" }),
+    type: transactionTypeEnum("type").notNull(),
+    status: transactionStatusEnum("status").notNull().default("pending"),
+    amount: decimal("amount", { precision: 10, scale: 4 }).notNull(),
+    balanceBefore: decimal("balance_before", {
+      precision: 10,
+      scale: 2,
+    }).notNull(),
+    balanceAfter: decimal("balance_after", {
+      precision: 10,
+      scale: 2,
+    }).notNull(),
+
+    // Reference to related entities
+    chatId: text("chat_id").references(() => chat.id, { onDelete: "set null" }),
+
+    description: text("description"),
+    metadata: jsonb("metadata").default("{}"),
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index("transaction_user_id_idx").on(table.userId),
+    walletIdIdx: index("transaction_wallet_id_idx").on(table.walletId),
+    chatIdIdx: index("transaction_chat_id_idx").on(table.chatId),
+    typeIdx: index("transaction_type_idx").on(table.type),
+    statusIdx: index("transaction_status_idx").on(table.status),
+    createdAtIdx: index("transaction_created_at_idx").on(table.createdAt),
+    userCreatedAtIdx: index("transaction_user_created_at_idx").on(
+      table.userId,
+      table.createdAt,
+    ),
+  }),
+);
+
+export const payment = pgTable(
+  "payment",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    walletId: text("wallet_id")
+      .notNull()
+      .references(() => wallet.id, { onDelete: "cascade" }),
+    transactionId: text("transaction_id").references(() => transaction.id, {
+      onDelete: "set null",
+    }),
+
+    // Payment details
+    provider: paymentProviderEnum("provider").notNull().default("sizpay"),
+    status: paymentStatusEnum("status").notNull().default("pending"),
+
+    amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+    currency: text("currency").notNull().default("IRR"),
+
+    // Provider-specific data
+    providerToken: text("provider_token"),
+    providerOrderId: text("provider_order_id"),
+    providerTransactionId: text("provider_transaction_id"),
+    providerRefNo: text("provider_ref_no"),
+    providerTraceNo: text("provider_trace_no"),
+
+    // Card details (masked)
+    cardNumber: text("card_number"), // last 4 digits only
+
+    // URLs
+    callbackUrl: text("callback_url").notNull(),
+    gatewayUrl: text("gateway_url"),
+
+    // Additional metadata
+    metadata: text("metadata"), // JSON string
+    errorMessage: text("error_message"),
+
+    // Timestamps
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    paidAt: timestamp("paid_at"),
+    expiresAt: timestamp("expires_at"),
+  },
+  (table) => ({
+    userIdIdx: index("payment_user_id_idx").on(table.userId),
+    walletIdIdx: index("payment_wallet_id_idx").on(table.walletId),
+    transactionIdIdx: index("payment_transaction_id_idx").on(
+      table.transactionId,
+    ),
+    statusIdx: index("payment_status_idx").on(table.status),
+    providerTokenIdx: index("payment_provider_token_idx").on(
+      table.providerToken,
+    ),
+    providerOrderIdIdx: index("payment_provider_order_id_idx").on(
+      table.providerOrderId,
+    ),
+    createdAtIdx: index("payment_created_at_idx").on(table.createdAt),
+    userStatusIdx: index("payment_user_status_idx").on(
+      table.userId,
+      table.status,
+    ),
+  }),
+);
+
+// ============================================================================
+// BILLING: PLANS, SUBSCRIPTIONS, INVOICES, USAGE
+// ============================================================================
+
+export const subscriptionPlan = pgTable(
+  "subscription_plan",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    description: text("description"),
+    amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+    currency: text("currency").notNull().default("IRR"),
+    interval: billingIntervalEnum("interval").notNull().default("month"),
+    intervalCount: integer("interval_count").notNull().default(1),
+    trialPeriodDays: integer("trial_period_days"),
+    features: jsonb("features").notNull().default("{}"),
+    metadata: jsonb("metadata").default("{}"),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => ({
+    activeIdx: index("subscription_plan_active_idx").on(table.active),
+    intervalIdx: index("subscription_plan_interval_idx").on(table.interval),
+    amountIdx: index("subscription_plan_amount_idx").on(table.amount),
+    nameIdx: index("subscription_plan_name_idx").on(table.name),
+  }),
+);
+
+export const subscription = pgTable(
+  "subscription",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    planId: text("plan_id")
+      .notNull()
+      .references(() => subscriptionPlan.id, { onDelete: "restrict" }),
+    status: subscriptionStatusEnum("status").notNull().default("active"),
+    currentPeriodStart: timestamp("current_period_start").notNull(),
+    currentPeriodEnd: timestamp("current_period_end").notNull(),
+    canceledAt: timestamp("canceled_at"),
+    trialStart: timestamp("trial_start"),
+    trialEnd: timestamp("trial_end"),
+    metadata: jsonb("metadata").default("{}"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => ({
+    userIdx: index("subscription_user_id_idx").on(table.userId),
+    planIdx: index("subscription_plan_id_idx").on(table.planId),
+    statusIdx: index("subscription_status_idx").on(table.status),
+    periodIdx: index("subscription_period_idx").on(
+      table.currentPeriodStart,
+      table.currentPeriodEnd,
+    ),
+  }),
+);
+
+export const invoice = pgTable(
+  "invoice",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    subscriptionId: text("subscription_id").references(() => subscription.id, {
+      onDelete: "set null",
+    }),
+    number: text("number").notNull(),
+    status: invoiceStatusEnum("status").notNull().default("draft"),
+    subtotalAmount: decimal("subtotal_amount", {
+      precision: 10,
+      scale: 2,
+    }).notNull(),
+    subtotalCurrency: text("subtotal_currency").notNull().default("IRR"),
+    taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }),
+    taxCurrency: text("tax_currency"),
+    totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
+    totalCurrency: text("total_currency").notNull().default("IRR"),
+    dueDate: timestamp("due_date"),
+    paidAt: timestamp("paid_at"),
+    metadata: jsonb("metadata").default("{}"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => ({
+    userIdx: index("invoice_user_id_idx").on(table.userId),
+    subIdx: index("invoice_subscription_id_idx").on(table.subscriptionId),
+    statusIdx: index("invoice_status_idx").on(table.status),
+    numberUniqueIdx: index("invoice_number_idx").on(table.number),
+    createdAtIdx: index("invoice_created_at_idx").on(table.createdAt),
+  }),
+);
+
+export const invoiceLineItem = pgTable(
+  "invoice_line_item",
+  {
+    id: text("id").primaryKey(),
+    invoiceId: text("invoice_id")
+      .notNull()
+      .references(() => invoice.id, { onDelete: "cascade" }),
+    description: text("description").notNull(),
+    quantity: integer("quantity").notNull().default(1),
+    unitAmount: decimal("unit_amount", { precision: 10, scale: 2 }).notNull(),
+    unitCurrency: text("unit_currency").notNull().default("IRR"),
+    amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+    currency: text("currency").notNull().default("IRR"),
+    metadata: jsonb("metadata").default("{}"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    invoiceIdx: index("invoice_line_item_invoice_id_idx").on(table.invoiceId),
+    createdAtIdx: index("invoice_line_item_created_at_idx").on(
+      table.createdAt,
+    ),
+  }),
+);
+
+export const paymentMethod = pgTable(
+  "payment_method",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    providerId: text("provider_id").notNull(),
+    providerMethodId: text("provider_method_id").notNull(),
+    isDefault: boolean("is_default").notNull().default(false),
+    lastFour: text("last_four"),
+    expiryMonth: integer("expiry_month"),
+    expiryYear: integer("expiry_year"),
+    metadata: jsonb("metadata").default("{}"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => ({
+    userIdx: index("payment_method_user_id_idx").on(table.userId),
+    providerIdx: index("payment_method_provider_id_idx").on(table.providerId),
+    defaultIdx: index("payment_method_default_idx").on(table.isDefault),
+  }),
+);
+
+export const usageRecord = pgTable(
+  "usage_record",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    subscriptionId: text("subscription_id")
+      .notNull()
+      .references(() => subscription.id, { onDelete: "cascade" }),
+    metric: text("metric").notNull(),
+    quantity: integer("quantity").notNull(),
+    timestamp: timestamp("timestamp").notNull().defaultNow(),
+    metadata: jsonb("metadata").default("{}"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    subIdx: index("usage_record_subscription_id_idx").on(table.subscriptionId),
+    metricIdx: index("usage_record_metric_idx").on(table.metric),
+    periodIdx: index("usage_record_period_idx").on(table.timestamp),
+  }),
+);
 
 // User-facing transaction view
-export const userTransactionView = pgView('user_transaction_view').as((qb) => 
-  qb.select({
-    id: transaction.id,
-    userId: transaction.userId,
-    type: transaction.type,
-    status: transaction.status,
-    amount: transaction.amount,
-    balanceAfter: transaction.balanceAfter,
-    description: transaction.description,
-    chatId: transaction.chatId,
-    createdAt: transaction.createdAt,
-  })
-  .from(transaction)
-  .where(sql`${transaction.status} = 'completed'`)
+export const userTransactionView = pgView("user_transaction_view").as((qb) =>
+  qb
+    .select({
+      id: transaction.id,
+      userId: transaction.userId,
+      type: transaction.type,
+      status: transaction.status,
+      amount: transaction.amount,
+      balanceAfter: transaction.balanceAfter,
+      description: transaction.description,
+      chatId: transaction.chatId,
+      createdAt: transaction.createdAt,
+    })
+    .from(transaction)
+    .where(sql`${transaction.status} = 'completed'`),
 );
 
 // ============================================================================
 // AGENTS
 // ============================================================================
 
-export const agent = pgTable('agent', {
-  id: text('id').primaryKey(),
-  userId: text('user_id')
-    .notNull()
-    .references(() => user.id, { onDelete: 'cascade' }),
-  
-  name: text('name').notNull(),
-  description: text('description'),
-  systemPrompt: text('system_prompt').notNull(),
-  
-  // Model configuration
-  model: text('model').notNull().default('gpt-4'),
-  temperature: decimal('temperature', { precision: 3, scale: 2 }).default('0.7'),
-  maxTokens: integer('max_tokens').default(2000),
-  
-  // Avatar and styling
-  avatar: text('avatar'),
-  color: text('color').default('#3B82F6'),
-  
-  // Visibility
-  isPublic: boolean('is_public').notNull().default(false),
-  
-  // Tools configuration (JSON array of tool names/configs)
-  tools: jsonb('tools').default('[]'),
-  
-  // Usage stats
-  usageCount: integer('usage_count').notNull().default(0),
-  
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-}, (table) => ({
-  userIdIdx: index('agent_user_id_idx').on(table.userId),
-  isPublicIdx: index('agent_is_public_idx').on(table.isPublic),
-  userPublicIdx: index('agent_user_public_idx').on(table.userId, table.isPublic),
-  usageCountIdx: index('agent_usage_count_idx').on(table.usageCount),
-}));
+export const agent = pgTable(
+  "agent",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+
+    name: text("name").notNull(),
+    description: text("description"),
+    systemPrompt: text("system_prompt").notNull(),
+
+    // Model configuration
+    model: text("model").notNull().default("gpt-4"),
+    temperature: numeric("temperature", {
+      precision: 3,
+      scale: 2,
+      mode: "number",
+    })
+      .notNull()
+      .default(0.7),
+    maxTokens: integer("max_tokens").default(2000),
+
+    // Avatar and styling
+    avatar: text("avatar"),
+    color: text("color").default("#3B82F6"),
+
+    // Visibility
+    isPublic: boolean("is_public").notNull().default(false),
+
+    // Tools configuration (JSON array of tool names/configs)
+    tools: jsonb("tools").default("[]"),
+
+    // Usage stats
+    usageCount: integer("usage_count").notNull().default(0),
+
+    deleted: boolean("deleted").notNull().default(false),
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index("agent_user_id_idx").on(table.userId),
+    isPublicIdx: index("agent_is_public_idx").on(table.isPublic),
+    userPublicIdx: index("agent_user_public_idx").on(
+      table.userId,
+      table.isPublic,
+    ),
+    usageCountIdx: index("agent_usage_count_idx").on(table.usageCount),
+  }),
+);
 
 // ============================================================================
 // KNOWLEDGE BASES
 // ============================================================================
 
-export const knowledgeBase = pgTable('knowledge_base', {
-  id: text('id').primaryKey(),
-  userId: text('user_id')
-    .notNull()
-    .references(() => user.id, { onDelete: 'cascade' }),
-  
-  name: text('name').notNull(),
-  description: text('description'),
-  
-  // Embedding configuration
-  embeddingModel: text('embedding_model').notNull().default('text-embedding-3-small'),
-  embeddingDimension: integer('embedding_dimension').notNull().default(1536),
-  
-  // Stats
-  documentCount: integer('document_count').notNull().default(0),
-  totalTokens: integer('total_tokens').notNull().default(0),
-  
-  isPublic: boolean('is_public').notNull().default(false),
-  
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-}, (table) => ({
-  userIdIdx: index('kb_user_id_idx').on(table.userId),
-  isPublicIdx: index('kb_is_public_idx').on(table.isPublic),
-}));
+export const knowledgeBase = pgTable(
+  "knowledge_base",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
 
-export const document = pgTable('document', {
-  id: text('id').primaryKey(),
-  knowledgeBaseId: text('knowledge_base_id')
-    .notNull()
-    .references(() => knowledgeBase.id, { onDelete: 'cascade' }),
-  
-  filename: text('filename').notNull(),
-  fileUrl: text('file_url').notNull(),
-  fileSize: integer('file_size').notNull(),
-  mimeType: text('mime_type').notNull(),
-  
-  chunkCount: integer('chunk_count').notNull().default(0),
-  tokenCount: integer('token_count').notNull().default(0),
-  
-  processingStatus: text('processing_status').notNull().default('pending'),
-  processingError: text('processing_error'),
-  
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-}, (table) => ({
-  kbIdIdx: index('document_kb_id_idx').on(table.knowledgeBaseId),
-  statusIdx: index('document_status_idx').on(table.processingStatus),
-}));
+    name: text("name").notNull(),
+    description: text("description"),
 
-export const embedding = pgTable('embedding', {
-  id: text('id').primaryKey(),
-  knowledgeBaseId: text('knowledge_base_id')
-    .notNull()
-    .references(() => knowledgeBase.id, { onDelete: 'cascade' }),
-  documentId: text('document_id')
-    .notNull()
-    .references(() => document.id, { onDelete: 'cascade' }),
-  
-  content: text('content').notNull(),
-  chunkIndex: integer('chunk_index').notNull(),
-  tokenCount: integer('token_count').notNull(),
-  
-  // Vector embedding
-  embedding: vector('embedding', { dimensions: 1536 }).notNull(),
-  
-  // Full-text search
-  contentTsv: tsvector('content_tsv').generatedAlwaysAs(
-    (): SQL => sql`to_tsvector('english', ${embedding.content})`
-  ),
-  
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-}, (table) => ({
-  kbIdIdx: index('embedding_kb_id_idx').on(table.knowledgeBaseId),
-  docIdIdx: index('embedding_doc_id_idx').on(table.documentId),
-  docChunkIdx: uniqueIndex('embedding_doc_chunk_idx').on(table.documentId, table.chunkIndex),
-  
-  // Vector similarity search (HNSW)
-  embeddingVectorIdx: index('embedding_vector_hnsw_idx')
-    .using('hnsw', table.embedding.op('vector_cosine_ops'))
-    .with({ m: 16, ef_construction: 64 }),
-  
-  // Full-text search
-  contentFtsIdx: index('embedding_content_fts_idx').using('gin', table.contentTsv),
-}));
+    // Embedding configuration
+    embeddingModel: text("embedding_model")
+      .notNull()
+      .default("text-embedding-3-small"),
+    embeddingDimension: integer("embedding_dimension").notNull().default(1536),
+
+    // Stats
+    documentCount: integer("document_count").notNull().default(0),
+    totalTokens: integer("total_tokens").notNull().default(0),
+
+    isPublic: boolean("is_public").notNull().default(false),
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index("kb_user_id_idx").on(table.userId),
+    isPublicIdx: index("kb_is_public_idx").on(table.isPublic),
+  }),
+);
+
+export const document = pgTable(
+  "document",
+  {
+    id: text("id").primaryKey(),
+    knowledgeBaseId: text("knowledge_base_id")
+      .notNull()
+      .references(() => knowledgeBase.id, { onDelete: "cascade" }),
+
+    filename: text("filename").notNull(),
+    fileUrl: text("file_url").notNull(),
+    fileSize: integer("file_size").notNull(),
+    mimeType: text("mime_type").notNull(),
+
+    chunkCount: integer("chunk_count").notNull().default(0),
+    tokenCount: integer("token_count").notNull().default(0),
+
+    processingStatus: text("processing_status").notNull().default("pending"),
+    processingError: text("processing_error"),
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    kbIdIdx: index("document_kb_id_idx").on(table.knowledgeBaseId),
+    statusIdx: index("document_status_idx").on(table.processingStatus),
+  }),
+);
+
+export const embedding = pgTable(
+  "embedding",
+  {
+    id: text("id").primaryKey(),
+    knowledgeBaseId: text("knowledge_base_id")
+      .notNull()
+      .references(() => knowledgeBase.id, { onDelete: "cascade" }),
+    documentId: text("document_id")
+      .notNull()
+      .references(() => document.id, { onDelete: "cascade" }),
+
+    content: text("content").notNull(),
+    chunkIndex: integer("chunk_index").notNull(),
+    tokenCount: integer("token_count").notNull(),
+
+    // Vector embedding
+    embedding: vector("embedding", { dimensions: 1536 }).notNull(),
+
+    // Full-text search
+    contentTsv: tsvector("content_tsv").generatedAlwaysAs(
+      (): SQL => sql`to_tsvector('english', ${embedding.content})`,
+    ),
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    kbIdIdx: index("embedding_kb_id_idx").on(table.knowledgeBaseId),
+    docIdIdx: index("embedding_doc_id_idx").on(table.documentId),
+    docChunkIdx: uniqueIndex("embedding_doc_chunk_idx").on(
+      table.documentId,
+      table.chunkIndex,
+    ),
+
+    // Vector similarity search (HNSW)
+    embeddingVectorIdx: index("embedding_vector_hnsw_idx")
+      .using("hnsw", table.embedding.op("vector_cosine_ops"))
+      .with({ m: 16, ef_construction: 64 }),
+
+    // Full-text search
+    contentFtsIdx: index("embedding_content_fts_idx").using(
+      "gin",
+      table.contentTsv,
+    ),
+  }),
+);
 
 // ============================================================================
 // CHATS
 // ============================================================================
 
-export const chat = pgTable('chat', {
-  id: text('id').primaryKey(),
-  userId: text('user_id')
-    .notNull()
-    .references(() => user.id, { onDelete: 'cascade' }),
-  
-  title: text('title').notNull(),
-  description: text('description'),
-  
-  // Chat configuration
-  style: chatStyleEnum('style').notNull().default('brainstorm'),
-  visibility: chatVisibilityEnum('visibility').notNull().default('private'),
-  
-  // Share link (for public/private accessible chats)
-  shareLink: text('share_link').unique(),
-  linkEnabled: boolean('link_enabled').notNull().default(false),
-  
-  // Custom instructions for the roundtable
-  instructions: text('instructions'),
-  
-  // Usage tracking
-  messageCount: integer('message_count').notNull().default(0),
-  totalTokens: integer('total_tokens').notNull().default(0),
-  totalCost: decimal('total_cost', { precision: 10, scale: 4 }).notNull().default('0.0000'),
-  
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-}, (table) => ({
-  userIdIdx: index('chat_user_id_idx').on(table.userId),
-  visibilityIdx: index('chat_visibility_idx').on(table.visibility),
-  shareLinkIdx: index('chat_share_link_idx').on(table.shareLink),
-  userCreatedAtIdx: index('chat_user_created_at_idx').on(table.userId, table.createdAt),
-}));
+export const chat = pgTable(
+  "chat",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+
+    title: text("title").notNull(),
+    description: text("description"),
+
+    // Chat configuration
+    style: chatStyleEnum("style").notNull().default("brainstorm"),
+    visibility: chatVisibilityEnum("visibility").notNull().default("private"),
+
+    // Share link (for public/private accessible chats)
+    shareLink: text("share_link").unique(),
+    linkEnabled: boolean("link_enabled").notNull().default(false),
+
+    // Custom instructions for the roundtable
+    instructions: text("instructions"),
+
+    // Usage tracking
+    messageCount: integer("message_count").notNull().default(0),
+    totalTokens: integer("total_tokens").notNull().default(0),
+    totalCost: decimal("total_cost", { precision: 10, scale: 4 })
+      .notNull()
+      .default("0.0000"),
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index("chat_user_id_idx").on(table.userId),
+    visibilityIdx: index("chat_visibility_idx").on(table.visibility),
+    shareLinkIdx: index("chat_share_link_idx").on(table.shareLink),
+    userCreatedAtIdx: index("chat_user_created_at_idx").on(
+      table.userId,
+      table.createdAt,
+    ),
+  }),
+);
 
 // Agent-Chat relationship (defines the order and which agents participate)
-export const chatAgent = pgTable('chat_agent', {
-  id: text('id').primaryKey(),
-  chatId: text('chat_id')
-    .notNull()
-    .references(() => chat.id, { onDelete: 'cascade' }),
-  agentId: text('agent_id')
-    .notNull()
-    .references(() => agent.id, { onDelete: 'cascade' }),
-  
-  // Order in the roundtable (who speaks after whom)
-  speakOrder: integer('speak_order').notNull(),
-  
-  // Can be disabled without removing from chat
-  enabled: boolean('enabled').notNull().default(true),
-  
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-}, (table) => ({
-  chatIdIdx: index('chat_agent_chat_id_idx').on(table.chatId),
-  agentIdIdx: index('chat_agent_agent_id_idx').on(table.agentId),
-  chatOrderIdx: index('chat_agent_chat_order_idx').on(table.chatId, table.speakOrder),
-  uniqueChatAgentIdx: uniqueIndex('chat_agent_unique_idx').on(table.chatId, table.agentId),
-}));
+export const chatAgent = pgTable(
+  "chat_agent",
+  {
+    id: text("id").primaryKey(),
+    chatId: text("chat_id")
+      .notNull()
+      .references(() => chat.id, { onDelete: "cascade" }),
+    agentId: text("agent_id")
+      .notNull()
+      .references(() => agent.id, { onDelete: "cascade" }),
+
+    // Order in the roundtable (who speaks after whom)
+    speakOrder: integer("speak_order").notNull(),
+
+    // Can be disabled without removing from chat
+    enabled: boolean("enabled").notNull().default(true),
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    chatIdIdx: index("chat_agent_chat_id_idx").on(table.chatId),
+    agentIdIdx: index("chat_agent_agent_id_idx").on(table.agentId),
+    chatOrderIdx: index("chat_agent_chat_order_idx").on(
+      table.chatId,
+      table.speakOrder,
+    ),
+    uniqueChatAgentIdx: uniqueIndex("chat_agent_unique_idx").on(
+      table.chatId,
+      table.agentId,
+    ),
+  }),
+);
 
 // Knowledge Base-Chat relationship
-export const chatKnowledgeBase = pgTable('chat_knowledge_base', {
-  id: text('id').primaryKey(),
-  chatId: text('chat_id')
-    .notNull()
-    .references(() => chat.id, { onDelete: 'cascade' }),
-  knowledgeBaseId: text('knowledge_base_id')
-    .notNull()
-    .references(() => knowledgeBase.id, { onDelete: 'cascade' }),
-  
-  enabled: boolean('enabled').notNull().default(true),
-  
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-}, (table) => ({
-  chatIdIdx: index('chat_kb_chat_id_idx').on(table.chatId),
-  kbIdIdx: index('chat_kb_kb_id_idx').on(table.knowledgeBaseId),
-  uniqueChatKbIdx: uniqueIndex('chat_kb_unique_idx').on(table.chatId, table.knowledgeBaseId),
-}));
+export const chatKnowledgeBase = pgTable(
+  "chat_knowledge_base",
+  {
+    id: text("id").primaryKey(),
+    chatId: text("chat_id")
+      .notNull()
+      .references(() => chat.id, { onDelete: "cascade" }),
+    knowledgeBaseId: text("knowledge_base_id")
+      .notNull()
+      .references(() => knowledgeBase.id, { onDelete: "cascade" }),
+
+    enabled: boolean("enabled").notNull().default(true),
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    chatIdIdx: index("chat_kb_chat_id_idx").on(table.chatId),
+    kbIdIdx: index("chat_kb_kb_id_idx").on(table.knowledgeBaseId),
+    uniqueChatKbIdx: uniqueIndex("chat_kb_unique_idx").on(
+      table.chatId,
+      table.knowledgeBaseId,
+    ),
+  }),
+);
 
 // ============================================================================
 // MESSAGES
 // ============================================================================
 
-export const message = pgTable('message', {
-  id: text('id').primaryKey(),
-  chatId: text('chat_id')
-    .notNull()
-    .references(() => chat.id, { onDelete: 'cascade' }),
-  
-  // Who sent the message (user or agent)
-  userId: text('user_id').references(() => user.id, { onDelete: 'set null' }),
-  agentId: text('agent_id').references(() => agent.id, { onDelete: 'set null' }),
-  
-  content: text('content').notNull(),
-  
-  // Message metadata
-  tokenCount: integer('token_count').notNull().default(0),
-  cost: decimal('cost', { precision: 10, scale: 6 }).default('0.000000'),
-  
-  // Tool calls and results
-  toolCalls: jsonb('tool_calls').default('[]'),
-  
-  // References for quotes/replies (self-reference)
-  quotedMessageId: text('quoted_message_id'),
-  
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-}, (table) => ({
-  chatIdIdx: index('message_chat_id_idx').on(table.chatId),
-  userIdIdx: index('message_user_id_idx').on(table.userId),
-  agentIdIdx: index('message_agent_id_idx').on(table.agentId),
-  chatCreatedAtIdx: index('message_chat_created_at_idx').on(table.chatId, table.createdAt),
-  quotedMessageIdx: index('message_quoted_idx').on(table.quotedMessageId),
-  
-  // Ensure message is from either user or agent, not both
-  senderCheck: check(
-    'message_sender_check',
-    sql`(user_id IS NOT NULL AND agent_id IS NULL) OR (user_id IS NULL AND agent_id IS NOT NULL)`
-  ),
-}));
+export const message = pgTable(
+  "message",
+  {
+    id: text("id").primaryKey(),
+    chatId: text("chat_id")
+      .notNull()
+      .references(() => chat.id, { onDelete: "cascade" }),
+
+    // Who sent the message (user or agent)
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    agentId: text("agent_id").references(() => agent.id, {
+      onDelete: "set null",
+    }),
+
+    content: text("content").notNull(),
+
+    // Message metadata
+    tokenCount: integer("token_count").notNull().default(0),
+    cost: decimal("cost", { precision: 10, scale: 6 }).default("0.000000"),
+
+    // Tool calls and results
+    toolCalls: jsonb("tool_calls").default("[]"),
+
+    // UI representation of the message (e.g., for streaming)
+    uiMessage: jsonb("ui_message").$type<UIMessage>(),
+
+    // References for quotes/replies (self-reference)
+    quotedMessageId: text("quoted_message_id"),
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    chatIdIdx: index("message_chat_id_idx").on(table.chatId),
+    userIdIdx: index("message_user_id_idx").on(table.userId),
+    agentIdIdx: index("message_agent_id_idx").on(table.agentId),
+    chatCreatedAtIdx: index("message_chat_created_at_idx").on(
+      table.chatId,
+      table.createdAt,
+    ),
+    quotedMessageIdx: index("message_quoted_idx").on(table.quotedMessageId),
+
+    // Ensure message is from either user or agent, not both
+    senderCheck: check(
+      "message_sender_check",
+      sql`(user_id IS NOT NULL AND agent_id IS NULL) OR (user_id IS NULL AND agent_id IS NOT NULL)`,
+    ),
+  }),
+);
 
 // ============================================================================
 // AUDIT LOGS
 // ============================================================================
 
-export const auditLog = pgTable('audit_log', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: text('user_id').references(() => user.id, { onDelete: 'set null' }),
-  
-  action: text('action').notNull(), // e.g., 'agent.create', 'chat.start', 'message.send'
-  entityType: text('entity_type').notNull(), // e.g., 'agent', 'chat', 'message'
-  entityId: text('entity_id'),
-  
-  details: jsonb('details').default('{}'),
-  
-  ipAddress: text('ip_address'),
-  userAgent: text('user_agent'),
-  
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-}, (table) => ({
-  userIdIdx: index('audit_log_user_id_idx').on(table.userId),
-  actionIdx: index('audit_log_action_idx').on(table.action),
-  entityIdx: index('audit_log_entity_idx').on(table.entityType, table.entityId),
-  createdAtIdx: index('audit_log_created_at_idx').on(table.createdAt),
-  userCreatedAtIdx: index('audit_log_user_created_at_idx').on(table.userId, table.createdAt),
-}));
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+
+    action: text("action").notNull(), // e.g., 'agent.create', 'chat.start', 'message.send'
+    entityType: text("entity_type").notNull(), // e.g., 'agent', 'chat', 'message'
+    entityId: text("entity_id"),
+
+    details: jsonb("details").default("{}"),
+
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    userIdIdx: index("audit_log_user_id_idx").on(table.userId),
+    actionIdx: index("audit_log_action_idx").on(table.action),
+    entityIdx: index("audit_log_entity_idx").on(
+      table.entityType,
+      table.entityId,
+    ),
+    createdAtIdx: index("audit_log_created_at_idx").on(table.createdAt),
+    userCreatedAtIdx: index("audit_log_user_created_at_idx").on(
+      table.userId,
+      table.createdAt,
+    ),
+  }),
+);
 
 // ============================================================================
 // RELATIONS (for self-referential and clarity)
 // ============================================================================
 
 // Self-referential foreign key for message quotes
-// In your migration, add: 
-// ALTER TABLE message ADD CONSTRAINT message_quoted_message_id_fk 
+// In your migration, add:
+// ALTER TABLE message ADD CONSTRAINT message_quoted_message_id_fk
 // FOREIGN KEY (quoted_message_id) REFERENCES message(id) ON DELETE SET NULL;
 
 // User relations
@@ -529,6 +935,64 @@ export const transactionRelations = relations(transaction, ({ one }) => ({
   }),
 }));
 
+// Billing relations
+export const subscriptionPlanRelations = relations(
+  subscriptionPlan,
+  ({ many }) => ({
+    subscriptions: many(subscription),
+  }),
+);
+
+export const subscriptionRelations = relations(subscription, ({ one, many }) => ({
+  user: one(user, {
+    fields: [subscription.userId],
+    references: [user.id],
+  }),
+  plan: one(subscriptionPlan, {
+    fields: [subscription.planId],
+    references: [subscriptionPlan.id],
+  }),
+  invoices: many(invoice),
+  usageRecords: many(usageRecord),
+}));
+
+export const invoiceRelations = relations(invoice, ({ one, many }) => ({
+  user: one(user, {
+    fields: [invoice.userId],
+    references: [user.id],
+  }),
+  subscription: one(subscription, {
+    fields: [invoice.subscriptionId],
+    references: [subscription.id],
+  }),
+  lineItems: many(invoiceLineItem),
+}));
+
+export const invoiceLineItemRelations = relations(invoiceLineItem, ({ one }) => ({
+  invoice: one(invoice, {
+    fields: [invoiceLineItem.invoiceId],
+    references: [invoice.id],
+  }),
+}));
+
+export const paymentMethodRelations = relations(paymentMethod, ({ one }) => ({
+  user: one(user, {
+    fields: [paymentMethod.userId],
+    references: [user.id],
+  }),
+}));
+
+export const usageRecordRelations = relations(usageRecord, ({ one }) => ({
+  user: one(user, {
+    fields: [usageRecord.userId],
+    references: [user.id],
+  }),
+  subscription: one(subscription, {
+    fields: [usageRecord.subscriptionId],
+    references: [subscription.id],
+  }),
+}));
+
 // Agent relations
 export const agentRelations = relations(agent, ({ one, many }) => ({
   user: one(user, {
@@ -540,14 +1004,17 @@ export const agentRelations = relations(agent, ({ one, many }) => ({
 }));
 
 // Knowledge Base relations
-export const knowledgeBaseRelations = relations(knowledgeBase, ({ one, many }) => ({
-  user: one(user, {
-    fields: [knowledgeBase.userId],
-    references: [user.id],
+export const knowledgeBaseRelations = relations(
+  knowledgeBase,
+  ({ one, many }) => ({
+    user: one(user, {
+      fields: [knowledgeBase.userId],
+      references: [user.id],
+    }),
+    documents: many(document),
+    chatKnowledgeBases: many(chatKnowledgeBase),
   }),
-  documents: many(document),
-  chatKnowledgeBases: many(chatKnowledgeBase),
-}));
+);
 
 // Document relations
 export const documentRelations = relations(document, ({ one, many }) => ({
@@ -595,16 +1062,19 @@ export const chatAgentRelations = relations(chatAgent, ({ one }) => ({
 }));
 
 // ChatKnowledgeBase (junction table) relations
-export const chatKnowledgeBaseRelations = relations(chatKnowledgeBase, ({ one }) => ({
-  chat: one(chat, {
-    fields: [chatKnowledgeBase.chatId],
-    references: [chat.id],
+export const chatKnowledgeBaseRelations = relations(
+  chatKnowledgeBase,
+  ({ one }) => ({
+    chat: one(chat, {
+      fields: [chatKnowledgeBase.chatId],
+      references: [chat.id],
+    }),
+    knowledgeBase: one(knowledgeBase, {
+      fields: [chatKnowledgeBase.knowledgeBaseId],
+      references: [knowledgeBase.id],
+    }),
   }),
-  knowledgeBase: one(knowledgeBase, {
-    fields: [chatKnowledgeBase.knowledgeBaseId],
-    references: [knowledgeBase.id],
-  }),
-}));
+);
 
 // Message relations
 export const messageRelations = relations(message, ({ one, many }) => ({
@@ -623,10 +1093,10 @@ export const messageRelations = relations(message, ({ one, many }) => ({
   quotedMessage: one(message, {
     fields: [message.quotedMessageId],
     references: [message.id],
-    relationName: 'messageQuotes',
+    relationName: "messageQuotes",
   }),
   quotes: many(message, {
-    relationName: 'messageQuotes',
+    relationName: "messageQuotes",
   }),
 }));
 
@@ -662,8 +1132,9 @@ export type NewWallet = typeof wallet.$inferInsert;
 export type Transaction = typeof transaction.$inferSelect;
 export type NewTransaction = typeof transaction.$inferInsert;
 
-export type TransactionType = typeof transactionTypeEnum.enumValues[number];
-export type TransactionStatus = typeof transactionStatusEnum.enumValues[number];
+export type TransactionType = (typeof transactionTypeEnum.enumValues)[number];
+export type TransactionStatus =
+  (typeof transactionStatusEnum.enumValues)[number];
 
 // Agent types
 export type Agent = typeof agent.$inferSelect;
@@ -683,8 +1154,19 @@ export type NewEmbedding = typeof embedding.$inferInsert;
 export type Chat = typeof chat.$inferSelect;
 export type NewChat = typeof chat.$inferInsert;
 
-export type ChatVisibility = typeof chatVisibilityEnum.enumValues[number];
-export type ChatStyle = typeof chatStyleEnum.enumValues[number];
+export type MessageWithAgent = Message & {
+  agent: Agent | null;
+};
+
+export interface ChatWithRelations extends Chat {
+  agents: (Agent & ChatAgent)[];
+  knowledgeBases: { id: string; name: string; enabled: boolean }[];
+  messages: MessageWithAgent[];
+  user: { id: string; name: string; email: string };
+}
+
+export type ChatVisibility = (typeof chatVisibilityEnum.enumValues)[number];
+export type ChatStyle = (typeof chatStyleEnum.enumValues)[number];
 
 export type ChatAgent = typeof chatAgent.$inferSelect;
 export type NewChatAgent = typeof chatAgent.$inferInsert;
@@ -699,3 +1181,27 @@ export type NewMessage = typeof message.$inferInsert;
 // Audit Log types
 export type AuditLog = typeof auditLog.$inferSelect;
 export type NewAuditLog = typeof auditLog.$inferInsert;
+
+// Payment types
+export type Payment = typeof payment.$inferSelect;
+export type NewPayment = typeof payment.$inferInsert;
+export type PaymentStatus = (typeof paymentStatusEnum.enumValues)[number];
+export type PaymentProvider = (typeof paymentProviderEnum.enumValues)[number];
+
+// Billing types
+export type SubscriptionPlan = typeof subscriptionPlan.$inferSelect;
+export type NewSubscriptionPlan = typeof subscriptionPlan.$inferInsert;
+export type Subscription = typeof subscription.$inferSelect;
+export type NewSubscription = typeof subscription.$inferInsert;
+export type SubscriptionStatus =
+  (typeof subscriptionStatusEnum.enumValues)[number];
+export type BillingInterval = (typeof billingIntervalEnum.enumValues)[number];
+export type Invoice = typeof invoice.$inferSelect;
+export type NewInvoice = typeof invoice.$inferInsert;
+export type InvoiceStatus = (typeof invoiceStatusEnum.enumValues)[number];
+export type InvoiceLineItem = typeof invoiceLineItem.$inferSelect;
+export type NewInvoiceLineItem = typeof invoiceLineItem.$inferInsert;
+export type PaymentMethod = typeof paymentMethod.$inferSelect;
+export type NewPaymentMethod = typeof paymentMethod.$inferInsert;
+export type UsageRecord = typeof usageRecord.$inferSelect;
+export type NewUsageRecord = typeof usageRecord.$inferInsert;

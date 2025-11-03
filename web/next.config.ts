@@ -1,12 +1,11 @@
 import { env } from "@/lib/env";
 import { isDev } from "@/lib/environment";
+import createWithVercelToolbar from "@vercel/toolbar/plugins/next";
 import type { NextConfig } from "next";
+import { withWorkflow } from "workflow/next";
 
 const nextConfig: NextConfig = {
   /* config options here */
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   turbopack: {
     resolveExtensions: [".tsx", ".ts", ".jsx", ".js", ".mjs", ".json"],
   },
@@ -16,6 +15,16 @@ const nextConfig: NextConfig = {
     "@t3-oss/env-core",
     "@ton/ton",
   ],
+  webpack: (config, { dev }) => {
+    if (dev) {
+      config.watchOptions = {
+        poll: 2000, // Check for changes every second
+        aggregateTimeout: 300,
+        ignored: ["**/node_modules/**", "**/.next/**"],
+      };
+    }
+    return config;
+  },
   ...(isDev && {
     allowedDevOrigins: [
       ...(env.NEXT_PUBLIC_APP_URL
@@ -32,4 +41,6 @@ const nextConfig: NextConfig = {
   }),
 };
 
-export default nextConfig;
+const withVercelToolbar = createWithVercelToolbar();
+
+export default withWorkflow(withVercelToolbar(nextConfig));

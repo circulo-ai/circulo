@@ -56,8 +56,8 @@ export const env = createEnv({
     DOCKER_BUILD: z.boolean().optional(), // Flag indicating Docker build environment
 
     // Background Jobs & Scheduling
-    INNGEST_EVENT_KEY: z.string().optional(), // Inngest event key for background jobs
-    INNGEST_SIGNING_KEY: z.string().optional(), // Inngest signing key for webhook verification
+    TRIGGER_SECRET_KEY: z.string(), // Trigger.dev webhook secret for task execution
+    TRIGGER_API_URL: z.string().url().optional(), // Trigger.dev API base URL for self-hosted (e.g., http://localhost:8030)
     CRON_SECRET: z.string().optional(), // Secret for authenticating cron job requests
     JOB_RETENTION_DAYS: z.string().optional().default("1"), // Days to retain job logs/data
 
@@ -84,6 +84,9 @@ export const env = createEnv({
     // Core Application URLs - Required for frontend functionality
     NEXT_PUBLIC_APP_URL: z.string().url(), // Base URL of the application (e.g., https://app.sim.ai)
 
+    // Trigger.dev Realtime base URL for self-hosted setups
+    NEXT_PUBLIC_TRIGGER_API_URL: z.string().url().optional(),
+
     // Google Services - For client-side Google integrations
     NEXT_PUBLIC_GOOGLE_CLIENT_ID: z.string().optional(), // Google OAuth client ID for browser auth
 
@@ -102,6 +105,7 @@ export const env = createEnv({
   experimental__runtimeEnv: {
     NEXT_PUBLIC_DEPOSIT_ADDRESS: process.env.NEXT_PUBLIC_DEPOSIT_ADDRESS,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+    NEXT_PUBLIC_TRIGGER_API_URL: process.env.NEXT_PUBLIC_TRIGGER_API_URL,
     NEXT_PUBLIC_GOOGLE_CLIENT_ID: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
     NEXT_PUBLIC_GOOGLE_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_API_KEY,
     NEXT_PUBLIC_GOOGLE_PROJECT_NUMBER:
