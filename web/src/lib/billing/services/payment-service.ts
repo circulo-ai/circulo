@@ -1,9 +1,17 @@
 import { db } from "@/db";
-import { payment, wallet } from "@/db/schema";
 import type { Wallet } from "@/db/schema";
-import { PaymentService as BdkPaymentService, type PaymentFilters } from "@mhbdev/bdk";
-import { Money, Payment as BdkPayment, PaymentStatus } from "@mhbdev/bdk";
-import type { PaymentProvider, PaymentMethod as BdkPaymentMethod } from "@mhbdev/bdk";
+import { payment, wallet } from "@/db/schema";
+import type {
+  PaymentMethod as BdkPaymentMethod,
+  PaymentProvider,
+} from "@mhbdev/bdk";
+import {
+  Payment as BdkPayment,
+  PaymentService as BdkPaymentService,
+  Money,
+  PaymentStatus,
+  type PaymentFilters,
+} from "@mhbdev/bdk";
 import { and, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
@@ -20,7 +28,12 @@ export class DrizzlePaymentService extends BdkPaymentService {
     customerId: string,
     amount: Money,
     _paymentMethodId: string,
-    options?: { subscriptionId?: string; description?: string; captureMethod?: "automatic" | "manual"; metadata?: Record<string, any> },
+    options?: {
+      subscriptionId?: string;
+      description?: string;
+      captureMethod?: "automatic" | "manual";
+      metadata?: Record<string, any>;
+    },
   ): Promise<BdkPayment> {
     const callbackUrl = options?.metadata?.callbackUrl as string | undefined;
     const now = new Date();
@@ -49,7 +62,9 @@ export class DrizzlePaymentService extends BdkPaymentService {
     const expiresAt = new Date(now.getTime() + 30 * 60 * 1000);
 
     // Ensure wallet exists for the user (required by payment schema)
-    let userWallet: Wallet | undefined = await db.query.wallet.findFirst({ where: eq(wallet.userId, customerId) });
+    let userWallet: Wallet | undefined = await db.query.wallet.findFirst({
+      where: eq(wallet.userId, customerId),
+    });
     if (!userWallet) {
       const walletId = nanoid();
       // Concurrency-safe create: ignore if another insert wins, then re-fetch
@@ -64,14 +79,18 @@ export class DrizzlePaymentService extends BdkPaymentService {
           updatedAt: now,
         })
         .onConflictDoNothing();
-      userWallet = await db.query.wallet.findFirst({ where: eq(wallet.userId, customerId) }) || ({
-        id: walletId,
-        userId: customerId,
-        balance: "0.00",
-        currency: "USD",
-        createdAt: now,
-        updatedAt: now,
-      } as Wallet);
+      userWallet =
+        (await db.query.wallet.findFirst({
+          where: eq(wallet.userId, customerId),
+        })) ||
+        ({
+          id: walletId,
+          userId: customerId,
+          balance: "0.00",
+          currency: "USD",
+          createdAt: now,
+          updatedAt: now,
+        } as Wallet);
     }
 
     const ensuredWallet = userWallet as Wallet;
@@ -132,7 +151,9 @@ export class DrizzlePaymentService extends BdkPaymentService {
   }
 
   async getById(paymentId: string): Promise<BdkPayment | null> {
-    const p = await db.query.payment.findFirst({ where: eq(payment.id, paymentId) });
+    const p = await db.query.payment.findFirst({
+      where: eq(payment.id, paymentId),
+    });
     if (!p) return null;
     const statusMap: Record<string, PaymentStatus> = {
       awaiting_payment: PaymentStatus.PENDING,
@@ -150,14 +171,18 @@ export class DrizzlePaymentService extends BdkPaymentService {
       status: statusMap[p.status],
       paymentMethodId: "sizpay_redirect",
       providerId: p.provider,
-      providerTransactionId: p.providerTransactionId ?? p.providerToken ?? undefined,
+      providerTransactionId:
+        p.providerTransactionId ?? p.providerToken ?? undefined,
       metadata: p.metadata ? JSON.parse(p.metadata) : undefined,
       createdAt: p.createdAt!,
       updatedAt: p.updatedAt!,
     };
   }
 
-  async listByCustomer(customerId: string, filters?: PaymentFilters): Promise<BdkPayment[]> {
+  async listByCustomer(
+    customerId: string,
+    filters?: PaymentFilters,
+  ): Promise<BdkPayment[]> {
     const rows = await db.query.payment.findMany({
       where: filters?.status
         ? and(eq(payment.userId, customerId))
@@ -181,7 +206,8 @@ export class DrizzlePaymentService extends BdkPaymentService {
       status: statusMap[p.status],
       paymentMethodId: "sizpay_redirect",
       providerId: p.provider,
-      providerTransactionId: p.providerTransactionId ?? p.providerToken ?? undefined,
+      providerTransactionId:
+        p.providerTransactionId ?? p.providerToken ?? undefined,
       metadata: p.metadata ? JSON.parse(p.metadata) : undefined,
       createdAt: p.createdAt!,
       updatedAt: p.updatedAt!,

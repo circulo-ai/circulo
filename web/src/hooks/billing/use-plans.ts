@@ -18,7 +18,7 @@ export type BillingPlan = {
 
 export function usePlans() {
   const { data, error, isLoading, mutate } = useSWR<BillingPlan[]>(
-    "/api/v1/billing/plans"
+    "/api/v1/billing/plans",
   );
 
   return {

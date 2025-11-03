@@ -437,9 +437,7 @@ export const invoiceLineItem = pgTable(
   },
   (table) => ({
     invoiceIdx: index("invoice_line_item_invoice_id_idx").on(table.invoiceId),
-    createdAtIdx: index("invoice_line_item_created_at_idx").on(
-      table.createdAt,
-    ),
+    createdAtIdx: index("invoice_line_item_created_at_idx").on(table.createdAt),
   }),
 );
 
@@ -943,18 +941,21 @@ export const subscriptionPlanRelations = relations(
   }),
 );
 
-export const subscriptionRelations = relations(subscription, ({ one, many }) => ({
-  user: one(user, {
-    fields: [subscription.userId],
-    references: [user.id],
+export const subscriptionRelations = relations(
+  subscription,
+  ({ one, many }) => ({
+    user: one(user, {
+      fields: [subscription.userId],
+      references: [user.id],
+    }),
+    plan: one(subscriptionPlan, {
+      fields: [subscription.planId],
+      references: [subscriptionPlan.id],
+    }),
+    invoices: many(invoice),
+    usageRecords: many(usageRecord),
   }),
-  plan: one(subscriptionPlan, {
-    fields: [subscription.planId],
-    references: [subscriptionPlan.id],
-  }),
-  invoices: many(invoice),
-  usageRecords: many(usageRecord),
-}));
+);
 
 export const invoiceRelations = relations(invoice, ({ one, many }) => ({
   user: one(user, {
@@ -968,12 +969,15 @@ export const invoiceRelations = relations(invoice, ({ one, many }) => ({
   lineItems: many(invoiceLineItem),
 }));
 
-export const invoiceLineItemRelations = relations(invoiceLineItem, ({ one }) => ({
-  invoice: one(invoice, {
-    fields: [invoiceLineItem.invoiceId],
-    references: [invoice.id],
+export const invoiceLineItemRelations = relations(
+  invoiceLineItem,
+  ({ one }) => ({
+    invoice: one(invoice, {
+      fields: [invoiceLineItem.invoiceId],
+      references: [invoice.id],
+    }),
   }),
-}));
+);
 
 export const paymentMethodRelations = relations(paymentMethod, ({ one }) => ({
   user: one(user, {

@@ -29,7 +29,7 @@ export type SubscriptionSummary = {
 
 export function useSubscriptions() {
   const { data, error, isLoading, mutate } = useSWR<SubscriptionSummary[]>(
-    "/api/v1/billing/subscriptions"
+    "/api/v1/billing/subscriptions",
   );
 
   return {

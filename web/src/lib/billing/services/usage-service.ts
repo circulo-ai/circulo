@@ -2,25 +2,28 @@ import { db } from "@/db";
 import {
   subscription,
   subscriptionPlan,
+  transaction,
   usageRecord,
   wallet,
-  transaction,
   type TransactionType,
 } from "@/db/schema";
+import type { UsageMetric } from "@/lib/billing/usage-metrics";
+import {
+  metricToTransactionType,
+  resolveUnitPriceUSD,
+} from "@/lib/billing/usage-metrics";
+import { fetchUsdToIrrRate, irrToUsd } from "@/lib/fx/rates";
+import type { Money } from "@mhbdev/bdk";
+import type {
+  UsageAggregate as BdkUsageAggregate,
+  UsageChargeLineItem as BdkUsageChargeLineItem,
+  UsageCharges as BdkUsageCharges,
+  UsageRecord as BdkUsageRecord,
+} from "@mhbdev/bdk/services";
+import { UsageService as BDKUsageService } from "@mhbdev/bdk/services";
 import { and, eq, gt, lt, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import EntitlementsService from "./entitlements-service";
-import type { UsageMetric } from "@/lib/billing/usage-metrics";
-import { metricToTransactionType, resolveUnitPriceUSD } from "@/lib/billing/usage-metrics";
-import { irrToUsd, fetchUsdToIrrRate } from "@/lib/fx/rates";
-import { UsageService as BDKUsageService } from "@mhbdev/bdk/services"
-import type { Money } from "@mhbdev/bdk";
-import type {
-  UsageRecord as BdkUsageRecord,
-  UsageAggregate as BdkUsageAggregate,
-  UsageCharges as BdkUsageCharges,
-  UsageChargeLineItem as BdkUsageChargeLineItem,
-} from "@mhbdev/bdk/services";
 
 /**
  * UsageService
@@ -69,7 +72,12 @@ export class UsageService extends BDKUsageService {
     costUSD: number;
   }> {
     if (quantity <= 0) {
-      return { allowed: true, freeUnitsApplied: 0, billableUnits: 0, costUSD: 0 };
+      return {
+        allowed: true,
+        freeUnitsApplied: 0,
+        billableUnits: 0,
+        costUSD: 0,
+      };
     }
 
     const ent = await this.entitlements.getEntitlements(userId);
@@ -81,9 +89,14 @@ export class UsageService extends BDKUsageService {
     if (billableUnits > 0) {
       const rate = ent.planRates?.rates?.[metric];
       if (!rate) throw new Error(`No rate defined for metric: ${metric}`);
-      const resolved = await resolveUnitPriceUSD(rate, { irrToUsd, fetchUsdToIrrRate });
-      const multiplier = (rate.multiplier ?? ent.profitMultiplier ?? 1);
-      costUSD = Number((billableUnits * resolved.unitPriceUSD * multiplier).toFixed(4));
+      const resolved = await resolveUnitPriceUSD(rate, {
+        irrToUsd,
+        fetchUsdToIrrRate,
+      });
+      const multiplier = rate.multiplier ?? ent.profitMultiplier ?? 1;
+      costUSD = Number(
+        (billableUnits * resolved.unitPriceUSD * multiplier).toFixed(4),
+      );
     }
 
     return {
@@ -114,7 +127,12 @@ export class UsageService extends BDKUsageService {
     pastDue?: boolean;
   }> {
     if (quantity <= 0) {
-      return { allowed: true, freeUnitsApplied: 0, billableUnits: 0, costUSD: 0 };
+      return {
+        allowed: true,
+        freeUnitsApplied: 0,
+        billableUnits: 0,
+        costUSD: 0,
+      };
     }
 
     // Idempotency: if a usage record exists with this key, return previous outcome
@@ -137,10 +155,20 @@ export class UsageService extends BDKUsageService {
         const freeUnitsApplied = Number(meta.freeUnitsApplied ?? 0);
         const billableUnits = Number(meta.billableUnits ?? 0);
         const costUSD = Number(meta.costUSD ?? 0);
-        const walletBalanceAfter = typeof meta.walletBalanceAfter === "number" ? meta.walletBalanceAfter : undefined;
+        const walletBalanceAfter =
+          typeof meta.walletBalanceAfter === "number"
+            ? meta.walletBalanceAfter
+            : undefined;
         const pastDue = Boolean(meta.pastDue ?? false);
         const allowed = Boolean(meta.allowed ?? true);
-        return { allowed, freeUnitsApplied, billableUnits, costUSD, walletBalanceAfter, pastDue };
+        return {
+          allowed,
+          freeUnitsApplied,
+          billableUnits,
+          costUSD,
+          walletBalanceAfter,
+          pastDue,
+        };
       }
     }
 
@@ -173,7 +201,9 @@ export class UsageService extends BDKUsageService {
       const usedSoFar = Number(rows[0]?.used ?? 0);
 
       // Plan rates
-      const plan = await tx.query.subscriptionPlan.findFirst({ where: eq(subscriptionPlan.id, sub.planId) });
+      const plan = await tx.query.subscriptionPlan.findFirst({
+        where: eq(subscriptionPlan.id, sub.planId),
+      });
       const meta = (plan?.metadata ?? {}) as Record<string, any>;
       const rate = meta?.rates?.[metric];
       if (!rate) throw new Error(`No rate defined for metric: ${metric}`);
@@ -183,12 +213,24 @@ export class UsageService extends BDKUsageService {
       const freeUnitsApplied = Math.min(remainingIncluded, quantity);
       const billableUnits = Math.max(0, quantity - freeUnitsApplied);
 
-      const resolved = await resolveUnitPriceUSD(rate, { irrToUsd, fetchUsdToIrrRate });
-      const effectiveMultiplier = details?.profitMultiplierOverride ?? rate.multiplier ?? (meta?.profitMultiplier ?? 1);
-      const costUSD = Number((billableUnits * resolved.unitPriceUSD * effectiveMultiplier).toFixed(4));
+      const resolved = await resolveUnitPriceUSD(rate, {
+        irrToUsd,
+        fetchUsdToIrrRate,
+      });
+      const effectiveMultiplier =
+        details?.profitMultiplierOverride ??
+        rate.multiplier ??
+        meta?.profitMultiplier ??
+        1;
+      const costUSD = Number(
+        (billableUnits * resolved.unitPriceUSD * effectiveMultiplier).toFixed(
+          4,
+        ),
+      );
 
       // Determine overage policy
-      const policy: "hard" | "soft" = details?.policyOverride ?? (meta?.overagePolicy ?? "hard");
+      const policy: "hard" | "soft" =
+        details?.policyOverride ?? meta?.overagePolicy ?? "hard";
       let pastDue = false;
       let walletBalanceAfter: number | undefined;
 
@@ -198,11 +240,24 @@ export class UsageService extends BDKUsageService {
       // Apply wallet deduction if billable units > 0
       if (billableUnits > 0 && costUSD > 0) {
         // Ensure wallet exists
-        let userWallet = await tx.query.wallet.findFirst({ where: eq(wallet.userId, userId) });
+        let userWallet = await tx.query.wallet.findFirst({
+          where: eq(wallet.userId, userId),
+        });
         if (!userWallet) {
           const walletId = nanoid();
-          await tx.insert(wallet).values({ id: walletId, userId, balance: "0.00", currency: "USD", createdAt: new Date(), updatedAt: new Date() });
-          userWallet = await tx.query.wallet.findFirst({ where: eq(wallet.userId, userId) });
+          await tx
+            .insert(wallet)
+            .values({
+              id: walletId,
+              userId,
+              balance: "0.00",
+              currency: "USD",
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+          userWallet = await tx.query.wallet.findFirst({
+            where: eq(wallet.userId, userId),
+          });
         }
 
         const balanceBefore = Number(userWallet!.balance);
@@ -248,7 +303,10 @@ export class UsageService extends BDKUsageService {
         // Deduct if enough, else soft-policy allows overage and marks past_due
         if (enough) {
           const balanceAfter = Number((balanceBefore - costUSD).toFixed(2));
-          await tx.update(wallet).set({ balance: String(balanceAfter), updatedAt: new Date() }).where(eq(wallet.id, userWallet!.id));
+          await tx
+            .update(wallet)
+            .set({ balance: String(balanceAfter), updatedAt: new Date() })
+            .where(eq(wallet.id, userWallet!.id));
           await tx.insert(transaction).values({
             id: nanoid(),
             userId,
@@ -271,7 +329,10 @@ export class UsageService extends BDKUsageService {
         } else {
           // Soft policy: mark subscription past_due and do not deduct
           pastDue = true;
-          await tx.update(subscription).set({ status: "past_due", updatedAt: new Date() }).where(eq(subscription.id, sub.id));
+          await tx
+            .update(subscription)
+            .set({ status: "past_due", updatedAt: new Date() })
+            .where(eq(subscription.id, sub.id));
           await tx.insert(transaction).values({
             id: nanoid(),
             userId,
@@ -281,7 +342,8 @@ export class UsageService extends BDKUsageService {
             amount: String(costUSD.toFixed(4)),
             balanceBefore: String(balanceBefore.toFixed(2)),
             balanceAfter: String(balanceBefore.toFixed(2)),
-            description: details?.description ?? `${metric} usage billing (soft overage)`,
+            description:
+              details?.description ?? `${metric} usage billing (soft overage)`,
             metadata: {
               ...(details?.metadata ?? {}),
               metric,
@@ -411,7 +473,10 @@ export class UsageService extends BDKUsageService {
           lt(usageRecord.timestamp, periodEnd),
         ),
       );
-    const totalQuantity = rows.reduce((sum, r) => sum + Number(r.quantity ?? 0), 0);
+    const totalQuantity = rows.reduce(
+      (sum, r) => sum + Number(r.quantity ?? 0),
+      0,
+    );
     const records: BdkUsageRecord[] = rows.map((r) => ({
       id: r.id,
       customerId: r.userId,
@@ -443,9 +508,12 @@ export class UsageService extends BDKUsageService {
     },
   ): Promise<BdkUsageRecord[]> {
     const conditions = [eq(usageRecord.subscriptionId, subscriptionId)];
-    if (filters?.metric) conditions.push(eq(usageRecord.metric, filters.metric));
-    if (filters?.dateFrom) conditions.push(gt(usageRecord.timestamp, filters.dateFrom));
-    if (filters?.dateTo) conditions.push(lt(usageRecord.timestamp, filters.dateTo));
+    if (filters?.metric)
+      conditions.push(eq(usageRecord.metric, filters.metric));
+    if (filters?.dateFrom)
+      conditions.push(gt(usageRecord.timestamp, filters.dateFrom));
+    if (filters?.dateTo)
+      conditions.push(lt(usageRecord.timestamp, filters.dateTo));
 
     const rows = await db
       .select({
@@ -478,10 +546,14 @@ export class UsageService extends BDKUsageService {
     periodStart: Date,
     periodEnd: Date,
   ): Promise<BdkUsageCharges> {
-    const sub = await db.query.subscription.findFirst({ where: eq(subscription.id, subscriptionId) });
+    const sub = await db.query.subscription.findFirst({
+      where: eq(subscription.id, subscriptionId),
+    });
     if (!sub) throw new Error("Subscription not found");
 
-    const plan = await db.query.subscriptionPlan.findFirst({ where: eq(subscriptionPlan.id, sub.planId) });
+    const plan = await db.query.subscriptionPlan.findFirst({
+      where: eq(subscriptionPlan.id, sub.planId),
+    });
     const meta = (plan?.metadata ?? {}) as Record<string, any>;
 
     const usageAgg = await db
@@ -510,7 +582,10 @@ export class UsageService extends BDKUsageService {
       const billableUnits = Math.max(0, used - included);
       if (billableUnits <= 0) continue;
 
-      const resolved = await resolveUnitPriceUSD(rate, { irrToUsd, fetchUsdToIrrRate });
+      const resolved = await resolveUnitPriceUSD(rate, {
+        irrToUsd,
+        fetchUsdToIrrRate,
+      });
       const multiplier = rate.multiplier ?? meta?.profitMultiplier ?? 1;
       const unitUSD = Number((resolved.unitPriceUSD * multiplier).toFixed(4));
       const amountUSD = Number((unitUSD * billableUnits).toFixed(4));
@@ -518,10 +593,18 @@ export class UsageService extends BDKUsageService {
 
       const unitPrice: Money = { amount: unitUSD, currency: "USD" };
       const amount: Money = { amount: amountUSD, currency: "USD" };
-      lineItems.push({ metric: metricKey, quantity: billableUnits, unitPrice, amount });
+      lineItems.push({
+        metric: metricKey,
+        quantity: billableUnits,
+        unitPrice,
+        amount,
+      });
     }
 
-    const total: Money = { amount: Number(totalAmount.toFixed(4)), currency: "USD" };
+    const total: Money = {
+      amount: Number(totalAmount.toFixed(4)),
+      currency: "USD",
+    };
     return {
       subscriptionId,
       periodStart,
