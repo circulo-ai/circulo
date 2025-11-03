@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --webpack",
+    "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
@@ -52,6 +52,7 @@
     "@ton/crypto": "^3.3.0",
     "@ton/ton": "^16.0.0",
     "@trigger.dev/react-hooks": "4.0.5",
+    "@vercel/toolbar": "^0.1.41",
     "@workflow/ai": "4.0.1-beta.5",
     "@xyflow/react": "^12.9.2",
     "ai": "^5.0.86",

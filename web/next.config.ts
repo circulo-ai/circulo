@@ -1,5 +1,6 @@
 import { env } from "@/lib/env";
 import { isDev } from "@/lib/environment";
+import createWithVercelToolbar from "@vercel/toolbar/plugins/next";
 import type { NextConfig } from "next";
 import { withWorkflow } from "workflow/next";
 
@@ -17,7 +18,7 @@ const nextConfig: NextConfig = {
   webpack: (config, { dev }) => {
     if (dev) {
       config.watchOptions = {
-        poll: 800, // Check for changes every second
+        poll: 2000, // Check for changes every second
         aggregateTimeout: 300,
         ignored: ["**/node_modules/**", "**/.next/**"],
       };
@@ -40,4 +41,6 @@ const nextConfig: NextConfig = {
   }),
 };
 
-export default withWorkflow(nextConfig);
+const withVercelToolbar = createWithVercelToolbar();
+
+export default withWorkflow(withVercelToolbar(nextConfig));

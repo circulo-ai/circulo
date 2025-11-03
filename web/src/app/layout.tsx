@@ -1,8 +1,10 @@
+import { isDev } from "@/lib/environment";
 import { AuthClientProvider } from "@/providers/auth-client-provider";
-import { SwrProvider } from "@/providers/swr-provider";
 import { SessionProvider } from "@/providers/session-provider";
+import { SwrProvider } from "@/providers/swr-provider";
 import { ThemeProvider } from "@/providers/theme-provider";
 import { ZoomPrevention } from "@/providers/zoom-prevention";
+import { VercelToolbar } from "@vercel/toolbar/next";
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { ReactNode } from "react";
@@ -32,6 +34,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             </SwrProvider>
           </SessionProvider>
         </ThemeProvider>
+        {isDev && <VercelToolbar />}
       </body>
     </html>
   );
