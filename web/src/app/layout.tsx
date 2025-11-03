@@ -1,19 +1,18 @@
 import { isDev } from "@/lib/environment";
 import { AuthClientProvider } from "@/providers/auth-client-provider";
+import { PointerProvider } from "@/providers/pointer-provider";
 import { SessionProvider } from "@/providers/session-provider";
 import { SwrProvider } from "@/providers/swr-provider";
 import { ThemeProvider } from "@/providers/theme-provider";
-import { ZoomPrevention } from "@/providers/zoom-prevention";
 import { VercelToolbar } from "@vercel/toolbar/next";
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import { Montserrat as Sans } from "next/font/google";
 import { ReactNode } from "react";
 import { Toaster } from "sonner";
 import "./globals.css";
 
-const fontSans = Geist({
+const fontSans = Sans({
   variable: "--font-sans",
-  subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
@@ -23,14 +22,19 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html suppressHydrationWarning={true} lang="en">
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className="snap-y snap-mandatory scroll-smooth"
+    >
       <body className={fontSans.variable}>
         <ThemeProvider>
           <SessionProvider>
             <SwrProvider>
-              <ZoomPrevention />
-              <AuthClientProvider>{children}</AuthClientProvider>
-              <Toaster />
+              <PointerProvider>
+                <AuthClientProvider>{children}</AuthClientProvider>
+                <Toaster />
+              </PointerProvider>
             </SwrProvider>
           </SessionProvider>
         </ThemeProvider>
