@@ -1,3 +1,6 @@
+import { createHmac } from 'crypto';
+import crypto from 'crypto';
+
 export function generateId() {
   return crypto.randomUUID();
 }
@@ -48,4 +51,23 @@ export function calculateCostFromUsage(
 
   // Ensure precision and prevent negative or NaN
   return Number(total.toFixed(6)) || 0;
+}
+
+
+export function aesEncryptBase64(plain: string, keyB64: string, ivB64: string): string {
+  const key = Buffer.from(keyB64, 'base64');
+  const iv = Buffer.from(ivB64, 'base64');
+  const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+  const encrypted = Buffer.concat([cipher.update(Buffer.from(plain, 'utf8')), cipher.final()]);
+  return encrypted.toString('base64');
+}
+
+export function hmacSha256Base64(data: string, secret: string): string {
+  return crypto.createHmac('sha256', secret).update(data, 'utf8').digest('base64');
+}
+
+export function sha256SignBase64(data: string, signKey: string): string {
+  const h = createHmac('sha256', signKey);
+  h.update(data, 'utf8');
+  return h.digest('base64');
 }

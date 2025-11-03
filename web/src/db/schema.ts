@@ -11,12 +11,11 @@ import {
   numeric,
   pgEnum,
   pgTable,
-  pgView,
   text,
   timestamp,
+  unique,
   uniqueIndex,
-  uuid,
-  vector,
+  vector
 } from "drizzle-orm/pg-core";
 
 // ============================================================================
@@ -48,6 +47,8 @@ export const transactionTypeEnum = pgEnum("transaction_type", [
   "withdrawal",
   "chat_usage",
   "embedding_usage",
+  "agent_purchase",
+  "agent_sale",
   "refund",
 ]);
 export const transactionStatusEnum = pgEnum("transaction_status", [
@@ -68,7 +69,6 @@ export const paymentStatusEnum = pgEnum("payment_status", [
 
 export const paymentProviderEnum = pgEnum("payment_provider", ["sizpay"]);
 
-// Billing enums for subscriptions and invoices
 export const billingIntervalEnum = pgEnum("billing_interval", [
   "day",
   "week",
@@ -93,8 +93,27 @@ export const invoiceStatusEnum = pgEnum("invoice_status", [
   "uncollectible",
 ]);
 
+export const agentVisibilityEnum = pgEnum("agent_visibility", [
+  "private",
+  "public",
+  "marketplace",
+]);
+
+export const agentTemplateStatusEnum = pgEnum("agent_template_status", [
+  "draft",
+  "published",
+  "archived",
+]);
+
+export const agentPurchaseStatusEnum = pgEnum("agent_purchase_status", [
+  "pending",
+  "completed",
+  "refunded",
+  "disputed",
+]);
+
 // ============================================================================
-// EXISTING AUTH TABLES (from your minimal schema)
+// AUTH TABLES
 // ============================================================================
 
 export const user = pgTable("user", {
@@ -103,6 +122,16 @@ export const user = pgTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   image: text("image"),
+  bio: text("bio"),
+
+  // Creator profile
+  isCreator: boolean("is_creator").notNull().default(false),
+  creatorVerified: boolean("creator_verified").notNull().default(false),
+
+  // Stats
+  totalSales: decimal("total_sales", { precision: 10, scale: 2 }).default("0.00"),
+  totalEarnings: decimal("total_earnings", { precision: 10, scale: 2 }).default("0.00"),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
@@ -110,7 +139,10 @@ export const user = pgTable("user", {
     .notNull(),
   telegramId: text("telegram_id"),
   telegramUsername: text("telegram_username"),
-});
+}, (table) => ({
+  emailIdx: index("user_email_idx").on(table.email),
+  isCreatorIdx: index("user_is_creator_idx").on(table.isCreator),
+}));
 
 export const session = pgTable(
   "session",
@@ -159,6 +191,7 @@ export const account = pgTable(
   },
   (table) => ({
     userIdIdx: index("account_user_id_idx").on(table.userId),
+    providerAccountIdx: unique("account_provider_account_idx").on(table.providerId, table.accountId),
   }),
 );
 
@@ -228,6 +261,7 @@ export const transaction = pgTable(
 
     // Reference to related entities
     chatId: text("chat_id").references(() => chat.id, { onDelete: "set null" }),
+    agentPurchaseId: text("agent_purchase_id").references(() => agentPurchase.id, { onDelete: "set null" }),
 
     description: text("description"),
     metadata: jsonb("metadata").default("{}"),
@@ -238,6 +272,7 @@ export const transaction = pgTable(
     userIdIdx: index("transaction_user_id_idx").on(table.userId),
     walletIdIdx: index("transaction_wallet_id_idx").on(table.walletId),
     chatIdIdx: index("transaction_chat_id_idx").on(table.chatId),
+    agentPurchaseIdIdx: index("transaction_agent_purchase_id_idx").on(table.agentPurchaseId),
     typeIdx: index("transaction_type_idx").on(table.type),
     statusIdx: index("transaction_status_idx").on(table.status),
     createdAtIdx: index("transaction_created_at_idx").on(table.createdAt),
@@ -262,32 +297,26 @@ export const payment = pgTable(
       onDelete: "set null",
     }),
 
-    // Payment details
     provider: paymentProviderEnum("provider").notNull().default("sizpay"),
     status: paymentStatusEnum("status").notNull().default("pending"),
 
     amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
     currency: text("currency").notNull().default("IRR"),
 
-    // Provider-specific data
     providerToken: text("provider_token"),
     providerOrderId: text("provider_order_id"),
     providerTransactionId: text("provider_transaction_id"),
     providerRefNo: text("provider_ref_no"),
     providerTraceNo: text("provider_trace_no"),
 
-    // Card details (masked)
-    cardNumber: text("card_number"), // last 4 digits only
+    cardNumber: text("card_number"),
 
-    // URLs
     callbackUrl: text("callback_url").notNull(),
     gatewayUrl: text("gateway_url"),
 
-    // Additional metadata
-    metadata: text("metadata"), // JSON string
+    metadata: text("metadata"),
     errorMessage: text("error_message"),
 
-    // Timestamps
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
     paidAt: timestamp("paid_at"),
@@ -315,207 +344,88 @@ export const payment = pgTable(
 );
 
 // ============================================================================
-// BILLING: PLANS, SUBSCRIPTIONS, INVOICES, USAGE
+// AGENT TEMPLATES & MARKETPLACE
 // ============================================================================
 
-export const subscriptionPlan = pgTable(
-  "subscription_plan",
+// Templates that creators publish - the "original" agents
+export const agentTemplate = pgTable(
+  "agent_template",
   {
     id: text("id").primaryKey(),
+    creatorId: text("creator_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+
     name: text("name").notNull(),
     description: text("description"),
-    amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
-    currency: text("currency").notNull().default("IRR"),
-    interval: billingIntervalEnum("interval").notNull().default("month"),
-    intervalCount: integer("interval_count").notNull().default(1),
-    trialPeriodDays: integer("trial_period_days"),
-    features: jsonb("features").notNull().default("{}"),
-    metadata: jsonb("metadata").default("{}"),
-    active: boolean("active").notNull().default(true),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => new Date())
-      .notNull(),
-  },
-  (table) => ({
-    activeIdx: index("subscription_plan_active_idx").on(table.active),
-    intervalIdx: index("subscription_plan_interval_idx").on(table.interval),
-    amountIdx: index("subscription_plan_amount_idx").on(table.amount),
-    nameIdx: index("subscription_plan_name_idx").on(table.name),
-  }),
-);
+    longDescription: text("long_description"), // Markdown description for marketplace
+    systemPrompt: text("system_prompt").notNull(),
 
-export const subscription = pgTable(
-  "subscription",
-  {
-    id: text("id").primaryKey(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    planId: text("plan_id")
-      .notNull()
-      .references(() => subscriptionPlan.id, { onDelete: "restrict" }),
-    status: subscriptionStatusEnum("status").notNull().default("active"),
-    currentPeriodStart: timestamp("current_period_start").notNull(),
-    currentPeriodEnd: timestamp("current_period_end").notNull(),
-    canceledAt: timestamp("canceled_at"),
-    trialStart: timestamp("trial_start"),
-    trialEnd: timestamp("trial_end"),
-    metadata: jsonb("metadata").default("{}"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => new Date())
-      .notNull(),
-  },
-  (table) => ({
-    userIdx: index("subscription_user_id_idx").on(table.userId),
-    planIdx: index("subscription_plan_id_idx").on(table.planId),
-    statusIdx: index("subscription_status_idx").on(table.status),
-    periodIdx: index("subscription_period_idx").on(
-      table.currentPeriodStart,
-      table.currentPeriodEnd,
-    ),
-  }),
-);
-
-export const invoice = pgTable(
-  "invoice",
-  {
-    id: text("id").primaryKey(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    subscriptionId: text("subscription_id").references(() => subscription.id, {
-      onDelete: "set null",
-    }),
-    number: text("number").notNull(),
-    status: invoiceStatusEnum("status").notNull().default("draft"),
-    subtotalAmount: decimal("subtotal_amount", {
-      precision: 10,
+    // Model configuration (defaults for instances)
+    model: text("model").notNull().default("gpt-4"),
+    temperature: numeric("temperature", {
+      precision: 3,
       scale: 2,
-    }).notNull(),
-    subtotalCurrency: text("subtotal_currency").notNull().default("IRR"),
-    taxAmount: decimal("tax_amount", { precision: 10, scale: 2 }),
-    taxCurrency: text("tax_currency"),
-    totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
-    totalCurrency: text("total_currency").notNull().default("IRR"),
-    dueDate: timestamp("due_date"),
-    paidAt: timestamp("paid_at"),
-    metadata: jsonb("metadata").default("{}"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => new Date())
-      .notNull(),
-  },
-  (table) => ({
-    userIdx: index("invoice_user_id_idx").on(table.userId),
-    subIdx: index("invoice_subscription_id_idx").on(table.subscriptionId),
-    statusIdx: index("invoice_status_idx").on(table.status),
-    numberUniqueIdx: index("invoice_number_idx").on(table.number),
-    createdAtIdx: index("invoice_created_at_idx").on(table.createdAt),
-  }),
-);
-
-export const invoiceLineItem = pgTable(
-  "invoice_line_item",
-  {
-    id: text("id").primaryKey(),
-    invoiceId: text("invoice_id")
-      .notNull()
-      .references(() => invoice.id, { onDelete: "cascade" }),
-    description: text("description").notNull(),
-    quantity: integer("quantity").notNull().default(1),
-    unitAmount: decimal("unit_amount", { precision: 10, scale: 2 }).notNull(),
-    unitCurrency: text("unit_currency").notNull().default("IRR"),
-    amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
-    currency: text("currency").notNull().default("IRR"),
-    metadata: jsonb("metadata").default("{}"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-  },
-  (table) => ({
-    invoiceIdx: index("invoice_line_item_invoice_id_idx").on(table.invoiceId),
-    createdAtIdx: index("invoice_line_item_created_at_idx").on(
-      table.createdAt,
-    ),
-  }),
-);
-
-export const paymentMethod = pgTable(
-  "payment_method",
-  {
-    id: text("id").primaryKey(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    type: text("type").notNull(),
-    providerId: text("provider_id").notNull(),
-    providerMethodId: text("provider_method_id").notNull(),
-    isDefault: boolean("is_default").notNull().default(false),
-    lastFour: text("last_four"),
-    expiryMonth: integer("expiry_month"),
-    expiryYear: integer("expiry_year"),
-    metadata: jsonb("metadata").default("{}"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
-      .$onUpdate(() => new Date())
-      .notNull(),
-  },
-  (table) => ({
-    userIdx: index("payment_method_user_id_idx").on(table.userId),
-    providerIdx: index("payment_method_provider_id_idx").on(table.providerId),
-    defaultIdx: index("payment_method_default_idx").on(table.isDefault),
-  }),
-);
-
-export const usageRecord = pgTable(
-  "usage_record",
-  {
-    id: text("id").primaryKey(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    subscriptionId: text("subscription_id")
-      .notNull()
-      .references(() => subscription.id, { onDelete: "cascade" }),
-    metric: text("metric").notNull(),
-    quantity: integer("quantity").notNull(),
-    timestamp: timestamp("timestamp").notNull().defaultNow(),
-    metadata: jsonb("metadata").default("{}"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-  },
-  (table) => ({
-    subIdx: index("usage_record_subscription_id_idx").on(table.subscriptionId),
-    metricIdx: index("usage_record_metric_idx").on(table.metric),
-    periodIdx: index("usage_record_period_idx").on(table.timestamp),
-  }),
-);
-
-// User-facing transaction view
-export const userTransactionView = pgView("user_transaction_view").as((qb) =>
-  qb
-    .select({
-      id: transaction.id,
-      userId: transaction.userId,
-      type: transaction.type,
-      status: transaction.status,
-      amount: transaction.amount,
-      balanceAfter: transaction.balanceAfter,
-      description: transaction.description,
-      chatId: transaction.chatId,
-      createdAt: transaction.createdAt,
     })
-    .from(transaction)
-    .where(sql`${transaction.status} = 'completed'`),
+      .notNull()
+      .default("0.7"),
+    maxTokens: integer("max_tokens").default(2000),
+
+    // Visual identity
+    avatar: text("avatar"),
+    color: text("color").default("#3B82F6"),
+    tags: jsonb("tags").$type<string[]>().default([]),
+
+    // Tools configuration
+    tools: jsonb("tools").default("[]"),
+
+    // Template status and visibility
+    status: agentTemplateStatusEnum("status").notNull().default("draft"),
+    visibility: agentVisibilityEnum("visibility").notNull().default("private"),
+
+    // Marketplace info
+    isMarketplace: boolean("is_marketplace").notNull().default(false),
+    price: decimal("price", { precision: 10, scale: 2 }).default("0.00"),
+    currency: text("currency").default("USD"),
+
+    // Stats
+    instanceCount: integer("instance_count").notNull().default(0), // How many agents created from this
+    purchaseCount: integer("purchase_count").notNull().default(0),
+    totalRevenue: decimal("total_revenue", { precision: 10, scale: 2 }).default("0.00"),
+    rating: numeric("rating", { precision: 3, scale: 2 }).default("0.00"),
+    reviewCount: integer("review_count").notNull().default(0),
+    usageCount: integer("usage_count").notNull().default(0), // Total messages across all instances
+
+    // SEO & Discovery
+    slug: text("slug").unique(),
+    featured: boolean("featured").notNull().default(false),
+
+    // Version control
+    version: text("version").notNull().default("1.0.0"),
+
+    deleted: boolean("deleted").notNull().default(false),
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    publishedAt: timestamp("published_at"),
+  },
+  (table) => ({
+    creatorIdIdx: index("agent_template_creator_id_idx").on(table.creatorId),
+    statusIdx: index("agent_template_status_idx").on(table.status),
+    visibilityIdx: index("agent_template_visibility_idx").on(table.visibility),
+    isMarketplaceIdx: index("agent_template_is_marketplace_idx").on(table.isMarketplace),
+    featuredIdx: index("agent_template_featured_idx").on(table.featured),
+    slugIdx: index("agent_template_slug_idx").on(table.slug),
+    marketplaceFeaturedIdx: index("agent_template_marketplace_featured_idx").on(
+      table.isMarketplace,
+      table.featured,
+      table.status
+    ),
+    createdAtIdx: index("agent_template_created_at_idx").on(table.createdAt),
+  }),
 );
 
-// ============================================================================
-// AGENTS
-// ============================================================================
-
+// Agent instances - users' personalized versions
 export const agent = pgTable(
   "agent",
   {
@@ -524,33 +434,35 @@ export const agent = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
 
+    // Link to template (nullable for custom agents not from marketplace)
+    templateId: text("template_id").references(() => agentTemplate.id, {
+      onDelete: "set null",
+    }),
+
     name: text("name").notNull(),
     description: text("description"),
     systemPrompt: text("system_prompt").notNull(),
 
-    // Model configuration
+    // Model configuration (can override template defaults)
     model: text("model").notNull().default("gpt-4"),
     temperature: numeric("temperature", {
       precision: 3,
       scale: 2,
-      mode: "number",
     })
       .notNull()
-      .default(0.7),
+      .default("0.7"),
     maxTokens: integer("max_tokens").default(2000),
 
     // Avatar and styling
     avatar: text("avatar"),
     color: text("color").default("#3B82F6"),
 
-    // Visibility
-    isPublic: boolean("is_public").notNull().default(false),
-
-    // Tools configuration (JSON array of tool names/configs)
+    // Tools configuration
     tools: jsonb("tools").default("[]"),
 
-    // Usage stats
+    // Usage stats (for this instance)
     usageCount: integer("usage_count").notNull().default(0),
+    lastUsedAt: timestamp("last_used_at"),
 
     deleted: boolean("deleted").notNull().default(false),
 
@@ -559,12 +471,89 @@ export const agent = pgTable(
   },
   (table) => ({
     userIdIdx: index("agent_user_id_idx").on(table.userId),
-    isPublicIdx: index("agent_is_public_idx").on(table.isPublic),
-    userPublicIdx: index("agent_user_public_idx").on(
+    templateIdIdx: index("agent_template_id_idx").on(table.templateId),
+    userTemplateIdx: index("agent_user_template_idx").on(
       table.userId,
-      table.isPublic,
+      table.templateId,
     ),
     usageCountIdx: index("agent_usage_count_idx").on(table.usageCount),
+    lastUsedIdx: index("agent_last_used_idx").on(table.lastUsedAt),
+  }),
+);
+
+// Agent purchases from marketplace
+export const agentPurchase = pgTable(
+  "agent_purchase",
+  {
+    id: text("id").primaryKey(),
+    buyerId: text("buyer_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    templateId: text("template_id")
+      .notNull()
+      .references(() => agentTemplate.id, { onDelete: "restrict" }),
+    agentId: text("agent_id").references(() => agent.id, {
+      onDelete: "set null",
+    }), // The created agent instance
+
+    amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+    currency: text("currency").notNull().default("USD"),
+
+    status: agentPurchaseStatusEnum("status").notNull().default("pending"),
+
+    // Revenue split (for creator)
+    creatorRevenue: decimal("creator_revenue", { precision: 10, scale: 2 }).notNull(),
+    platformFee: decimal("platform_fee", { precision: 10, scale: 2 }).notNull(),
+
+    refundedAt: timestamp("refunded_at"),
+    refundReason: text("refund_reason"),
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    completedAt: timestamp("completed_at"),
+  },
+  (table) => ({
+    buyerIdIdx: index("agent_purchase_buyer_id_idx").on(table.buyerId),
+    templateIdIdx: index("agent_purchase_template_id_idx").on(table.templateId),
+    agentIdIdx: index("agent_purchase_agent_id_idx").on(table.agentId),
+    statusIdx: index("agent_purchase_status_idx").on(table.status),
+    createdAtIdx: index("agent_purchase_created_at_idx").on(table.createdAt),
+  }),
+);
+
+// Reviews for marketplace agents
+export const agentReview = pgTable(
+  "agent_review",
+  {
+    id: text("id").primaryKey(),
+    templateId: text("template_id")
+      .notNull()
+      .references(() => agentTemplate.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    purchaseId: text("purchase_id")
+      .notNull()
+      .references(() => agentPurchase.id, { onDelete: "cascade" }),
+
+    rating: integer("rating").notNull(), // 1-5
+    title: text("title"),
+    comment: text("comment"),
+
+    helpful: integer("helpful").notNull().default(0), // Helpful votes
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    templateIdIdx: index("agent_review_template_id_idx").on(table.templateId),
+    userIdIdx: index("agent_review_user_id_idx").on(table.userId),
+    purchaseIdIdx: index("agent_review_purchase_id_idx").on(table.purchaseId),
+    uniqueUserTemplateIdx: unique("agent_review_user_template_unique").on(
+      table.userId,
+      table.templateId,
+    ),
+    ratingIdx: index("agent_review_rating_idx").on(table.rating),
+    createdAtIdx: index("agent_review_created_at_idx").on(table.createdAt),
   }),
 );
 
@@ -583,13 +572,11 @@ export const knowledgeBase = pgTable(
     name: text("name").notNull(),
     description: text("description"),
 
-    // Embedding configuration
     embeddingModel: text("embedding_model")
       .notNull()
       .default("text-embedding-3-small"),
     embeddingDimension: integer("embedding_dimension").notNull().default(1536),
 
-    // Stats
     documentCount: integer("document_count").notNull().default(0),
     totalTokens: integer("total_tokens").notNull().default(0),
 
@@ -646,10 +633,8 @@ export const embedding = pgTable(
     chunkIndex: integer("chunk_index").notNull(),
     tokenCount: integer("token_count").notNull(),
 
-    // Vector embedding
     embedding: vector("embedding", { dimensions: 1536 }).notNull(),
 
-    // Full-text search
     contentTsv: tsvector("content_tsv").generatedAlwaysAs(
       (): SQL => sql`to_tsvector('english', ${embedding.content})`,
     ),
@@ -664,12 +649,10 @@ export const embedding = pgTable(
       table.chunkIndex,
     ),
 
-    // Vector similarity search (HNSW)
     embeddingVectorIdx: index("embedding_vector_hnsw_idx")
       .using("hnsw", table.embedding.op("vector_cosine_ops"))
       .with({ m: 16, ef_construction: 64 }),
 
-    // Full-text search
     contentFtsIdx: index("embedding_content_fts_idx").using(
       "gin",
       table.contentTsv,
@@ -692,18 +675,14 @@ export const chat = pgTable(
     title: text("title").notNull(),
     description: text("description"),
 
-    // Chat configuration
     style: chatStyleEnum("style").notNull().default("brainstorm"),
     visibility: chatVisibilityEnum("visibility").notNull().default("private"),
 
-    // Share link (for public/private accessible chats)
     shareLink: text("share_link").unique(),
     linkEnabled: boolean("link_enabled").notNull().default(false),
 
-    // Custom instructions for the roundtable
     instructions: text("instructions"),
 
-    // Usage tracking
     messageCount: integer("message_count").notNull().default(0),
     totalTokens: integer("total_tokens").notNull().default(0),
     totalCost: decimal("total_cost", { precision: 10, scale: 4 })
@@ -724,7 +703,7 @@ export const chat = pgTable(
   }),
 );
 
-// Agent-Chat relationship (defines the order and which agents participate)
+// Junction table: which agents participate in a chat
 export const chatAgent = pgTable(
   "chat_agent",
   {
@@ -736,11 +715,12 @@ export const chatAgent = pgTable(
       .notNull()
       .references(() => agent.id, { onDelete: "cascade" }),
 
-    // Order in the roundtable (who speaks after whom)
     speakOrder: integer("speak_order").notNull(),
-
-    // Can be disabled without removing from chat
     enabled: boolean("enabled").notNull().default(true),
+
+    // Custom configuration per chat (can override agent defaults)
+    customSystemPrompt: text("custom_system_prompt"),
+    customTemperature: numeric("custom_temperature", { precision: 3, scale: 2 }),
 
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
@@ -755,10 +735,13 @@ export const chatAgent = pgTable(
       table.chatId,
       table.agentId,
     ),
+    uniqueChatOrderIdx: unique("chat_agent_unique_order_idx").on(
+      table.chatId,
+      table.speakOrder,
+    ),
   }),
 );
 
-// Knowledge Base-Chat relationship
 export const chatKnowledgeBase = pgTable(
   "chat_knowledge_base",
   {
@@ -796,7 +779,6 @@ export const message = pgTable(
       .notNull()
       .references(() => chat.id, { onDelete: "cascade" }),
 
-    // Who sent the message (user or agent)
     userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
     agentId: text("agent_id").references(() => agent.id, {
       onDelete: "set null",
@@ -804,18 +786,17 @@ export const message = pgTable(
 
     content: text("content").notNull(),
 
-    // Message metadata
     tokenCount: integer("token_count").notNull().default(0),
     cost: decimal("cost", { precision: 10, scale: 6 }).default("0.000000"),
 
-    // Tool calls and results
     toolCalls: jsonb("tool_calls").default("[]"),
 
-    // UI representation of the message (e.g., for streaming)
     uiMessage: jsonb("ui_message").$type<UIMessage>(),
 
-    // References for quotes/replies (self-reference)
     quotedMessageId: text("quoted_message_id"),
+
+    // Agent mentions - which specific agents were mentioned
+    mentionedAgentIds: jsonb("mentioned_agent_ids").$type<string[]>().default([]),
 
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
@@ -829,7 +810,6 @@ export const message = pgTable(
     ),
     quotedMessageIdx: index("message_quoted_idx").on(table.quotedMessageId),
 
-    // Ensure message is from either user or agent, not both
     senderCheck: check(
       "message_sender_check",
       sql`(user_id IS NOT NULL AND agent_id IS NULL) OR (user_id IS NULL AND agent_id IS NOT NULL)`,
@@ -838,64 +818,293 @@ export const message = pgTable(
 );
 
 // ============================================================================
-// AUDIT LOGS
+// BILLING: PLANS, SUBSCRIPTIONS, INVOICES
 // ============================================================================
 
-export const auditLog = pgTable(
-  "audit_log",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+export const subscriptionPlans = pgTable('subscription_plans', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description'),
+  amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
+  currency: text('currency').notNull(),
+  interval: text('interval').notNull(),
+  intervalCount: integer('interval_count').notNull(),
+  trialPeriodDays: integer('trial_period_days'),
+  features: jsonb('features').$type<Record<string, any>>().notNull(),
+  metadata: jsonb('metadata').$type<Record<string, any> | null>(),
+  active: boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+}, (table) => ({
+  activeIdx: index('subscription_plans_active_idx').on(table.active),
+  intervalIdx: index('subscription_plans_interval_idx').on(table.interval)
+}));
 
-    action: text("action").notNull(), // e.g., 'agent.create', 'chat.start', 'message.send'
-    entityType: text("entity_type").notNull(), // e.g., 'agent', 'chat', 'message'
-    entityId: text("entity_id"),
+export const subscriptions = pgTable('subscriptions', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  planId: text('plan_id').notNull().references(() => subscriptionPlans.id, { onDelete: 'restrict' }),
+  status: text('status').notNull(),
+  currentPeriodStart: timestamp('current_period_start', { withTimezone: true }).notNull(),
+  currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }).notNull(),
+  canceledAt: timestamp('canceled_at', { withTimezone: true }),
+  trialStart: timestamp('trial_start', { withTimezone: true }),
+  trialEnd: timestamp('trial_end', { withTimezone: true }),
+  metadata: jsonb('metadata').$type<Record<string, any> | null>(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+}, (table) => ({
+  userIdIdx: index('subscriptions_user_id_idx').on(table.userId),
+  statusIdx: index('subscriptions_status_idx').on(table.status),
+  planIdx: index('subscriptions_plan_id_idx').on(table.planId),
+  currentPeriodEndIdx: index('subscriptions_current_period_end_idx').on(table.currentPeriodEnd)
+}));
 
-    details: jsonb("details").default("{}"),
+export const paymentMethods = pgTable('payment_methods', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  type: text('type').notNull(),
+  providerId: text('provider_id').notNull(),
+  providerMethodId: text('provider_method_id').notNull(),
+  isDefault: boolean('is_default').notNull().default(false),
+  lastFour: text('last_four'),
+  expiryMonth: integer('expiry_month'),
+  expiryYear: integer('expiry_year'),
+  metadata: jsonb('metadata').$type<Record<string, any> | null>(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+}, (table) => ({
+  userIdIdx: index('payment_methods_user_id_idx').on(table.userId),
+  providerMethodUnique: unique('payment_methods_provider_method_unique').on(table.providerId, table.providerMethodId),
+  defaultIdx: index('payment_methods_is_default_idx').on(table.userId, table.isDefault)
+}));
 
-    ipAddress: text("ip_address"),
-    userAgent: text("user_agent"),
+export const payments = pgTable('payments', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  subscriptionId: text('subscription_id').references(() => subscriptions.id, { onDelete: 'set null' }),
+  amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
+  currency: text('currency').notNull(),
+  // Optional idempotency key to prevent duplicate payment creation
+  idempotencyKey: text('idempotency_key'),
+  status: text('status').notNull(),
+  paymentMethodId: text('payment_method_id').notNull().references(() => paymentMethods.id, { onDelete: 'restrict' }),
+  providerId: text('provider_id'),
+  providerTransactionId: text('provider_transaction_id'),
+  failureReason: text('failure_reason'),
+  metadata: jsonb('metadata').$type<Record<string, any> | null>(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+}, (table) => ({
+  userIdIdx: index('payments_user_id_idx').on(table.userId),
+  subscriptionIdx: index('payments_subscription_id_idx').on(table.subscriptionId),
+  statusIdx: index('payments_status_idx').on(table.status),
+  providerTransactionUnique: unique('payments_provider_transaction_unique').on(table.providerId, table.providerTransactionId),
+  idempotencyKeyUnique: unique('payments_idempotency_key_unique').on(table.idempotencyKey),
+  createdAtIdx: index('payments_created_at_idx').on(table.createdAt)
+}));
 
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-  },
-  (table) => ({
-    userIdIdx: index("audit_log_user_id_idx").on(table.userId),
-    actionIdx: index("audit_log_action_idx").on(table.action),
-    entityIdx: index("audit_log_entity_idx").on(
-      table.entityType,
-      table.entityId,
-    ),
-    createdAtIdx: index("audit_log_created_at_idx").on(table.createdAt),
-    userCreatedAtIdx: index("audit_log_user_created_at_idx").on(
-      table.userId,
-      table.createdAt,
-    ),
-  }),
-);
+export const balances = pgTable('balances', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  availableAmount: numeric('available_amount', { precision: 14, scale: 2 }).notNull().default('0'),
+  availableCurrency: text('available_currency').notNull(),
+  pendingAmount: numeric('pending_amount', { precision: 14, scale: 2 }).notNull().default('0'),
+  pendingCurrency: text('pending_currency').notNull(),
+  reservedAmount: numeric('reserved_amount', { precision: 14, scale: 2 }).notNull().default('0'),
+  reservedCurrency: text('reserved_currency').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+}, (table) => ({
+  userIdUnique: unique('balances_user_id_unique').on(table.userId)
+}));
+
+export const ledgerEntries = pgTable('ledger_entries', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  transactionId: text('transaction_id').notNull(),
+  type: text('type').notNull(),
+  transactionType: text('transaction_type').notNull(),
+  amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
+  currency: text('currency').notNull(),
+  balanceAmount: numeric('balance_amount', { precision: 14, scale: 2 }).notNull(),
+  balanceCurrency: text('balance_currency').notNull(),
+  description: text('description'),
+  metadata: jsonb('metadata').$type<Record<string, any> | null>(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+}, (table) => ({
+  userIdIdx: index('ledger_entries_user_id_idx').on(table.userId),
+  transactionIdx: index('ledger_entries_transaction_id_idx').on(table.transactionId),
+  typeIdx: index('ledger_entries_type_idx').on(table.type),
+  createdAtIdx: index('ledger_entries_created_at_idx').on(table.createdAt)
+}));
+
+export const invoices = pgTable('invoices', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  subscriptionId: text('subscription_id').references(() => subscriptions.id, { onDelete: 'set null' }),
+  number: text('number').notNull(),
+  status: text('status').notNull(),
+  subtotalAmount: numeric('subtotal_amount', { precision: 14, scale: 2 }).notNull(),
+  subtotalCurrency: text('subtotal_currency').notNull(),
+  taxAmount: numeric('tax_amount', { precision: 14, scale: 2 }),
+  taxCurrency: text('tax_currency'),
+  totalAmount: numeric('total_amount', { precision: 14, scale: 2 }).notNull(),
+  totalCurrency: text('total_currency').notNull(),
+  dueDate: timestamp('due_date', { withTimezone: true }).notNull(),
+  paidAt: timestamp('paid_at', { withTimezone: true }),
+  metadata: jsonb('metadata').$type<Record<string, any> | null>(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+}, (table) => ({
+  userIdIdx: index('invoices_user_id_idx').on(table.userId),
+  subscriptionIdx: index('invoices_subscription_id_idx').on(table.subscriptionId),
+  statusIdx: index('invoices_status_idx').on(table.status),
+  numberUnique: unique('invoices_number_unique').on(table.number),
+  dueDateIdx: index('invoices_due_date_idx').on(table.dueDate)
+}));
+
+export const invoiceLineItems = pgTable('invoice_line_items', {
+  id: text('id').primaryKey(),
+  invoiceId: text('invoice_id').notNull().references(() => invoices.id, { onDelete: 'cascade' }),
+  description: text('description').notNull(),
+  quantity: integer('quantity').notNull(),
+  unitAmount: numeric('unit_amount', { precision: 14, scale: 2 }).notNull(),
+  unitCurrency: text('unit_currency').notNull(),
+  amount: numeric('amount', { precision: 14, scale: 2 }).notNull(),
+  currency: text('currency').notNull(),
+  metadata: jsonb('metadata').$type<Record<string, any> | null>(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+}, (table) => ({
+  invoiceIdx: index('invoice_line_items_invoice_id_idx').on(table.invoiceId)
+}));
+
+export const usageRecords = pgTable('usage_records', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  subscriptionId: text('subscription_id').notNull().references(() => subscriptions.id, { onDelete: 'cascade' }),
+  metric: text('metric').notNull(),
+  quantity: integer('quantity').notNull(),
+  timestamp: timestamp('timestamp', { withTimezone: true }).notNull(),
+  metadata: jsonb('metadata').$type<Record<string, any> | null>(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+}, (table) => ({
+  userIdIdx: index('usage_records_user_id_idx').on(table.userId),
+  subscriptionIdx: index('usage_records_subscription_id_idx').on(table.subscriptionId),
+  metricIdx: index('usage_records_metric_idx').on(table.metric),
+  timestampIdx: index('usage_records_timestamp_idx').on(table.timestamp)
+}));
+
+export const usageMetrics = pgTable('usage_metrics', {
+  id: text('id').primaryKey(),
+  subscriptionId: text('subscription_id').notNull().references(() => subscriptions.id, { onDelete: 'cascade' }),
+  metric: text('metric').notNull(),
+  unitPriceAmount: numeric('unit_price_amount', { precision: 14, scale: 2 }).notNull(),
+  unitPriceCurrency: text('unit_price_currency').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+}, (table) => ({
+  subscriptionIdx: index('usage_metrics_subscription_id_idx').on(table.subscriptionId),
+  subscriptionMetricUnique: unique('usage_metrics_subscription_metric_unique').on(table.subscriptionId, table.metric)
+}));
+
+export const dunningCampaigns = pgTable('dunning_campaigns', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  steps: jsonb('steps').$type<{ dayOffset: number; action: string; config: Record<string, any> }[]>(),
+  enabled: boolean('enabled').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+}, (table) => ({
+  nameUnique: unique('dunning_campaigns_name_unique').on(table.name),
+  enabledIdx: index('dunning_campaigns_enabled_idx').on(table.enabled)
+}));
+
+export const dunningAttempts = pgTable('dunning_attempts', {
+  id: text('id').primaryKey(),
+  subscriptionId: text('subscription_id').notNull().references(() => subscriptions.id, { onDelete: 'cascade' }),
+  paymentId: text('payment_id').notNull().references(() => payments.id, { onDelete: 'cascade' }),
+  attemptNumber: integer('attempt_number').notNull(),
+  scheduledAt: timestamp('scheduled_at', { withTimezone: true }).notNull(),
+  executedAt: timestamp('executed_at', { withTimezone: true }),
+  status: text('status').notNull(),
+  result: text('result'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+}, (table) => ({
+  subscriptionIdx: index('dunning_attempts_subscription_id_idx').on(table.subscriptionId),
+  paymentIdx: index('dunning_attempts_payment_id_idx').on(table.paymentId),
+  statusIdx: index('dunning_attempts_status_idx').on(table.status),
+  scheduledAtIdx: index('dunning_attempts_scheduled_at_idx').on(table.scheduledAt)
+}));
+
+export const dunningSubscriptionState = pgTable('dunning_subscription_state', {
+  subscriptionId: text('subscription_id').primaryKey().references(() => subscriptions.id, { onDelete: 'cascade' }),
+  paused: boolean('paused').notNull().default(false),
+  pauseUntil: timestamp('pause_until', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+}, (table) => ({
+  pausedIdx: index('dunning_subscription_state_paused_idx').on(table.paused),
+  pauseUntilIdx: index('dunning_subscription_state_pause_until_idx').on(table.pauseUntil)
+}));
+
+export const webhookEvents = pgTable('webhook_events', {
+  id: text('id').primaryKey(),
+  providerId: text('provider_id').notNull(),
+  eventType: text('event_type').notNull(),
+  payload: jsonb('payload').$type<Record<string, any>>().notNull(),
+  signature: text('signature'),
+  processed: boolean('processed').notNull().default(false),
+  processedAt: timestamp('processed_at', { withTimezone: true }),
+  error: text('error'),
+  retryCount: integer('retry_count').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+}, (table) => ({
+  providerIdx: index('webhook_events_provider_id_idx').on(table.providerId),
+  eventTypeIdx: index('webhook_events_event_type_idx').on(table.eventType),
+  processedIdx: index('webhook_events_processed_idx').on(table.processed),
+  createdAtIdx: index('webhook_events_created_at_idx').on(table.createdAt)
+}));
+
+export const auditLogs = pgTable('audit_logs', {
+  id: text('id').primaryKey(),
+  entityType: text('entity_type').notNull(),
+  entityId: text('entity_id').notNull(),
+  action: text('action').notNull(),
+  actorId: text('actor_id'),
+  actorType: text('actor_type'),
+  changes: jsonb('changes').$type<Record<string, any> | null>(),
+  metadata: jsonb('metadata').$type<Record<string, any> | null>(),
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+}, (table) => ({
+  entityIdx: index('audit_logs_entity_idx').on(table.entityType, table.entityId),
+  actorIdx: index('audit_logs_actor_idx').on(table.actorId),
+  createdAtIdx: index('audit_logs_created_at_idx').on(table.createdAt)
+}));
 
 // ============================================================================
-// RELATIONS (for self-referential and clarity)
+// RELATIONS
 // ============================================================================
 
-// Self-referential foreign key for message quotes
-// In your migration, add:
-// ALTER TABLE message ADD CONSTRAINT message_quoted_message_id_fk
-// FOREIGN KEY (quoted_message_id) REFERENCES message(id) ON DELETE SET NULL;
-
-// User relations
 export const userRelations = relations(user, ({ many, one }) => ({
   sessions: many(session),
   accounts: many(account),
   wallet: one(wallet),
   agents: many(agent),
+  agentTemplates: many(agentTemplate),
+  agentPurchases: many(agentPurchase),
+  agentReviews: many(agentReview),
   knowledgeBases: many(knowledgeBase),
   chats: many(chat),
   messages: many(message),
   transactions: many(transaction),
-  auditLogs: many(auditLog),
+  subscriptions: many(subscriptions),
 }));
 
-// Session relations
 export const sessionRelations = relations(session, ({ one }) => ({
   user: one(user, {
     fields: [session.userId],
@@ -903,7 +1112,6 @@ export const sessionRelations = relations(session, ({ one }) => ({
   }),
 }));
 
-// Account relations
 export const accountRelations = relations(account, ({ one }) => ({
   user: one(user, {
     fields: [account.userId],
@@ -917,9 +1125,9 @@ export const walletRelations = relations(wallet, ({ one, many }) => ({
     references: [user.id],
   }),
   transactions: many(transaction),
+  payments: many(payment),
 }));
 
-// Transaction relations
 export const transactionRelations = relations(transaction, ({ one }) => ({
   user: one(user, {
     fields: [transaction.userId],
@@ -933,77 +1141,87 @@ export const transactionRelations = relations(transaction, ({ one }) => ({
     fields: [transaction.chatId],
     references: [chat.id],
   }),
+  agentPurchase: one(agentPurchase, {
+    fields: [transaction.agentPurchaseId],
+    references: [agentPurchase.id],
+  }),
 }));
 
-// Billing relations
-export const subscriptionPlanRelations = relations(
-  subscriptionPlan,
-  ({ many }) => ({
-    subscriptions: many(subscription),
-  }),
-);
-
-export const subscriptionRelations = relations(subscription, ({ one, many }) => ({
+export const paymentRelations = relations(payment, ({ one }) => ({
   user: one(user, {
-    fields: [subscription.userId],
+    fields: [payment.userId],
     references: [user.id],
   }),
-  plan: one(subscriptionPlan, {
-    fields: [subscription.planId],
-    references: [subscriptionPlan.id],
+  wallet: one(wallet, {
+    fields: [payment.walletId],
+    references: [wallet.id],
   }),
-  invoices: many(invoice),
-  usageRecords: many(usageRecord),
+  transaction: one(transaction, {
+    fields: [payment.transactionId],
+    references: [transaction.id],
+  }),
 }));
 
-export const invoiceRelations = relations(invoice, ({ one, many }) => ({
-  user: one(user, {
-    fields: [invoice.userId],
+// Agent Template Relations
+export const agentTemplateRelations = relations(agentTemplate, ({ one, many }) => ({
+  creator: one(user, {
+    fields: [agentTemplate.creatorId],
     references: [user.id],
   }),
-  subscription: one(subscription, {
-    fields: [invoice.subscriptionId],
-    references: [subscription.id],
-  }),
-  lineItems: many(invoiceLineItem),
+  instances: many(agent),
+  purchases: many(agentPurchase),
+  reviews: many(agentReview),
 }));
 
-export const invoiceLineItemRelations = relations(invoiceLineItem, ({ one }) => ({
-  invoice: one(invoice, {
-    fields: [invoiceLineItem.invoiceId],
-    references: [invoice.id],
-  }),
-}));
-
-export const paymentMethodRelations = relations(paymentMethod, ({ one }) => ({
-  user: one(user, {
-    fields: [paymentMethod.userId],
-    references: [user.id],
-  }),
-}));
-
-export const usageRecordRelations = relations(usageRecord, ({ one }) => ({
-  user: one(user, {
-    fields: [usageRecord.userId],
-    references: [user.id],
-  }),
-  subscription: one(subscription, {
-    fields: [usageRecord.subscriptionId],
-    references: [subscription.id],
-  }),
-}));
-
-// Agent relations
+// Agent Relations
 export const agentRelations = relations(agent, ({ one, many }) => ({
   user: one(user, {
     fields: [agent.userId],
     references: [user.id],
   }),
+  template: one(agentTemplate, {
+    fields: [agent.templateId],
+    references: [agentTemplate.id],
+  }),
   chatAgents: many(chatAgent),
   messages: many(message),
 }));
 
-// Knowledge Base relations
+// Agent Purchase Relations
+export const agentPurchaseRelations = relations(agentPurchase, ({ one, many }) => ({
+  buyer: one(user, {
+    fields: [agentPurchase.buyerId],
+    references: [user.id],
+  }),
+  template: one(agentTemplate, {
+    fields: [agentPurchase.templateId],
+    references: [agentTemplate.id],
+  }),
+  agent: one(agent, {
+    fields: [agentPurchase.agentId],
+    references: [agent.id],
+  }),
+  transactions: many(transaction),
+  reviews: many(agentReview),
+}));
+
+// Agent Review Relations
+export const agentReviewRelations = relations(agentReview, ({ one }) => ({
+  template: one(agentTemplate, {
+    fields: [agentReview.templateId],
+    references: [agentTemplate.id],
+  }),
+  user: one(user, {
+    fields: [agentReview.userId],
+    references: [user.id],
+  }),
+  purchase: one(agentPurchase, {
+    fields: [agentReview.purchaseId],
+    references: [agentPurchase.id],
+  }),
+}));
+
+// Knowledge Base Relations
 export const knowledgeBaseRelations = relations(
   knowledgeBase,
   ({ one, many }) => ({
@@ -1016,7 +1234,6 @@ export const knowledgeBaseRelations = relations(
   }),
 );
 
-// Document relations
 export const documentRelations = relations(document, ({ one, many }) => ({
   knowledgeBase: one(knowledgeBase, {
     fields: [document.knowledgeBaseId],
@@ -1025,7 +1242,6 @@ export const documentRelations = relations(document, ({ one, many }) => ({
   embeddings: many(embedding),
 }));
 
-// Embedding relations
 export const embeddingRelations = relations(embedding, ({ one }) => ({
   knowledgeBase: one(knowledgeBase, {
     fields: [embedding.knowledgeBaseId],
@@ -1037,7 +1253,7 @@ export const embeddingRelations = relations(embedding, ({ one }) => ({
   }),
 }));
 
-// Chat relations
+// Chat Relations
 export const chatRelations = relations(chat, ({ one, many }) => ({
   user: one(user, {
     fields: [chat.userId],
@@ -1049,7 +1265,6 @@ export const chatRelations = relations(chat, ({ one, many }) => ({
   transactions: many(transaction),
 }));
 
-// ChatAgent (junction table) relations
 export const chatAgentRelations = relations(chatAgent, ({ one }) => ({
   chat: one(chat, {
     fields: [chatAgent.chatId],
@@ -1061,7 +1276,6 @@ export const chatAgentRelations = relations(chatAgent, ({ one }) => ({
   }),
 }));
 
-// ChatKnowledgeBase (junction table) relations
 export const chatKnowledgeBaseRelations = relations(
   chatKnowledgeBase,
   ({ one }) => ({
@@ -1076,7 +1290,7 @@ export const chatKnowledgeBaseRelations = relations(
   }),
 );
 
-// Message relations
+// Message Relations
 export const messageRelations = relations(message, ({ one, many }) => ({
   chat: one(chat, {
     fields: [message.chatId],
@@ -1100,11 +1314,98 @@ export const messageRelations = relations(message, ({ one, many }) => ({
   }),
 }));
 
-// Audit Log relations
-export const auditLogRelations = relations(auditLog, ({ one }) => ({
+// Billing Relations
+export const subscriptionPlanRelations = relations(
+  subscriptionPlans,
+  ({ many }) => ({
+    subscriptions: many(subscriptions),
+  }),
+);
+
+export const subscriptionRelations = relations(subscriptions, ({ one, many }) => ({
   user: one(user, {
-    fields: [auditLog.userId],
+    fields: [subscriptions.userId],
     references: [user.id],
+  }),
+  plan: one(subscriptionPlans, {
+    fields: [subscriptions.planId],
+    references: [subscriptionPlans.id],
+  }),
+  invoices: many(invoices),
+  usageRecords: many(usageRecords),
+  payments: many(payments),
+}));
+
+export const invoiceRelations = relations(invoices, ({ one, many }) => ({
+  user: one(user, {
+    fields: [invoices.userId],
+    references: [user.id],
+  }),
+  subscription: one(subscriptions, {
+    fields: [invoices.subscriptionId],
+    references: [subscriptions.id],
+  }),
+  lineItems: many(invoiceLineItems),
+}));
+
+export const invoiceLineItemRelations = relations(invoiceLineItems, ({ one }) => ({
+  invoice: one(invoices, {
+    fields: [invoiceLineItems.invoiceId],
+    references: [invoices.id],
+  }),
+}));
+
+export const paymentMethodRelations = relations(paymentMethods, ({ one }) => ({
+  user: one(user, {
+    fields: [paymentMethods.userId],
+    references: [user.id],
+  }),
+}));
+
+export const paymentsRelations = relations(payments, ({ one }) => ({
+  user: one(user, {
+    fields: [payments.userId],
+    references: [user.id],
+  }),
+  subscription: one(subscriptions, {
+    fields: [payments.subscriptionId],
+    references: [subscriptions.id],
+  }),
+  paymentMethod: one(paymentMethods, {
+    fields: [payments.paymentMethodId],
+    references: [paymentMethods.id],
+  }),
+}));
+
+export const balanceRelations = relations(balances, ({ one }) => ({
+  user: one(user, {
+    fields: [balances.userId],
+    references: [user.id],
+  }),
+}));
+
+export const ledgerEntryRelations = relations(ledgerEntries, ({ one }) => ({
+  user: one(user, {
+    fields: [ledgerEntries.userId],
+    references: [user.id],
+  }),
+}));
+
+export const usageRecordRelations = relations(usageRecords, ({ one }) => ({
+  user: one(user, {
+    fields: [usageRecords.userId],
+    references: [user.id],
+  }),
+  subscription: one(subscriptions, {
+    fields: [usageRecords.subscriptionId],
+    references: [subscriptions.id],
+  }),
+}));
+
+export const usageMetricRelations = relations(usageMetrics, ({ one }) => ({
+  subscription: one(subscriptions, {
+    fields: [usageMetrics.subscriptionId],
+    references: [subscriptions.id],
   }),
 }));
 
@@ -1136,9 +1437,29 @@ export type TransactionType = (typeof transactionTypeEnum.enumValues)[number];
 export type TransactionStatus =
   (typeof transactionStatusEnum.enumValues)[number];
 
+export type Payment = typeof payment.$inferSelect;
+export type NewPayment = typeof payment.$inferInsert;
+export type PaymentStatus = (typeof paymentStatusEnum.enumValues)[number];
+export type PaymentProvider = (typeof paymentProviderEnum.enumValues)[number];
+
+// Agent Template types
+export type AgentTemplate = typeof agentTemplate.$inferSelect;
+export type NewAgentTemplate = typeof agentTemplate.$inferInsert;
+export type AgentVisibility = (typeof agentVisibilityEnum.enumValues)[number];
+export type AgentTemplateStatus = (typeof agentTemplateStatusEnum.enumValues)[number];
+
 // Agent types
 export type Agent = typeof agent.$inferSelect;
 export type NewAgent = typeof agent.$inferInsert;
+
+// Agent Purchase types
+export type AgentPurchase = typeof agentPurchase.$inferSelect;
+export type NewAgentPurchase = typeof agentPurchase.$inferInsert;
+export type AgentPurchaseStatus = (typeof agentPurchaseStatusEnum.enumValues)[number];
+
+// Agent Review types
+export type AgentReview = typeof agentReview.$inferSelect;
+export type NewAgentReview = typeof agentReview.$inferInsert;
 
 // Knowledge Base types
 export type KnowledgeBase = typeof knowledgeBase.$inferSelect;
@@ -1178,30 +1499,30 @@ export type NewChatKnowledgeBase = typeof chatKnowledgeBase.$inferInsert;
 export type Message = typeof message.$inferSelect;
 export type NewMessage = typeof message.$inferInsert;
 
-// Audit Log types
-export type AuditLog = typeof auditLog.$inferSelect;
-export type NewAuditLog = typeof auditLog.$inferInsert;
-
-// Payment types
-export type Payment = typeof payment.$inferSelect;
-export type NewPayment = typeof payment.$inferInsert;
-export type PaymentStatus = (typeof paymentStatusEnum.enumValues)[number];
-export type PaymentProvider = (typeof paymentProviderEnum.enumValues)[number];
-
 // Billing types
-export type SubscriptionPlan = typeof subscriptionPlan.$inferSelect;
-export type NewSubscriptionPlan = typeof subscriptionPlan.$inferInsert;
-export type Subscription = typeof subscription.$inferSelect;
-export type NewSubscription = typeof subscription.$inferInsert;
+export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
+export type NewSubscriptionPlan = typeof subscriptionPlans.$inferInsert;
+export type Subscription = typeof subscriptions.$inferSelect;
+export type NewSubscription = typeof subscriptions.$inferInsert;
 export type SubscriptionStatus =
   (typeof subscriptionStatusEnum.enumValues)[number];
 export type BillingInterval = (typeof billingIntervalEnum.enumValues)[number];
-export type Invoice = typeof invoice.$inferSelect;
-export type NewInvoice = typeof invoice.$inferInsert;
+export type Invoice = typeof invoices.$inferSelect;
+export type NewInvoice = typeof invoices.$inferInsert;
 export type InvoiceStatus = (typeof invoiceStatusEnum.enumValues)[number];
-export type InvoiceLineItem = typeof invoiceLineItem.$inferSelect;
-export type NewInvoiceLineItem = typeof invoiceLineItem.$inferInsert;
-export type PaymentMethod = typeof paymentMethod.$inferSelect;
-export type NewPaymentMethod = typeof paymentMethod.$inferInsert;
-export type UsageRecord = typeof usageRecord.$inferSelect;
-export type NewUsageRecord = typeof usageRecord.$inferInsert;
+export type InvoiceLineItem = typeof invoiceLineItems.$inferSelect;
+export type NewInvoiceLineItem = typeof invoiceLineItems.$inferInsert;
+export type PaymentMethod = typeof paymentMethods.$inferSelect;
+export type NewPaymentMethod = typeof paymentMethods.$inferInsert;
+export type UsageRecord = typeof usageRecords.$inferSelect;
+export type NewUsageRecord = typeof usageRecords.$inferInsert;
+export type UsageMetric = typeof usageMetrics.$inferSelect;
+export type NewUsageMetric = typeof usageMetrics.$inferInsert;
+export type Balance = typeof balances.$inferSelect;
+export type NewBalance = typeof balances.$inferInsert;
+export type LedgerEntry = typeof ledgerEntries.$inferSelect;
+export type NewLedgerEntry = typeof ledgerEntries.$inferInsert;
+
+// Audit Log types
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type NewAuditLog = typeof auditLogs.$inferInsert;

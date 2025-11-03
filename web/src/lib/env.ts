@@ -16,7 +16,14 @@ export const env = createEnv({
   skipValidation: true,
 
   server: {
-    // Telegram
+    SIZPAY_MERCHANT_ID: z.string().optional(),
+    SIZPAY_TERMINAL_ID: z.string().optional(),
+    SIZPAY_USERNAME_B64: z.string().optional(),
+    SIZPAY_PASSWORD_B64: z.string().optional(),
+    SIZPAY_SIGN_KEY: z.string().optional(),
+    SIZPAY_RETURN_URL: z.string().optional(),
+
+  // Telegram
     BOT_TOKEN: z.string(),
 
     // Email
