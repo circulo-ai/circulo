@@ -5,3 +5,6 @@ export { OTPVerificationEmail } from "./otp-verification-email";
 export { PlanWelcomeEmail } from "./plan-welcome-email";
 export * from "./render-email";
 export { ResetPasswordEmail } from "./reset-password-email";
+export { UsageThresholdEmail } from "./usage-threshold-email";
+export { InvitationEmail } from "./invitation-email";
+export { BatchInvitationEmail } from "./batch-invitation-email";

@@ -31,7 +31,7 @@ export function PlanWelcomeEmail({
   createdDate = new Date(),
 }: PlanWelcomeEmailProps) {
   const brand = getBrandConfig()
-  const baseUrl = getEnv('NEXT_PUBLIC_APP_URL') || 'https://sim.ai'
+  const baseUrl = getEnv('NEXT_PUBLIC_APP_URL') || 'https://circulo.ir'
   const cta = loginLink || `${baseUrl}/login`
 
   const previewText = `${brand.name}: Your ${planName} plan is active`
@@ -96,7 +96,7 @@ export function PlanWelcomeEmail({
             <Text style={baseStyles.paragraph}>
               Best regards,
               <br />
-              The Sim Team
+              The Circulo Team
             </Text>
 
             <Text style={{ ...baseStyles.paragraph, fontSize: '12px', color: '#666' }}>

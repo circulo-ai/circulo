@@ -1,7 +1,7 @@
 /**
  * Environment utility functions for consistent environment detection across the application
  */
-import { env } from "./env";
+import { env, isTruthy } from "./env";
 
 /**
  * Is the application running in production mode
@@ -18,9 +18,16 @@ export const isDev = env.NODE_ENV === "development";
  */
 export const isTest = env.NODE_ENV === "test";
 
+
+/**
+ * Is billing enforcement enabled
+ */
+export const isBillingEnabled = isTruthy(env.BILLING_ENABLED)
+
+
 /**
  * Is this the hosted version of the application
  */
 export const isHosted =
-  env.NEXT_PUBLIC_APP_URL === "https://www.sim.ai" ||
-  env.NEXT_PUBLIC_APP_URL === "https://www.staging.sim.ai";
+  env.NEXT_PUBLIC_APP_URL === "https://www.circulo.ir" ||
+  env.NEXT_PUBLIC_APP_URL === "https://www.staging.circulo.ir";

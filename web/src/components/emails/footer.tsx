@@ -13,7 +13,7 @@ interface EmailFooterProps {
 }
 
 export const EmailFooter = ({
-  baseUrl = getEnv('NEXT_PUBLIC_APP_URL') || 'https://sim.ai',
+  baseUrl = getEnv('NEXT_PUBLIC_APP_URL') || 'https://circulo.ir',
   unsubscribe,
 }: EmailFooterProps) => {
   const brand = getBrandConfig()
@@ -27,7 +27,7 @@ export const EmailFooter = ({
               <table cellPadding={0} cellSpacing={0} style={{ border: 0 }}>
                 <tr>
                   <td align='center' style={{ padding: '0 8px' }}>
-                    <Link href='https://x.com/simdotai' rel='noopener noreferrer'>
+                    <Link href='https://x.com/circulo' rel='noopener noreferrer'>
                       <Img src={`${baseUrl}/static/x-icon.png`} width='24' height='24' alt='X' />
                     </Link>
                   </td>
@@ -41,16 +41,16 @@ export const EmailFooter = ({
                       />
                     </Link>
                   </td>
-                  <td align='center' style={{ padding: '0 8px' }}>
-                    <Link href='https://github.com/simstudioai/sim' rel='noopener noreferrer'>
-                      <Img
-                        src={`${baseUrl}/static/github-icon.png`}
-                        width='24'
-                        height='24'
-                        alt='GitHub'
-                      />
-                    </Link>
-                  </td>
+                  {/*<td align='center' style={{ padding: '0 8px' }}>*/}
+                  {/*  <Link href='https://github.com/circulo/sim' rel='noopener noreferrer'>*/}
+                  {/*    <Img*/}
+                  {/*      src={`${baseUrl}/static/github-icon.png`}*/}
+                  {/*      width='24'*/}
+                  {/*      height='24'*/}
+                  {/*      alt='GitHub'*/}
+                  {/*    />*/}
+                  {/*  </Link>*/}
+                  {/*</td>*/}
                 </tr>
               </table>
             </td>

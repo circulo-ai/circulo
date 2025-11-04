@@ -78,14 +78,14 @@ export const rateLimitMiddleware = (options: {
   maxRequests: number;
   windowMs: number;
   keyPrefix?: string;
-  getIdentifier?: (req: NextRequest) => string;
+  getIdentifier?: (req: Request | NextRequest) => string;
 }): Middleware => {
   // Fallback in-memory cache when Redis is unavailable
   const fallbackCache = new Map<string, number[]>();
   const keyPrefix = options.keyPrefix || "ratelimit";
   const getIdentifier =
     options.getIdentifier ||
-    ((req: NextRequest) =>
+    ((req: Request | NextRequest) =>
       req.headers.get("x-forwarded-for") ||
       req.headers.get("x-real-ip") ||
       "unknown");

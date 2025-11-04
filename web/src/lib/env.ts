@@ -16,6 +16,24 @@ export const env = createEnv({
   skipValidation: true,
 
   server: {
+    // Payment & Billing
+    STRIPE_SECRET_KEY:                     z.string().min(1).optional(),           // Stripe secret key for payment processing
+    STRIPE_WEBHOOK_SECRET:                 z.string().min(1).optional(),           // General Stripe webhook secret
+    STRIPE_FREE_PRICE_ID:                  z.string().min(1).optional(),           // Stripe price ID for free tier
+    FREE_TIER_COST_LIMIT:                  z.number().optional(),                  // Cost limit for free tier users
+    FREE_STORAGE_LIMIT_GB:                 z.number().optional().default(5),       // Storage limit in GB for free tier users
+    STRIPE_PRO_PRICE_ID:                   z.string().min(1).optional(),           // Stripe price ID for pro tier
+    PRO_TIER_COST_LIMIT:                   z.number().optional(),                  // Cost limit for pro tier users
+    PRO_STORAGE_LIMIT_GB:                  z.number().optional().default(50),      // Storage limit in GB for pro tier users
+    STRIPE_TEAM_PRICE_ID:                  z.string().min(1).optional(),           // Stripe price ID for team tier
+    TEAM_TIER_COST_LIMIT:                  z.number().optional(),                  // Cost limit for team tier users
+    TEAM_STORAGE_LIMIT_GB:                 z.number().optional().default(500),     // Storage limit in GB for team tier organizations (pooled)
+    STRIPE_ENTERPRISE_PRICE_ID:            z.string().min(1).optional(),           // Stripe price ID for enterprise tier
+    ENTERPRISE_TIER_COST_LIMIT:            z.number().optional(),                  // Cost limit for enterprise tier users
+    ENTERPRISE_STORAGE_LIMIT_GB:           z.number().optional().default(500),     // Default storage limit in GB for enterprise tier (can be overridden per org)
+    BILLING_ENABLED:                       z.boolean().optional(),                 // Enable billing enforcement and usage tracking
+    OVERAGE_THRESHOLD_DOLLARS:             z.number().optional().default(50),      // Dollar threshold for incremental overage billing (default: $50)
+
     SIZPAY_MERCHANT_ID: z.string().optional(),
     SIZPAY_TERMINAL_ID: z.string().optional(),
     SIZPAY_USERNAME_B64: z.string().optional(),
@@ -23,7 +41,7 @@ export const env = createEnv({
     SIZPAY_SIGN_KEY: z.string().optional(),
     SIZPAY_RETURN_URL: z.string().optional(),
 
-  // Telegram
+    // Telegram
     BOT_TOKEN: z.string(),
 
     // Email
@@ -89,7 +107,7 @@ export const env = createEnv({
 
   client: {
     // Core Application URLs - Required for frontend functionality
-    NEXT_PUBLIC_APP_URL: z.string().url(), // Base URL of the application (e.g., https://app.sim.ai)
+    NEXT_PUBLIC_APP_URL: z.string().url(), // Base URL of the application (e.g., https://app.circulo.ir)
 
     // Trigger.dev Realtime base URL for self-hosted setups
     NEXT_PUBLIC_TRIGGER_API_URL: z.string().url().optional(),

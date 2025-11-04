@@ -9,8 +9,8 @@ export function generateBrandedMetadata(override: Partial<Metadata> = {}): Metad
   const brand = getBrandConfig()
 
   const defaultTitle = brand.name
-  const summaryFull = `Sim is an open-source AI agent workflow builder. Developers at trail-blazing startups to Fortune 500 companies deploy agentic workflows on the Sim platform.  35,000+ developers are already using Sim to build and deploy AI agent workflows. Sim lets developers integrate with 100+ apps to streamline workflows with AI agents. Sim is SOC2 and HIPAA compliant, ensuring enterprise-level security.`
-  const summaryShort = `Sim is an open-source AI agent workflow builder.`
+  const summaryFull = `Circulo is an open-source AI agent workflow builder. Developers at trail-blazing startups to Fortune 500 companies deploy agentic workflows on the Sim platform.  35,000+ developers are already using Sim to build and deploy AI agent workflows. Sim lets developers integrate with 100+ apps to streamline workflows with AI agents. Sim is SOC2 and HIPAA compliant, ensuring enterprise-level security.`
+  const summaryShort = `Circulo is an open-source AI agent workflow builder.`
 
   return {
     title: {
@@ -42,7 +42,7 @@ export function generateBrandedMetadata(override: Partial<Metadata> = {}): Metad
     publisher: brand.name,
     metadataBase: env.NEXT_PUBLIC_APP_URL
       ? new URL(env.NEXT_PUBLIC_APP_URL)
-      : new URL('https://sim.ai'),
+      : new URL('https://circulo.ir'),
     alternates: {
       canonical: '/',
       languages: {
@@ -63,7 +63,7 @@ export function generateBrandedMetadata(override: Partial<Metadata> = {}): Metad
     openGraph: {
       type: 'website',
       locale: 'en_US',
-      url: env.NEXT_PUBLIC_APP_URL || 'https://sim.ai',
+      url: env.NEXT_PUBLIC_APP_URL || 'https://circulo.ir',
       title: defaultTitle,
       description: summaryFull,
       siteName: brand.name,
@@ -81,8 +81,8 @@ export function generateBrandedMetadata(override: Partial<Metadata> = {}): Metad
       title: defaultTitle,
       description: summaryFull,
       images: [brand.logoUrl || '/social/twitter.png'],
-      creator: '@simstudioai',
-      site: '@simstudioai',
+      creator: '@Circulo',
+      site: '@Circulo',
     },
     manifest: '/manifest.webmanifest',
     icons: {
@@ -99,7 +99,7 @@ export function generateBrandedMetadata(override: Partial<Metadata> = {}): Metad
           sizes: '512x512',
           type: 'image/png',
         },
-        { url: brand.faviconUrl || '/sim.png', sizes: 'any', type: 'image/png' },
+        { url: brand.faviconUrl || '/logo.png', sizes: 'any', type: 'image/png' },
       ],
       apple: '/favicon/apple-touch-icon.png',
       shortcut: brand.faviconUrl || '/favicon/favicon.ico',
@@ -116,7 +116,7 @@ export function generateBrandedMetadata(override: Partial<Metadata> = {}): Metad
     other: {
       'apple-mobile-web-app-capable': 'yes',
       'mobile-web-app-capable': 'yes',
-      'msapplication-TileColor': '#701FFC', // Default Sim brand primary color
+      'msapplication-TileColor': '#701FFC', // Default Circulo brand primary color
       'msapplication-config': '/favicon/browserconfig.xml',
     },
     ...override,
@@ -130,10 +130,10 @@ export function generateStructuredData() {
   return {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
-    name: 'Sim',
+    name: 'Circulo',
     description:
-      'Sim is an open-source AI agent workflow builder. Developers at trail-blazing startups to Fortune 500 companies deploy agentic workflows on the Sim platform.  30,000+ developers are already using Sim to build and deploy AI agent workflows. Sim lets developers integrate with 100+ apps to streamline workflows with AI agents. Sim is SOC2 and HIPAA compliant, ensuring enterprise-level security.',
-    url: 'https://sim.ai',
+      'Circulo is an open-source AI agent workflow builder. Developers at trail-blazing startups to Fortune 500 companies deploy agentic workflows on the Sim platform.  30,000+ developers are already using Sim to build and deploy AI agent workflows. Sim lets developers integrate with 100+ apps to streamline workflows with AI agents. Sim is SOC2 and HIPAA compliant, ensuring enterprise-level security.',
+    url: 'https://circulo.ir',
     applicationCategory: 'BusinessApplication',
     operatingSystem: 'Web Browser',
     offers: {
@@ -142,8 +142,8 @@ export function generateStructuredData() {
     },
     creator: {
       '@type': 'Organization',
-      name: 'Sim',
-      url: 'https://sim.ai',
+      name: 'Circulo',
+      url: 'https://circulo.ir',
     },
     featureList: [
       'Visual AI Agent Builder',

@@ -1,5 +1,13 @@
 {
   "version": "7",
   "dialect": "postgresql",
-  "entries": []
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1762189173484,
+      "tag": "0000_milky_nuke",
+      "breakpoints": true
+    }
+  ]
 }

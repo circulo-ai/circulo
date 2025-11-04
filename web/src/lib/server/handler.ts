@@ -8,14 +8,81 @@ import {
   RouteContext,
   StreamingApiHandler,
 } from "@/lib/server/types";
-import { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
 type InferMiddlewareContext<T extends readonly Middleware<any>[]> =
-  T extends readonly [...any[], Middleware<infer Last>] ? Last : RouteContext;
+  T extends readonly [...any[], Middleware<infer Last>]
+    ? Last
+    : T extends readonly []
+      ? RouteContext
+      : RouteContext;
 
-// route-handler.ts
-export const createRoute = <
-  TMiddleware extends readonly Middleware<any>[],
+/**
+ * Creates a formatted error response for failed requests
+ */
+const createErrorResponse = (error: unknown, context: RouteContext): NextResponse => {
+  console.error("[API Error]", error);
+
+  if (error instanceof HttpError) {
+    return ApiResponseBuilder.toNextResponse(
+      ApiResponseBuilder.error(error),
+      context,
+    );
+  }
+
+  return ApiResponseBuilder.toNextResponse(
+    ApiResponseBuilder.error(
+      Errors.internal("An unexpected error occurred"),
+    ),
+    context,
+  );
+};
+
+/**
+ * Creates a streaming error response
+ */
+const createStreamingErrorResponse = (error: unknown): Response => {
+  console.error("[Streaming API Error]", error);
+
+  const errorData = error instanceof HttpError
+    ? {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      statusCode: error.statusCode,
+    }
+    : {
+      message: "An unexpected error occurred",
+      code: "INTERNAL_ERROR",
+      statusCode: 500,
+    };
+
+  return new Response(
+    JSON.stringify({
+      success: false,
+      error: errorData,
+    }),
+    {
+      status: errorData.statusCode,
+      headers: { "Content-Type": "application/json" },
+    },
+  );
+};
+
+/**
+ * Creates a route handler with middleware support for standard API responses
+ *
+ * @example
+ * ```ts
+ * export const GET = createRoute({
+ *   middleware: [authMiddleware, rateLimitMiddleware],
+ *   handler: async (req, ctx) => {
+ *     return ApiResponseBuilder.success({ data: "hello" });
+ *   }
+ * });
+ * ```
+ */
+export const createRoute = <TMiddleware extends readonly Middleware<any>[],
   TContext extends RouteContext = InferMiddlewareContext<TMiddleware>,
 >(options: {
   handler: ApiHandler<any, TContext>;
@@ -24,8 +91,8 @@ export const createRoute = <
   const { handler, middleware = [] as unknown as TMiddleware } = options;
 
   return async (
-    req: NextRequest,
-    routeContext?: { params: Record<string, string> },
+    req: Request,
+    routeContext?: { params: Record<string, string | string[]> },
   ) => {
     const context: RouteContext = {
       params: routeContext?.params || {},
@@ -36,37 +103,32 @@ export const createRoute = <
       const finalMiddleware = compose(...middleware);
 
       const response = await finalMiddleware(
-        req,
+        req as any,
         context as TContext,
-        async () => {
-          return handler(req, context as TContext);
-        },
+        async () => handler(req as any, context as TContext),
       );
 
       return ApiResponseBuilder.toNextResponse(response, context);
     } catch (error) {
-      console.error("[API Error]", error);
-
-      if (error instanceof HttpError) {
-        return ApiResponseBuilder.toNextResponse(
-          ApiResponseBuilder.error(error),
-          context,
-        );
-      }
-
-      return ApiResponseBuilder.toNextResponse(
-        ApiResponseBuilder.error(
-          Errors.internal("An unexpected error occurred"),
-        ),
-        context,
-      );
+      return createErrorResponse(error, context);
     }
   };
 };
 
-// Helper to create handlers for different HTTP methods
-export const createRouteHandlers = <
-  TMiddleware extends readonly Middleware<any>[],
+/**
+ * Creates multiple route handlers for different HTTP methods
+ *
+ * @example
+ * ```ts
+ * export const { GET, POST } = createRouteHandlers({
+ *   middleware: [authMiddleware],
+ *   GET: async (req, ctx) => ApiResponseBuilder.success({ data }),
+ *   POST: async (req, ctx) => ApiResponseBuilder.success({ created: true }),
+ * });
+ * ```
+ */
+export const createRouteHandlers =
+  <TMiddleware extends readonly Middleware<any>[],
   TContext extends RouteContext = InferMiddlewareContext<TMiddleware>,
 >(config: {
   GET?: ApiHandler<any, TContext>;
@@ -76,22 +138,39 @@ export const createRouteHandlers = <
   DELETE?: ApiHandler<any, TContext>;
   middleware?: TMiddleware;
 }) => {
-  const handlers: Record<string, any> = {};
+  const handlers: Record<string, ReturnType<typeof createRoute<TMiddleware, TContext>>> = {};
 
-  for (const [method, handler] of Object.entries(config)) {
-    if (method !== "middleware" && handler) {
-      handlers[method] = createRoute<TMiddleware, TContext>({
-        handler: handler as ApiHandler<any, TContext>,
-        middleware: config.middleware,
-      });
+  (Object.keys(config) as Array<keyof typeof config>).forEach((method) => {
+    if (method !== "middleware") {
+      const handler = config[method];
+      if (handler) {
+        handlers[method] = createRoute<TMiddleware, TContext>({
+          handler: handler as ApiHandler<any, TContext>,
+          middleware: config.middleware,
+        });
+      }
     }
-  }
+  });
 
   return handlers;
 };
 
-export const createStreamingRoute = <
-  TMiddleware extends readonly Middleware<any>[],
+/**
+ * Creates a streaming route handler with middleware support
+ *
+ * @example
+ * ```ts
+ * export const POST = createStreamingRoute({
+ *   middleware: [authMiddleware],
+ *   handler: async (req, ctx) => {
+ *     const stream = new ReadableStream({...});
+ *     return new Response(stream);
+ *   }
+ * });
+ * ```
+ */
+export const createStreamingRoute =
+  <TMiddleware extends readonly Middleware<any>[],
   TContext extends RouteContext = InferMiddlewareContext<TMiddleware>,
 >(options: {
   handler: StreamingApiHandler<TContext>;
@@ -100,8 +179,8 @@ export const createStreamingRoute = <
   const { handler, middleware = [] as unknown as TMiddleware } = options;
 
   return async (
-    req: NextRequest,
-    routeContext?: { params: Record<string, string> },
+    req: Request,
+    routeContext?: { params: Record<string, string | string[]> },
   ) => {
     const context: RouteContext = {
       params: routeContext?.params || {},
@@ -111,63 +190,32 @@ export const createStreamingRoute = <
     try {
       const finalMiddleware = compose(...middleware);
 
-      // For streaming, we need to handle middleware differently
-      // Middleware should still run, but we return a Response directly
-      let streamingResponse: Response | null = null;
-
-      await finalMiddleware(req, context as TContext, async () => {
-        streamingResponse = await handler(req, context as TContext);
-        // Return a dummy ApiResponse to satisfy middleware chain
+      // Run middleware chain without requiring an ApiResponse return
+      // Middleware can modify context and throw errors, but shouldn't block streaming
+      await finalMiddleware(req as any, context as TContext, async () => {
+        // Return a placeholder to satisfy middleware chain type
         return ApiResponseBuilder.success(null);
       });
 
-      if (!streamingResponse) {
-        throw new Error("Handler did not return a streaming response");
+      // After middleware validation, call the actual streaming handler
+      const streamingResponse = await handler(req as any, context as TContext);
+
+      if (!streamingResponse || !(streamingResponse instanceof Response)) {
+        throw new Error("Handler must return a Response object");
       }
 
       return streamingResponse;
     } catch (error) {
-      console.error("[Streaming API Error]", error);
-
-      if (error instanceof HttpError) {
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: {
-              message: error.message,
-              code: error.code,
-              details: error.details,
-              statusCode: error.statusCode,
-            },
-          }),
-          {
-            status: error.statusCode,
-            headers: { "Content-Type": "application/json" },
-          },
-        );
-      }
-
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: {
-            message: "An unexpected error occurred",
-            code: "INTERNAL_ERROR",
-            statusCode: 500,
-          },
-        }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
+      return createStreamingErrorResponse(error);
     }
   };
 };
 
-// Helper to create streaming handlers for different HTTP methods
-export const createStreamingRouteHandlers = <
-  TMiddleware extends readonly Middleware<any>[],
+/**
+ * Creates multiple streaming route handlers for different HTTP methods
+ */
+export const createStreamingRouteHandlers =
+  <TMiddleware extends readonly Middleware<any>[],
   TContext extends RouteContext = InferMiddlewareContext<TMiddleware>,
 >(config: {
   GET?: StreamingApiHandler<TContext>;
@@ -177,16 +225,19 @@ export const createStreamingRouteHandlers = <
   DELETE?: StreamingApiHandler<TContext>;
   middleware?: TMiddleware;
 }) => {
-  const handlers: Record<string, any> = {};
+  const handlers: Record<string, ReturnType<typeof createStreamingRoute<TMiddleware, TContext>>> = {};
 
-  for (const [method, handler] of Object.entries(config)) {
-    if (method !== "middleware" && handler) {
-      handlers[method] = createStreamingRoute<TMiddleware, TContext>({
-        handler: handler as StreamingApiHandler<TContext>,
-        middleware: config.middleware,
-      });
+  (Object.keys(config) as Array<keyof typeof config>).forEach((method) => {
+    if (method !== "middleware") {
+      const handler = config[method];
+      if (handler) {
+        handlers[method] = createStreamingRoute<TMiddleware, TContext>({
+          handler: handler as StreamingApiHandler<TContext>,
+          middleware: config.middleware,
+        });
+      }
     }
-  }
+  });
 
   return handlers;
 };

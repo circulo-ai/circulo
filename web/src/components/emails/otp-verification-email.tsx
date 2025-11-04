@@ -22,7 +22,7 @@ interface OTPVerificationEmailProps {
   chatTitle?: string
 }
 
-const baseUrl = getEnv('NEXT_PUBLIC_APP_URL') || 'https://sim.ai'
+const baseUrl = getEnv('NEXT_PUBLIC_APP_URL') || 'https://circulo.ir'
 
 const getSubjectByType = (type: string, brandName: string, chatTitle?: string) => {
   switch (type) {
@@ -101,7 +101,7 @@ export const OTPVerificationEmail = ({
             <Text style={baseStyles.paragraph}>
               Best regards,
               <br />
-              The Sim Team
+              The Circulo Team
             </Text>
           </Section>
         </Container>

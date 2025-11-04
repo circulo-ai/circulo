@@ -1,15 +1,16 @@
 import type { auth } from "@/lib/auth";
 import { getEnv } from "@/lib/env";
-import { telegramClient } from "better-auth-telegram/client";
 import {
   apiKeyClient,
   customSessionClient,
   magicLinkClient,
-  oneTimeTokenClient,
+  oneTimeTokenClient, organizationClient
 } from "better-auth/client/plugins";
 import { nextCookies } from "better-auth/next-js";
 import { createAuthClient } from "better-auth/react";
 import { toast } from "sonner";
+import { stripeClient } from '@better-auth/stripe/client'
+import { isBillingEnabled } from "@/lib/environment";
 
 export function getBaseURL() {
   return getEnv("NEXT_PUBLIC_APP_URL") || "http://localhost:3000";
@@ -20,12 +21,19 @@ export const authClient = createAuthClient({
   baseURL:
     typeof window !== "undefined" ? window.location.origin : getBaseURL(),
   plugins: [
-    telegramClient(),
     oneTimeTokenClient(),
     nextCookies(),
     customSessionClient<typeof auth>(),
+    ...(isBillingEnabled
+      ? [
+        stripeClient({
+          subscription: true, // Enable subscription management
+        }),
+      ]
+      : []),
     apiKeyClient(),
     magicLinkClient(),
+    organizationClient(),
   ],
   fetchOptions: {
     onError(e) {
@@ -35,5 +43,17 @@ export const authClient = createAuthClient({
     },
   },
 });
+
+
+export const { useActiveOrganization } = authClient
+
+export const useSubscription = () => {
+  return {
+    list: authClient.subscription?.list,
+    upgrade: authClient.subscription?.upgrade,
+    cancel: authClient.subscription?.cancel,
+    restore: authClient.subscription?.restore,
+  }
+}
 
 export const { signIn, signUp, signOut } = authClient;

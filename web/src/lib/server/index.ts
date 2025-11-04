@@ -1,6 +1,6 @@
 export * from "./errors";
 export * from "./handler";
-export * from "./middleware";
+export * from "./middlewares";
 export * from "./request-helpers";
 export * from "./response";
 export * from "./types";

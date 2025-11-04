@@ -1,11 +1,15 @@
 import {
+  BatchInvitationEmail,
+  InvitationEmail,
   MagicLinkEmail,
   OTPVerificationEmail,
   PlanWelcomeEmail,
-  ResetPasswordEmail,
+  ResetPasswordEmail, UsageThresholdEmail
 } from "@/components/emails";
 import { getBrandConfig } from "@/lib/branding/branding";
 import { render } from "@react-email/components";
+import { getBaseUrl } from "@/lib/urls/utils";
+import EnterpriseSubscriptionEmail from "@/components/emails/enterprise-subscription-email";
 
 export async function renderOTPEmail(
   otp: string,
@@ -30,6 +34,80 @@ export async function renderPasswordResetEmail(
       updatedDate: new Date(),
     }),
   );
+}
+
+export async function renderUsageThresholdEmail(params: {
+  userName?: string
+  planName: string
+  percentUsed: number
+  currentUsage: number
+  limit: number
+  ctaLink: string
+}): Promise<string> {
+  return await render(
+    UsageThresholdEmail({
+      userName: params.userName,
+      planName: params.planName,
+      percentUsed: params.percentUsed,
+      currentUsage: params.currentUsage,
+      limit: params.limit,
+      ctaLink: params.ctaLink,
+      updatedDate: new Date(),
+    })
+  )
+}
+
+
+export async function renderEnterpriseSubscriptionEmail(
+  userName: string,
+  userEmail: string
+): Promise<string> {
+  const baseUrl = getBaseUrl()
+  const loginLink = `${baseUrl}/auth/sign-in`
+
+  return await render(
+    EnterpriseSubscriptionEmail({
+      userName,
+      userEmail,
+      loginLink,
+      createdDate: new Date(),
+    })
+  )
+}
+
+export async function renderInvitationEmail(
+  inviterName: string,
+  organizationName: string,
+  invitationUrl: string,
+  email: string
+): Promise<string> {
+  return await render(
+    InvitationEmail({
+      inviterName,
+      organizationName,
+      inviteLink: invitationUrl,
+      invitedEmail: email,
+      updatedDate: new Date(),
+    })
+  )
+}
+
+export async function renderBatchInvitationEmail(
+  inviterName: string,
+  organizationName: string,
+  organizationRole: 'admin' | 'member',
+  workspaceInvitations: WorkspaceInvitation[],
+  acceptUrl: string
+): Promise<string> {
+  return await render(
+    BatchInvitationEmail({
+      inviterName,
+      organizationName,
+      organizationRole,
+      workspaceInvitations,
+      acceptUrl,
+    })
+  )
 }
 
 export async function renderMagicLinkEmail(

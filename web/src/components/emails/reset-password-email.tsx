@@ -23,7 +23,7 @@ interface ResetPasswordEmailProps {
   updatedDate?: Date
 }
 
-const baseUrl = getEnv('NEXT_PUBLIC_APP_URL') || 'https://sim.ai'
+const baseUrl = getEnv('NEXT_PUBLIC_APP_URL') || 'https://circulo.ir'
 
 export const ResetPasswordEmail = ({
   username = '',

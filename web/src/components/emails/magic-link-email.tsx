@@ -22,7 +22,7 @@ interface MagicLinkEmailProps {
   type?: "sign-in" | "email-verification";
 }
 
-const baseUrl = getEnv("NEXT_PUBLIC_APP_URL") || "https://sim.ai";
+const baseUrl = getEnv("NEXT_PUBLIC_APP_URL") || "https://circulo.ir";
 
 const getSubjectByType = (type: string, brandName: string) => {
   switch (type) {
@@ -60,7 +60,7 @@ export const MagicLinkEmail = ({
       case "email-verification":
         return "Verify email address";
       default:
-        return "Continue to Sim";
+        return "Continue to Circulo";
     }
   };
 
@@ -112,7 +112,7 @@ export const MagicLinkEmail = ({
             <Text style={baseStyles.paragraph}>
               Best regards,
               <br />
-              The Sim Team
+              The Circulo Team
             </Text>
           </Section>
         </Container>

@@ -2,7 +2,7 @@ import { ApiResponse, HttpError, RouteContext } from "@/lib/server/types";
 import { NextResponse } from "next/server";
 
 export const ApiResponseBuilder = {
-  success: <T>(data: T, metadata?: Record<string, any>): ApiResponse<T> => ({
+  success: <T>(data?: T, metadata?: Record<string, any>): ApiResponse<T> => ({
     success: true,
     data,
     metadata,
