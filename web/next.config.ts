@@ -1,6 +1,5 @@
 import { env } from "@/lib/env";
 import { isDev } from "@/lib/environment";
-import createWithVercelToolbar from "@vercel/toolbar/plugins/next";
 import type { NextConfig } from "next";
 import { withWorkflow } from "workflow/next";
 
@@ -9,6 +8,7 @@ const nextConfig: NextConfig = {
   turbopack: {
     resolveExtensions: [".tsx", ".ts", ".jsx", ".js", ".mjs", ".json"],
   },
+  serverExternalPackages: ['pdf-parse'],
   transpilePackages: [
     "prettier",
     "@t3-oss/env-nextjs",
@@ -41,6 +41,4 @@ const nextConfig: NextConfig = {
   }),
 };
 
-const withVercelToolbar = createWithVercelToolbar();
-
-export default withWorkflow(withVercelToolbar(nextConfig));
+export default withWorkflow(nextConfig);
