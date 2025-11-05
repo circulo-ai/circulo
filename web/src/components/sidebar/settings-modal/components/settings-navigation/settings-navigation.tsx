@@ -2,9 +2,7 @@ import { env, getEnv, isTruthy } from "@/lib/env";
 import { isHosted } from "@/lib/environment";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/providers/session-provider";
-import { useOrganizationStore } from "@/stores/organization";
 import { useGeneralStore } from "@/stores/settings/general/store";
-import { useSubscriptionStore } from "@/stores/subscription/store";
 import {
   CreditCard,
   Files,
@@ -83,10 +81,6 @@ export function SettingsNavigation({
 }: SettingsNavigationProps) {
   console.log(isBillingEnabled);
   const { data: session } = useSession();
-  const { hasEnterprisePlan, getUserRole } = useOrganizationStore();
-  const userEmail = session?.user?.email;
-  const userRole = getUserRole(userEmail);
-  const isOwner = userRole === "owner";
 
   const navigationItems = allNavigationItems.filter((item) => {
     if (item.hideWhenBillingDisabled && !isBillingEnabled) {
@@ -94,14 +88,6 @@ export function SettingsNavigation({
     }
 
     if (item.requiresTeam && !hasOrganization) {
-      return false;
-    }
-
-    if (item.requiresEnterprise && !hasEnterprisePlan) {
-      return false;
-    }
-
-    if (item.requiresOwner && !isOwner) {
       return false;
     }
 
@@ -122,12 +108,6 @@ export function SettingsNavigation({
                 switch (item.id) {
                   case "general":
                     useGeneralStore.getState().loadSettings();
-                    break;
-                  case "subscription":
-                    useSubscriptionStore.getState().loadData();
-                    break;
-                  case "team":
-                    useOrganizationStore.getState().loadData();
                     break;
                   default:
                     break;

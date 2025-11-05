@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { env, isTruthy } from '@/lib/env'
 import { createLogger } from '@/lib/logs/console/logger'
-import { useOrganizationStore } from '@/stores/organization'
 import { useGeneralStore } from '@/stores/settings/general/store'
 import {
   SettingsNavigation
@@ -33,7 +32,6 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const [activeSection, setActiveSection] = useState<SettingsSection>('general')
   const [isLoading, setIsLoading] = useState(true)
   const loadSettings = useGeneralStore((state) => state.loadSettings)
-  const { activeOrganization } = useOrganizationStore()
   const hasLoadedInitialData = useRef(false)
   const hasLoadedGeneral = useRef(false)
   const environmentCloseHandler = useRef<((open: boolean) => void) | null>(null)
@@ -104,7 +102,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             <SettingsNavigation
               activeSection={activeSection}
               onSectionChange={setActiveSection}
-              hasOrganization={!!activeOrganization?.id}
+              hasOrganization={false}
             />
           </div>
 
