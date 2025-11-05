@@ -2,7 +2,6 @@
 
 import { useEffect } from 'react'
 import { createLogger } from '@/lib/logs/console/logger'
-import { useSubscriptionStore } from '@/stores/subscription/store'
 
 const logger = createLogger('Stores')
 
@@ -177,22 +176,16 @@ if (typeof window !== 'undefined') {
   initializeApplication()
 }
 
-// Export all stores
-export {
-  useSubscriptionStore,
-}
 
 // Helper function to reset all stores
 export const resetAllStores = () => {
   // Reset all stores to initial state
   // Variables store has no tracking to reset; registry hydrates
-  useSubscriptionStore.getState().reset() // Reset subscription store
 }
 
 // Helper function to log all store states
 export const logAllStores = () => {
   const state = {
-    subscription: useSubscriptionStore.getState(),
   }
 
   return state

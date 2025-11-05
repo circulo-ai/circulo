@@ -58,15 +58,6 @@ export function General() {
   const toggleFloatingControls = useGeneralStore((state) => state.toggleFloatingControls)
   const toggleTrainingControls = useGeneralStore((state) => state.toggleTrainingControls)
 
-  // Sync theme from store to next-themes when theme changes
-  useEffect(() => {
-    if (!isLoading && theme) {
-      // Ensure next-themes is in sync with our store
-      const { syncThemeToNextThemes } = require('@/lib/theme-sync')
-      syncThemeToNextThemes(theme)
-    }
-  }, [theme, isLoading])
-
   const handleThemeChange = async (value: 'system' | 'light' | 'dark') => {
     await setTheme(value)
   }

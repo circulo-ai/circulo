@@ -1,7 +1,6 @@
 import {
   bigint,
   boolean,
-  check,
   decimal,
   index,
   integer,
@@ -9,7 +8,6 @@ import {
   pgTable,
   text,
   timestamp,
-  unique
 } from "drizzle-orm/pg-core";
 import { DEFAULT_FREE_CREDITS } from "@/db/constants";
 
@@ -138,7 +136,6 @@ export const member = pgTable(
     organizationIdIdx: index('member_organization_id_idx').on(table.organizationId),
   })
 )
-
 
 export const userStats = pgTable('user_stats', {
   id: text('id').primaryKey(),

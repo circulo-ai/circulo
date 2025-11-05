@@ -4,7 +4,9 @@ import {
   MagicLinkEmail,
   OTPVerificationEmail,
   PlanWelcomeEmail,
-  ResetPasswordEmail, UsageThresholdEmail
+  ResetPasswordEmail,
+  UsageThresholdEmail,
+  SizpayRenewalEmail,
 } from "@/components/emails";
 import { getBrandConfig } from "@/lib/branding/branding";
 import { render } from "@react-email/components";
@@ -136,7 +138,8 @@ export function getEmailSubject(
     | "enterprise-subscription"
     | "usage-threshold"
     | "plan-welcome-pro"
-    | "plan-welcome-team",
+    | "plan-welcome-team"
+    | "sizpay-renewal",
 ): string {
   const brandName = getBrandConfig().name;
 
@@ -163,6 +166,8 @@ export function getEmailSubject(
       return `Your Pro plan is now active on ${brandName}`;
     case "plan-welcome-team":
       return `Your Team plan is now active on ${brandName}`;
+    case "sizpay-renewal":
+      return `Your subscription is due for renewal on ${brandName}`;
     default:
       return brandName;
   }
@@ -181,4 +186,20 @@ export async function renderPlanWelcomeEmail(params: {
       createdDate: new Date(),
     }),
   );
+}
+
+export async function renderSizpayRenewalEmail(params: {
+  planName: "Pro" | "Team";
+  userName?: string | null;
+  periodEnd: Date;
+  renewLink: string;
+}): Promise<string> {
+  return await render(
+    SizpayRenewalEmail({
+      planName: params.planName,
+      userName: params.userName,
+      periodEnd: params.periodEnd,
+      renewLink: params.renewLink,
+    })
+  )
 }

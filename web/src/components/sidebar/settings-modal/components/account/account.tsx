@@ -40,12 +40,6 @@ export function Account(_props: AccountProps) {
   const [isEditingName, setIsEditingName] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const [isResettingPassword, setIsResettingPassword] = useState(false)
-  const [resetPasswordMessage, setResetPasswordMessage] = useState<{
-    type: 'success' | 'error'
-    text: string
-  } | null>(null)
-
   const [uploadError, setUploadError] = useState<string | null>(null)
 
   const {
@@ -201,48 +195,6 @@ export function Account(_props: AccountProps) {
     }
   }
 
-  const handleResetPassword = async () => {
-    setIsResettingPassword(true)
-    setResetPasswordMessage(null)
-
-    try {
-      const response = await fetch('/api/auth/forget-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          redirectTo: `${getBaseUrl()}/reset-password`,
-        }),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || 'Failed to send reset password email')
-      }
-
-      setResetPasswordMessage({
-        type: 'success',
-        text: 'email sent',
-      })
-
-      setTimeout(() => {
-        setResetPasswordMessage(null)
-      }, 5000)
-    } catch (error) {
-      logger.error('Error resetting password:', error)
-      setResetPasswordMessage({
-        type: 'error',
-        text: 'error',
-      })
-
-      setTimeout(() => {
-        setResetPasswordMessage(null)
-      }, 5000)
-    } finally {
-      setIsResettingPassword(false)
-    }
-  }
-
   return (
     <div className='px-6 pt-4 pb-4'>
       <div className='flex flex-col gap-4'>
@@ -273,15 +225,6 @@ export function Account(_props: AccountProps) {
             <div className='flex flex-col gap-2'>
               <Skeleton className='h-4 w-16' />
               <Skeleton className='h-5 w-48' />
-            </div>
-
-            {/* Password Field Skeleton */}
-            <div className='flex flex-col gap-2'>
-              <Skeleton className='h-4 w-16' />
-              <div className='flex items-center gap-4'>
-                <Skeleton className='h-5 w-20' />
-                <Skeleton className='h-5 w-[42px]' />
-              </div>
             </div>
 
             {/* Sign Out Button Skeleton */}
@@ -390,33 +333,6 @@ export function Account(_props: AccountProps) {
             <div className='flex flex-col gap-2'>
               <Label className='font-normal text-muted-foreground text-sm'>Email</Label>
               <p className='text-base'>{email}</p>
-            </div>
-
-            {/* Password Field */}
-            <div className='flex flex-col gap-2'>
-              <Label className='font-normal text-muted-foreground text-sm'>Password</Label>
-              <div className='flex items-center gap-4'>
-                <span className='text-base'>••••••••</span>
-                <Button
-                  variant='ghost'
-                  className={`h-auto p-0 font-normal text-sm transition-colors hover:bg-transparent ${
-                    resetPasswordMessage
-                      ? resetPasswordMessage.type === 'success'
-                        ? 'text-green-500 hover:text-green-600'
-                        : 'text-destructive hover:text-destructive/80'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                  onClick={handleResetPassword}
-                  disabled={isResettingPassword}
-                >
-                  {isResettingPassword
-                    ? 'sending...'
-                    : resetPasswordMessage
-                      ? resetPasswordMessage.text
-                      : 'reset'}
-                  <span className='sr-only'>Reset password</span>
-                </Button>
-              </div>
             </div>
 
             {/* Sign Out Button */}

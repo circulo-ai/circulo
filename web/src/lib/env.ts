@@ -16,23 +16,25 @@ export const env = createEnv({
   skipValidation: true,
 
   server: {
+    TONAPI_API_KEY: z.string(),
+    
     // Payment & Billing
-    STRIPE_SECRET_KEY:                     z.string().min(1).optional(),           // Stripe secret key for payment processing
-    STRIPE_WEBHOOK_SECRET:                 z.string().min(1).optional(),           // General Stripe webhook secret
-    STRIPE_FREE_PRICE_ID:                  z.string().min(1).optional(),           // Stripe price ID for free tier
-    FREE_TIER_COST_LIMIT:                  z.number().optional(),                  // Cost limit for free tier users
-    FREE_STORAGE_LIMIT_GB:                 z.number().optional().default(5),       // Storage limit in GB for free tier users
-    STRIPE_PRO_PRICE_ID:                   z.string().min(1).optional(),           // Stripe price ID for pro tier
-    PRO_TIER_COST_LIMIT:                   z.number().optional(),                  // Cost limit for pro tier users
-    PRO_STORAGE_LIMIT_GB:                  z.number().optional().default(50),      // Storage limit in GB for pro tier users
-    STRIPE_TEAM_PRICE_ID:                  z.string().min(1).optional(),           // Stripe price ID for team tier
-    TEAM_TIER_COST_LIMIT:                  z.number().optional(),                  // Cost limit for team tier users
-    TEAM_STORAGE_LIMIT_GB:                 z.number().optional().default(500),     // Storage limit in GB for team tier organizations (pooled)
-    STRIPE_ENTERPRISE_PRICE_ID:            z.string().min(1).optional(),           // Stripe price ID for enterprise tier
-    ENTERPRISE_TIER_COST_LIMIT:            z.number().optional(),                  // Cost limit for enterprise tier users
-    ENTERPRISE_STORAGE_LIMIT_GB:           z.number().optional().default(500),     // Default storage limit in GB for enterprise tier (can be overridden per org)
-    BILLING_ENABLED:                       z.boolean().optional(),                 // Enable billing enforcement and usage tracking
-    OVERAGE_THRESHOLD_DOLLARS:             z.number().optional().default(50),      // Dollar threshold for incremental overage billing (default: $50)
+    STRIPE_SECRET_KEY: z.string().min(1).optional(),           // Stripe secret key for payment processing
+    STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),           // General Stripe webhook secret
+    STRIPE_FREE_PRICE_ID: z.string().min(1).optional(),           // Stripe price ID for free tier
+    FREE_TIER_COST_LIMIT: z.number().optional(),                  // Cost limit for free tier users
+    FREE_STORAGE_LIMIT_GB: z.number().optional().default(5),       // Storage limit in GB for free tier users
+    STRIPE_PRO_PRICE_ID: z.string().min(1).optional(),           // Stripe price ID for pro tier
+    PRO_TIER_COST_LIMIT: z.number().optional(),                  // Cost limit for pro tier users
+    PRO_STORAGE_LIMIT_GB: z.number().optional().default(50),      // Storage limit in GB for pro tier users
+    STRIPE_TEAM_PRICE_ID: z.string().min(1).optional(),           // Stripe price ID for team tier
+    TEAM_TIER_COST_LIMIT: z.number().optional(),                  // Cost limit for team tier users
+    TEAM_STORAGE_LIMIT_GB: z.number().optional().default(500),     // Storage limit in GB for team tier organizations (pooled)
+    STRIPE_ENTERPRISE_PRICE_ID: z.string().min(1).optional(),           // Stripe price ID for enterprise tier
+    ENTERPRISE_TIER_COST_LIMIT: z.number().optional(),                  // Cost limit for enterprise tier users
+    ENTERPRISE_STORAGE_LIMIT_GB: z.number().optional().default(500),     // Default storage limit in GB for enterprise tier (can be overridden per org)
+    BILLING_ENABLED: z.boolean().optional(),                 // Enable billing enforcement and usage tracking
+    OVERAGE_THRESHOLD_DOLLARS: z.number().optional().default(50),      // Dollar threshold for incremental overage billing (default: $50)
 
     SIZPAY_MERCHANT_ID: z.string().optional(),
     SIZPAY_TERMINAL_ID: z.string().optional(),
@@ -42,26 +44,26 @@ export const env = createEnv({
     SIZPAY_RETURN_URL: z.string().optional(),
 
     // Cloud Storage - AWS S3
-    AWS_REGION:                            z.string().optional(),                  // AWS region for S3 buckets
-    AWS_ACCESS_KEY_ID:                     z.string().optional(),                  // AWS access key ID
-    AWS_SECRET_ACCESS_KEY:                 z.string().optional(),                  // AWS secret access key
-    S3_BUCKET_NAME:                        z.string().optional(),                  // S3 bucket for general file storage
-    S3_LOGS_BUCKET_NAME:                   z.string().optional(),                  // S3 bucket for storing logs
-    S3_KB_BUCKET_NAME:                     z.string().optional(),                  // S3 bucket for knowledge base files
-    S3_EXECUTION_FILES_BUCKET_NAME:        z.string().optional(),                  // S3 bucket for workflow execution files
-    S3_CHAT_BUCKET_NAME:                   z.string().optional(),                  // S3 bucket for chat logos
-    S3_COPILOT_BUCKET_NAME:                z.string().optional(),                  // S3 bucket for copilot files
-    S3_PROFILE_PICTURES_BUCKET_NAME:       z.string().optional(),                  // S3 bucket for profile pictures
+    AWS_REGION: z.string().optional(),                  // AWS region for S3 buckets
+    AWS_ACCESS_KEY_ID: z.string().optional(),                  // AWS access key ID
+    AWS_SECRET_ACCESS_KEY: z.string().optional(),                  // AWS secret access key
+    S3_BUCKET_NAME: z.string().optional(),                  // S3 bucket for general file storage
+    S3_LOGS_BUCKET_NAME: z.string().optional(),                  // S3 bucket for storing logs
+    S3_KB_BUCKET_NAME: z.string().optional(),                  // S3 bucket for knowledge base files
+    S3_EXECUTION_FILES_BUCKET_NAME: z.string().optional(),                  // S3 bucket for workflow execution files
+    S3_CHAT_BUCKET_NAME: z.string().optional(),                  // S3 bucket for chat logos
+    S3_COPILOT_BUCKET_NAME: z.string().optional(),                  // S3 bucket for copilot files
+    S3_PROFILE_PICTURES_BUCKET_NAME: z.string().optional(),                  // S3 bucket for profile pictures
 
     // Cloud Storage - Azure Blob
-    AZURE_ACCOUNT_NAME:                    z.string().optional(),                  // Azure storage account name
-    AZURE_ACCOUNT_KEY:                     z.string().optional(),                  // Azure storage account key
-    AZURE_CONNECTION_STRING:               z.string().optional(),                  // Azure storage connection string
-    AZURE_STORAGE_CONTAINER_NAME:          z.string().optional(),                  // Azure container for general files
-    AZURE_STORAGE_KB_CONTAINER_NAME:       z.string().optional(),                  // Azure container for knowledge base files
+    AZURE_ACCOUNT_NAME: z.string().optional(),                  // Azure storage account name
+    AZURE_ACCOUNT_KEY: z.string().optional(),                  // Azure storage account key
+    AZURE_CONNECTION_STRING: z.string().optional(),                  // Azure storage connection string
+    AZURE_STORAGE_CONTAINER_NAME: z.string().optional(),                  // Azure container for general files
+    AZURE_STORAGE_KB_CONTAINER_NAME: z.string().optional(),                  // Azure container for knowledge base files
     AZURE_STORAGE_EXECUTION_FILES_CONTAINER_NAME: z.string().optional(),          // Azure container for workflow execution files
-    AZURE_STORAGE_CHAT_CONTAINER_NAME:     z.string().optional(),                  // Azure container for chat logos
-    AZURE_STORAGE_COPILOT_CONTAINER_NAME:  z.string().optional(),                  // Azure container for copilot files
+    AZURE_STORAGE_CHAT_CONTAINER_NAME: z.string().optional(),                  // Azure container for chat logos
+    AZURE_STORAGE_COPILOT_CONTAINER_NAME: z.string().optional(),                  // Azure container for copilot files
     AZURE_STORAGE_PROFILE_PICTURES_CONTAINER_NAME: z.string().optional(),          // Azure container for profile pictures
 
     // Telegram
@@ -129,6 +131,8 @@ export const env = createEnv({
   },
 
   client: {
+    NEXT_PUBLIC_BILLING_ENABLED: z.boolean().optional(),                 // Enable billing enforcement and usage tracking (client-side)
+
     // Core Application URLs - Required for frontend functionality
     NEXT_PUBLIC_APP_URL: z.string().url(), // Base URL of the application (e.g., https://app.circulo.ir)
 
@@ -151,6 +155,7 @@ export const env = createEnv({
   },
 
   experimental__runtimeEnv: {
+    NEXT_PUBLIC_BILLING_ENABLED: process.env.NEXT_PUBLIC_BILLING_ENABLED,
     NEXT_PUBLIC_DEPOSIT_ADDRESS: process.env.NEXT_PUBLIC_DEPOSIT_ADDRESS,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     NEXT_PUBLIC_TRIGGER_API_URL: process.env.NEXT_PUBLIC_TRIGGER_API_URL,
@@ -165,14 +170,10 @@ export const env = createEnv({
 
 // Need this utility because t3-env is returning string for boolean values.
 export const isTruthy = (value: string | boolean | number | undefined) =>
-  typeof value === "string"
-    ? value.toLowerCase() === "true" || value === "1"
-    : Boolean(value);
+  typeof value === 'string' ? value.toLowerCase() === 'true' || value === '1' : Boolean(value)
 
 // Utility to check if a value is explicitly false (defaults to false only if explicitly set)
 export const isFalsy = (value: string | boolean | number | undefined) =>
-  typeof value === "string"
-    ? value.toLowerCase() === "false" || value === "0"
-    : value === false;
+  typeof value === 'string' ? value.toLowerCase() === 'false' || value === '0' : value === false
 
-export { getEnv };
+export { getEnv }

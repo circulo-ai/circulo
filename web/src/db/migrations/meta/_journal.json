@@ -8,6 +8,13 @@
       "when": 1762189173484,
       "tag": "0000_milky_nuke",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1762282569968,
+      "tag": "0001_bored_surge",
+      "breakpoints": true
     }
   ]
 }

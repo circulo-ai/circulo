@@ -1,7 +1,6 @@
 import { db } from '@/db'
 import { userRateLimits } from '@/db/schema'
 import { eq, sql } from 'drizzle-orm'
-import { getHighestPrioritySubscription } from '@/lib/billing/core/subscription'
 import { createLogger } from '@/lib/logs/console/logger'
 import {
   MANUAL_EXECUTION_LIMIT,
@@ -274,21 +273,6 @@ export class RateLimiter {
   }
 
   /**
-   * Legacy method - for backward compatibility
-   * @deprecated Use checkRateLimitWithSubscription instead
-   */
-  async checkRateLimit(
-    userId: string,
-    subscriptionPlan: SubscriptionPlan = 'free',
-    triggerType: TriggerType = 'manual',
-    isAsync = false
-  ): Promise<{ allowed: boolean; remaining: number; resetAt: Date }> {
-    // For backward compatibility, fetch the subscription
-    const subscription = await getHighestPrioritySubscription(userId)
-    return this.checkRateLimitWithSubscription(userId, subscription, triggerType, isAsync)
-  }
-
-  /**
    * Get current rate limit status with organization awareness
    * Only applies to API executions
    */
@@ -353,21 +337,6 @@ export class RateLimiter {
         resetAt: new Date(Date.now() + RATE_LIMIT_WINDOW_MS),
       }
     }
-  }
-
-  /**
-   * Legacy method - for backward compatibility
-   * @deprecated Use getRateLimitStatusWithSubscription instead
-   */
-  async getRateLimitStatus(
-    userId: string,
-    subscriptionPlan: SubscriptionPlan = 'free',
-    triggerType: TriggerType = 'manual',
-    isAsync = false
-  ): Promise<{ used: number; limit: number; remaining: number; resetAt: Date }> {
-    // For backward compatibility, fetch the subscription
-    const subscription = await getHighestPrioritySubscription(userId)
-    return this.getRateLimitStatusWithSubscription(userId, subscription, triggerType, isAsync)
   }
 
   /**

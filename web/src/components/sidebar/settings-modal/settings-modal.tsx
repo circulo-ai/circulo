@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { getEnv, isTruthy } from '@/lib/env'
+import { env, isTruthy } from '@/lib/env'
 import { createLogger } from '@/lib/logs/console/logger'
 import { useOrganizationStore } from '@/stores/organization'
 import { useGeneralStore } from '@/stores/settings/general/store'
@@ -11,13 +11,11 @@ import {
 } from "@/components/sidebar/settings-modal/components/settings-navigation/settings-navigation";
 import { General } from "@/components/sidebar/settings-modal/components/general/general";
 import { Account } from "@/components/sidebar/settings-modal/components/account/account";
-import { Subscription } from "@/components/sidebar/settings-modal/components/subscription/subscription";
-import { TeamManagement } from "@/components/sidebar/settings-modal/components/team-management/team-management";
 import { Privacy } from "@/components/sidebar/settings-modal/components/privacy/privacy";
 
 const logger = createLogger('SettingsModal')
 
-const isBillingEnabled = isTruthy(getEnv('NEXT_PUBLIC_BILLING_ENABLED'))
+const isBillingEnabled = isTruthy(env.NEXT_PUBLIC_BILLING_ENABLED);
 
 interface SettingsModalProps {
   open: boolean
@@ -120,16 +118,6 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             {activeSection === 'account' && (
               <div className='h-full'>
                 <Account onOpenChange={onOpenChange} />
-              </div>
-            )}
-            {isSubscriptionEnabled && activeSection === 'subscription' && (
-              <div className='h-full'>
-                <Subscription onOpenChange={onOpenChange} />
-              </div>
-            )}
-            {isBillingEnabled && activeSection === 'team' && (
-              <div className='h-full'>
-                <TeamManagement />
               </div>
             )}
             {activeSection === 'privacy' && (

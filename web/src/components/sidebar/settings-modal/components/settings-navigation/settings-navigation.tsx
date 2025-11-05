@@ -1,4 +1,4 @@
-import { getEnv, isTruthy } from "@/lib/env";
+import { env, getEnv, isTruthy } from "@/lib/env";
 import { isHosted } from "@/lib/environment";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/providers/session-provider";
@@ -15,7 +15,7 @@ import {
   Users,
 } from "lucide-react";
 
-const isBillingEnabled = isTruthy(getEnv("NEXT_PUBLIC_BILLING_ENABLED"));
+const isBillingEnabled = isTruthy(env.NEXT_PUBLIC_BILLING_ENABLED);
 
 interface SettingsNavigationProps {
   activeSection: string;
@@ -81,6 +81,7 @@ export function SettingsNavigation({
   onSectionChange,
   hasOrganization,
 }: SettingsNavigationProps) {
+  console.log(isBillingEnabled);
   const { data: session } = useSession();
   const { hasEnterprisePlan, getUserRole } = useOrganizationStore();
   const userEmail = session?.user?.email;

@@ -8,3 +8,4 @@ export { ResetPasswordEmail } from "./reset-password-email";
 export { UsageThresholdEmail } from "./usage-threshold-email";
 export { InvitationEmail } from "./invitation-email";
 export { BatchInvitationEmail } from "./batch-invitation-email";
+export { SizpayRenewalEmail } from "./sizpay-renewal-email";

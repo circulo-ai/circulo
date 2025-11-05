@@ -1,6 +1,6 @@
 import { boolean, check, index, integer, pgTable, text, timestamp, uniqueIndex, vector } from "drizzle-orm/pg-core";
 import { SQL, sql } from "drizzle-orm";
-import { tsvector } from "@/db";
+import { tsvector } from "@/db/schema/types";
 import { user } from "@/db/schema/auth";
 
 export const knowledgeBase = pgTable(
