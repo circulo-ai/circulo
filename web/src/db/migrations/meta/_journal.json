@@ -15,6 +15,13 @@
       "when": 1762282569968,
       "tag": "0001_bored_surge",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1762360216681,
+      "tag": "0002_bizarre_black_bird",
+      "breakpoints": true
     }
   ]
 }

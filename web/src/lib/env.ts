@@ -20,6 +20,7 @@ export const env = createEnv({
     
     // Payment & Billing
     STRIPE_SECRET_KEY: z.string().min(1).optional(),           // Stripe secret key for payment processing
+    STRIPE_PUBLISHABLE_KEY: z.string().min(1).optional(),       // Stripe publishable key for client-side SDK
     STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),           // General Stripe webhook secret
     STRIPE_FREE_PRICE_ID: z.string().min(1).optional(),           // Stripe price ID for free tier
     FREE_TIER_COST_LIMIT: z.number().optional(),                  // Cost limit for free tier users
@@ -35,6 +36,12 @@ export const env = createEnv({
     ENTERPRISE_STORAGE_LIMIT_GB: z.number().optional().default(500),     // Default storage limit in GB for enterprise tier (can be overridden per org)
     BILLING_ENABLED: z.boolean().optional(),                 // Enable billing enforcement and usage tracking
     OVERAGE_THRESHOLD_DOLLARS: z.number().optional().default(50),      // Dollar threshold for incremental overage billing (default: $50)
+
+    // Optional crypto wallets for future payment providers
+    BTC_WALLET_ADDRESS: z.string().optional(),
+    ETH_WALLET_ADDRESS: z.string().optional(),
+    SOL_WALLET_ADDRESS: z.string().optional(),
+    USDC_WALLET_ADDRESS: z.string().optional(),
 
     SIZPAY_MERCHANT_ID: z.string().optional(),
     SIZPAY_TERMINAL_ID: z.string().optional(),
