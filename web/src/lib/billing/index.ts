@@ -6,7 +6,7 @@ import { StripeProvider } from './providers/stripe';
 export const paymentProviders: Record<PaymentProviderName, PaymentProvider> = {
   changelly: new ChangellyProvider(
     process.env.CHANGELLY_API_KEY!,
-    process.env.CHANGELLY_API_SECRET!
+    process.env.CHANGELLY_API_SECRET!,
   ),
   stripe: new StripeProvider(process.env.STRIPE_SECRET_KEY!),
 };

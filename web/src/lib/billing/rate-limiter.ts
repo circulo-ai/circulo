@@ -68,12 +68,12 @@ export class UsageRateLimiter {
         const limit = features.maxAgents;
         if (limit === null) return { allowed: true };
 
-        const [{ count: currentCount }] = await db
+        const [result] = await db
           .select({ count: count() })
           .from(agent)
           .where(eq(agent.userId, userId));
 
-        if (currentCount >= limit) {
+        if (result && result.count >= limit) {
           return {
             allowed: false,
             reason: `Agent limit reached (${limit}). Upgrade your plan for more.`,
@@ -108,12 +108,12 @@ export class UsageRateLimiter {
         const limit = features.kbSlots;
         if (limit === null) return { allowed: true };
 
-        const [{count: currentCount}] = await db
+        const [result] = await db
           .select({ count: count() })
           .from(knowledgeBase)
           .where(eq(knowledgeBase.userId, userId));
 
-        if (currentCount >= limit) {
+        if (result && result.count >= limit) {
           return {
             allowed: false,
             reason: `Knowledge base limit reached (${limit}). Upgrade for more.`,

@@ -32,8 +32,10 @@ export class ChangellyProvider extends PaymentProvider {
   readonly name = "changelly" as const;
 
   /**
-   * Note: The apiSecret is used for signing OUTGOING requests (createInvoice).
-   * The callbackPublicKey is used for verifying INCOMING webhooks.
+   * Note: The apiSecret holds the private key used for signing OUTGOING requests
+   * (it should be the RSA private key in PEM format). The apiKey is the public
+   * identifier and must be sent in the X-Api-Key header. The callbackPublicKey
+   * is the public key used for verifying incoming webhooks.
    */
   constructor(
     private readonly apiKey: string,
@@ -60,9 +62,11 @@ export class ChangellyProvider extends PaymentProvider {
 
     const bodyJson = JSON.stringify(body);
 
-    // API expects X-Signature header — HMAC-SHA256 of the body using apiSecret.
-    // Format: <signature_base64>:<timestamp>
-    const signatureHeader = this.generateApiSignature(bodyJson);
+  // API expects X-Signature header — RSA-SHA256 signature over a payload
+  // PAYLOAD = METHOD + ":" + PATH + ":" + [EncodeBase64(BODY)] + ":" + TIMESTAMP
+  // Then header is EncodeBase64(SIGNATURE_BASE64 + ":" + TIMESTAMP)
+  const postUrl = new URL(`${this.baseUrl}/payments`).pathname; // e.g. /api/v1/payments
+  const signatureHeader = this.generateApiSignature("POST", postUrl, bodyJson);
 
     const response = await fetch(`${this.baseUrl}/payments`, {
       method: "POST",
@@ -92,7 +96,8 @@ export class ChangellyProvider extends PaymentProvider {
 
   async getInvoiceStatus(invoiceId: string): Promise<InvoiceStatus> {
     // For GET requests we sign an empty body; include timestamp in signature header.
-    const signatureHeader = this.generateApiSignature(""); // sign empty payload for GET
+    const getUrl = new URL(`${this.baseUrl}/payments/${invoiceId}`).pathname;
+    const signatureHeader = this.generateApiSignature("GET", getUrl, ""); // sign empty payload for GET
 
     const response = await fetch(`${this.baseUrl}/payments/${invoiceId}`, {
       method: "GET",
@@ -127,43 +132,34 @@ export class ChangellyProvider extends PaymentProvider {
    */
   verifyWebhook(rawBody: string, signatureHeader: string): boolean {
     if (!signatureHeader || !this.callbackPublicKey) {
-      console.warn(
-        "Changelly Webhook: Missing signature header or public key.",
-      );
+      console.warn("Changelly Webhook: Missing signature header or public key.");
       return false;
     }
 
-    // Normalize header: support both raw "sig:ts" and base64("sig:ts")
-    let decodedHeader = signatureHeader;
+    // Per Changelly docs the X-Signature header is base64(SIGNATURE_BASE64 + ':' + TIMESTAMP)
+    // Decode it first, then split by ':' to get the inner signature and timestamp.
+    let decoded: string;
     try {
-      // if header appears base64-encoded (no colon after decoding), try decode
-      if (!decodedHeader.includes(":")) {
-        const attempted = Buffer.from(signatureHeader, "base64").toString(
-          "utf8",
-        );
-        if (attempted.includes(":")) {
-          decodedHeader = attempted;
-        }
-      }
-    } catch {
-      // if decoding fails, keep original value
-      decodedHeader = signatureHeader;
+      decoded = Buffer.from(signatureHeader, "base64").toString("utf8");
+    } catch (e) {
+      // If it's not base64, maybe the header was already raw 'sig:ts'
+      decoded = signatureHeader;
     }
 
-    const parts = decodedHeader.split(":");
-    if (parts.length !== 2) {
-      console.error("Changelly Webhook: X-Signature header format is invalid.");
+    if (!decoded.includes(":")) {
+      // fallback: header isn't in expected form
+      console.error("Changelly Webhook: X-Signature header format is invalid after decoding.");
       return false;
     }
 
-    const [signatureBase64, timestamp] = parts;
+    const [signatureBase64, timestamp] = decoded.split(":", 2);
     if (!signatureBase64 || !timestamp) {
       console.error("Changelly Webhook: X-Signature header missing parts.");
       return false;
     }
 
     // Recreate payload that was signed by Changelly: "<rawBody>:<timestamp>"
-    const payload = Buffer.from(`${rawBody}:${timestamp}`);
+    const payload = Buffer.from(`${rawBody}:${timestamp}`, "utf8");
 
     // Prepare public key PEM (allow either PEM provided or raw base64 key)
     let pem = this.callbackPublicKey.trim();
@@ -173,10 +169,8 @@ export class ChangellyProvider extends PaymentProvider {
 
     try {
       const signature = Buffer.from(signatureBase64, "base64");
-
-      // Use RSA-SHA256 verification
-      const verified = crypto.verify("RSA-SHA256", payload, pem, signature);
-      return verified;
+      // Verify RSA-SHA256(signature of SHA256(payload))
+      return crypto.verify("RSA-SHA256", payload, pem, signature);
     } catch (e) {
       console.error("Error during Changelly webhook verification:", e);
       return false;
@@ -205,19 +199,48 @@ export class ChangellyProvider extends PaymentProvider {
   }
 
   /**
-   * Generates the signature for outgoing requests.
+   * Generates the signature for outgoing requests following Changelly docs.
    *
-   * Returns a string in the format: "<signature_base64>:<timestamp>"
-   * where signature is HMAC-SHA256(apiSecret, body).
+   * PAYLOAD = METHOD + ":" + PATH + ":" + [EncodeBase64(BODY)] + ":" + TIMESTAMP
+   * SIGNATURE = RSASign(SHA256(PAYLOAD), PRIVATE_KEY) -> then Base64(SIGNATURE)
+   * X-Signature header = Base64(SIGNATURE_BASE64 + ":" + TIMESTAMP)
+   *
+   * We support RSA private key PEM in `apiSecret`. If a non-PEM secret is provided,
+   * we fallback to HMAC-SHA256 over the same payload (legacy/compat).
    */
-  private generateApiSignature(data: string): string {
-    const hmac = crypto
-      .createHmac("sha256", this.apiSecret)
-      .update(data)
-      .digest();
-    const signatureBase64 = hmac.toString("base64");
-    const timestamp = Math.floor(Date.now() / 1000).toString();
-    return `${signatureBase64}:${timestamp}`;
+  private generateApiSignature(
+    method: string,
+    path: string,
+    bodyJson: string,
+    windowSeconds = 3600,
+  ): string {
+    // Body must be base64-encoded in the payload; if body is empty object, send empty string
+    const bodyBase64 = bodyJson && bodyJson !== "{}" ? Buffer.from(bodyJson).toString("base64") : "";
+
+    const timestamp = (Math.floor(Date.now() / 1000) + windowSeconds).toString();
+    const payload = [method, path, bodyBase64, timestamp].join(":");
+
+    let signatureBase64: string;
+
+    const key = (this.apiSecret ?? "").toString().trim();
+    try {
+      if (key.startsWith("-----BEGIN")) {
+        // RSA sign the payload
+        const sig = crypto.sign("RSA-SHA256", Buffer.from(payload, "utf8"), key);
+        signatureBase64 = sig.toString("base64");
+      } else {
+        // Fallback: HMAC-SHA256 of payload
+        const hmac = crypto.createHmac("sha256", key).update(payload).digest();
+        signatureBase64 = hmac.toString("base64");
+      }
+    } catch (e) {
+      console.error("Error generating Changelly API signature:", e);
+      throw e;
+    }
+
+    // Per docs, the header contains base64(SIGNATURE_BASE64 + ':' + TIMESTAMP)
+    const headerValue = Buffer.from(`${signatureBase64}:${timestamp}`).toString("base64");
+    return headerValue;
   }
 
   private mapStatus(changellyStatus: string): InvoiceStatus {
