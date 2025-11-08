@@ -6,7 +6,6 @@ import { nanoid } from "nanoid";
 import { start } from "workflow/api";
 import { z } from "zod";
 import { chat as chatWorkflow } from "@/workflows/chat";
-import { registerChatStream } from "@/lib/streams/chat-stream-hub";
 
 // List chats for the current user
 export const GET = api({ auth: true }, async (req, ctx) => {
@@ -72,7 +71,7 @@ export const POST = api(
     const workflowHandle = await start(chatWorkflow, [messages, newChat.id, ctx.user.id]);
 
     const runId = workflowHandle.runId;
-    const stream = registerChatStream(id, workflowHandle.readable);
+    const stream = workflowHandle.readable;
 
     return createUIMessageStreamResponse({
       stream,

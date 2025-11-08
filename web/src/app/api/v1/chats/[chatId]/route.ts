@@ -1,6 +1,5 @@
 import { api, notFound, noContent, success } from "@/lib/server";
 import { chat as chatWorkflow } from "@/workflows/chat";
-import { registerChatStream } from "@/lib/streams/chat-stream-hub";
 import { createUIMessageStreamResponse, type UIMessage } from "ai";
 import { start } from "workflow/api";
 import { z } from "zod";
@@ -76,7 +75,7 @@ export const POST = api(
 
     const workflowHandle = await start(chatWorkflow, [messages, chatId, ctx.user.id]);
     const runId = workflowHandle.runId;
-    const stream = registerChatStream(chatId, workflowHandle.readable);
+    const stream = workflowHandle.readable;
 
     return createUIMessageStreamResponse({
       stream,
