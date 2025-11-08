@@ -1,5 +1,6 @@
 import { api, notFound, noContent, success } from "@/lib/server";
 import { chat as chatWorkflow } from "@/workflows/chat";
+import { registerChatStream } from "@/lib/streams/chat-stream-hub";
 import { createUIMessageStreamResponse, type UIMessage } from "ai";
 import { start } from "workflow/api";
 import { z } from "zod";
@@ -7,6 +8,9 @@ import { messageRepo } from "@/db/repositories/message-repo";
 import { chatRepo } from "@/db/repositories/chat-repo";
 import { nanoid } from "nanoid";
 import { chat } from "@/db";
+import { createLogger } from "@/lib/logs/console/logger";
+
+const logger = createLogger("CHAT");
 
 // Allow streaming responses up to 60 seconds
 export const maxDuration = 60;
@@ -36,6 +40,14 @@ export const POST = api(
     const { chatId } = ctx.params;
     const messages = ctx.body.messages;
 
+    // Ensure the chat exists and belongs to the current user before persisting
+    const existingChat = await chatRepo.findById(chatId);
+    if (!existingChat || existingChat.userId !== ctx.user.id) {
+      return notFound("Chat not found");
+    }
+
+    logger.info(JSON.stringify(messages));
+
     // Type guard for text parts
     const isTextPart = (
       part: unknown
@@ -62,9 +74,9 @@ export const POST = api(
       });
     }
 
-    const workflowHandle = await start(chatWorkflow, [messages]);
+    const workflowHandle = await start(chatWorkflow, [messages, chatId, ctx.user.id]);
     const runId = workflowHandle.runId;
-    const stream = workflowHandle.readable;
+    const stream = registerChatStream(chatId, workflowHandle.readable);
 
     return createUIMessageStreamResponse({
       stream,

@@ -230,8 +230,15 @@ export function api<
     routeContext?: { params: output<TParams> },
   ): Promise<NextResponse> => {
     try {
-      // Parse params
-      const rawParams = routeContext?.params ? routeContext.params : {};
+      // Parse params (Next 15+: params may be a Promise and must be unwrapped)
+      let rawParams: unknown = {};
+      if (routeContext?.params) {
+        const maybeParams = routeContext.params as unknown;
+        const isThenable =
+          typeof (maybeParams as any)?.then === "function" ||
+          Object.prototype.toString.call(maybeParams) === "[object Promise]";
+        rawParams = isThenable ? await (maybeParams as Promise<unknown>) : maybeParams;
+      }
       const validatedParams = actualConfig.params
         ? actualConfig.params.parse(rawParams)
         : (rawParams as output<TParams>);
@@ -242,14 +249,12 @@ export function api<
         ? actualConfig.query.parse(queryObj)
         : (queryObj as output<TQuery>);
 
-      // Parse body (only for methods with body)
+      // Parse body only when a body schema is configured
       let validatedBody: InferZodSchema<TBody>;
-      if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
+      if (actualConfig.body) {
         try {
           const rawBody = await req.json();
-          validatedBody = actualConfig.body
-            ? actualConfig.body.parse(rawBody)
-            : (rawBody as InferZodSchema<TBody>);
+          validatedBody = actualConfig.body.parse(rawBody);
         } catch (jsonError) {
           if (jsonError instanceof SyntaxError) {
             throw Errors.badRequest("Invalid JSON in request body");

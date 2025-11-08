@@ -175,6 +175,12 @@ export const message = pgTable(
     ),
     quotedMessageIdx: index("message_quoted_idx").on(table.quotedMessageId),
 
+    // Enforce at most one stored message per UI message id within a chat
+    messageUiIdUniqueIdx: uniqueIndex("message_chat_ui_message_id_unique").on(
+      table.chatId,
+      sql`(ui_message ->> 'id')`
+    ),
+
     senderCheck: check(
       "message_sender_check",
       sql`(user_id IS NOT NULL AND agent_id IS NULL) OR (user_id IS NULL AND agent_id IS NOT NULL)`,

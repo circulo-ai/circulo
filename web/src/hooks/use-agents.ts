@@ -4,11 +4,11 @@ import { useSWR } from "@/lib/swr";
 import { type Agent } from "@/db/schema/agent";
 
 export function useAgents() {
-  const { data, error, isLoading, mutate } = useSWR<{ agents: Agent[] }>(
+  const { data, error, isLoading, mutate } = useSWR<{ data: { agents: Agent[] } }>(
     "/api/v1/agents"
   );
 
-  const agents = data?.agents ?? [];
+  const agents = data?.data?.agents ?? [];
 
   async function createAgent(payload: {
     name: string;
@@ -28,10 +28,10 @@ export function useAgents() {
     });
     const json = await res.json();
     if (!res.ok) throw new Error(json.error || "Failed to create agent");
-    await mutate((prev) => ({ agents: [json.agent, ...(prev?.agents ?? [])] }), {
+    await mutate((prev) => ({ data: { agents: [json.data.agent, ...(prev?.data?.agents ?? [])] } }), {
       revalidate: false,
     });
-    return json as { agent: Agent };
+    return json.data as { agent: Agent };
   }
 
   return {

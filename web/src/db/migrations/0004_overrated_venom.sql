@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "message_chat_ui_message_id_unique" ON "message" USING btree ("chat_id",(ui_message ->> 'id'));

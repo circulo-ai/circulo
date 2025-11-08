@@ -45,7 +45,7 @@ import {
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { CopyIcon, GlobeIcon, RefreshCcwIcon } from "lucide-react";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useChats } from "@/hooks/use-chats";
 
 const models = [
@@ -65,6 +65,7 @@ const ChatBotDemo = () => {
   const [webSearch, setWebSearch] = useState(false);
   const { createChat } = useChats();
   const [chatId, setChatId] = useState<string | null>(null);
+  const [pendingMessage, setPendingMessage] = useState<PromptInputMessage | null>(null);
 
   const transport = useMemo(
     () =>
@@ -86,33 +87,40 @@ const ChatBotDemo = () => {
       return;
     }
 
-    // Ensure we have a chatId before streaming
+    // If no chatId, create the chat first and defer sending until transport updates
     if (!chatId) {
       try {
         const created = await createChat({
           title: message.text?.slice(0, 80) || "New Chat",
         });
         setChatId(created.chat.id);
+        setPendingMessage(message);
       } catch (e) {
         console.error(e);
         return;
       }
-    }
-
-    sendMessage(
-      {
+    } else {
+      // Chat already exists; send immediately
+      sendMessage({
         text: message.text || "Sent with attachments",
         files: message.files,
-      },
-      {
-        body: {
-          model: model,
-          webSearch: webSearch,
-        },
-      },
-    );
+      });
+    }
+
     setInput("");
   };
+
+  // After chatId is set, send the deferred initial message using the updated transport
+  useEffect(() => {
+    if (!chatId || !pendingMessage) return;
+    sendMessage({
+      text: pendingMessage.text || "Sent with attachments",
+      files: pendingMessage.files,
+    });
+    setPendingMessage(null);
+    // We intentionally depend on chatId to ensure transport points to the new route
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId]);
 
   return (
     <div className="relative mx-auto size-full h-screen max-w-4xl p-6">

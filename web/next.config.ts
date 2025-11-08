@@ -69,7 +69,7 @@ const nextConfig: NextConfig = {
   turbopack: {
     resolveExtensions: [".tsx", ".ts", ".jsx", ".js", ".mjs", ".json"],
   },
-  serverExternalPackages: ['pdf-parse'],
+  serverExternalPackages: ['pdf-parse', 'postgres'],
   transpilePackages: [
     "prettier",
     "@t3-oss/env-nextjs",

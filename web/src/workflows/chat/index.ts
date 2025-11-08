@@ -1,41 +1,35 @@
 import { UIMessage, type UIMessageChunk } from "ai";
 import { getWritable } from "workflow";
-import { endStream, startStream, streamTextStep } from "./steps";
-// Persistence is handled in the API route to avoid bundler issues in workflows
+import { endStream, startStream, streamResponse, persistAssistant } from "./steps";
+import { createLogger } from "@/lib/logs/console/logger";
+
+const logger = createLogger("ChatWorkflow")
 
 const MAX_STEPS = 5;
 
-export async function chat(messages: UIMessage[]) {
+/**
+ * Chat workflow
+ * Streams model responses and persists assistant messages
+ * even if the HTTP connection closes.
+ */
+export async function chat(messages: UIMessage[], chatId?: string, userId?: string) {
   "use workflow";
 
-  // Get typed writable stream for UI message chunks
+  // Writable stream for real-time UI updates
   const writable = getWritable<UIMessageChunk>();
 
-  // Start the stream
-  await startStream(writable);
+  const messageId = await startStream(writable);
 
-  let currentMessages = [...messages];
+  const { text } = await streamResponse(messages, writable);
 
-  // Process messages in steps
-  for (let i = 0; i < MAX_STEPS; i++) {
-    const result = await streamTextStep(currentMessages, writable);
-
-    // Add the assistant's message to the conversation
-    currentMessages.push(result.message);
-
-  // Persisting assistant messages is handled by the API route after streaming
-
-    // Break if not continuing with tool calls
-    if (result.finishReason !== "tool-calls") {
-      break;
-    }
-  }
-
-  // End the stream
   await endStream(writable);
 
-  // Return final messages if needed
+  // Persist assistant response via API to keep workflow bundle clean
+  if (chatId && userId && text.trim().length > 0) {
+    await persistAssistant(chatId, userId, text, messageId);
+  }
+
   return {
-    messages: currentMessages,
+    messages,
   };
 }
