@@ -45,8 +45,8 @@
 
 :root {
   --radius: 0.65rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.141 0.005 285.823);
+  --background: var(--color-teal-50);
+  --foreground: var(--color-neutral-950);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.141 0.005 285.823);
   --popover: oklch(1 0 0);
@@ -79,8 +79,8 @@
 }
 
 .dark {
-  --background: oklch(0.141 0.005 285.823);
-  --foreground: oklch(0.985 0 0);
+  --background: var(--color-neutral-950);
+  --foreground: var(--color-teal-50);
   --card: oklch(0.21 0.006 285.885);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.21 0.006 285.885);
@@ -122,7 +122,7 @@
 }
 
 @theme {
-  --animate-down: down 3000ms ease-in-out infinite;
+  --animate-down: down 3s ease-in-out infinite;
 
   @keyframes down {
     0% {
@@ -134,6 +134,31 @@
     }
     100% {
       top: 100%;
+    }
+  }
+}
+
+@layer utilities {
+  .main-section:not(:first-of-type) {
+    height: 100vh;
+    padding-top: 5rem;
+    margin-bottom: 5rem;
+  }
+  .main-section:first-of-type {
+    height: calc(100vh - 5rem);
+    scroll-margin-top: 5rem;
+  }
+  .main-section {
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+
+  @supports (height: 100lvh) {
+    .main-section:not(:first-of-type) {
+      height: 100lvh;
+    }
+    .main-section:first-of-type {
+      height: calc(100lvh - 5rem);
     }
   }
 }
