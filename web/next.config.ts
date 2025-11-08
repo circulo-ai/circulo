@@ -78,16 +78,6 @@ const nextConfig: NextConfig = {
     '@react-email/render',
     "@ton/ton",
   ],
-  webpack: (config, { dev }) => {
-    if (dev) {
-      config.watchOptions = {
-        poll: 2000, // Check for changes every second
-        aggregateTimeout: 300,
-        ignored: ["**/node_modules/**", "**/.next/**"],
-      };
-    }
-    return config;
-  },
   ...(isDev && {
     allowedDevOrigins: [
       ...(env.NEXT_PUBLIC_APP_URL
