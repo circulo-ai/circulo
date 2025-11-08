@@ -22,9 +22,7 @@ import {
   PromptInputSubmit,
   type PromptInputMessage,
 } from "@/components/ai-elements/prompt-input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Skeleton } from "@/components/ui/skeleton";
+import { AgentManager } from "@/components/ai-elements/agent-manager";
 
 // Utility: convert stored DB message to UIMessage-like for rendering
 function toUIMessages(dbMessages: Array<{ uiMessage: any; content: string; userId: string | null; agentId: string | null }>) {
@@ -43,7 +41,7 @@ export default function ChatPage() {
   const params = useParams();
   const chatId = String(params?.chatId);
   const { messages: serverMessages, chat, isLoading } = useMessages(chatId);
-  const { agents, isLoading: isLoadingAgents } = useChatAgents(chatId);
+  const { isLoading: isLoadingAgents } = useChatAgents();
   const [input, setInput] = useState("");
 
   const transport = useMemo(
@@ -90,61 +88,9 @@ export default function ChatPage() {
   return (
     <div className="h-full">
       <div className="flex h-full flex-col">
-        <div className="border-b p-4 space-y-2">
+        <div className="border-b p-4 space-y-4">
           <h1 className="text-lg font-semibold truncate">{chat?.title ?? "Chat"}</h1>
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
-            {isLoadingAgents && (
-              <div className="flex gap-2">
-                {Array.from({ length: 3 }).map((_, idx) => (
-                  <Skeleton key={idx} className="h-8 w-28 rounded-full" />
-                ))}
-              </div>
-            )}
-            {!isLoadingAgents && agents.length === 0 && (
-              <div className="text-xs text-muted-foreground">No agents linked to this chat.</div>
-            )}
-            {!isLoadingAgents && agents.length > 0 && (
-              <div className="flex items-center gap-2">
-                {agents.map((a) => {
-                  const initials = a.name?.trim()?.slice(0, 2).toUpperCase() || "AI";
-                  const accent = a.color || "#64748b"; // slate-500 default
-                  return (
-                    <Tooltip key={a.id}>
-                      <TooltipTrigger asChild>
-                        <div
-                          className="border hover:bg-accent/60 bg-background text-foreground flex items-center gap-2 rounded-full px-2 py-1 text-xs transition-colors"
-                          style={{ borderColor: accent }}
-                        >
-                          <Avatar className="size-6" style={{ boxShadow: `0 0 0 2px ${accent}` }}>
-                            <AvatarImage src={a.avatar || ""} alt={a.name || "Agent"} />
-                            <AvatarFallback>{initials}</AvatarFallback>
-                          </Avatar>
-                          <span className="max-w-[140px] truncate font-medium">{a.name}</span>
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="size-3 rounded-full"
-                            style={{ backgroundColor: accent }}
-                          />
-                          <div className="font-medium">{a.name}</div>
-                        </div>
-                        {a.description && (
-                          <div className="mt-1 text-xs text-muted-foreground max-w-[260px]">
-                            {a.description}
-                          </div>
-                        )}
-                        {a.model && (
-                          <div className="mt-1 text-[11px] text-muted-foreground">Model: {a.model}</div>
-                        )}
-                      </TooltipContent>
-                    </Tooltip>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          <AgentManager />
         </div>
         <Conversation className="h-full">
           <ConversationContent>

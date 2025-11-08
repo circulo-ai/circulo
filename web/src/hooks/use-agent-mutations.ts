@@ -5,26 +5,34 @@ import useSWR, { useSWRConfig } from "swr";
 const AGENTS_API_BASE = "/api/v1/agents";
 
 export function useAgentList() {
-  const { data, error, isLoading } = useSWR<Agent[]>(
+  const { data, error, isLoading } = useSWR<{
+    data: {
+      agents: Agent[]
+    }
+  }>(
     AGENTS_API_BASE,
     fetcher
   );
 
   return {
-    agents: data,
+    agents: data?.data.agents || [],
     isLoading,
     error
   };
 }
 
 export function useAgent(agentId: string) {
-  const { data, error, isLoading } = useSWR<Agent>(
+  const { data, error, isLoading } = useSWR<{
+    data: {
+      agent: Agent
+    }
+  }>(
     agentId ? `${AGENTS_API_BASE}/${agentId}` : null,
     fetcher
   );
 
   return {
-    agent: data,
+    agent: data?.data.agent,
     isLoading,
     error
   };
@@ -39,7 +47,7 @@ export function useAgentMutations() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
-    
+
     if (!response.ok) {
       throw new Error("Failed to create agent");
     }

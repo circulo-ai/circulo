@@ -223,7 +223,7 @@ const ChatBotDemo = () => {
           </PromptInputHeader>
           <PromptInputBody>
             <PromptInputTextarea
-              placeholder="Hello there, how can I assist you today? 2"
+              placeholder="Hello there, how can I assist you today?"
               onChange={(e) => setInput(e.target.value)}
               value={input}
             />

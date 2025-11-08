@@ -1,3 +1,6 @@
+import EmailFooter from "@/components/emails/footer";
+import { getBrandConfig } from "@/lib/branding/branding";
+import { getEnv } from "@/lib/env";
 import {
   Body,
   Column,
@@ -11,17 +14,14 @@ import {
   Row,
   Section,
   Text,
-} from '@react-email/components'
-import EmailFooter from '@/components/emails/footer'
-import { getBrandConfig } from '@/lib/branding/branding'
-import { getEnv } from '@/lib/env'
-import { baseStyles } from './base-styles'
+} from "@react-email/components";
+import { baseStyles } from "./base-styles";
 
 interface PlanWelcomeEmailProps {
-  planName: 'Pro' | 'Team'
-  userName?: string
-  loginLink?: string
-  createdDate?: Date
+  planName: "Pro" | "Team";
+  userName?: string;
+  loginLink?: string;
+  createdDate?: Date;
 }
 
 export function PlanWelcomeEmail({
@@ -30,11 +30,11 @@ export function PlanWelcomeEmail({
   loginLink,
   createdDate = new Date(),
 }: PlanWelcomeEmailProps) {
-  const brand = getBrandConfig()
-  const baseUrl = getEnv('NEXT_PUBLIC_APP_URL') || 'https://circulo.ir'
-  const cta = loginLink || `${baseUrl}/login`
+  const brand = getBrandConfig();
+  const baseUrl = getEnv("NEXT_PUBLIC_APP_URL") || "https://sim.ai";
+  const cta = loginLink || `${baseUrl}/login`;
 
-  const previewText = `${brand.name}: Your ${planName} plan is active`
+  const previewText = `${brand.name}: Your ${planName} plan is active`;
 
   return (
     <Html>
@@ -42,15 +42,17 @@ export function PlanWelcomeEmail({
       <Preview>{previewText}</Preview>
       <Body style={baseStyles.main}>
         <Container style={baseStyles.container}>
-          <Section style={{ padding: '30px 0', textAlign: 'center' }}>
+          <Section style={{ padding: "30px 0", textAlign: "center" }}>
             <Row>
-              <Column style={{ textAlign: 'center' }}>
+              <Column style={{ textAlign: "center" }}>
                 <Img
-                  src={brand.logoUrl || `${baseUrl}/logo/reverse/text/medium.png`}
-                  width='114'
+                  src={
+                    brand.logoUrl || `${baseUrl}/logo/reverse/text/medium.png`
+                  }
+                  width="114"
                   alt={brand.name}
                   style={{
-                    margin: '0 auto',
+                    margin: "0 auto",
                   }}
                 />
               </Column>
@@ -67,30 +69,34 @@ export function PlanWelcomeEmail({
 
           <Section style={baseStyles.content}>
             <Text style={{ ...baseStyles.paragraph, marginTop: 0 }}>
-              {userName ? `Hi ${userName},` : 'Hi,'}
+              {userName ? `Hi ${userName},` : "Hi,"}
             </Text>
             <Text style={baseStyles.paragraph}>
-              Welcome to the <strong>{planName}</strong> plan on {brand.name}. You're all set to
-              build, test, and scale your agentic workflows.
+              Welcome to the <strong>{planName}</strong> plan on {brand.name}.
+              You're all set to build, test, and scale your agentic workflows.
             </Text>
 
-            <Link href={cta} style={{ textDecoration: 'none' }}>
+            <Link href={cta} style={{ textDecoration: "none" }}>
               <Text style={baseStyles.button}>Open {brand.name}</Text>
             </Link>
 
             <Text style={baseStyles.paragraph}>
-              Want to discuss your plan or get personalized help getting started?{' '}
-              <Link href='https://cal.com/waleedlatif/15min' style={baseStyles.link}>
+              Want to discuss your plan or get personalized help getting
+              started?{" "}
+              <Link
+                href="https://cal.com/waleedlatif/15min"
+                style={baseStyles.link}
+              >
                 Schedule a 15-minute call
-              </Link>{' '}
+              </Link>{" "}
               with our team.
             </Text>
 
             <Hr />
 
             <Text style={baseStyles.paragraph}>
-              Need to invite teammates, adjust usage limits, or manage billing? You can do that from
-              Settings → Subscription.
+              Need to invite teammates, adjust usage limits, or manage billing?
+              You can do that from Settings → Subscription.
             </Text>
 
             <Text style={baseStyles.paragraph}>
@@ -99,7 +105,13 @@ export function PlanWelcomeEmail({
               The Circulo Team
             </Text>
 
-            <Text style={{ ...baseStyles.paragraph, fontSize: '12px', color: '#666' }}>
+            <Text
+              style={{
+                ...baseStyles.paragraph,
+                fontSize: "12px",
+                color: "#666",
+              }}
+            >
               Sent on {createdDate.toLocaleDateString()}
             </Text>
           </Section>
@@ -107,7 +119,7 @@ export function PlanWelcomeEmail({
         <EmailFooter baseUrl={baseUrl} />
       </Body>
     </Html>
-  )
+  );
 }
 
-export default PlanWelcomeEmail
+export default PlanWelcomeEmail;

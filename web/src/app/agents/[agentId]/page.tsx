@@ -5,15 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { ArrowLeft, Pencil } from "lucide-react";
+import { useParams } from "next/navigation";
 
-interface AgentDetailPageProps {
-  params: {
-    agentId: string;
-  };
-}
-
-export default function AgentDetailPage({ params }: AgentDetailPageProps) {
-  const { agent, isLoading, error } = useAgent(params.agentId);
+export default function AgentDetailPage() {
+  const {agentId} = useParams<{
+    agentId: string
+  }>();
+  const { agent, isLoading, error } = useAgent(agentId);
 
   if (isLoading) {
     return <div>Loading agent...</div>;

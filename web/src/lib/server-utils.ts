@@ -16,7 +16,7 @@ export function generateId() {
 
 /**
  * Calculate approximate USD cost for a model usage.
- * 
+ *
  * @param model - The full model name, e.g. "gpt-4o-mini" or "claude-3.5-sonnet".
  * @param inputTokens - Prompt tokens used.
  * @param outputTokens - Completion tokens used.
@@ -25,14 +25,11 @@ export function generateId() {
 export function calculateCostFromUsage(
   model: string,
   inputTokens: number,
-  outputTokens: number
+  outputTokens: number,
 ): number {
   // Prices are per 1,000 tokens, in USD
   // (as of late 2025; update as needed)
-  const pricing: Record<
-    string,
-    { input: number; output: number }
-  > = {
+  const pricing: Record<string, { input: number; output: number }> = {
     // --- OpenAI ---
     "gpt-4o": { input: 0.005, output: 0.015 },
     "gpt-4o-mini": { input: 0.00015, output: 0.0006 },
