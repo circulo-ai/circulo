@@ -18,7 +18,7 @@ export const invoiceTypeSchema = z.enum([
   'custom',
 ]);
 
-export const paymentProviderSchema = z.enum(['changelly', 'stripe']);
+export const paymentProviderSchema = z.enum(['changelly']);
 
 export type InvoiceStatus = z.infer<typeof invoiceStatusSchema>;
 export type InvoiceType = z.infer<typeof invoiceTypeSchema>;

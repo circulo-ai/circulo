@@ -72,7 +72,7 @@ export async function streamTextStep(
       },
     ],
     metadata: {
-      craetedAt: Date.now(),
+      createdAt: Date.now(),
     },
   };
 

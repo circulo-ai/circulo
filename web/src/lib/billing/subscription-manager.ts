@@ -16,7 +16,7 @@ export class SubscriptionManager {
   static async createSubscription(
     userId: string,
     planSlug: string,
-    provider: 'stripe' | 'changelly' = 'stripe'
+    provider: 'changelly' = 'changelly'
   ) {
     // Get plan
     const plan = await db.query.subscriptionPlans.findFirst({
@@ -49,6 +49,10 @@ export class SubscriptionManager {
         autoRenew: true,
       })
       .returning();
+
+    if(!subscription) {
+      return { subscription: undefined, invoice: null };
+    }
 
     // Record history
     await db.insert(subscriptionHistory).values({
@@ -103,7 +107,7 @@ export class SubscriptionManager {
   static async changePlan(
     userId: string,
     newPlanSlug: string,
-    provider: 'stripe' | 'changelly' = 'stripe'
+    provider: 'changelly' = 'changelly'
   ) {
     const subscription = await db.query.subscriptions.findFirst({
       where: and(

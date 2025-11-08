@@ -49,8 +49,6 @@ export const invoiceStatusEnum = pgEnum("invoice_status", [
 
 export const paymentProviderEnum = pgEnum("payment_provider", [
   "changelly",
-  "stripe",
-  "manual",
 ]);
 
 // -------------------- SUBSCRIPTION PLANS --------------------
@@ -240,6 +238,24 @@ export const usageMetrics = pgTable(
     subscriptionIdx: index("usage_subscription_idx").on(table.subscriptionId),
   }),
 );
+
+export const webhookLogs = pgTable("webhook_logs", {
+  id: serial("id").primaryKey(),
+  provider: paymentProviderEnum("provider").notNull(),
+  eventType: varchar("event_type", { length: 100 }).notNull(),
+  invoiceId: varchar("invoice_id", { length: 255 }),
+  payload: jsonb("payload").notNull(),
+  signature: text("signature"),
+  status: varchar("status", { length: 50 }).notNull(), // 'success', 'failed', 'pending'
+  errorMessage: text("error_message"),
+  attempts: integer("attempts").notNull().default(1),
+  processedAt: timestamp("processed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  providerIdx: index("webhook_provider_idx").on(table.provider),
+  statusIdx: index("webhook_status_idx").on(table.status),
+  createdAtIdx: index("webhook_created_at_idx").on(table.createdAt),
+}));
 
 // -------------------- RELATIONS --------------------
 

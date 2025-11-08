@@ -22,10 +22,16 @@ function getBillingPeriod(subscriptionStartDate: Date, now = new Date()) {
 }
 
 export class UsageRateLimiter {
+
   /**
    * Enforce rate limit for API calls
+   * Automatically tracks usage when called
    */
-  static async enforce(userId: string, windowMs: number = 60_000): Promise<void> {
+  static async enforce(
+    userId: string,
+    metric: string = "api_calls",
+    windowMs: number = 60_000
+  ): Promise<void> {
     const subscription =
       await SubscriptionManager.getActiveSubscription(userId);
 
@@ -34,7 +40,7 @@ export class UsageRateLimiter {
     }
 
     const limit = subscription.features.rateLimitPerMinute;
-    const exceeded = await UsageTracker.checkLimit(userId, "api_calls", limit, windowMs);
+    const exceeded = await UsageTracker.checkLimit(userId, metric, limit, windowMs);
 
     if (exceeded) {
       throw new Error(
@@ -42,8 +48,8 @@ export class UsageRateLimiter {
       );
     }
 
-    // Track this API call
-    await UsageTracker.track(userId, "api_calls", 1, subscription.id);
+    // Automatically track this usage
+    await UsageTracker.track(userId, metric, 1, subscription.id);
   }
 
   /**
@@ -124,5 +130,18 @@ export class UsageRateLimiter {
     }
 
     return { allowed: true };
+  }
+
+  /**
+   * Track usage without enforcing rate limit
+   * Use for actions that don't count toward rate limits
+   */
+  static async trackOnly(
+    userId: string,
+    metric: string,
+    count: number = 1
+  ): Promise<void> {
+    const subscription = await SubscriptionManager.getActiveSubscription(userId);
+    await UsageTracker.track(userId, metric, count, subscription?.id);
   }
 }

@@ -56,13 +56,13 @@ export const auth = betterAuth({
             if (members.length > 0) {
               logger.info("Found organization for user", {
                 userId: session.userId,
-                organizationId: members[0].organizationId
+                organizationId: members[0]?.organizationId
               });
 
               return {
                 data: {
                   ...session,
-                  activeOrganizationId: members[0].organizationId
+                  activeOrganizationId: members[0]?.organizationId
                 }
               };
             }
