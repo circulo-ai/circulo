@@ -1,4 +1,4 @@
-import { agent, chat, db } from "@/db";
+import { agent, db } from "@/db";
 import { eq, sql } from "drizzle-orm";
 import { makeRepo } from "../helpers/repo";
 
@@ -7,7 +7,7 @@ const agentRepoFactory = makeRepo(agent, (base) => ({
     return base.findMany({ orderBy: sql`created_at desc`, limit });
   },
   findForUser(userId: string) {
-    return base.findMany({ where: eq(chat.userId, userId) });
+    return base.findMany({ where: eq(agent.userId, userId) });
   },
 }), { primaryKey: "id" });
 

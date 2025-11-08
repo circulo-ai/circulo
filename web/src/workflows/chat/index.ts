@@ -1,6 +1,7 @@
 import { UIMessage, type UIMessageChunk } from "ai";
 import { getWritable } from "workflow";
 import { endStream, startStream, streamTextStep } from "./steps";
+// Persistence is handled in the API route to avoid bundler issues in workflows
 
 const MAX_STEPS = 5;
 
@@ -21,6 +22,8 @@ export async function chat(messages: UIMessage[]) {
 
     // Add the assistant's message to the conversation
     currentMessages.push(result.message);
+
+  // Persisting assistant messages is handled by the API route after streaming
 
     // Break if not continuing with tool calls
     if (result.finishReason !== "tool-calls") {

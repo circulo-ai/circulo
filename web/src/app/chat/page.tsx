@@ -45,7 +45,8 @@ import {
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { CopyIcon, GlobeIcon, RefreshCcwIcon } from "lucide-react";
-import { Fragment, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
+import { useChats } from "@/hooks/use-chats";
 
 const models = [
   {
@@ -62,18 +63,40 @@ const ChatBotDemo = () => {
   const [input, setInput] = useState("");
   const [model, setModel] = useState<string>(models[0].value);
   const [webSearch, setWebSearch] = useState(false);
+  const { createChat } = useChats();
+  const [chatId, setChatId] = useState<string | null>(null);
+
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: chatId ? `/api/v1/chats/${chatId}` : "/api/v1/chats",
+      }),
+    [chatId]
+  );
+
   const { messages, sendMessage, status, regenerate } = useChat({
-    transport: new DefaultChatTransport({
-      api: "/api/v1/chats",
-    }),
+    transport,
   });
 
-  const handleSubmit = (message: PromptInputMessage) => {
+  const handleSubmit = async (message: PromptInputMessage) => {
     const hasText = Boolean(message.text);
     const hasAttachments = Boolean(message.files?.length);
 
     if (!(hasText || hasAttachments)) {
       return;
+    }
+
+    // Ensure we have a chatId before streaming
+    if (!chatId) {
+      try {
+        const created = await createChat({
+          title: message.text?.slice(0, 80) || "New Chat",
+        });
+        setChatId(created.chat.id);
+      } catch (e) {
+        console.error(e);
+        return;
+      }
     }
 
     sendMessage(

@@ -93,6 +93,7 @@ export async function streamTextStep(
   return {
     message: assistantMessage,
     finishReason,
+    text,
   };
 }
 
