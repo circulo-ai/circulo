@@ -16,13 +16,19 @@ export function useChats() {
     style?: Chat["style"];
     visibility?: Chat["visibility"];
   }) {
-    const res = await fetch("/api/v1/chats/create", {
+    const res = await fetch("/api/v1/chats", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload ?? {}),
     });
+
+    if (!res.ok) {
+      const json = await res.json().catch(() => null);
+      console.error("Create chat error:", json);
+      throw new Error(json?.error || json?.message || "Failed to create chat");
+    }
+
     const json = await res.json();
-    if (!res.ok) throw new Error(json.error || "Failed to create chat");
 
     // Optimistically add to cache
     await mutate(

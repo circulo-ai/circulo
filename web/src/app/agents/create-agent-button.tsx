@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAgentMutations } from "@/hooks/use-agent-mutations";
+import { useAgents, useAgentTemplates } from "@/hooks/use-agents";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -10,8 +10,10 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus } from "lucide-react";
 import { ColorInput } from "@/components/ui/color-input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const createAgentSchema = z.object({
+  templateId: z.string().optional(),
   name: z.string().min(1, "Name is required").max(50),
   description: z.string().max(500).optional(),
   systemPrompt: z.string().min(1, "System prompt is required"),
@@ -35,11 +37,13 @@ interface FormFieldProps {
 
 export function CreateAgentButton() {
   const [open, setOpen] = useState(false);
-  const { createAgent } = useAgentMutations();
+  const { createAgent } = useAgents();
+  const { templates, isLoading: loadingTemplates } = useAgentTemplates();
 
   const form = useForm<CreateAgentFormData>({
     resolver: zodResolver(createAgentSchema),
     defaultValues: {
+      templateId: undefined,
       name: "",
       description: "",
       systemPrompt: "",
@@ -48,7 +52,9 @@ export function CreateAgentButton() {
       maxTokens: 2000,
       color: "#3B82F6",
     },
-  });  const onSubmit = async (data: CreateAgentFormData) => {
+  });
+
+  const onSubmit = async (data: CreateAgentFormData) => {
     try {
       await createAgent(data);
       setOpen(false);
@@ -66,12 +72,60 @@ export function CreateAgentButton() {
           Create Agent
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="flex h-[85vh] w-[95vw] sm:max-w-xl md:max-w-2xl lg:max-w-3xl p-0 flex-col">
+        <DialogHeader className="border-b px-6 py-4 sticky top-0 bg-background z-10">
           <DialogTitle>Create New Agent</DialogTitle>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4 space-y-6">
+            <FormField
+              control={form.control}
+              name="templateId"
+              render={({ field }: FormFieldProps) => (
+                <FormItem>
+                  <FormLabel>Template (optional)</FormLabel>
+                  <FormControl>
+                    <Select
+                      value={field.value ?? ""}
+                      onValueChange={(value) => {
+                        if (value === "__none__") {
+                          // Clear selection to show placeholder
+                          field.onChange("");
+                          return;
+                        }
+                        const selected = templates.find(t => t.id === value);
+                        field.onChange(value);
+                        if (selected) {
+                          // Prefill form fields from template
+                          form.setValue("name", selected.name || "");
+                          form.setValue("description", selected.description || "");
+                          form.setValue("systemPrompt", selected.systemPrompt || "");
+                          form.setValue("model", selected.model || "gpt-4");
+                          form.setValue("temperature", (selected.temperature as unknown as string) || "0.7");
+                          form.setValue("maxTokens", selected.maxTokens ?? 2000);
+                          form.setValue("color", selected.color || "#3B82F6");
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={loadingTemplates ? "Loading templates..." : "Select a template"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">None</SelectItem>
+                        {templates.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {t.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <FormField
               control={form.control}
               name="name"
@@ -191,10 +245,12 @@ export function CreateAgentButton() {
                 )}
               />
             </div>
-
-            <Button type="submit" className="w-full">
-              Create Agent
-            </Button>
+            </div>
+            <div className="border-t px-6 py-4">
+              <Button type="submit" className="w-full sm:w-auto">
+                Create Agent
+              </Button>
+            </div>
           </form>
         </Form>
       </DialogContent>

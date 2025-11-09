@@ -1,17 +1,13 @@
 "use client";
 
-import { useAgent } from "@/hooks/use-agent-mutations";
+import { useAgent } from "@/hooks/use-agents";
 import { Suspense } from "react";
+import { useParams } from "next/navigation";
 import { EditAgentForm } from "./edit-agent-form";
 
-interface EditAgentPageProps {
-  params: {
-    agentId: string;
-  };
-}
-
-export default function EditAgentPage({ params }: EditAgentPageProps) {
-  const { agent, isLoading, error } = useAgent(params.agentId);
+export default function EditAgentPage() {
+  const { agentId } = useParams<{ agentId: string }>();
+  const { agent, isLoading, error } = useAgent(agentId);
 
   if (isLoading) {
     return <div>Loading agent...</div>;

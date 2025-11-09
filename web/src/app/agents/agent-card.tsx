@@ -1,5 +1,5 @@
 import { Agent } from "@/db/schema";
-import { useAgentMutations } from "@/hooks/use-agent-mutations";
+import { useAgents } from "@/hooks/use-agents";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -11,7 +11,7 @@ interface AgentCardProps {
 }
 
 export function AgentCard({ agent }: AgentCardProps) {
-  const { deleteAgent } = useAgentMutations();
+  const { deleteAgent } = useAgents();
 
   const handleDelete = async () => {
     try {

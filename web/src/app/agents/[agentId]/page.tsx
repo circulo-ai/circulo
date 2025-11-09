@@ -1,6 +1,6 @@
 "use client";
 
-import { useAgent } from "@/hooks/use-agent-mutations";
+import { useAgent } from "@/hooks/use-agents";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";

@@ -1,5 +1,5 @@
 import { Agent } from "@/db/schema";
-import { useAgentMutations } from "@/hooks/use-agent-mutations";
+import { useAgents } from "@/hooks/use-agents";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -38,7 +38,7 @@ interface EditAgentFormProps {
 
 export function EditAgentForm({ agent }: EditAgentFormProps) {
   const router = useRouter();
-  const { updateAgent } = useAgentMutations();
+  const { updateAgent } = useAgents();
 
   const form = useForm<EditAgentFormData>({
     resolver: zodResolver(editAgentSchema),

@@ -1,4 +1,4 @@
-import { useAgentList } from "@/hooks/use-agent-mutations";
+import { useAgentList } from "@/hooks/use-agents";
 import { AgentCard } from "./agent-card";
 
 export default function AgentsList() {

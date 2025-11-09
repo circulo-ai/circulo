@@ -336,6 +336,9 @@ export const noContent = (): NextResponse =>
 export const notFound = (message?: string): NextResponse =>
   json({ success: false, error: message ?? "Entity not found!" }, 404);
 
+export const forbidden = (message?: string): NextResponse =>
+  json({ success: false, error: message ?? "Forbidden" }, 403);
+
 // ============================================================================
 // Composable Middleware
 // ============================================================================

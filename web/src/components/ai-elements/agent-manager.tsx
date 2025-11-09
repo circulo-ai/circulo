@@ -1,281 +1,227 @@
 "use client";
 
-import { useChatAgents } from "@/hooks/use-chat-agents";
-import { useAgentList } from "@/hooks/use-agent-mutations";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { type DraggableProvided, type DroppableProvided, type DropResult, DragDropContext, Draggable, Droppable } from "@hello-pangea/dnd";
-import { Input } from "@/components/ui/input";
-import { Plus, Trash2, GripVertical } from "lucide-react";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { Agent } from "@/db/schema/agent";
 import { useState } from "react";
-import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical, X, Settings2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
-const addAgentSchema = z.object({
-  agentId: z.string().min(1, "Please select an agent"),
-  customSystemPrompt: z.string().nullable().optional(),
-  customTemperature: z.number().min(0).max(2).nullable().optional(),
-});
+interface ChatAgentManagerProps {
+  chatAgents: Agent[];
+  allAgents: Agent[];
+  onReorder: (agents: Array<{ agentId: string; speakOrder: number }>) => Promise<void>;
+  onRemove: (agentId: string) => Promise<void>;
+  onClose: () => void;
+}
 
-type AddAgentFormData = z.infer<typeof addAgentSchema>;
+function SortableChatAgent({
+                             agent,
+                             index,
+                             isExpanded,
+                             onToggle,
+                             onRemove,
+                           }: {
+  agent: Agent;
+  index: number;
+  isExpanded: boolean;
+  onToggle: () => void;
+  onRemove: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: agent.id });
 
-export function AgentManager() {
-  const [open, setOpen] = useState(false);
-  const { agents, isLoading: isLoadingChatAgents } = useChatAgents();
-  const { agents: availableAgents, isLoading: isLoadingAgentList } = useAgentList();
-  const { addAgent, updateAgent, reorderAgents, removeAgent } = useChatAgents();
-
-  const form = useForm<AddAgentFormData>({
-    resolver: zodResolver(addAgentSchema),
-    defaultValues: {
-      agentId: "",
-      customSystemPrompt: null,
-      customTemperature: null,
-    },
-  });
-
-  const onSubmit = async (data: AddAgentFormData) => {
-    try {
-      await addAgent(data);
-      setOpen(false);
-      form.reset();
-    } catch (error) {
-      console.error("Failed to add agent:", error);
-    }
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
   };
-
-  const onDragEnd = async (result: DropResult) => {
-    if (!result.destination) return;
-
-    const sourceIndex = result.source.index;
-    const destIndex = result.destination.index;
-
-    if (sourceIndex === destIndex) return;
-
-    const orderedAgents = Array.from(agents);
-    const [movedAgent] = orderedAgents.splice(sourceIndex, 1);
-    orderedAgents.splice(destIndex, 0, movedAgent);
-
-    // Build updates array and send a single PATCH to apply the new order atomically
-    const updates = orderedAgents.map((a, i) => ({ agentId: a.id, speakOrder: i }));
-    try {
-      await reorderAgents(updates);
-    } catch (err) {
-      console.error("Failed to reorder agents:", err);
-    }
-  };
-
-  const handleRemoveAgent = async (agentId: string) => {
-    try {
-      await removeAgent(agentId);
-    } catch (error) {
-      console.error("Failed to remove agent:", error);
-    }
-  };
-
-  const unusedAgents = availableAgents.filter(
-    (a) => !agents.find((ca) => ca.id === a.id)
-  );
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-medium">Chat Agents</h3>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button
-              size="sm"
-              disabled={isLoadingAgentList || unusedAgents.length === 0}
+    <Card ref={setNodeRef} style={style}>
+      <Collapsible open={isExpanded} onOpenChange={onToggle}>
+        <div className="p-3">
+          <div className="flex items-center gap-3">
+            <div
+              {...attributes}
+              {...listeners}
+              className="cursor-grab active:cursor-grabbing touch-none"
             >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Agent
+              <GripVertical className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <Badge variant="outline" className="shrink-0">
+              #{index + 1}
+            </Badge>
+            <div
+              className="h-10 w-10 rounded-full flex items-center justify-center text-white font-semibold"
+              style={{ backgroundColor: agent.color || "#3B82F6" }}
+            >
+              {agent.avatar ? (
+                <img
+                  src={agent.avatar}
+                  alt={agent.name}
+                  className="h-full w-full rounded-full"
+                />
+              ) : (
+                agent.name.charAt(0).toUpperCase()
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium truncate">{agent.name}</p>
+              {agent.description && (
+                <p className="text-xs text-muted-foreground truncate">
+                  {agent.description}
+                </p>
+              )}
+            </div>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm">
+                <Settings2 className="h-4 w-4" />
+              </Button>
+            </CollapsibleTrigger>
+            <Button variant="ghost" size="sm" onClick={onRemove}>
+              <X className="h-4 w-4" />
             </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Agent to Chat</DialogTitle>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="agentId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Agent</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select an agent" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <ScrollArea className="max-h-[200px]">
-                            {unusedAgents.map((agent) => (
-                              <SelectItem
-                                key={agent.id}
-                                value={agent.id}
-                                className="flex items-center gap-2"
-                              >
-                                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: agent.color || '#3B82F6' }} />
-                                {agent.name}
-                              </SelectItem>
-                            ))}
-                          </ScrollArea>
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="customTemperature"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Custom Temperature (Optional)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          step="0.1"
-                          min="0"
-                          max="2"
-                          placeholder="Default temperature"
-                          value={field.value ?? ""}
-                          onChange={(e) => {
-                            const value = e.target.value === "" ? null : parseFloat(e.target.value);
-                            field.onChange(value);
-                          }}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="customSystemPrompt"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Custom System Prompt (Optional)</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Default system prompt"
-                          value={field.value ?? ""}
-                          onChange={(e) => {
-                            const value = e.target.value === "" ? null : e.target.value;
-                            field.onChange(value);
-                          }}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <Button type="submit" className="w-full">
-                  Add to Chat
-                </Button>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+          </div>
+        </div>
+
+        <CollapsibleContent>
+          <div className="px-3 pb-3 pt-0 space-y-4 border-t mt-3 pt-3">
+            <div className="space-y-2">
+              <Label className="text-xs">Model</Label>
+              <p className="text-sm font-mono">{agent.model}</p>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Temperature</Label>
+              <p className="text-sm">{agent.temperature}</p>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">System Prompt</Label>
+              <p className="text-sm text-muted-foreground">
+                {agent.systemPrompt.substring(0, 200)}
+                {agent.systemPrompt.length > 200 ? "..." : ""}
+              </p>
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    </Card>
+  );
+}
+
+export function ChatAgentManager({
+                                   chatAgents,
+                                   allAgents,
+                                   onReorder,
+                                   onRemove,
+                                   onClose,
+                                 }: ChatAgentManagerProps) {
+  const [expandedAgentId, setExpandedAgentId] = useState<string | null>(null);
+  const [localAgents, setLocalAgents] = useState(chatAgents);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = localAgents.findIndex((a) => a.id === active.id);
+      const newIndex = localAgents.findIndex((a) => a.id === over.id);
+      const newOrder = arrayMove(localAgents, oldIndex, newIndex);
+
+      setLocalAgents(newOrder);
+
+      const updates = newOrder.map((agent, index) => ({
+        agentId: agent.id,
+        speakOrder: index,
+      }));
+
+      await onReorder(updates);
+    }
+  };
+
+  return (
+    <div className="p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold">Manage Chat Agents</h3>
+          <p className="text-sm text-muted-foreground">
+            Reorder agents to control speaking sequence
+          </p>
+        </div>
+        <Button variant="ghost" size="sm" onClick={onClose}>
+          Close
+        </Button>
       </div>
 
-      {isLoadingChatAgents && (
-        <div className="space-y-2">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-12 bg-muted animate-pulse rounded-lg"
-            />
-          ))}
-        </div>
-      )}
-
-      {!isLoadingChatAgents && agents.length === 0 && (
-        <div className="text-center py-8 text-muted-foreground">
-          No agents are currently part of this chat.
-        </div>
-      )}
-
-      {!isLoadingChatAgents && agents.length > 0 && (
-        <DragDropContext onDragEnd={onDragEnd}>
-          <Droppable droppableId="agents">
-            {(provided: DroppableProvided) => (
-              <div
-                {...provided.droppableProps}
-                ref={provided.innerRef}
-                className="space-y-2"
-              >
-                {agents.map((agent, index) => (
-                  <Draggable
-                    key={agent.id}
-                    draggableId={agent.id}
-                    index={index}
-                  >
-                    {(provided: DraggableProvided) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.draggableProps}
-                        className="flex items-center justify-between p-3 bg-card border rounded-lg group hover:border-primary/50 transition-colors"
-                      >
-                        <div className="flex items-center gap-3 flex-1">
-                          <div
-                            {...provided.dragHandleProps}
-                            className="cursor-grab text-muted-foreground hover:text-foreground"
-                          >
-                            <GripVertical className="h-4 w-4" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span
-                                className="w-2 h-2 rounded-full"
-                                style={{ backgroundColor: agent.color || '#3B82F6' }}
-                              />
-                              <span className="font-medium">
-                                {agent.name}
-                              </span>
-                              <span className="text-xs text-muted-foreground">
-                                #{index + 1}
-                              </span>
-                            </div>
-                            {agent.description && (
-                              <p className="text-sm text-muted-foreground truncate max-w-md">
-                                {agent.description}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleRemoveAgent(agent.id)}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              Remove from chat
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    )}
-                  </Draggable>
-                ))}
-                {provided.placeholder}
-              </div>
-            )}
-          </Droppable>
-        </DragDropContext>
+      {localAgents.length === 0 ? (
+        <Card className="p-8 text-center border-dashed">
+          <p className="text-sm text-muted-foreground">
+            No agents in this chat. Add agents to start collaborating.
+          </p>
+        </Card>
+      ) : (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={localAgents.map((a) => a.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="space-y-2">
+              {localAgents.map((agent, index) => (
+                <SortableChatAgent
+                  key={agent.id}
+                  agent={agent}
+                  index={index}
+                  isExpanded={expandedAgentId === agent.id}
+                  onToggle={() =>
+                    setExpandedAgentId(
+                      expandedAgentId === agent.id ? null : agent.id
+                    )
+                  }
+                  onRemove={() => onRemove(agent.id)}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
     </div>
   );
