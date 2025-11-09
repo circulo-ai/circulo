@@ -1,5 +1,5 @@
-import { renderInvitationEmail, renderMagicLinkEmail } from "@/components/emails";
-import { db } from "@/db";
+import { renderMagicLinkEmail } from "@/components/emails";
+import {db} from "@/db";
 import * as schema from "@/db/schema";
 import { getBaseURL } from "@/lib/auth-client";
 import { sendEmail } from "@/lib/email/mailer";
@@ -14,34 +14,65 @@ import { eq } from "drizzle-orm";
 
 const logger = createLogger("Auth");
 
+const handleNewUser = async (userId: string) => {
+  try {
+    // Get the free tier plan (you'll need to ensure this exists in your database)
+    const freePlan = await db
+        .select()
+        .from(schema.subscriptionPlans)
+        .where(eq(schema.subscriptionPlans.slug, 'free'))
+        .limit(1);
+
+    if (!freePlan[0]) {
+      logger.error('Free tier plan not found in database');
+      throw new Error('Free tier plan not configured');
+    }
+
+    // Create subscription for new user
+    await db.insert(schema.subscriptions).values({
+      userId: userId,
+      planId: freePlan[0].id,
+      status: 'active',
+      startDate: new Date(),
+      endDate: null, // Free tier never expires
+      autoRenew: true, // Should be handled explicitly to renew free tiers every month
+    });
+
+    logger.info('Free tier subscription created for new user', {
+      userId,
+      planId: freePlan[0].id
+    });
+  } catch (error) {
+    logger.error('Failed to create subscription for new user', {
+      userId,
+      error,
+    });
+    throw error;
+  }
+};
+
+
 export const auth = betterAuth({
   appName: "circulo",
   baseURL: getBaseURL(),
   databaseHooks: {
-    // user: {
-    //   create: {
-    //     after: async (user) => {
-    //       logger.info(
-    //         "[databaseHooks.user.create.after] User created, initializing stats",
-    //         {
-    //           userId: user.id
-    //         }
-    //       );
-    //
-    //       try {
-    //         await handleNewUser(user.id);
-    //       } catch (error) {
-    //         logger.error(
-    //           "[databaseHooks.user.create.after] Failed to initialize user stats",
-    //           {
-    //             userId: user.id,
-    //             error
-    //           }
-    //         );
-    //       }
-    //     }
-    //   }
-    // },
+    user: {
+      create: {
+        after: async (user) => {
+          try {
+            await handleNewUser(user.id);
+          } catch (error) {
+            logger.error(
+              "[databaseHooks.user.create.after] Failed to initialize user stats",
+              {
+                userId: user.id,
+                error
+              }
+            );
+          }
+        }
+      }
+    },
     session: {
       create: {
         before: async (session) => {

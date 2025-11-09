@@ -1,23 +1,13 @@
 import { agentRepo } from "@/db/repositories/agent-repo";
-import { api, created, success } from "@/lib/server";
+import { UsageRateLimiter } from "@/lib/billing/rate-limiter";
+import { createLogger } from "@/lib/logs/console/logger";
+import { api, created, error, success } from "@/lib/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 
 export const GET = api({ auth: true }, async (req, ctx) => {
-  try {
-    const agents = await agentRepo.findForUser(ctx.user.id);
-    return success({ agents });
-  } catch (err) {
-    console.error('Error fetching agents:', err);
-    if (err instanceof Error) {
-      return new Response(JSON.stringify({
-        error: err.message
-      }), { status: 400 });
-    }
-    return new Response(JSON.stringify({
-      error: 'Internal server error'
-    }), { status: 500 });
-  }
+  const agents = await agentRepo.findForUser(ctx.user.id);
+  return success({ agents });
 });
 
 export const POST = api(
@@ -35,37 +25,34 @@ export const POST = api(
     }),
   },
   async (req, ctx) => {
-    try {
-      const id = nanoid();
-      const now = new Date();
-
-      const agentData = {
-        id,
-        userId: ctx.user.id,
-        name: ctx.body.name,
-        description: ctx.body.description ?? null,
-        systemPrompt: ctx.body.systemPrompt,
-        model: ctx.body.model,
-        temperature: ctx.body.temperature,
-        maxTokens: ctx.body.maxTokens,
-        color: ctx.body.color,
-        tools: ctx.body.tools ?? [],
-        usageCount: 0,
-        createdAt: now,
-        updatedAt: now,
-      };
-
-      const agent = await agentRepo.create(agentData);
-      return created({ agent });
-    } catch (err) {
-      console.error('Error creating agent:', err);
-      if (err instanceof Error) {
-        return new Response(JSON.stringify({
-          error: err.message
-        }), { status: 400 });
-      }
-      return new Response(JSON.stringify({
-        error: 'Internal server error'
-      }), { status: 500 });
+    const { allowed, reason } = await UsageRateLimiter.canPerformAction(
+      ctx.user.id,
+      "create_agent",
+    );
+    if (!allowed) {
+      return error(reason ?? "You are not allowed to create a new Agent", 403);
     }
-  });
+
+    const id = nanoid();
+    const now = new Date();
+
+    const agentData = {
+      id,
+      userId: ctx.user.id,
+      name: ctx.body.name,
+      description: ctx.body.description ?? null,
+      systemPrompt: ctx.body.systemPrompt,
+      model: ctx.body.model,
+      temperature: ctx.body.temperature,
+      maxTokens: ctx.body.maxTokens,
+      color: ctx.body.color,
+      tools: ctx.body.tools ?? [],
+      usageCount: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const agent = await agentRepo.create(agentData);
+    return created({ agent });
+  },
+);

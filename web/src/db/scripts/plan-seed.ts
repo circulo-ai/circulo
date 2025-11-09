@@ -1,5 +1,7 @@
+import "dotenv/config"
 import { db } from "..";
-import { subscriptionPlans, type PlanFeatures } from "../schema/billing";
+import { subscriptionPlans, type PlanFeatures } from "@/db";
+import { sql } from "drizzle-orm";
 
 type PlanSeed = typeof subscriptionPlans.$inferInsert;
 
@@ -16,9 +18,7 @@ const plans: PlanSeed[] = [
       maxAgents: 5,
       maxChats: 10,
       kbSlots: 1,
-      roundtableAgents: 2,
-      marketplaceAccess: "browse",
-      revenueSharePercent: null,
+      maxAgentsInChat: 4,
     } satisfies PlanFeatures,
   },
   {
@@ -33,9 +33,7 @@ const plans: PlanSeed[] = [
       maxAgents: 10,
       maxChats: 1000,
       kbSlots: 5,
-      roundtableAgents: 5,
-      marketplaceAccess: "full",
-      revenueSharePercent: 15,
+      maxAgentsInChat: 7,
     } satisfies PlanFeatures,
   },
   {
@@ -50,10 +48,8 @@ const plans: PlanSeed[] = [
       maxAgents: 50,
       maxChats: 2000,
       kbSlots: 15,
-      roundtableAgents: 10,
-      marketplaceAccess: "full",
       teamMembers: 3,
-      revenueSharePercent: 10,
+      maxAgentsInChat: 10,
     } satisfies PlanFeatures,
   },
   {
@@ -68,17 +64,15 @@ const plans: PlanSeed[] = [
       maxAgents: null, // unlimited
       maxChats: null,  // unlimited
       kbSlots: null,   // unlimited
-      roundtableAgents: null, // unlimited
-      marketplaceAccess: "full",
       teamMembers: null, // unlimited
       dedicatedSupport: true,
       customBilling: true,
-      revenueSharePercent: 0, // Custom negotiation
+      maxAgentsInChat: 20,
     } satisfies PlanFeatures,
   },
 ];
 
-async function seed() {
+async function planSeed() {
   try {
     console.log("🌱 Seeding subscription plans...");
 
@@ -90,12 +84,13 @@ async function seed() {
         .onConflictDoUpdate({
           target: subscriptionPlans.slug,
           set: {
-            name: plan.name,
-            description: plan.description,
-            usdPrice: plan.usdPrice,
-            billingIntervalDays: plan.billingIntervalDays,
-            features: plan.features,
-            isActive: plan.isActive,
+            name: sql`excluded.name`,
+            description: sql`excluded.description`,
+            usdPrice: sql`excluded.usd_price`,
+            billingIntervalDays: sql`excluded.billing_interval_days`,
+            features: sql`excluded.features`,
+            isActive: sql`excluded.is_active`,
+            // Note: createdAt is intentionally not updated
           },
         });
     }
@@ -103,15 +98,20 @@ async function seed() {
     console.log("✓ Subscription plans seeded successfully");
     console.log(`  - ${plans.length} plans created/updated`);
 
-    // Display summary
+    // Verify and display summary
+    const insertedPlans = await db
+      .select()
+      .from(subscriptionPlans)
+      .orderBy(subscriptionPlans.id);
+
     console.log("\n📊 Plan Summary:");
-    plans.forEach((plan) => {
+    insertedPlans.forEach((plan) => {
       const features = plan.features as PlanFeatures;
       console.log(`  ${plan.name} ($${plan.usdPrice}/mo):`);
       console.log(`    - Agents: ${features.maxAgents ?? "∞"}`);
       console.log(`    - Chats: ${features.maxChats ?? "∞"}`);
+      console.log(`    - KB Slots: ${features.kbSlots ?? "∞"}`);
       console.log(`    - Rate Limit: ${features.rateLimitPerMinute}/min`);
-      console.log(`    - Revenue Share: ${features.revenueSharePercent ?? "N/A"}%`);
     });
 
   } catch (error) {
@@ -122,9 +122,15 @@ async function seed() {
 
 // Run if executed directly
 if (require.main === module) {
-  seed()
-    .then(() => process.exit(0))
-    .catch(() => process.exit(1));
+  planSeed()
+    .then(() => {
+      console.log("\n✓ Seed completed successfully");
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error("\n✗ Seed failed:", error);
+      process.exit(1);
+    });
 }
 
-export { seed as seedSubscriptionPlans };
+export { planSeed }

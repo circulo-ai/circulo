@@ -13,7 +13,7 @@ import {
   varchar,
   text
 } from "drizzle-orm/pg-core";
-import { user } from "./auth";
+import { user } from "@/db";
 
 // -------------------- TYPES --------------------
 
@@ -22,9 +22,7 @@ export type PlanFeatures = {
   maxAgents: number | null; // null = unlimited
   maxChats: number | null;
   kbSlots: number | null;
-  roundtableAgents: number | null;
-  marketplaceAccess: 'browse' | 'full';
-  revenueSharePercent: number | null;
+  maxAgentsInChat: number | null;
   teamMembers?: number | null;
   dedicatedSupport?: boolean;
   customBilling?: boolean;
@@ -258,12 +256,6 @@ export const webhookLogs = pgTable("webhook_logs", {
 }));
 
 // -------------------- RELATIONS --------------------
-
-export const usersRelations = relations(user, ({ many }) => ({
-  subscriptions: many(subscriptions),
-  invoices: many(invoices),
-  usageMetrics: many(usageMetrics),
-}));
 
 export const subscriptionPlansRelations = relations(
   subscriptionPlans,

@@ -252,6 +252,7 @@ export class BillingManager {
 
     for (const sub of expired) {
       if (sub.autoRenew) {
+        // TODO: maybe we can handle autoRenew for free plans in here
         // Create renewal invoice
         const manager = new BillingManager(getProvider('stripe')); // Default provider
         await manager.createSubscriptionInvoice(

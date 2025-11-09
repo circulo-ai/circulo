@@ -44,6 +44,8 @@ export const agentTemplate = pgTable(
     longDescription: text("long_description"), // Markdown description for marketplace
     systemPrompt: text("system_prompt").notNull(),
 
+    category: text("category"),
+
     // Model configuration (defaults for instances)
     model: text("model").notNull().default("gpt-4"),
     temperature: numeric("temperature", {

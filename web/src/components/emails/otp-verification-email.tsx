@@ -22,7 +22,7 @@ interface OTPVerificationEmailProps {
   chatTitle?: string;
 }
 
-const baseUrl = getEnv("NEXT_PUBLIC_APP_URL") || "https://sim.ai";
+const baseUrl = getEnv("NEXT_PUBLIC_APP_URL") || "https://circulo.ir";
 
 const getSubjectByType = (
   type: string,

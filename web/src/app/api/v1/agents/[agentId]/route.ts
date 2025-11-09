@@ -25,9 +25,8 @@ export const PATCH = api(
       model: z.string().min(1).optional(),
       temperature: z.number().min(0).max(2).optional(),
       maxTokens: z.number().min(1).optional(),
-      avatar: z.string().url().optional(),
+      avatar: z.url().optional(),
       color: z.string().optional(),
-      tools: z.array(z.any()).optional(),
     }),
   },
   async (req, ctx) => {
@@ -47,7 +46,6 @@ export const PATCH = api(
       maxTokens: ctx.body.maxTokens ?? undefined,
       avatar: ctx.body.avatar ?? undefined,
       color: ctx.body.color ?? undefined,
-      tools: (ctx.body.tools as any) ?? undefined,
       updatedAt: new Date(),
     } as any);
     return success({ agent: updated });

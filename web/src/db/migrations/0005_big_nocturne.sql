@@ -1,0 +1,1 @@
+ALTER TABLE "agent_template" ADD COLUMN "category" text;

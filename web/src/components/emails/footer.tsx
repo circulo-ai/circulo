@@ -13,7 +13,7 @@ interface EmailFooterProps {
 }
 
 export const EmailFooter = ({
-  baseUrl = getEnv("NEXT_PUBLIC_APP_URL") || "https://sim.ai",
+  baseUrl = getEnv("NEXT_PUBLIC_APP_URL") || "https://circulo.ir",
   unsubscribe,
 }: EmailFooterProps) => {
   const brand = getBrandConfig();
