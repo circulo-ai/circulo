@@ -145,57 +145,39 @@ export const PATCH = api(
     }
 
     await db.transaction(async (tx) => {
-      // Strategy: Use a CASE statement in a single UPDATE to atomically
-      // update all fields at once, avoiding unique constraint violations
+      // Two-step reorder to avoid unique (chat_id, speak_order) conflicts:
+      // 1) Temporarily move targeted rows out of the way by adding an offset
+      // 2) Set final speakOrder and other fields per update
 
-      const agentIds = updates.map(u => u.agentId);
+      const agentIds = updates.map((u) => u.agentId);
 
-      // Build CASE statements for each field that might be updated
-      const speakOrderCases = updates
-        .filter(u => u.speakOrder !== undefined)
-        .map(u => sql`WHEN ${chatAgentTable.agentId} = ${u.agentId} THEN ${u.speakOrder}`);
+      // Step 1: add large offset to avoid collisions
+      await tx
+        .update(chatAgentTable)
+        .set({ speakOrder: sql`${chatAgentTable.speakOrder} + 1000` })
+        .where(
+          and(
+            eq(chatAgentTable.chatId, chatId),
+            inArray(chatAgentTable.agentId, agentIds),
+          ),
+        );
 
-      const enabledCases = updates
-        .filter(u => u.enabled !== undefined)
-        .map(u => sql`WHEN ${chatAgentTable.agentId} = ${u.agentId} THEN ${u.enabled}`);
+      // Step 2: apply final values individually
+      for (const u of updates) {
+        const setObj: Record<string, any> = { speakOrder: u.speakOrder };
+        if (u.enabled !== undefined) setObj.enabled = u.enabled;
+        if ("customSystemPrompt" in u) setObj.customSystemPrompt = u.customSystemPrompt ?? null;
+        if ("customTemperature" in u)
+          setObj.customTemperature = u.customTemperature != null ? String(u.customTemperature) : null;
 
-      const systemPromptCases = updates
-        .filter(u => 'customSystemPrompt' in u)
-        .map(u => sql`WHEN ${chatAgentTable.agentId} = ${u.agentId} THEN ${u.customSystemPrompt}`);
-
-      const temperatureCases = updates
-        .filter(u => 'customTemperature' in u)
-        .map(u => sql`WHEN ${chatAgentTable.agentId} = ${u.agentId} THEN ${u.customTemperature ? String(u.customTemperature) : null}`);
-
-      // Build the SET clause dynamically
-      const setClause: Record<string, any> = {};
-
-      if (speakOrderCases.length > 0) {
-        setClause.speakOrder = sql`CASE ${sql.join(speakOrderCases, sql` `)} ELSE ${chatAgentTable.speakOrder} END`;
-      }
-
-      if (enabledCases.length > 0) {
-        setClause.enabled = sql`CASE ${sql.join(enabledCases, sql` `)} ELSE ${chatAgentTable.enabled} END`;
-      }
-
-      if (systemPromptCases.length > 0) {
-        setClause.customSystemPrompt = sql`CASE ${sql.join(systemPromptCases, sql` `)} ELSE ${chatAgentTable.customSystemPrompt} END`;
-      }
-
-      if (temperatureCases.length > 0) {
-        setClause.customTemperature = sql`CASE ${sql.join(temperatureCases, sql` `)} ELSE ${chatAgentTable.customTemperature} END`;
-      }
-
-      // Execute single atomic UPDATE
-      if (Object.keys(setClause).length > 0) {
         await tx
           .update(chatAgentTable)
-          .set(setClause)
+          .set(setObj)
           .where(
             and(
               eq(chatAgentTable.chatId, chatId),
-              inArray(chatAgentTable.agentId, agentIds)
-            )
+              eq(chatAgentTable.agentId, u.agentId),
+            ),
           );
       }
     });
