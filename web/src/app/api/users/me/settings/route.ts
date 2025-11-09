@@ -11,11 +11,6 @@ import { generateRequestId } from '@/lib/server-utils'
 const logger = createLogger('UserSettingsAPI')
 
 const SettingsSchema = z.object({
-  theme: z.enum(['system', 'light', 'dark']).optional(),
-  autoConnect: z.boolean().optional(),
-  autoFillEnvVars: z.boolean().optional(), // DEPRECATED: kept for backwards compatibility
-  autoPan: z.boolean().optional(),
-  consoleExpandedByDefault: z.boolean().optional(),
   telemetryEnabled: z.boolean().optional(),
   emailPreferences: z
     .object({
@@ -26,22 +21,13 @@ const SettingsSchema = z.object({
     })
     .optional(),
   billingUsageNotificationsEnabled: z.boolean().optional(),
-  showFloatingControls: z.boolean().optional(),
-  showTrainingControls: z.boolean().optional(),
 })
 
 // Default settings values
 const defaultSettings = {
-  theme: 'system',
-  autoConnect: true,
-  autoFillEnvVars: true, // DEPRECATED: kept for backwards compatibility, always true
-  autoPan: true,
-  consoleExpandedByDefault: true,
   telemetryEnabled: true,
   emailPreferences: {},
   billingUsageNotificationsEnabled: true,
-  showFloatingControls: true,
-  showTrainingControls: false,
 }
 
 export async function GET() {

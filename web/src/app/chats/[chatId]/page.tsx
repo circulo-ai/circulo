@@ -3,7 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useMessages } from "@/hooks/use-messages";
 import { useChatAgents } from "@/hooks/use-chat-agents";
-import { useAgents } from "@/hooks/use-agents";
+import { useAgentList, useAgents } from "@/hooks/use-agents";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, UIMessage } from "ai";
 import { Fragment, useMemo, useState, useEffect } from "react";
@@ -61,7 +61,7 @@ export default function ChatPage() {
     removeAgent,
     reorderAgents
   } = useChatAgents();
-  const { agents: allAgents } = useAgents();
+  const { agents: allAgents } = useAgentList();
 
   const [input, setInput] = useState("");
   const [showAgentManager, setShowAgentManager] = useState(false);

@@ -17,25 +17,13 @@ export const useGeneralStore = create<GeneralStore>()(
         let hasLoadedFromDb = false // Track if we've loaded from DB in this session
 
         const store: General = {
-          isAutoConnectEnabled: true,
-          isAutoPanEnabled: true,
-          isConsoleExpandedByDefault: true,
-          showFloatingControls: true,
-          showTrainingControls: false,
-          theme: 'system' as const, // Keep for compatibility but not used
           telemetryEnabled: true,
           isLoading: false,
           error: null,
           // Individual loading states
-          isAutoConnectLoading: false,
-          isAutoPanLoading: false,
-          isConsoleExpandedByDefaultLoading: false,
-          isThemeLoading: false, // Keep for compatibility but not used
           isTelemetryLoading: false,
           isBillingUsageNotificationsLoading: false,
           isBillingUsageNotificationsEnabled: true,
-          isFloatingControlsLoading: false,
-          isTrainingControlsLoading: false,
         }
 
         // Optimistic update helper
@@ -66,81 +54,6 @@ export const useGeneralStore = create<GeneralStore>()(
         return {
           ...store,
           // Basic Actions with optimistic updates
-          toggleAutoConnect: async () => {
-            if (get().isAutoConnectLoading) return
-            const newValue = !get().isAutoConnectEnabled
-            await updateSettingOptimistic(
-              'autoConnect',
-              newValue,
-              'isAutoConnectLoading',
-              'isAutoConnectEnabled'
-            )
-          },
-
-          toggleAutoPan: async () => {
-            if (get().isAutoPanLoading) return
-            const newValue = !get().isAutoPanEnabled
-            await updateSettingOptimistic(
-              'autoPan',
-              newValue,
-              'isAutoPanLoading',
-              'isAutoPanEnabled'
-            )
-          },
-
-          toggleConsoleExpandedByDefault: async () => {
-            if (get().isConsoleExpandedByDefaultLoading) return
-            const newValue = !get().isConsoleExpandedByDefault
-            await updateSettingOptimistic(
-              'consoleExpandedByDefault',
-              newValue,
-              'isConsoleExpandedByDefaultLoading',
-              'isConsoleExpandedByDefault'
-            )
-          },
-
-          toggleFloatingControls: async () => {
-            if (get().isFloatingControlsLoading) return
-            const newValue = !get().showFloatingControls
-            await updateSettingOptimistic(
-              'showFloatingControls',
-              newValue,
-              'isFloatingControlsLoading',
-              'showFloatingControls'
-            )
-          },
-
-          toggleTrainingControls: async () => {
-            if (get().isTrainingControlsLoading) return
-            const newValue = !get().showTrainingControls
-            await updateSettingOptimistic(
-              'showTrainingControls',
-              newValue,
-              'isTrainingControlsLoading',
-              'showTrainingControls'
-            )
-          },
-
-          setTheme: async (theme) => {
-            if (get().isThemeLoading) return
-
-            const originalTheme = get().theme
-
-            // Optimistic update
-            set({ theme, isThemeLoading: true })
-
-            try {
-              // Sync to DB for authenticated users
-              await get().updateSetting('theme', theme)
-              set({ isThemeLoading: false })
-            } catch (error) {
-              // Rollback on error
-              set({ theme: originalTheme, isThemeLoading: false })
-              logger.error('Failed to sync theme to database:', error)
-              throw error
-            }
-          },
-
           setTelemetryEnabled: async (enabled) => {
             if (get().isTelemetryLoading) return
             await updateSettingOptimistic(
@@ -209,12 +122,6 @@ export const useGeneralStore = create<GeneralStore>()(
               const { data } = await response.json()
 
               set({
-                isAutoConnectEnabled: data.autoConnect,
-                isAutoPanEnabled: data.autoPan ?? true,
-                isConsoleExpandedByDefault: data.consoleExpandedByDefault ?? true,
-                showFloatingControls: data.showFloatingControls ?? true,
-                showTrainingControls: data.showTrainingControls ?? false,
-                theme: data.theme || 'system',
                 telemetryEnabled: data.telemetryEnabled,
                 isBillingUsageNotificationsEnabled: data.billingUsageNotificationsEnabled ?? true,
                 isLoading: false,
