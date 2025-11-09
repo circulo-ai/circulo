@@ -163,6 +163,9 @@ export const message = pgTable(
     // Agent mentions - which specific agents were mentioned
     mentionedAgentIds: jsonb("mentioned_agent_ids").$type<string[]>().default([]),
 
+    // Knowledge base mentions - which KBs were mentioned/should be used
+    mentionedKnowledgeBaseIds: jsonb("mentioned_knowledge_base_ids").$type<string[]>().default([]),
+
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => ({
@@ -189,6 +192,11 @@ export const message = pgTable(
       "message_counts_non_negative",
       sql`token_count >= 0 AND cost >= 0`
     ),
+
+    mentionedAgentsIdx: index("message_mentioned_agents_idx")
+      .using("gin", table.mentionedAgentIds),
+    mentionedKbsIdx: index("message_mentioned_kbs_idx")
+      .using("gin", table.mentionedKnowledgeBaseIds),
   }),
 );
 

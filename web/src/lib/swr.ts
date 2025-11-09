@@ -1,5 +1,3 @@
-"use client";
-
 import useSWR, { SWRConfiguration, mutate as globalMutate } from "swr";
 
 export const fetcher = async <T>(
