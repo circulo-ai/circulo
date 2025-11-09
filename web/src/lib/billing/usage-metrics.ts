@@ -23,7 +23,9 @@ export type PlanRatesMetadata = {
 
 // Map a usage metric to an existing transaction type for ledger entries
 // We restrict to existing enum values to avoid migrations.
-export function metricToTransactionType(metric: UsageMetric): "chat_usage" | "embedding_usage" | "withdrawal" {
+export function metricToTransactionType(
+  metric: UsageMetric,
+): "chat_usage" | "embedding_usage" | "withdrawal" {
   switch (metric) {
     case "chat_tokens":
     case "image_requests":
@@ -50,7 +52,11 @@ export async function resolveUnitPriceUSD(
   if (typeof rate.unitPriceUSD === "number") {
     return { unitPriceUSD: rate.unitPriceUSD };
   }
-  if (typeof rate.unitPriceIRR === "number" && opts?.irrToUsd && opts?.fetchUsdToIrrRate) {
+  if (
+    typeof rate.unitPriceIRR === "number" &&
+    opts?.irrToUsd &&
+    opts?.fetchUsdToIrrRate
+  ) {
     const { rate: fxRate, source } = await opts.fetchUsdToIrrRate();
     const usd = opts.irrToUsd(rate.unitPriceIRR, fxRate);
     return { unitPriceUSD: usd, fxRate, fxSource: source };

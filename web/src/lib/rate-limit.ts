@@ -2,7 +2,10 @@ import { getRedisClient } from "@/lib/redis";
 
 const fallbackCounters = new Map<string, { count: number; expiry: number }>();
 
-export async function incrementCounter(key: string, windowSeconds: number): Promise<number> {
+export async function incrementCounter(
+  key: string,
+  windowSeconds: number,
+): Promise<number> {
   const redis = getRedisClient();
   if (redis) {
     const pipeline = redis.multi();

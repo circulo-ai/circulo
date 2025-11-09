@@ -1,5 +1,11 @@
 import type { BillingContext, BillingStrategy } from "@mhbdev/bdk";
-import { Money, Subscription, SubscriptionPlan, InvoiceLineItem, SubscriptionStatus } from "@mhbdev/bdk";
+import {
+  InvoiceLineItem,
+  Money,
+  Subscription,
+  SubscriptionPlan,
+  SubscriptionStatus,
+} from "@mhbdev/bdk";
 
 type UsageTier = { upTo: number; unitPrice: number }; // price per unit within tier
 
@@ -18,38 +24,70 @@ export interface DefaultStrategyConfig {
 export class DefaultBillingStrategy implements BillingStrategy {
   constructor(private config: DefaultStrategyConfig = {}) {}
 
-  async calculateAmount(subscription: Subscription, plan: SubscriptionPlan, context: BillingContext): Promise<Money> {
+  async calculateAmount(
+    subscription: Subscription,
+    plan: SubscriptionPlan,
+    context: BillingContext,
+  ): Promise<Money> {
     const base = plan.price;
-    const periodMs = context.periodEnd.getTime() - context.periodStart.getTime();
-    const remainingMs = context.periodEnd.getTime() - context.currentDate.getTime();
-    const fraction = context.isProration ? Math.max(0, Math.min(1, remainingMs / periodMs)) : 1;
+    const periodMs =
+      context.periodEnd.getTime() - context.periodStart.getTime();
+    const remainingMs =
+      context.periodEnd.getTime() - context.currentDate.getTime();
+    const fraction = context.isProration
+      ? Math.max(0, Math.min(1, remainingMs / periodMs))
+      : 1;
 
     const baseAmount = round2(base.amount * fraction);
     const usageAmount = this.computeUsageCharge(context);
 
-    return { amount: round2(baseAmount + usageAmount), currency: base.currency };
+    return {
+      amount: round2(baseAmount + usageAmount),
+      currency: base.currency,
+    };
   }
 
-  async shouldBill(subscription: Subscription, context: BillingContext): Promise<boolean> {
-    const activeStatuses: SubscriptionStatus[] = [SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING, SubscriptionStatus.PAST_DUE, SubscriptionStatus.PAUSED]; // exclude canceled/expired
+  async shouldBill(
+    subscription: Subscription,
+    context: BillingContext,
+  ): Promise<boolean> {
+    const activeStatuses: SubscriptionStatus[] = [
+      SubscriptionStatus.ACTIVE,
+      SubscriptionStatus.TRIALING,
+      SubscriptionStatus.PAST_DUE,
+      SubscriptionStatus.PAUSED,
+    ]; // exclude canceled/expired
     return activeStatuses.includes(subscription.status);
   }
 
-  async generateLineItems(subscription: Subscription, plan: SubscriptionPlan, context: BillingContext): Promise<InvoiceLineItem[]> {
+  async generateLineItems(
+    subscription: Subscription,
+    plan: SubscriptionPlan,
+    context: BillingContext,
+  ): Promise<InvoiceLineItem[]> {
     const base = plan.price;
-    const periodMs = context.periodEnd.getTime() - context.periodStart.getTime();
-    const remainingMs = context.periodEnd.getTime() - context.currentDate.getTime();
-    const fraction = context.isProration ? Math.max(0, Math.min(1, remainingMs / periodMs)) : 1;
+    const periodMs =
+      context.periodEnd.getTime() - context.periodStart.getTime();
+    const remainingMs =
+      context.periodEnd.getTime() - context.currentDate.getTime();
+    const fraction = context.isProration
+      ? Math.max(0, Math.min(1, remainingMs / periodMs))
+      : 1;
 
     const items: InvoiceLineItem[] = [];
     // Base subscription fee (prorated if applicable)
     const proratedBase = round2(base.amount * fraction);
     items.push({
-      description: fraction < 1 ? `${plan.name} (prorated)` : `${plan.name} subscription`,
+      description:
+        fraction < 1 ? `${plan.name} (prorated)` : `${plan.name} subscription`,
       quantity: 1,
       unitAmount: { amount: proratedBase, currency: base.currency },
       amount: { amount: proratedBase, currency: base.currency },
-      metadata: { interval: plan.interval, intervalCount: plan.intervalCount, prorationFraction: fraction },
+      metadata: {
+        interval: plan.interval,
+        intervalCount: plan.intervalCount,
+        prorationFraction: fraction,
+      },
     });
 
     // Usage-based charges
@@ -61,7 +99,10 @@ export class DefaultBillingStrategy implements BillingStrategy {
       items.push({
         description: `${billableUnits} ${this.config.usageUnit ?? "units"} usage`,
         quantity: billableUnits,
-        unitAmount: { amount: round2(unitCharge / billableUnits), currency: base.currency },
+        unitAmount: {
+          amount: round2(unitCharge / billableUnits),
+          currency: base.currency,
+        },
         amount: { amount: round2(unitCharge), currency: base.currency },
         metadata: { freeUnits, totalUnits: units },
       });

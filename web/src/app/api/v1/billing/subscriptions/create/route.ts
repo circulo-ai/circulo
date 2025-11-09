@@ -1,15 +1,24 @@
-import { getSession } from "@/lib/auth";
 import { db } from "@/db";
-import { invoice, invoiceLineItem, subscription, subscriptionPlan } from "@/db/schema";
-import { initializeSizPay } from "@/lib/sizpay/client";
+import {
+  invoice,
+  invoiceLineItem,
+  subscription,
+  subscriptionPlan,
+} from "@/db/schema";
+import { getSession } from "@/lib/auth";
 import SizpayProvider from "@/lib/billing/providers/sizpay-provider";
 import DrizzlePaymentService from "@/lib/billing/services/payment-service";
-import { NextRequest, NextResponse } from "next/server";
-import { nanoid } from "nanoid";
-import { eq, or, and } from "drizzle-orm";
-import { z } from "zod";
 import DefaultBillingStrategy from "@/lib/billing/strategies/default-strategy";
-import type { Subscription as BdkSubscription, SubscriptionPlan as BdkPlan, BillingInterval as BdkInterval } from "@mhbdev/bdk";
+import { initializeSizPay } from "@/lib/sizpay/client";
+import type {
+  BillingInterval as BdkInterval,
+  SubscriptionPlan as BdkPlan,
+  Subscription as BdkSubscription,
+} from "@mhbdev/bdk";
+import { and, eq, or } from "drizzle-orm";
+import { nanoid } from "nanoid";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
 const bodySchema = z.object({
   planId: z.string().min(1),
@@ -45,12 +54,20 @@ export async function POST(req: NextRequest) {
     const json = await req.json();
     const parsed = bodySchema.safeParse(json);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid body", details: parsed.error.flatten() }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid body", details: parsed.error.flatten() },
+        { status: 400 },
+      );
     }
 
-    const plan = await db.query.subscriptionPlan.findFirst({ where: eq(subscriptionPlan.id, parsed.data.planId) });
+    const plan = await db.query.subscriptionPlan.findFirst({
+      where: eq(subscriptionPlan.id, parsed.data.planId),
+    });
     if (!plan || !plan.active) {
-      return NextResponse.json({ error: "Plan not found or inactive" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Plan not found or inactive" },
+        { status: 404 },
+      );
     }
 
     // Prevent duplicate active/trialing subscriptions for the same plan
@@ -66,7 +83,10 @@ export async function POST(req: NextRequest) {
       ),
     });
     if (existingSub) {
-      return NextResponse.json({ error: "Subscription already exists for this plan" }, { status: 409 });
+      return NextResponse.json(
+        { error: "Subscription already exists for this plan" },
+        { status: 409 },
+      );
     }
 
     const now = new Date();
@@ -76,7 +96,7 @@ export async function POST(req: NextRequest) {
     const subId = nanoid();
     // Create subscription + invoice + line items atomically
     const invoiceId = nanoid();
-    const invoiceNumber = `INV-${now.toISOString().slice(0,10).replace(/-/g,"")}-${invoiceId.slice(0,8)}`;
+    const invoiceNumber = `INV-${now.toISOString().slice(0, 10).replace(/-/g, "")}-${invoiceId.slice(0, 8)}`;
 
     await db.transaction(async (tx) => {
       await tx.insert(subscription).values({
@@ -87,7 +107,9 @@ export async function POST(req: NextRequest) {
         currentPeriodStart: periodStart,
         currentPeriodEnd: periodEnd,
         trialStart: plan.trialPeriodDays ? now : null,
-        trialEnd: plan.trialPeriodDays ? addInterval(now, "day", plan.trialPeriodDays) : null,
+        trialEnd: plan.trialPeriodDays
+          ? addInterval(now, "day", plan.trialPeriodDays)
+          : null,
         metadata: plan.metadata ?? {},
         createdAt: now,
         updatedAt: now,
@@ -116,7 +138,9 @@ export async function POST(req: NextRequest) {
     };
 
     const planFeatures = (plan.features ?? {}) as Record<string, any>;
-    const planMetadata = (plan.metadata ?? {}) as Record<string, any> & { usageConfig?: any };
+    const planMetadata = (plan.metadata ?? {}) as Record<string, any> & {
+      usageConfig?: any;
+    };
 
     const bdkPlan: BdkPlan = {
       id: plan.id,
@@ -139,16 +163,28 @@ export async function POST(req: NextRequest) {
       currentPeriodStart: periodStart,
       currentPeriodEnd: periodEnd,
       trialStart: plan.trialPeriodDays ? now : undefined,
-      trialEnd: plan.trialPeriodDays ? addInterval(now, "day", plan.trialPeriodDays) : undefined,
+      trialEnd: plan.trialPeriodDays
+        ? addInterval(now, "day", plan.trialPeriodDays)
+        : undefined,
       metadata: plan.metadata ?? {},
       createdAt: now,
       updatedAt: now,
     };
 
     const strategy = new DefaultBillingStrategy(planMetadata.usageConfig ?? {});
-    const context = { currentDate: now, periodStart, periodEnd, isProration: false, usageData: {} };
+    const context = {
+      currentDate: now,
+      periodStart,
+      periodEnd,
+      isProration: false,
+      usageData: {},
+    };
     const totalMoney = await strategy.calculateAmount(bdkSub, bdkPlan, context);
-    const lineItems = await strategy.generateLineItems(bdkSub, bdkPlan, context);
+    const lineItems = await strategy.generateLineItems(
+      bdkSub,
+      bdkPlan,
+      context,
+    );
     // Insert invoice + line items in a single transaction for consistency
     await db.transaction(async (tx) => {
       await tx.insert(invoice).values({
@@ -162,7 +198,11 @@ export async function POST(req: NextRequest) {
         totalAmount: String(totalMoney.amount.toFixed(2)),
         totalCurrency: totalMoney.currency,
         dueDate: addInterval(now, "day", 1),
-        metadata: { planId: plan.id, interval: plan.interval, intervalCount: plan.intervalCount },
+        metadata: {
+          planId: plan.id,
+          interval: plan.interval,
+          intervalCount: plan.intervalCount,
+        },
         createdAt: now,
         updatedAt: now,
       });
@@ -211,8 +251,18 @@ export async function POST(req: NextRequest) {
     } catch (err) {
       // If payment creation fails, mark invoice/subscription accordingly
       await db.transaction(async (tx) => {
-        await tx.update(invoice).set({ status: "void", updatedAt: new Date() }).where(eq(invoice.id, invoiceId));
-        await tx.update(subscription).set({ status: "cancelled", updatedAt: new Date(), canceledAt: new Date() }).where(eq(subscription.id, subId));
+        await tx
+          .update(invoice)
+          .set({ status: "void", updatedAt: new Date() })
+          .where(eq(invoice.id, invoiceId));
+        await tx
+          .update(subscription)
+          .set({
+            status: "cancelled",
+            updatedAt: new Date(),
+            canceledAt: new Date(),
+          })
+          .where(eq(subscription.id, subId));
       });
       throw err;
     }
@@ -228,6 +278,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("Create subscription error:", error);
-    return NextResponse.json({ error: "Failed to create subscription" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to create subscription" },
+      { status: 500 },
+    );
   }
 }

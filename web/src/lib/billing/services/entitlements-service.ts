@@ -1,8 +1,11 @@
 import { db } from "@/db";
 import { subscription, subscriptionPlan, usageRecord } from "@/db/schema";
-import { and, eq, sql, gt, lt } from "drizzle-orm";
+import type {
+  PlanRatesMetadata,
+  UsageMetric,
+} from "@/lib/billing/usage-metrics";
+import { and, eq, gt, lt, sql } from "drizzle-orm";
 import { z } from "zod";
-import type { UsageMetric, PlanRatesMetadata } from "@/lib/billing/usage-metrics";
 
 const RatesSchema = z.object({
   rates: z.record(
@@ -30,7 +33,10 @@ export type Entitlements = {
   planRates: PlanRatesMetadata | null;
   overagePolicy: "hard" | "soft";
   profitMultiplier: number;
-  usage: Record<UsageMetric, { used: number; included: number; remainingIncluded: number }>;
+  usage: Record<
+    UsageMetric,
+    { used: number; included: number; remainingIncluded: number }
+  >;
 };
 
 /**
@@ -77,7 +83,9 @@ export class EntitlementsService {
     });
     const rawMeta = (plan?.metadata ?? {}) as Record<string, any>;
     const parsed = RatesSchema.safeParse(rawMeta);
-    const planRates: PlanRatesMetadata | null = parsed.success ? (parsed.data as PlanRatesMetadata) : null;
+    const planRates: PlanRatesMetadata | null = parsed.success
+      ? (parsed.data as PlanRatesMetadata)
+      : null;
     const overagePolicy = planRates?.overagePolicy ?? "hard";
     const profitMultiplier = planRates?.profitMultiplier ?? 1;
 

@@ -13,11 +13,14 @@ export function usePayment() {
     setError(null);
 
     try {
-      const data = await fetcher<PaymentResult>("/api/v1/billing/deposits/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(params),
-      });
+      const data = await fetcher<PaymentResult>(
+        "/api/v1/billing/deposits/create",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(params),
+        },
+      );
 
       // Optimistically update payment list cache
       await globalMutate(
@@ -45,11 +48,14 @@ export function usePayment() {
     setError(null);
 
     try {
-      const verified = await fetcher<Payment>("/api/v1/billing/payments/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
-      });
+      const verified = await fetcher<Payment>(
+        "/api/v1/billing/payments/verify",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
+        },
+      );
 
       // Optimistically update both payment list and status caches
       await globalMutate(
@@ -61,7 +67,11 @@ export function usePayment() {
         false,
       );
 
-      await globalMutate(`/api/v1/billing/payments/${verified.id}`, verified, false);
+      await globalMutate(
+        `/api/v1/billing/payments/${verified.id}`,
+        verified,
+        false,
+      );
 
       return verified;
     } catch (err) {

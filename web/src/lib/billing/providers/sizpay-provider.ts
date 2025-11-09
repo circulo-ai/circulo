@@ -1,6 +1,14 @@
-import { PaymentProvider, PaymentStatus, type Money, type PaymentOptions, type ProviderPaymentResult, type ProviderRefundResult, type ProviderMethodResult } from "@mhbdev/bdk";
 import { SizPayClient } from "@/lib/sizpay/client";
 import type { SizPayConfirmResponse } from "@/lib/sizpay/types";
+import {
+  PaymentProvider,
+  PaymentStatus,
+  type Money,
+  type PaymentOptions,
+  type ProviderMethodResult,
+  type ProviderPaymentResult,
+  type ProviderRefundResult,
+} from "@mhbdev/bdk";
 
 /**
  * BDK PaymentProvider implementation for SizPay (redirect-based checkout).
@@ -48,7 +56,9 @@ export class SizpayProvider implements PaymentProvider {
     };
   }
 
-  async capturePayment(providerTransactionId: string): Promise<ProviderPaymentResult> {
+  async capturePayment(
+    providerTransactionId: string,
+  ): Promise<ProviderPaymentResult> {
     const confirm: SizPayConfirmResponse = await this.client.confirm(
       providerTransactionId,
     );
@@ -73,12 +83,18 @@ export class SizpayProvider implements PaymentProvider {
     };
   }
 
-  async refundPayment(_providerTransactionId: string, _amount?: Money): Promise<ProviderRefundResult> {
+  async refundPayment(
+    _providerTransactionId: string,
+    _amount?: Money,
+  ): Promise<ProviderRefundResult> {
     // SizPay typically does not support programmatic refunds; manual settlement is required.
     throw new Error("SizPay refunds are not supported via API");
   }
 
-  async createPaymentMethod(_customerId: string, _providerMethodData: any): Promise<ProviderMethodResult> {
+  async createPaymentMethod(
+    _customerId: string,
+    _providerMethodData: any,
+  ): Promise<ProviderMethodResult> {
     // Not applicable for SizPay; payment method is handled on bank gateway.
     throw new Error("SizPay does not support stored payment methods");
   }

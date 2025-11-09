@@ -21,7 +21,7 @@ export type InvoiceSummary = {
 
 export function useInvoices() {
   const { data, error, isLoading, mutate } = useSWR<InvoiceSummary[]>(
-    "/api/v1/billing/invoices"
+    "/api/v1/billing/invoices",
   );
 
   return {

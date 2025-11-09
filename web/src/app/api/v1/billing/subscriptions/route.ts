@@ -1,6 +1,6 @@
-import { getSession } from "@/lib/auth";
 import { db } from "@/db";
-import { subscription, subscriptionPlan } from "@/db/schema";
+import { subscription } from "@/db/schema";
+import { getSession } from "@/lib/auth";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
@@ -18,7 +18,9 @@ export async function GET() {
 
     const planIds = Array.from(new Set(subs.map((s) => s.planId)));
     const plans = planIds.length
-      ? await db.query.subscriptionPlan.findMany({ where: (p, { inArray }) => inArray(p.id, planIds) })
+      ? await db.query.subscriptionPlan.findMany({
+          where: (p, { inArray }) => inArray(p.id, planIds),
+        })
       : [];
     const planById = new Map(plans.map((p) => [p.id, p] as const));
 
@@ -51,10 +53,13 @@ export async function GET() {
               }
             : undefined,
         };
-      })
+      }),
     );
   } catch (error) {
     console.error("List subscriptions error:", error);
-    return NextResponse.json({ error: "Failed to list subscriptions" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to list subscriptions" },
+      { status: 500 },
+    );
   }
 }

@@ -10,6 +10,7 @@ import {
   AccordionTrigger,
 } from "./ui/accordion";
 import { AnimatedList } from "./ui/animated-list";
+import { IconBox } from "./ui/icon-box";
 import { ScrollArea } from "./ui/scroll-area";
 
 export function FaqList(props: ComponentProps<typeof ScrollArea>) {
@@ -47,9 +48,7 @@ export function FaqList(props: ComponentProps<typeof ScrollArea>) {
                 key={faq.index}
               >
                 <AccordionTrigger className="items-center underline-offset-6">
-                  <div className="rounded-md border-2 border-teal-50/10 p-2">
-                    <faq.icon className="text-foreground/75 size-4" />
-                  </div>
+                  <IconBox icon={faq.icon} />
                   <h4 className="font-semibold">{faq.question}</h4>
                 </AccordionTrigger>
                 <AccordionContent>

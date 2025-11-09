@@ -1,20 +1,22 @@
-import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { payment, wallet, transaction } from "@/db/schema";
-import { and, eq, sql } from "drizzle-orm";
+import { payment, transaction, wallet } from "@/db/schema";
 import { getSession } from "@/lib/auth";
-import { initializeSizPay } from "@/lib/sizpay/client";
 import SizpayProvider from "@/lib/billing/providers/sizpay-provider";
-import { irrToUsd, fetchUsdToIrrRate } from "@/lib/fx/rates";
+import { fetchUsdToIrrRate, irrToUsd } from "@/lib/fx/rates";
+import { initializeSizPay } from "@/lib/sizpay/client";
+import { and, eq, sql } from "drizzle-orm";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!session)
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   try {
     const body = await req.json();
     const token: string | undefined = body?.token;
-    if (!token) return NextResponse.json({ error: "missing_token" }, { status: 400 });
+    if (!token)
+      return NextResponse.json({ error: "missing_token" }, { status: 400 });
 
     const sizpayClient = initializeSizPay({
       merchantId: process.env.SIZPAY_MERCHANT_ID!,
@@ -28,19 +30,32 @@ export async function POST(req: NextRequest) {
     const captured = await provider.capturePayment(token);
     if (!captured.success) {
       // Mark as failed if payment exists
-      const existing = await db.query.payment.findFirst({ where: eq(payment.providerToken, token) });
+      const existing = await db.query.payment.findFirst({
+        where: eq(payment.providerToken, token),
+      });
       if (existing) {
         await db
           .update(payment)
-          .set({ status: "failed", errorMessage: String(captured.raw?.message || "capture_failed"), updatedAt: new Date() })
+          .set({
+            status: "failed",
+            errorMessage: String(captured.raw?.message || "capture_failed"),
+            updatedAt: new Date(),
+          })
           .where(eq(payment.id, existing.id));
       }
-      return NextResponse.json({ error: "verification_failed", details: captured.raw }, { status: 400 });
+      return NextResponse.json(
+        { error: "verification_failed", details: captured.raw },
+        { status: 400 },
+      );
     }
 
-    const pay = await db.query.payment.findFirst({ where: eq(payment.providerToken, token) });
-    if (!pay) return NextResponse.json({ error: "payment_not_found" }, { status: 404 });
-    if (pay.userId !== session.user.id) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    const pay = await db.query.payment.findFirst({
+      where: eq(payment.providerToken, token),
+    });
+    if (!pay)
+      return NextResponse.json({ error: "payment_not_found" }, { status: 404 });
+    if (pay.userId !== session.user.id)
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
 
     // Idempotency: if already processed, return current payment snapshot
     if (pay.status !== "awaiting_payment") {
@@ -64,15 +79,22 @@ export async function POST(req: NextRequest) {
         .update(payment)
         .set({
           status: "completed",
-          providerTransactionId: String(captured.providerTransactionId || token),
+          providerTransactionId: String(
+            captured.providerTransactionId || token,
+          ),
           paidAt: now,
           updatedAt: now,
           cardNumber: captured.raw?.cardNumber || pay.cardNumber,
           providerRefNo: captured.raw?.refNo || pay.providerRefNo,
           providerTraceNo: captured.raw?.traceNo || pay.providerTraceNo,
-          metadata: JSON.stringify({ ...(pay.metadata ? JSON.parse(pay.metadata) : {}), confirm: captured.raw }),
+          metadata: JSON.stringify({
+            ...(pay.metadata ? JSON.parse(pay.metadata) : {}),
+            confirm: captured.raw,
+          }),
         })
-        .where(and(eq(payment.id, pay.id), eq(payment.status, "awaiting_payment")));
+        .where(
+          and(eq(payment.id, pay.id), eq(payment.status, "awaiting_payment")),
+        );
     });
 
     // Wallet deposit crediting if applicable (USD wallet balance updated; FX TTL respected)
@@ -83,7 +105,13 @@ export async function POST(req: NextRequest) {
         const fx = meta.fx as { rate: number; expiresAt?: string } | undefined;
         const usdInit: number | undefined = meta.usdCreditAtInit;
         let usdCredit = 0;
-        if (irrAmount && fx?.rate && fx?.expiresAt && new Date() <= new Date(fx.expiresAt) && typeof usdInit === "number") {
+        if (
+          irrAmount &&
+          fx?.rate &&
+          fx?.expiresAt &&
+          new Date() <= new Date(fx.expiresAt) &&
+          typeof usdInit === "number"
+        ) {
           usdCredit = usdInit;
         } else if (irrAmount) {
           const { rate } = await fetchUsdToIrrRate();
@@ -92,8 +120,12 @@ export async function POST(req: NextRequest) {
         usdCredit = Number(usdCredit.toFixed(2));
 
         await db.transaction(async (tx) => {
-          await tx.execute(sql`select id from "wallet" where id = ${pay.walletId} for update`);
-          const w = await tx.query.wallet.findFirst({ where: eq(wallet.id, pay.walletId) });
+          await tx.execute(
+            sql`select id from "wallet" where id = ${pay.walletId} for update`,
+          );
+          const w = await tx.query.wallet.findFirst({
+            where: eq(wallet.id, pay.walletId),
+          });
           if (w) {
             const before = Number(w.balance);
             const after = Number((before + usdCredit).toFixed(2));
@@ -117,8 +149,14 @@ export async function POST(req: NextRequest) {
               .returning();
 
             if (inserted.length > 0) {
-              await tx.update(wallet).set({ balance: after.toFixed(2), updatedAt: now }).where(eq(wallet.id, w.id));
-              await tx.update(payment).set({ transactionId: inserted[0]?.id, updatedAt: now }).where(eq(payment.id, pay.id));
+              await tx
+                .update(wallet)
+                .set({ balance: after.toFixed(2), updatedAt: now })
+                .where(eq(wallet.id, w.id));
+              await tx
+                .update(payment)
+                .set({ transactionId: inserted[0]?.id, updatedAt: now })
+                .where(eq(payment.id, pay.id));
             }
           }
         });
@@ -128,7 +166,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const updated = await db.query.payment.findFirst({ where: eq(payment.id, pay.id) });
+    const updated = await db.query.payment.findFirst({
+      where: eq(payment.id, pay.id),
+    });
     return NextResponse.json({
       id: updated!.id,
       amount: Number(updated!.amount),

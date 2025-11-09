@@ -1,10 +1,13 @@
 import UsageService from "@/lib/billing/services/usage-service";
-import type { UsageMetric } from "@/lib/billing/usage-metrics";
 
 /**
  * Simple examples showing how to use UsageService in an action pipeline.
  */
-export async function handleChatTokens(userId: string, tokens: number, meta?: Record<string, any>) {
+export async function handleChatTokens(
+  userId: string,
+  tokens: number,
+  meta?: Record<string, any>,
+) {
   const svc = new UsageService();
 
   // Optional short-term rate limit: 30 actions per minute
@@ -19,7 +22,8 @@ export async function handleChatTokens(userId: string, tokens: number, meta?: Re
   }
 
   const result = await svc.applyConsumption(userId, "chat_tokens", tokens, {
-    idempotencyKey: meta?.idempotencyKey ?? `chat:${meta?.chatId}:msg:${meta?.messageId}`,
+    idempotencyKey:
+      meta?.idempotencyKey ?? `chat:${meta?.chatId}:msg:${meta?.messageId}`,
     metadata: { ...(meta ?? {}), model: meta?.model ?? "unknown" },
     description: "Chat token usage",
   });
@@ -27,7 +31,10 @@ export async function handleChatTokens(userId: string, tokens: number, meta?: Re
   return result; // { freeUnitsApplied, billableUnits, costUSD, pastDue, walletBalanceAfter }
 }
 
-export async function handleImageRequest(userId: string, meta?: Record<string, any>) {
+export async function handleImageRequest(
+  userId: string,
+  meta?: Record<string, any>,
+) {
   const svc = new UsageService();
   const precheck = await svc.canConsume(userId, "image_requests", 1);
   const res = await svc.applyConsumption(userId, "image_requests", 1, {

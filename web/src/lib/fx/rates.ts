@@ -4,7 +4,10 @@ import { z } from "zod";
  * Fetches the USD→IRR exchange rate from exchangerate.host with env fallback.
  * Returns IRR per 1 USD.
  */
-export async function fetchUsdToIrrRate(): Promise<{ rate: number; source: string }> {
+export async function fetchUsdToIrrRate(): Promise<{
+  rate: number;
+  source: string;
+}> {
   // Primary: exchangerate.host (no key required)
   try {
     const res = await fetch(
