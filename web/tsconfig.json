@@ -13,7 +13,6 @@
     "jsx": "react-jsx",
     "incremental": true,
     "target": "esnext",
-    "baseUrl": "./",
     "plugins": [
       {
         "name": "next"

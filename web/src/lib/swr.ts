@@ -1,5 +1,3 @@
-"use client";
-
 import useSWR, { SWRConfiguration, mutate as globalMutate } from "swr";
 
 export const fetcher = async <T>(
@@ -7,13 +5,22 @@ export const fetcher = async <T>(
   options?: RequestInit,
 ): Promise<T> => {
   const res = await fetch(url, options);
-  const json = await res.json();
-
-  if (!res.ok) {
-    throw new Error(json.error || "An error occurred while fetching data");
+  // Handle empty responses (e.g., 204 No Content) safely
+  if (res.status === 204) {
+    return undefined as unknown as T;
+  }
+  let json: any = null;
+  try {
+    json = await res.json();
+  } catch {
+    // Non-JSON or empty body — leave json as null
   }
 
-  return json;
+  if (!res.ok) {
+    throw new Error((json && json.error) || "An error occurred while fetching data");
+  }
+
+  return json as T;
 };
 
 export const swrConfig: SWRConfiguration = {

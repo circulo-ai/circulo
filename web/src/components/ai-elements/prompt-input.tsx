@@ -39,6 +39,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import type { MentionEntity } from "@/lib/chat/mentions/types";
 import { cn } from "@/lib/utils";
 import type { ChatStatus, FileUIPart } from "ai";
 import {
@@ -75,9 +76,22 @@ import {
   useRef,
   useState,
 } from "react";
+
 // ============================================================================
 // Provider Context & Types
 // ============================================================================
+
+export type MentionContext = {
+  entities: MentionEntity[];
+  onMentionSelect?: (mention: MentionEntity) => void;
+};
+
+const MentionContext = createContext<MentionContext | null>(null);
+
+export const useMentionContext = () => {
+  const ctx = useContext(MentionContext);
+  return ctx; // Can be null if mentions not enabled
+};
 
 export type AttachmentsContext = {
   files: (FileUIPart & { id: string })[];
@@ -140,6 +154,10 @@ const useOptionalProviderAttachments = () =>
 
 export type PromptInputProviderProps = PropsWithChildren<{
   initialInput?: string;
+  mentions?: {
+    entities: MentionEntity[];
+    onMentionSelect?: (mention: MentionEntity) => void;
+  };
 }>;
 
 /**
@@ -148,8 +166,21 @@ export type PromptInputProviderProps = PropsWithChildren<{
  */
 export function PromptInputProvider({
   initialInput: initialTextInput = "",
+  mentions,
   children,
 }: PromptInputProviderProps) {
+  // ----- mention state
+  const mentionContextValue = useMemo<MentionContext | null>(
+    () =>
+      mentions
+        ? {
+            entities: mentions.entities,
+            onMentionSelect: mentions.onMentionSelect,
+          }
+        : null,
+    [mentions],
+  );
+
   // ----- textInput state
   const [textInput, setTextInput] = useState(initialTextInput);
   const clearInput = useCallback(() => setTextInput(""), []);
@@ -233,7 +264,13 @@ export function PromptInputProvider({
   return (
     <PromptInputController.Provider value={controller}>
       <ProviderAttachmentsContext.Provider value={attachments}>
-        {children}
+        {mentionContextValue ? (
+          <MentionContext.Provider value={mentionContextValue}>
+            {children}
+          </MentionContext.Provider>
+        ) : (
+          children
+        )}
       </ProviderAttachmentsContext.Provider>
     </PromptInputController.Provider>
   );
@@ -449,6 +486,10 @@ export type PromptInputProps = Omit<
     message: PromptInputMessage,
     event: FormEvent<HTMLFormElement>,
   ) => void | Promise<void>;
+  mentions?: {
+    entities: MentionEntity[];
+    onMentionSelect?: (mention: MentionEntity) => void;
+  };
 };
 
 export const PromptInput = ({
@@ -461,9 +502,21 @@ export const PromptInput = ({
   maxFileSize,
   onError,
   onSubmit,
+  mentions,
   children,
   ...props
 }: PromptInputProps) => {
+  const mentionContextValue = useMemo<MentionContext | null>(
+    () =>
+      mentions
+        ? {
+          entities: mentions.entities,
+          onMentionSelect: mentions.onMentionSelect,
+        }
+        : null,
+    [mentions],
+  );
+
   // Try to use a provider controller if present
   const controller = useOptionalPromptInputController();
   const usingProvider = !!controller;
@@ -770,11 +823,20 @@ export const PromptInput = ({
     </>
   );
 
-  return usingProvider ? (
+  // Wrap the return with MentionContext if mentions enabled
+  const wrappedInner = mentionContextValue ? (
+    <MentionContext.Provider value={mentionContextValue}>
+      {inner}
+    </MentionContext.Provider>
+  ) : (
     inner
+  );
+
+  return usingProvider ? (
+    wrappedInner
   ) : (
     <LocalAttachmentsContext.Provider value={ctx}>
-      {inner}
+      {wrappedInner}
     </LocalAttachmentsContext.Provider>
   );
 };
@@ -1024,8 +1086,11 @@ interface SpeechRecognition extends EventTarget {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
+
   start(): void;
+
   stop(): void;
+
   onstart: ((this: SpeechRecognition, ev: Event) => any) | null;
   onend: ((this: SpeechRecognition, ev: Event) => any) | null;
   onresult:

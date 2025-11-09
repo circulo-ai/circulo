@@ -4,7 +4,6 @@ import { PointerProvider } from "@/providers/pointer-provider";
 import { SessionProvider } from "@/providers/session-provider";
 import { SwrProvider } from "@/providers/swr-provider";
 import { ThemeProvider } from "@/providers/theme-provider";
-import { VercelToolbar } from "@vercel/toolbar/next";
 import type { Metadata } from "next";
 import { Montserrat as Sans } from "next/font/google";
 import { ReactNode } from "react";
@@ -38,7 +37,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             </SwrProvider>
           </SessionProvider>
         </ThemeProvider>
-        {isDev && <VercelToolbar />}
       </body>
     </html>
   );
