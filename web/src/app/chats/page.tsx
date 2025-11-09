@@ -27,8 +27,8 @@ import {
   PromptInputModelSelectTrigger,
   PromptInputModelSelectValue,
   PromptInputSubmit,
-  PromptInputTextarea,
-  PromptInputTools,
+  PromptInputTextarea, PromptInputTextareaWithMentions,
+  PromptInputTools
 } from "@/components/ai-elements/prompt-input";
 import {
   Reasoning,
@@ -45,15 +45,18 @@ import {
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { CopyIcon, GlobeIcon, RefreshCcwIcon, Users, X } from "lucide-react";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useChats } from "@/hooks/use-chats";
-import { useAgents } from "@/hooks/use-agents";
+import { useAgentList, useAgents } from "@/hooks/use-agents";
 import { useChatAgents } from "@/hooks/use-chat-agents";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { AgentSelector } from "@/components/ai-elements/agent-selector";
+import { MentionEntity } from "@/lib/chat/mentions/types";
+import { useMentionInput } from "@/hooks/use-mention-input";
+import { parseMessageMentions } from "@/lib/chat/mentions/server";
 
 const models = [
   {
@@ -72,7 +75,7 @@ const ChatBotDemo = () => {
   const [model, setModel] = useState<string>(models[0].value);
   const [webSearch, setWebSearch] = useState(false);
   const { createChat } = useChats();
-  const { agents: allAgents, isLoading: isLoadingAgents } = useAgents();
+  const { agents: allAgents, isLoading: isLoadingAgents } = useAgentList();
 
   const [chatId, setChatId] = useState<string | null>(null);
   const [pendingMessage, setPendingMessage] = useState<PromptInputMessage | null>(null);
@@ -96,6 +99,16 @@ const ChatBotDemo = () => {
   });
 
   const handleSubmit = async (message: PromptInputMessage) => {
+    // Parse mentions before submitting
+    const parsed = parseMessageMentions(
+      message.text || "",
+      mentionEntities,
+    );
+
+    // You could validate mentions here
+    console.log("Submitting with mentions:", parsed.agentIds);
+
+
     const hasText = Boolean(message.text);
     const hasAttachments = Boolean(message.files?.length);
 
@@ -173,6 +186,32 @@ const ChatBotDemo = () => {
   const selectedAgents = selectedAgentIds
     .map((id) => allAgents.find((a) => a.id === id))
     .filter(Boolean);
+
+  const mentionEntities = useMemo<MentionEntity[]>(
+    () => [
+      ...allAgents.map((a) => ({
+        id: a.id,
+        name: a.name,
+        type: "agent" as const,
+      })),
+    ],
+    [allAgents],
+  );
+
+  const {
+    selectedMentions,
+    addMention,
+    removeMention,
+    clearMentions,
+    getMentionIds,
+  } = useMentionInput(mentionEntities);
+
+  const handleMentionSelect = useCallback(
+    (mention: MentionEntity) => {
+      addMention(mention);
+    },
+    [addMention],
+  );
 
   // Navigate to full chat page after first message is sent
   useEffect(() => {
@@ -372,7 +411,10 @@ const ChatBotDemo = () => {
           className="mt-4"
           globalDrop
           multiple
-          disabled={isAddingAgents}
+          mentions={{
+            entities: mentionEntities,
+            onMentionSelect: handleMentionSelect,
+          }}
         >
           <PromptInputHeader>
             <PromptInputAttachments>
@@ -380,7 +422,7 @@ const ChatBotDemo = () => {
             </PromptInputAttachments>
           </PromptInputHeader>
           <PromptInputBody>
-            <PromptInputTextarea
+            <PromptInputTextareaWithMentions
               placeholder={
                 isAddingAgents
                   ? "Setting up agents..."

@@ -44,6 +44,14 @@
 }
 
 :root {
+  --mention-agent: 217 91% 60%;
+  --mention-agent-foreground: 217 91% 20%;
+  --mention-agent-hover: 217 91% 55%;
+
+  --mention-kb: 142 76% 45%;
+  --mention-kb-foreground: 142 76% 20%;
+  --mention-kb-hover: 142 76% 40%;
+
   --radius: 0.65rem;
   --background: var(--color-teal-50);
   --foreground: var(--color-neutral-950);
@@ -79,6 +87,14 @@
 }
 
 .dark {
+  --mention-agent: 217 91% 60%;
+  --mention-agent-foreground: 217 91% 90%;
+  --mention-agent-hover: 217 91% 65%;
+
+  --mention-kb: 142 76% 50%;
+  --mention-kb-foreground: 142 76% 90%;
+  --mention-kb-hover: 142 76% 55%;
+
   --background: var(--color-neutral-950);
   --foreground: var(--color-teal-50);
   --card: oklch(0.21 0.006 285.885);
