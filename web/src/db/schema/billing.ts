@@ -325,3 +325,5 @@ export const usageRelations = relations(usageMetrics, ({ one }) => ({
     references: [subscriptions.id],
   }),
 }));
+
+export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
