@@ -1,7 +1,7 @@
-'use server'
+"use server";
 
-import { plansRepo } from "@/db/repositories/billing-repo"
+import { plansRepo } from "@/db/repositories/billing-repo";
 
 export async function getSubscriptionPlans() {
-    return await plansRepo.findMany();
+  return await plansRepo.findMany();
 }
