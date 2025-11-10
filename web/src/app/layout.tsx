@@ -2,13 +2,13 @@ import { isDev } from "@/lib/environment";
 import { AuthClientProvider } from "@/providers/auth-client-provider";
 import { PointerProvider } from "@/providers/pointer-provider";
 import { SessionProvider } from "@/providers/session-provider";
-import { SwrProvider } from "@/providers/swr-provider";
 import { ThemeProvider } from "@/providers/theme-provider";
 import type { Metadata } from "next";
 import { Montserrat as Sans } from "next/font/google";
 import { ReactNode } from "react";
 import { Toaster } from "sonner";
 import "./globals.css";
+import { SWRProvider } from "@/providers/swr-provider";
 
 const fontSans = Sans({
   variable: "--font-sans",
@@ -29,12 +29,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className={fontSans.variable}>
         <ThemeProvider>
           <SessionProvider>
-            <SwrProvider>
+            <SWRProvider>
               <PointerProvider>
                 <AuthClientProvider>{children}</AuthClientProvider>
                 <Toaster />
               </PointerProvider>
-            </SwrProvider>
+            </SWRProvider>
           </SessionProvider>
         </ThemeProvider>
       </body>
