@@ -9,6 +9,7 @@ import { z } from "zod";
 // List chats for the current user
 export const GET = api({ auth: true }, async (req, ctx) => {
   const chats = await chatRepo.findForUser(ctx.user.id);
+  console.log(chats)
   return success({ chats });
 });
 

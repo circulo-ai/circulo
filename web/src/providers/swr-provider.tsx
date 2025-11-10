@@ -2,6 +2,7 @@
 
 import { SWRConfig } from 'swr';
 import { ReactNode } from 'react';
+import { fetcher } from "@/lib/swr";
 
 interface SWRProviderProps {
   children: ReactNode;
@@ -37,7 +38,7 @@ export function SWRProvider({ children }: SWRProviderProps) {
         focusThrottleInterval: 5000,
 
         // Global fetcher (optional - we use custom fetchers in hooks)
-        // fetcher: (url: string) => fetch(url).then(res => res.json()),
+        fetcher,
       }}
     >
       {children}

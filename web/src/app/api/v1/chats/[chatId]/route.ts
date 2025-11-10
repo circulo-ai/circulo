@@ -1,13 +1,16 @@
 import { api, notFound, noContent, success } from "@/lib/server";
-import { chat as chatWorkflow } from "@/workflows/chat";
-import { createUIMessageStreamResponse, type UIMessage } from "ai";
+import { chatOrchestrationWorkflow } from "@/workflows/chat";
+import { convertToModelMessages, createUIMessageStreamResponse, type UIMessage } from "ai";
 import { start } from "workflow/api";
 import { z } from "zod";
 import { messageRepo } from "@/db/repositories/message-repo";
 import { chatRepo } from "@/db/repositories/chat-repo";
-import { nanoid } from "nanoid";
 import { chat } from "@/db";
 import { createLogger } from "@/lib/logs/console/logger";
+
+function isNotNullOrUndefined<T>(value: T | null | undefined): value is T {
+  return value !== null && value !== undefined;
+}
 
 const logger = createLogger("CHAT");
 
@@ -37,43 +40,29 @@ export const POST = api(
   },
   async (req, ctx) => {
     const { chatId } = ctx.params;
-    const messages = ctx.body.messages;
-
-    // Ensure the chat exists and belongs to the current user before persisting
+    // Ensure the chat exists and belongs to the current user
     const existingChat = await chatRepo.findById(chatId);
     if (!existingChat || existingChat.userId !== ctx.user.id) {
       return notFound("Chat not found");
     }
 
-    logger.info(JSON.stringify(messages));
+    const previousMessages = await messageRepo.findForChat(chatId);
+    const messages: UIMessage[] = [
+      ...previousMessages.map((e) => e.uiMessage).filter(isNotNullOrUndefined),
+      ...(ctx.body.messages || [])
+    ];
 
-    // Type guard for text parts
-    const isTextPart = (
-      part: unknown
-    ): part is { type: "text"; text: string } => {
-      return (part as any)?.type === "text" && typeof (part as any)?.text === "string";
-    };
+    // Note: The workflow will persist the user message internally
+    // so we don't need to persist it here to avoid duplication
 
-    // Persist the latest user message before starting streaming
-    const lastUser = [...messages].reverse().find((m) => m.role === "user");
-    if (lastUser) {
-      const text = lastUser.parts?.find(isTextPart)?.text ?? "";
-      await messageRepo.create({
-        id: nanoid(),
-        chatId,
-        userId: ctx.user.id,
-        agentId: null,
-        content: text,
-        tokenCount: 0,
-        cost: "0.000000",
-        toolCalls: [],
-        uiMessage: lastUser,
-        mentionedAgentIds: [],
-        createdAt: new Date(),
-      });
-    }
-
-    const workflowHandle = await start(chatWorkflow, [messages, chatId, ctx.user.id]);
+    // Start the workflow with the correct parameters
+    // Workflow signature: chatOrchestrationWorkflow(chatId, userId, userMessage, writable)
+    // Start the workflow with all required parameters
+    const workflowHandle = await start(chatOrchestrationWorkflow, [
+      chatId,
+      ctx.user.id,
+      convertToModelMessages(messages),
+    ]);
     const runId = workflowHandle.runId;
     const stream = workflowHandle.readable;
 

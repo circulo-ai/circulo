@@ -778,101 +778,64 @@ export const PromptInputBody = ({
 
 export type PromptInputTextareaProps = ComponentProps<
   typeof InputGroupTextarea
->;
+> & {
+  minHeight?: number;
+  maxHeight?: number;
+  disableAutoResize?: boolean;
+  resizeOnNewLinesOnly?: boolean;
+};
 
 export const PromptInputTextarea = ({
-  onChange,
-  className,
-  placeholder = "What would you like to know?",
-  ...props
-}: PromptInputTextareaProps) => {
-  const controller = useOptionalPromptInputController();
-  const attachments = usePromptInputAttachments();
-  const [isComposing, setIsComposing] = useState(false);
-
+                                      onChange,
+                                      className,
+                                      placeholder = "What would you like to know?",
+                                      minHeight = 48,
+                                      maxHeight = 164,
+                                      disableAutoResize = false,
+                                      resizeOnNewLinesOnly = false,
+                                      ...props
+                                    }: PromptInputTextareaProps) => {
   const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
     if (e.key === "Enter") {
-      if (isComposing || e.nativeEvent.isComposing) {
+      // Don't submit if IME composition is in progress
+      if (e.nativeEvent.isComposing) {
         return;
       }
+
       if (e.shiftKey) {
+        // Allow newline
         return;
       }
-      e.preventDefault();
 
-      // Check if the submit button is disabled before submitting
+      // Submit on Enter (without Shift)
+      e.preventDefault();
       const form = e.currentTarget.form;
-      const submitButton = form?.querySelector(
-        'button[type="submit"]'
-      ) as HTMLButtonElement | null;
-      if (submitButton?.disabled) {
-        return;
-      }
-
-      form?.requestSubmit();
-    }
-
-    // Remove last attachment when Backspace is pressed and textarea is empty
-    if (
-      e.key === "Backspace" &&
-      e.currentTarget.value === "" &&
-      attachments.files.length > 0
-    ) {
-      e.preventDefault();
-      const lastAttachment = attachments.files.at(-1);
-      if (lastAttachment) {
-        attachments.remove(lastAttachment.id);
+      if (form) {
+        form.requestSubmit();
       }
     }
   };
-
-  const handlePaste: ClipboardEventHandler<HTMLTextAreaElement> = (event) => {
-    const items = event.clipboardData?.items;
-
-    if (!items) {
-      return;
-    }
-
-    const files: File[] = [];
-
-    for (const item of items) {
-      if (item.kind === "file") {
-        const file = item.getAsFile();
-        if (file) {
-          files.push(file);
-        }
-      }
-    }
-
-    if (files.length > 0) {
-      event.preventDefault();
-      attachments.add(files);
-    }
-  };
-
-  const controlledProps = controller
-    ? {
-        value: controller.textInput.value,
-        onChange: (e: ChangeEvent<HTMLTextAreaElement>) => {
-          controller.textInput.setInput(e.currentTarget.value);
-          onChange?.(e);
-        },
-      }
-    : {
-        onChange,
-      };
 
   return (
     <InputGroupTextarea
-      className={cn("field-sizing-content max-h-48 min-h-16", className)}
+      className={cn(
+        "w-full resize-none rounded-none border-none p-3 shadow-none outline-hidden ring-0",
+        disableAutoResize
+          ? "field-sizing-fixed"
+          : resizeOnNewLinesOnly
+            ? "field-sizing-fixed"
+            : "field-sizing-content max-h-[6lh]",
+        "bg-transparent dark:bg-transparent",
+        "focus-visible:ring-0",
+        className
+      )}
       name="message"
-      onCompositionEnd={() => setIsComposing(false)}
-      onCompositionStart={() => setIsComposing(true)}
+      onChange={(e) => {
+        onChange?.(e);
+      }}
       onKeyDown={handleKeyDown}
-      onPaste={handlePaste}
       placeholder={placeholder}
       {...props}
-      {...controlledProps}
     />
   );
 };
@@ -1374,4 +1337,16 @@ export const PromptInputCommandSeparator = ({
   ...props
 }: PromptInputCommandSeparatorProps) => (
   <CommandSeparator className={cn(className)} {...props} />
+);
+
+export type PromptInputToolbarProps = HTMLAttributes<HTMLDivElement>;
+
+export const PromptInputToolbar = ({
+                                     className,
+                                     ...props
+                                   }: PromptInputToolbarProps) => (
+  <div
+    className={cn("flex items-center justify-between p-1", className)}
+    {...props}
+  />
 );

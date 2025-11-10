@@ -12,7 +12,7 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
-    "target": "esnext",
+    "target": "ESNext",
     "plugins": [
       {
         "name": "next"

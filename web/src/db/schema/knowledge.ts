@@ -41,8 +41,8 @@ export const knowledgeBase = pgTable(
   }),
 );
 
-export const document = pgTable(
-  "document",
+export const knowledgeDocument = pgTable(
+  "knowledge_document",
   {
     id: text("id").primaryKey(),
     knowledgeBaseId: text("knowledge_base_id")
@@ -82,7 +82,7 @@ export const embedding = pgTable(
       .references(() => knowledgeBase.id, { onDelete: "cascade" }),
     documentId: text("document_id")
       .notNull()
-      .references(() => document.id, { onDelete: "cascade" }),
+      .references(() => knowledgeDocument.id, { onDelete: "cascade" }),
 
     content: text("content").notNull(),
     chunkIndex: integer("chunk_index").notNull(),
@@ -121,8 +121,8 @@ export const embedding = pgTable(
 export type KnowledgeBase = typeof knowledgeBase.$inferSelect;
 export type NewKnowledgeBase = typeof knowledgeBase.$inferInsert;
 
-export type Document = typeof document.$inferSelect;
-export type NewDocument = typeof document.$inferInsert;
+export type KnowledgeDocument = typeof knowledgeDocument.$inferSelect;
+export type NewKnowledgeDocument = typeof knowledgeDocument.$inferInsert;
 
 export type Embedding = typeof embedding.$inferSelect;
 export type NewEmbedding = typeof embedding.$inferInsert;

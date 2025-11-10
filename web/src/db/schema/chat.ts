@@ -2,19 +2,25 @@ import {
   boolean,
   check,
   decimal,
+  foreignKey,
   index,
   integer, jsonb,
   numeric, pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp, unique,
-  uniqueIndex
+  uniqueIndex,
+  varchar
 } from "drizzle-orm/pg-core";
-import { relations, sql } from "drizzle-orm";
+import { InferSelectModel, relations, sql } from "drizzle-orm";
 import { user } from "@/db/schema/auth";
 import { agent } from "@/db/schema/agent";
 import { knowledgeBase } from "@/db/schema/knowledge";
 import { UIMessage } from "ai";
+import { json } from "zod";
+import { nanoid } from "nanoid";
+import { generateUUID } from "@/lib/utils";
 
 export const chatVisibilityEnum = pgEnum("chat_visibility", [
   "public",
@@ -153,12 +159,11 @@ export const message = pgTable(
     tokenCount: integer("token_count").notNull().default(0),
     cost: decimal("cost", { precision: 10, scale: 6 }).default("0.000000"),
 
-    toolCalls: jsonb("tool_calls").default("[]"),
-
-    uiMessage: jsonb("ui_message").$type<UIMessage>(),
+    role: varchar('role').notNull(),
+    parts: jsonb('parts').notNull(),
+    attachments: jsonb('attachments').notNull(),
 
     quotedMessageId: text("quoted_message_id"),
-    // quotedMessageId: text("quoted_message_id").references(() => message.id, { onDelete: "set null" }),
 
     // Agent mentions - which specific agents were mentioned
     mentionedAgentIds: jsonb("mentioned_agent_ids").$type<string[]>().default([]),
@@ -199,6 +204,94 @@ export const message = pgTable(
       .using("gin", table.mentionedKnowledgeBaseIds),
   }),
 );
+
+export const vote = pgTable(
+  'votes',
+  {
+    chatId: text('chatId')
+      .notNull()
+      .references(() => chat.id),
+    messageId: text('messageId')
+      .notNull()
+      .references(() => message.id),
+    isUpvoted: boolean('isUpvoted').notNull(),
+  },
+  (table) => {
+    return {
+      pk: primaryKey({ columns: [table.chatId, table.messageId] }),
+    };
+  },
+);
+
+
+export const stream = pgTable(
+  'stream',
+  {
+    id: text('id').notNull().$defaultFn(generateUUID),
+    chatId: text('chatId').notNull(),
+    createdAt: timestamp('createdAt').notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.id] }),
+    chatRef: foreignKey({
+      columns: [table.chatId],
+      foreignColumns: [chat.id],
+    }),
+  }),
+);
+
+export type Stream = InferSelectModel<typeof stream>;
+
+export type Vote = InferSelectModel<typeof vote>;
+
+export const document = pgTable(
+  "Document",
+  {
+    id: text("id").notNull().$defaultFn(generateUUID),
+    createdAt: timestamp("createdAt").notNull(),
+    title: text("title").notNull(),
+    content: text("content"),
+    kind: varchar("text", { enum: ["text", "code", "image", "sheet"] })
+      .notNull()
+      .default("text"),
+    userId: text("userId")
+      .notNull()
+      .references(() => user.id),
+  },
+  (table) => {
+    return {
+      pk: primaryKey({ columns: [table.id, table.createdAt] }),
+    };
+  }
+);
+
+export type Document = InferSelectModel<typeof document>;
+
+export const suggestion = pgTable(
+  "Suggestion",
+  {
+    id: text("id").notNull().$defaultFn(generateUUID),
+    documentId: text("documentId").notNull(),
+    documentCreatedAt: timestamp("documentCreatedAt").notNull(),
+    originalText: text("originalText").notNull(),
+    suggestedText: text("suggestedText").notNull(),
+    description: text("description"),
+    isResolved: boolean("isResolved").notNull().default(false),
+    userId: text("userId")
+      .notNull()
+      .references(() => user.id),
+    createdAt: timestamp("createdAt").notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.id] }),
+    documentRef: foreignKey({
+      columns: [table.documentId, table.documentCreatedAt],
+      foreignColumns: [document.id, document.createdAt],
+    }),
+  })
+);
+
+export type Suggestion = InferSelectModel<typeof suggestion>;
 
 // Chat types
 export type Chat = typeof chat.$inferSelect;

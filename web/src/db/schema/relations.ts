@@ -1,7 +1,7 @@
 import { relations } from "drizzle-orm";
 import { agent, agentPurchase, agentReview, agentTemplate } from "@/db/schema/agent";
 import { account, session, user } from "@/db/schema/auth";
-import { document, embedding, knowledgeBase } from "@/db/schema/knowledge";
+import { knowledgeDocument, embedding, knowledgeBase } from "@/db/schema/knowledge";
 import { chat, chatAgent, chatKnowledgeBase, message } from "@/db/schema/chat";
 
 export const userRelations = relations(user, ({ many, one }) => ({
@@ -96,14 +96,14 @@ export const knowledgeBaseRelations = relations(
       fields: [knowledgeBase.userId],
       references: [user.id],
     }),
-    documents: many(document),
+    documents: many(knowledgeDocument),
     chatKnowledgeBases: many(chatKnowledgeBase),
   }),
 );
 
-export const documentRelations = relations(document, ({ one, many }) => ({
+export const knowledgeDocumentDocumentRelations = relations(knowledgeDocument, ({ one, many }) => ({
   knowledgeBase: one(knowledgeBase, {
-    fields: [document.knowledgeBaseId],
+    fields: [knowledgeDocument.knowledgeBaseId],
     references: [knowledgeBase.id],
   }),
   embeddings: many(embedding),
@@ -114,9 +114,9 @@ export const embeddingRelations = relations(embedding, ({ one }) => ({
     fields: [embedding.knowledgeBaseId],
     references: [knowledgeBase.id],
   }),
-  document: one(document, {
+  document: one(knowledgeDocument, {
     fields: [embedding.documentId],
-    references: [document.id],
+    references: [knowledgeDocument.id],
   }),
 }));
 

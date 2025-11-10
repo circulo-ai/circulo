@@ -1,4 +1,5 @@
 import useSWR, { SWRConfiguration, mutate as globalMutate, mutate } from "swr";
+import { ChatSDKError, ErrorCode } from "@/lib/errors";
 
 export const fetcher = async <T>(
   url: string,
@@ -22,6 +23,28 @@ export const fetcher = async <T>(
 
   return json as T;
 };
+
+export async function fetchWithErrorHandlers(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+) {
+  try {
+    const response = await fetch(input, init);
+
+    if (!response.ok) {
+      const { code, cause } = await response.json();
+      throw new ChatSDKError(code as ErrorCode, cause);
+    }
+
+    return response;
+  } catch (error: unknown) {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      throw new ChatSDKError('offline:chat');
+    }
+
+    throw error;
+  }
+}
 
 export const swrConfig: SWRConfiguration = {
   revalidateOnFocus: false,
