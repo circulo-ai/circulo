@@ -7,184 +7,119 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
+import type { ToolUIPart } from "ai";
 import {
   CheckCircleIcon,
   ChevronDownIcon,
+  CircleIcon,
   ClockIcon,
-  Loader2Icon,
   WrenchIcon,
   XCircleIcon,
 } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
-import { isValidElement, useState } from "react";
+import { isValidElement } from "react";
 import { CodeBlock } from "./code-block";
 
 export type ToolProps = ComponentProps<typeof Collapsible>;
 
-export const Tool = ({
-  className,
-  defaultOpen = true,
-  ...props
-}: ToolProps) => (
+export const Tool = ({ className, ...props }: ToolProps) => (
   <Collapsible
-    defaultOpen={defaultOpen}
-    className={cn(
-      "not-prose bg-card mb-4 w-full rounded-lg border shadow-sm transition-all hover:shadow-md",
-      className,
-    )}
+    className={cn("not-prose mb-4 w-full rounded-md border", className)}
     {...props}
   />
 );
 
 export type ToolHeaderProps = {
   title?: string;
-  type: string;
-  state?:
-    | "input-streaming"
-    | "input-available"
-    | "output-available"
-    | "output-error";
+  type: ToolUIPart["type"];
+  state: ToolUIPart["state"];
   className?: string;
 };
 
-const getStatusBadge = (
-  status:
-    | "input-streaming"
-    | "input-available"
-    | "output-available"
-    | "output-error",
-) => {
-  const config = {
-    "input-streaming": {
-      label: "Streaming",
-      icon: <Loader2Icon className="h-3.5 w-3.5 animate-spin" />,
-      variant: "secondary" as const,
-      className:
-        "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-    },
-    "input-available": {
-      label: "Running",
-      icon: <ClockIcon className="h-3.5 w-3.5 animate-pulse" />,
-      variant: "secondary" as const,
-      className:
-        "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
-    },
-    "output-available": {
-      label: "Completed",
-      icon: <CheckCircleIcon className="h-3.5 w-3.5" />,
-      variant: "secondary" as const,
-      className:
-        "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
-    },
-    "output-error": {
-      label: "Error",
-      icon: <XCircleIcon className="h-3.5 w-3.5" />,
-      variant: "destructive" as const,
-      className: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
-    },
+const getStatusBadge = (status: ToolUIPart["state"]) => {
+  const labels: Record<ToolUIPart["state"], string> = {
+    "input-streaming": "Pending",
+    "input-available": "Running",
+    "approval-requested": "Awaiting Approval",
+    "approval-responded": "Responded",
+    "output-available": "Completed",
+    "output-error": "Error",
+    "output-denied": "Denied",
   };
 
-  const { label, icon, variant, className } = config[status];
+  const icons: Record<ToolUIPart["state"], ReactNode> = {
+    "input-streaming": <CircleIcon className="size-4" />,
+    "input-available": <ClockIcon className="size-4 animate-pulse" />,
+    "approval-requested": <ClockIcon className="size-4 text-yellow-600" />,
+    "approval-responded": <CheckCircleIcon className="size-4 text-blue-600" />,
+    "output-available": <CheckCircleIcon className="size-4 text-green-600" />,
+    "output-error": <XCircleIcon className="size-4 text-red-600" />,
+    "output-denied": <XCircleIcon className="size-4 text-orange-600" />,
+  };
 
   return (
-    <Badge
-      className={cn("gap-1.5 rounded-full text-xs font-medium", className)}
-      variant={variant}
-    >
-      {icon}
-      {label}
+    <Badge className="gap-1.5 rounded-full text-xs" variant="secondary">
+      {icons[status]}
+      {labels[status]}
     </Badge>
   );
-};
-
-const formatToolName = (type: string): string => {
-  // Remove common prefixes
-  const cleaned = type
-    .replace(/^(tool-|dynamic-)/i, "")
-    .replace(/_/g, " ")
-    .replace(/-/g, " ");
-
-  // Capitalize each word
-  return cleaned
-    .split(" ")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(" ");
 };
 
 export const ToolHeader = ({
   className,
   title,
   type,
-  state = "input-available",
+  state,
   ...props
-}: ToolHeaderProps) => {
-  const [isOpen, setIsOpen] = useState(true);
-  const displayTitle = title || formatToolName(type);
-
-  return (
-    <CollapsibleTrigger
-      className={cn(
-        "group hover:bg-accent/50 flex w-full items-center justify-between gap-4 p-4 transition-colors",
-        className,
-      )}
-      onClick={() => setIsOpen(!isOpen)}
-      {...props}
-    >
-      <div className="flex min-w-0 flex-1 items-center gap-3">
-        <div className="bg-primary/10 shrink-0 rounded-md p-1.5">
-          <WrenchIcon className="text-primary h-4 w-4" />
-        </div>
-        <span className="truncate text-sm font-medium">{displayTitle}</span>
-        {getStatusBadge(state)}
-      </div>
-      <ChevronDownIcon
-        className={cn(
-          "text-muted-foreground h-4 w-4 shrink-0 transition-transform duration-200",
-          isOpen && "rotate-180",
-        )}
-      />
-    </CollapsibleTrigger>
-  );
-};
+}: ToolHeaderProps) => (
+  <CollapsibleTrigger
+    className={cn(
+      "flex w-full items-center justify-between gap-4 p-3",
+      className
+    )}
+    {...props}
+  >
+    <div className="flex items-center gap-2">
+      <WrenchIcon className="size-4 text-muted-foreground" />
+      <span className="font-medium text-sm">
+        {title ?? type.split("-").slice(1).join("-")}
+      </span>
+      {getStatusBadge(state)}
+    </div>
+    <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+  </CollapsibleTrigger>
+);
 
 export type ToolContentProps = ComponentProps<typeof CollapsibleContent>;
 
 export const ToolContent = ({ className, ...props }: ToolContentProps) => (
   <CollapsibleContent
     className={cn(
-      "data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down overflow-hidden transition-all",
-      className,
+      "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-popover-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in",
+      className
     )}
     {...props}
   />
 );
 
 export type ToolInputProps = ComponentProps<"div"> & {
-  input: unknown;
+  input: ToolUIPart["input"];
 };
 
-export const ToolInput = ({ className, input, ...props }: ToolInputProps) => {
-  const inputString =
-    typeof input === "string" ? input : JSON.stringify(input, null, 2);
-
-  return (
-    <div className={cn("space-y-2 border-t p-4", className)} {...props}>
-      <div className="flex items-center gap-2">
-        <div className="bg-primary h-1 w-1 rounded-full"></div>
-        <h4 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
-          Input Parameters
-        </h4>
-      </div>
-      <div className="bg-muted/30 overflow-hidden rounded-md">
-        <CodeBlock code={inputString} language="json" />
-      </div>
+export const ToolInput = ({ className, input, ...props }: ToolInputProps) => (
+  <div className={cn("space-y-2 overflow-hidden p-4", className)} {...props}>
+    <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+      Parameters
+    </h4>
+    <div className="rounded-md bg-muted/50">
+      <CodeBlock code={JSON.stringify(input, null, 2)} language="json" />
     </div>
-  );
-};
+  </div>
+);
 
 export type ToolOutputProps = ComponentProps<"div"> & {
-  output?: unknown;
-  errorText?: string;
+  output: ToolUIPart["output"];
+  errorText: ToolUIPart["errorText"];
 };
 
 export const ToolOutput = ({
@@ -197,58 +132,31 @@ export const ToolOutput = ({
     return null;
   }
 
-  let OutputContent: ReactNode;
+  let Output = <div>{output as ReactNode}</div>;
 
-  if (errorText) {
-    OutputContent = (
-      <div className="text-destructive p-3 text-sm">{errorText}</div>
-    );
-  } else if (typeof output === "object" && !isValidElement(output)) {
-    OutputContent = (
+  if (typeof output === "object" && !isValidElement(output)) {
+    Output = (
       <CodeBlock code={JSON.stringify(output, null, 2)} language="json" />
     );
   } else if (typeof output === "string") {
-    // Try to parse as JSON for better formatting
-    try {
-      const parsed = JSON.parse(output);
-      OutputContent = (
-        <CodeBlock code={JSON.stringify(parsed, null, 2)} language="json" />
-      );
-    } catch {
-      // Not JSON, render as plain text with code formatting
-      OutputContent = <CodeBlock code={output} language="text" />;
-    }
-  } else {
-    OutputContent = <div className="p-3 text-sm">{output as ReactNode}</div>;
+    Output = <CodeBlock code={output} language="json" />;
   }
 
   return (
-    <div className={cn("space-y-2 border-t p-4", className)} {...props}>
-      <div className="flex items-center gap-2">
-        <div
-          className={cn(
-            "h-1 w-1 rounded-full",
-            errorText ? "bg-destructive" : "bg-green-500",
-          )}
-        ></div>
-        <h4
-          className={cn(
-            "text-xs font-semibold tracking-wider uppercase",
-            errorText ? "text-destructive" : "text-muted-foreground",
-          )}
-        >
-          {errorText ? "Error Output" : "Result"}
-        </h4>
-      </div>
+    <div className={cn("space-y-2 p-4", className)} {...props}>
+      <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+        {errorText ? "Error" : "Result"}
+      </h4>
       <div
         className={cn(
-          "overflow-x-auto rounded-md",
+          "overflow-x-auto rounded-md text-xs [&_table]:w-full",
           errorText
-            ? "bg-destructive/5 border-destructive/20 border"
-            : "bg-muted/30",
+            ? "bg-destructive/10 text-destructive"
+            : "bg-muted/50 text-foreground"
         )}
       >
-        {OutputContent}
+        {errorText && <div>{errorText}</div>}
+        {Output}
       </div>
     </div>
   );

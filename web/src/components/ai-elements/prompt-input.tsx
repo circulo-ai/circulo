@@ -34,21 +34,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import type { MentionEntity } from "@/lib/chat/mentions/types";
 import { cn } from "@/lib/utils";
 import type { ChatStatus, FileUIPart } from "ai";
 import {
+  CornerDownLeftIcon,
   ImageIcon,
   Loader2Icon,
   MicIcon,
   PaperclipIcon,
   PlusIcon,
-  SendIcon,
   SquareIcon,
   XIcon,
 } from "lucide-react";
@@ -71,28 +65,13 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
-import { filterEntitiesForAutocomplete, getCurrentMention, insertMention } from "@/lib/chat/mentions/client";
-
 // ============================================================================
 // Provider Context & Types
 // ============================================================================
-
-export type MentionContext = {
-  entities: MentionEntity[];
-  onMentionSelect?: (mention: MentionEntity) => void;
-};
-
-const MentionContext = createContext<MentionContext | null>(null);
-
-export const useMentionContext = () => {
-  const ctx = useContext(MentionContext);
-  return ctx; // Can be null if mentions not enabled
-};
 
 export type AttachmentsContext = {
   files: (FileUIPart & { id: string })[];
@@ -115,22 +94,22 @@ export type PromptInputControllerProps = {
   /** INTERNAL: Allows PromptInput to register its file textInput + "open" callback */
   __registerFileInput: (
     ref: RefObject<HTMLInputElement | null>,
-    open: () => void,
+    open: () => void
   ) => void;
 };
 
 const PromptInputController = createContext<PromptInputControllerProps | null>(
-  null,
+  null
 );
 const ProviderAttachmentsContext = createContext<AttachmentsContext | null>(
-  null,
+  null
 );
 
 export const usePromptInputController = () => {
   const ctx = useContext(PromptInputController);
   if (!ctx) {
     throw new Error(
-      "Wrap your component inside <PromptInputProvider> to use usePromptInputController().",
+      "Wrap your component inside <PromptInputProvider> to use usePromptInputController()."
     );
   }
   return ctx;
@@ -144,7 +123,7 @@ export const useProviderAttachments = () => {
   const ctx = useContext(ProviderAttachmentsContext);
   if (!ctx) {
     throw new Error(
-      "Wrap your component inside <PromptInputProvider> to use useProviderAttachments().",
+      "Wrap your component inside <PromptInputProvider> to use useProviderAttachments()."
     );
   }
   return ctx;
@@ -155,10 +134,6 @@ const useOptionalProviderAttachments = () =>
 
 export type PromptInputProviderProps = PropsWithChildren<{
   initialInput?: string;
-  mentions?: {
-    entities: MentionEntity[];
-    onMentionSelect?: (mention: MentionEntity) => void;
-  };
 }>;
 
 /**
@@ -167,21 +142,8 @@ export type PromptInputProviderProps = PropsWithChildren<{
  */
 export function PromptInputProvider({
   initialInput: initialTextInput = "",
-  mentions,
   children,
 }: PromptInputProviderProps) {
-  // ----- mention state
-  const mentionContextValue = useMemo<MentionContext | null>(
-    () =>
-      mentions
-        ? {
-            entities: mentions.entities,
-            onMentionSelect: mentions.onMentionSelect,
-          }
-        : null,
-    [mentions],
-  );
-
   // ----- textInput state
   const [textInput, setTextInput] = useState(initialTextInput);
   const clearInput = useCallback(() => setTextInput(""), []);
@@ -195,7 +157,9 @@ export function PromptInputProvider({
 
   const add = useCallback((files: File[] | FileList) => {
     const incoming = Array.from(files);
-    if (incoming.length === 0) return;
+    if (incoming.length === 0) {
+      return;
+    }
 
     setAttachements((prev) =>
       prev.concat(
@@ -205,22 +169,28 @@ export function PromptInputProvider({
           url: URL.createObjectURL(file),
           mediaType: file.type,
           filename: file.name,
-        })),
-      ),
+        }))
+      )
     );
   }, []);
 
   const remove = useCallback((id: string) => {
     setAttachements((prev) => {
       const found = prev.find((f) => f.id === id);
-      if (found?.url) URL.revokeObjectURL(found.url);
+      if (found?.url) {
+        URL.revokeObjectURL(found.url);
+      }
       return prev.filter((f) => f.id !== id);
     });
   }, []);
 
   const clear = useCallback(() => {
     setAttachements((prev) => {
-      for (const f of prev) if (f.url) URL.revokeObjectURL(f.url);
+      for (const f of prev) {
+        if (f.url) {
+          URL.revokeObjectURL(f.url);
+        }
+      }
       return [];
     });
   }, []);
@@ -238,7 +208,7 @@ export function PromptInputProvider({
       openFileDialog,
       fileInputRef,
     }),
-    [attachements, add, remove, clear, openFileDialog],
+    [attachements, add, remove, clear, openFileDialog]
   );
 
   const __registerFileInput = useCallback(
@@ -246,7 +216,7 @@ export function PromptInputProvider({
       fileInputRef.current = ref.current;
       openRef.current = open;
     },
-    [],
+    []
   );
 
   const controller = useMemo<PromptInputControllerProps>(
@@ -259,19 +229,13 @@ export function PromptInputProvider({
       attachments,
       __registerFileInput,
     }),
-    [textInput, clearInput, attachments, __registerFileInput],
+    [textInput, clearInput, attachments, __registerFileInput]
   );
 
   return (
     <PromptInputController.Provider value={controller}>
       <ProviderAttachmentsContext.Provider value={attachments}>
-        {mentionContextValue ? (
-          <MentionContext.Provider value={mentionContextValue}>
-            {children}
-          </MentionContext.Provider>
-        ) : (
-          children
-        )}
+        {children}
       </ProviderAttachmentsContext.Provider>
     </PromptInputController.Provider>
   );
@@ -290,7 +254,7 @@ export const usePromptInputAttachments = () => {
   const context = provider ?? local;
   if (!context) {
     throw new Error(
-      "usePromptInputAttachments must be used within a PromptInput or PromptInputProvider",
+      "usePromptInputAttachments must be used within a PromptInput or PromptInputProvider"
     );
   }
   return context;
@@ -308,58 +272,87 @@ export function PromptInputAttachment({
 }: PromptInputAttachmentProps) {
   const attachments = usePromptInputAttachments();
 
+  const filename = data.filename || "";
+
   const mediaType =
     data.mediaType?.startsWith("image/") && data.url ? "image" : "file";
+  const isImage = mediaType === "image";
+
+  const attachmentLabel = filename || (isImage ? "Image" : "Attachment");
 
   return (
-    <div
-      className={cn(
-        "group relative h-14 w-14 rounded-md border",
-        className,
-        mediaType === "image" ? "h-14 w-14" : "h-8 w-auto max-w-full",
-      )}
-      key={data.id}
-      {...props}
-    >
-      {mediaType === "image" ? (
-        <img
-          alt={data.filename || "attachment"}
-          className="size-full rounded-md object-cover"
-          height={56}
-          src={data.url}
-          width={56}
-        />
-      ) : (
-        <div className="text-muted-foreground flex size-full max-w-full cursor-pointer items-center justify-start gap-2 overflow-hidden px-2">
-          <PaperclipIcon className="size-4 shrink-0" />
-          <Tooltip delayDuration={400}>
-            <TooltipTrigger className="min-w-0 flex-1">
-              <h4 className="w-full truncate text-left text-sm font-medium">
-                {data.filename || "Unknown file"}
-              </h4>
-            </TooltipTrigger>
-            <TooltipContent>
-              <div className="text-muted-foreground text-xs">
-                <h4 className="max-w-[240px] overflow-hidden text-left text-sm font-semibold break-words whitespace-normal">
-                  {data.filename || "Unknown file"}
-                </h4>
-                {data.mediaType && <div>{data.mediaType}</div>}
-              </div>
-            </TooltipContent>
-          </Tooltip>
+    <PromptInputHoverCard>
+      <HoverCardTrigger asChild>
+        <div
+          className={cn(
+            "group relative flex h-8 cursor-default select-none items-center gap-1.5 rounded-md border border-border px-1.5 font-medium text-sm transition-all hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
+            className
+          )}
+          key={data.id}
+          {...props}
+        >
+          <div className="relative size-5 shrink-0">
+            <div className="absolute inset-0 flex size-5 items-center justify-center overflow-hidden rounded bg-background transition-opacity group-hover:opacity-0">
+              {isImage ? (
+                <img
+                  alt={filename || "attachment"}
+                  className="size-5 object-cover"
+                  height={20}
+                  src={data.url}
+                  width={20}
+                />
+              ) : (
+                <div className="flex size-5 items-center justify-center text-muted-foreground">
+                  <PaperclipIcon className="size-3" />
+                </div>
+              )}
+            </div>
+            <Button
+              aria-label="Remove attachment"
+              className="absolute inset-0 size-5 cursor-pointer rounded p-0 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 [&>svg]:size-2.5"
+              onClick={(e) => {
+                e.stopPropagation();
+                attachments.remove(data.id);
+              }}
+              type="button"
+              variant="ghost"
+            >
+              <XIcon />
+              <span className="sr-only">Remove</span>
+            </Button>
+          </div>
+
+          <span className="flex-1 truncate">{attachmentLabel}</span>
         </div>
-      )}
-      <Button
-        aria-label="Remove attachment"
-        className="absolute -top-1.5 -right-1.5 h-6 w-6 rounded-full opacity-0 group-hover:opacity-100"
-        onClick={() => attachments.remove(data.id)}
-        size="icon"
-        type="button"
-        variant="outline"
-      >
-        <XIcon className="h-3 w-3" />
-      </Button>
-    </div>
+      </HoverCardTrigger>
+      <PromptInputHoverCardContent className="w-auto p-2">
+        <div className="w-auto space-y-3">
+          {isImage && (
+            <div className="flex max-h-96 w-96 items-center justify-center overflow-hidden rounded-md border">
+              <img
+                alt={filename || "attachment preview"}
+                className="max-h-full max-w-full object-contain"
+                height={384}
+                src={data.url}
+                width={448}
+              />
+            </div>
+          )}
+          <div className="flex items-center gap-2.5">
+            <div className="min-w-0 flex-1 space-y-1 px-0.5">
+              <h4 className="truncate font-semibold text-sm leading-none">
+                {filename || (isImage ? "Image" : "Attachment")}
+              </h4>
+              {data.mediaType && (
+                <p className="truncate font-mono text-muted-foreground text-xs">
+                  {data.mediaType}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </PromptInputHoverCardContent>
+    </PromptInputHoverCard>
   );
 }
 
@@ -371,68 +364,25 @@ export type PromptInputAttachmentsProps = Omit<
 };
 
 export function PromptInputAttachments({
-  className,
   children,
+  className,
   ...props
 }: PromptInputAttachmentsProps) {
   const attachments = usePromptInputAttachments();
-  const [height, setHeight] = useState(0);
-  const contentRef = useRef<HTMLDivElement>(null);
 
-  useLayoutEffect(() => {
-    const el = contentRef.current;
-    if (!el) {
-      return;
-    }
-    const ro = new ResizeObserver(() => {
-      setHeight(el.getBoundingClientRect().height);
-    });
-    ro.observe(el);
-    setHeight(el.getBoundingClientRect().height);
-    return () => ro.disconnect();
-  }, []);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: Force height measurement when attachments change
-  useLayoutEffect(() => {
-    const el = contentRef.current;
-    if (!el) {
-      return;
-    }
-    setHeight(el.getBoundingClientRect().height);
-  }, [attachments.files.length]);
-
-  if (attachments.files.length === 0) {
+  if (!attachments.files.length) {
     return null;
   }
 
   return (
-    <InputGroupAddon
-      align="block-start"
-      aria-live="polite"
-      className={cn(
-        "overflow-hidden transition-[height] duration-200 ease-out",
-        className,
-      )}
-      style={{ height: attachments.files.length ? height : 0 }}
+    <div
+      className={cn("flex flex-wrap items-center gap-2 p-3", className)}
       {...props}
     >
-      <div className="space-y-2 py-1" ref={contentRef}>
-        <div className="flex flex-wrap gap-2">
-          {attachments.files
-            .filter((f) => !(f.mediaType?.startsWith("image/") && f.url))
-            .map((file) => (
-              <Fragment key={file.id}>{children(file)}</Fragment>
-            ))}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {attachments.files
-            .filter((f) => f.mediaType?.startsWith("image/") && f.url)
-            .map((file) => (
-              <Fragment key={file.id}>{children(file)}</Fragment>
-            ))}
-        </div>
-      </div>
-    </InputGroupAddon>
+      {attachments.files.map((file) => (
+        <Fragment key={file.id}>{children(file)}</Fragment>
+      ))}
+    </div>
   );
 }
 
@@ -485,12 +435,8 @@ export type PromptInputProps = Omit<
   }) => void;
   onSubmit: (
     message: PromptInputMessage,
-    event: FormEvent<HTMLFormElement>,
+    event: FormEvent<HTMLFormElement>
   ) => void | Promise<void>;
-  mentions?: {
-    entities: MentionEntity[];
-    onMentionSelect?: (mention: MentionEntity) => void;
-  };
 };
 
 export const PromptInput = ({
@@ -503,21 +449,9 @@ export const PromptInput = ({
   maxFileSize,
   onError,
   onSubmit,
-  mentions,
   children,
   ...props
 }: PromptInputProps) => {
-  const mentionContextValue = useMemo<MentionContext | null>(
-    () =>
-      mentions
-        ? {
-          entities: mentions.entities,
-          onMentionSelect: mentions.onMentionSelect,
-        }
-        : null,
-    [mentions],
-  );
-
   // Try to use a provider controller if present
   const controller = useOptionalPromptInputController();
   const usingProvider = !!controller;
@@ -554,7 +488,7 @@ export const PromptInput = ({
       // NOTE: keep simple; expand as needed
       return true;
     },
-    [accept],
+    [accept]
   );
 
   const addLocal = useCallback(
@@ -605,7 +539,7 @@ export const PromptInput = ({
         return prev.concat(next);
       });
     },
-    [matchesAccept, maxFiles, maxFileSize, onError],
+    [matchesAccept, maxFiles, maxFileSize, onError]
   );
 
   const add = usingProvider
@@ -711,7 +645,7 @@ export const PromptInput = ({
         }
       }
     },
-    [usingProvider, files],
+    [usingProvider, files]
   );
 
   const handleChange: ChangeEventHandler<HTMLInputElement> = (event) => {
@@ -740,7 +674,7 @@ export const PromptInput = ({
       openFileDialog,
       fileInputRef: inputRef,
     }),
-    [files, add, remove, clear, openFileDialog],
+    [files, add, remove, clear, openFileDialog]
   );
 
   const handleSubmit: FormEventHandler<HTMLFormElement> = (event) => {
@@ -770,7 +704,7 @@ export const PromptInput = ({
           };
         }
         return item;
-      }),
+      })
     ).then((convertedFiles: FileUIPart[]) => {
       try {
         const result = onSubmit({ text, files: convertedFiles }, event);
@@ -824,20 +758,11 @@ export const PromptInput = ({
     </>
   );
 
-  // Wrap the return with MentionContext if mentions enabled
-  const wrappedInner = mentionContextValue ? (
-    <MentionContext.Provider value={mentionContextValue}>
-      {inner}
-    </MentionContext.Provider>
-  ) : (
-    inner
-  );
-
   return usingProvider ? (
-    wrappedInner
+    inner
   ) : (
     <LocalAttachmentsContext.Provider value={ctx}>
-      {wrappedInner}
+      {inner}
     </LocalAttachmentsContext.Provider>
   );
 };
@@ -858,7 +783,7 @@ export type PromptInputTextareaProps = ComponentProps<
 export const PromptInputTextarea = ({
   onChange,
   className,
-  placeholder = "Ask something from AI?",
+  placeholder = "What would you like to know?",
   ...props
 }: PromptInputTextareaProps) => {
   const controller = useOptionalPromptInputController();
@@ -874,7 +799,17 @@ export const PromptInputTextarea = ({
         return;
       }
       e.preventDefault();
-      e.currentTarget.form?.requestSubmit();
+
+      // Check if the submit button is disabled before submitting
+      const form = e.currentTarget.form;
+      const submitButton = form?.querySelector(
+        'button[type="submit"]'
+      ) as HTMLButtonElement | null;
+      if (submitButton?.disabled) {
+        return;
+      }
+
+      form?.requestSubmit();
     }
 
     // Remove last attachment when Backspace is pressed and textarea is empty
@@ -953,7 +888,7 @@ export const PromptInputHeader = ({
 }: PromptInputHeaderProps) => (
   <InputGroupAddon
     align="block-end"
-    className={cn("order-first gap-1", className)}
+    className={cn("order-first flex-wrap gap-1", className)}
     {...props}
   />
 );
@@ -1059,7 +994,7 @@ export const PromptInputSubmit = ({
   children,
   ...props
 }: PromptInputSubmitProps) => {
-  let Icon = <SendIcon className="size-4" />;
+  let Icon = <CornerDownLeftIcon className="size-4" />;
 
   if (status === "submitted") {
     Icon = <Loader2Icon className="size-4 animate-spin" />;
@@ -1087,11 +1022,8 @@ interface SpeechRecognition extends EventTarget {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
-
   start(): void;
-
   stop(): void;
-
   onstart: ((this: SpeechRecognition, ev: Event) => any) | null;
   onend: ((this: SpeechRecognition, ev: Event) => any) | null;
   onresult:
@@ -1154,7 +1086,7 @@ export const PromptInputSpeechButton = ({
 }: PromptInputSpeechButtonProps) => {
   const [isListening, setIsListening] = useState(false);
   const [recognition, setRecognition] = useState<SpeechRecognition | null>(
-    null,
+    null
   );
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -1186,7 +1118,7 @@ export const PromptInputSpeechButton = ({
 
         for (const result of results) {
           if (result.isFinal) {
-            finalTranscript += result[0].transcript;
+            finalTranscript += result[0]?.transcript ?? "";
           }
         }
 
@@ -1234,8 +1166,8 @@ export const PromptInputSpeechButton = ({
     <PromptInputButton
       className={cn(
         "relative transition-all duration-200",
-        isListening && "bg-accent text-accent-foreground animate-pulse",
-        className,
+        isListening && "animate-pulse bg-accent text-accent-foreground",
+        className
       )}
       disabled={!recognition}
       onClick={toggleListening}
@@ -1246,58 +1178,56 @@ export const PromptInputSpeechButton = ({
   );
 };
 
-export type PromptInputModelSelectProps = ComponentProps<typeof Select>;
+export type PromptInputSelectProps = ComponentProps<typeof Select>;
 
-export const PromptInputModelSelect = (props: PromptInputModelSelectProps) => (
+export const PromptInputSelect = (props: PromptInputSelectProps) => (
   <Select {...props} />
 );
 
-export type PromptInputModelSelectTriggerProps = ComponentProps<
+export type PromptInputSelectTriggerProps = ComponentProps<
   typeof SelectTrigger
 >;
 
-export const PromptInputModelSelectTrigger = ({
+export const PromptInputSelectTrigger = ({
   className,
   ...props
-}: PromptInputModelSelectTriggerProps) => (
+}: PromptInputSelectTriggerProps) => (
   <SelectTrigger
     className={cn(
-      "text-muted-foreground border-none bg-transparent font-medium shadow-none transition-colors",
-      'hover:bg-accent hover:text-foreground [&[aria-expanded="true"]]:bg-accent [&[aria-expanded="true"]]:text-foreground',
-      className,
+      "border-none bg-transparent font-medium text-muted-foreground shadow-none transition-colors",
+      "hover:bg-accent hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground",
+      className
     )}
     {...props}
   />
 );
 
-export type PromptInputModelSelectContentProps = ComponentProps<
+export type PromptInputSelectContentProps = ComponentProps<
   typeof SelectContent
 >;
 
-export const PromptInputModelSelectContent = ({
+export const PromptInputSelectContent = ({
   className,
   ...props
-}: PromptInputModelSelectContentProps) => (
+}: PromptInputSelectContentProps) => (
   <SelectContent className={cn(className)} {...props} />
 );
 
-export type PromptInputModelSelectItemProps = ComponentProps<typeof SelectItem>;
+export type PromptInputSelectItemProps = ComponentProps<typeof SelectItem>;
 
-export const PromptInputModelSelectItem = ({
+export const PromptInputSelectItem = ({
   className,
   ...props
-}: PromptInputModelSelectItemProps) => (
+}: PromptInputSelectItemProps) => (
   <SelectItem className={cn(className)} {...props} />
 );
 
-export type PromptInputModelSelectValueProps = ComponentProps<
-  typeof SelectValue
->;
+export type PromptInputSelectValueProps = ComponentProps<typeof SelectValue>;
 
-export const PromptInputModelSelectValue = ({
+export const PromptInputSelectValue = ({
   className,
   ...props
-}: PromptInputModelSelectValueProps) => (
+}: PromptInputSelectValueProps) => (
   <SelectValue className={cn(className)} {...props} />
 );
 
@@ -1316,7 +1246,7 @@ export type PromptInputHoverCardTriggerProps = ComponentProps<
 >;
 
 export const PromptInputHoverCardTrigger = (
-  props: PromptInputHoverCardTriggerProps,
+  props: PromptInputHoverCardTriggerProps
 ) => <HoverCardTrigger {...props} />;
 
 export type PromptInputHoverCardContentProps = ComponentProps<
@@ -1352,8 +1282,8 @@ export const PromptInputTabLabel = ({
 }: PromptInputTabLabelProps) => (
   <h3
     className={cn(
-      "text-muted-foreground mb-2 px-3 text-xs font-medium",
-      className,
+      "mb-2 px-3 font-medium text-muted-foreground text-xs",
+      className
     )}
     {...props}
   />
@@ -1376,8 +1306,8 @@ export const PromptInputTabItem = ({
 }: PromptInputTabItemProps) => (
   <div
     className={cn(
-      "hover:bg-accent flex items-center gap-2 px-3 py-2 text-xs",
-      className,
+      "flex items-center gap-2 px-3 py-2 text-xs hover:bg-accent",
+      className
     )}
     {...props}
   />
@@ -1445,307 +1375,3 @@ export const PromptInputCommandSeparator = ({
 }: PromptInputCommandSeparatorProps) => (
   <CommandSeparator className={cn(className)} {...props} />
 );
-
-export type PromptInputTextareaWithMentionsProps = Omit<
-  PromptInputTextareaProps,
-  "onChange"
-> & {
-  onChange?: (
-    e: ChangeEvent<HTMLTextAreaElement>,
-    mentions?: { agentIds: string[]; knowledgeBaseIds: string[] },
-  ) => void;
-};
-
-export const PromptInputTextareaWithMentions = ({
-                                                  onChange,
-                                                  className,
-                                                  placeholder = "Type @ to mention agents or # for knowledge bases...",
-                                                  ...props
-                                                }: PromptInputTextareaWithMentionsProps) => {
-  const controller = useOptionalPromptInputController();
-  const attachments = usePromptInputAttachments();
-  const mentionCtx = useMentionContext();
-  const [isComposing, setIsComposing] = useState(false);
-
-  // Mention autocomplete state
-  const [showAutocomplete, setShowAutocomplete] = useState(false);
-  const [suggestions, setSuggestions] = useState<MentionEntity[]>([]);
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [currentMention, setCurrentMention] = useState<ReturnType<
-    typeof getCurrentMention
-  > | null>(null);
-  const [autocompletePosition, setAutocompletePosition] = useState({
-    top: 0,
-    left: 0,
-  });
-
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  // Calculate autocomplete position based on cursor
-  const updateAutocompletePosition = useCallback(() => {
-    if (!textareaRef.current || !currentMention) return;
-
-    const textarea = textareaRef.current;
-    const { selectionStart } = textarea;
-
-    // Create a temporary span to measure text position
-    const div = document.createElement("div");
-    const style = window.getComputedStyle(textarea);
-
-    // Copy textarea styles
-    div.style.position = "absolute";
-    div.style.visibility = "hidden";
-    div.style.whiteSpace = "pre-wrap";
-    div.style.wordWrap = "break-word";
-    div.style.font = style.font;
-    div.style.padding = style.padding;
-    div.style.border = style.border;
-    div.style.width = `${textarea.clientWidth}px`;
-
-    // Add text up to cursor
-    div.textContent = textarea.value.substring(0, selectionStart);
-    document.body.appendChild(div);
-
-    const textareaRect = textarea.getBoundingClientRect();
-    const divRect = div.getBoundingClientRect();
-
-    document.body.removeChild(div);
-
-    setAutocompletePosition({
-      top: divRect.height - textarea.scrollTop,
-      left: 0, // Left-align for simplicity
-    });
-  }, [currentMention]);
-
-  // Handle mention detection
-  const handleTextChange = useCallback(
-    (text: string, cursorPosition: number) => {
-      if (!mentionCtx) return;
-
-      const mention = getCurrentMention(text, cursorPosition);
-      setCurrentMention(mention);
-
-      if (mention) {
-        const filtered = filterEntitiesForAutocomplete(
-          mentionCtx.entities,
-          mention.query,
-          mention.type,
-          10,
-        );
-        setSuggestions(filtered);
-        setShowAutocomplete(filtered.length > 0);
-        setSelectedIndex(0);
-        updateAutocompletePosition();
-      } else {
-        setShowAutocomplete(false);
-        setSuggestions([]);
-      }
-    },
-    [mentionCtx, updateAutocompletePosition],
-  );
-
-  // Handle suggestion selection
-  const selectSuggestion = useCallback(
-    (entity: MentionEntity) => {
-      if (!currentMention || !textareaRef.current) return;
-
-      const textarea = textareaRef.current;
-      const cursorPos = textarea.selectionStart;
-
-      const { text: newText, newCursorPosition } = insertMention(
-        textarea.value,
-        cursorPos,
-        entity,
-        currentMention.startIndex,
-      );
-
-      // Update value
-      if (controller) {
-        controller.textInput.setInput(newText);
-      } else {
-        textarea.value = newText;
-      }
-
-      // Trigger change event
-      const event = new Event("input", { bubbles: true });
-      textarea.dispatchEvent(event);
-
-      // Close autocomplete
-      setShowAutocomplete(false);
-
-      // Set cursor position
-      setTimeout(() => {
-        textarea.selectionStart = newCursorPosition;
-        textarea.selectionEnd = newCursorPosition;
-        textarea.focus();
-      }, 0);
-
-      // Notify parent
-      mentionCtx?.onMentionSelect?.(entity);
-    },
-    [currentMention, controller, mentionCtx],
-  );
-
-  const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
-    // Handle autocomplete navigation
-    if (showAutocomplete && mentionCtx) {
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setSelectedIndex((prev) => Math.min(prev + 1, suggestions.length - 1));
-        return;
-      }
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setSelectedIndex((prev) => Math.max(prev - 1, 0));
-        return;
-      }
-      if (e.key === "Enter" || e.key === "Tab") {
-        if (suggestions[selectedIndex]) {
-          e.preventDefault();
-          selectSuggestion(suggestions[selectedIndex]);
-          return;
-        }
-      }
-      if (e.key === "Escape") {
-        e.preventDefault();
-        setShowAutocomplete(false);
-        return;
-      }
-    }
-
-    // Standard Enter handling
-    if (e.key === "Enter") {
-      if (isComposing || e.nativeEvent.isComposing) {
-        return;
-      }
-      if (e.shiftKey) {
-        return;
-      }
-      e.preventDefault();
-      e.currentTarget.form?.requestSubmit();
-    }
-
-    // Remove last attachment when Backspace is pressed and textarea is empty
-    if (
-      e.key === "Backspace" &&
-      e.currentTarget.value === "" &&
-      attachments.files.length > 0
-    ) {
-      e.preventDefault();
-      const lastAttachment = attachments.files.at(-1);
-      if (lastAttachment) {
-        attachments.remove(lastAttachment.id);
-      }
-    }
-  };
-
-  const handlePaste: ClipboardEventHandler<HTMLTextAreaElement> = (event) => {
-    const items = event.clipboardData?.items;
-
-    if (!items) {
-      return;
-    }
-
-    const files: File[] = [];
-
-    for (const item of items) {
-      if (item.kind === "file") {
-        const file = item.getAsFile();
-        if (file) {
-          files.push(file);
-        }
-      }
-    }
-
-    if (files.length > 0) {
-      event.preventDefault();
-      attachments.add(files);
-    }
-  };
-
-  const handleChange = useCallback(
-    (e: ChangeEvent<HTMLTextAreaElement>) => {
-      const newText = e.currentTarget.value;
-      const newCursor = e.currentTarget.selectionStart;
-
-      if (controller) {
-        controller.textInput.setInput(newText);
-      }
-
-      // Handle mention detection
-      if (mentionCtx) {
-        handleTextChange(newText, newCursor);
-      }
-
-      onChange?.(e);
-    },
-    [controller, mentionCtx, handleTextChange, onChange],
-  );
-
-  const controlledProps = controller
-    ? {
-      value: controller.textInput.value,
-      onChange: handleChange,
-    }
-    : {
-      onChange: handleChange,
-    };
-
-  return (
-    <div className="relative">
-      <InputGroupTextarea
-        ref={textareaRef}
-        className={cn("field-sizing-content max-h-48 min-h-16", className)}
-        name="message"
-        onCompositionEnd={() => setIsComposing(false)}
-        onCompositionStart={() => setIsComposing(true)}
-        onKeyDown={handleKeyDown}
-        onPaste={handlePaste}
-        placeholder={placeholder}
-        {...props}
-        {...controlledProps}
-      />
-
-      {/* Mention Autocomplete Dropdown */}
-      {showAutocomplete && mentionCtx && (
-        <div
-          className="absolute z-50 w-64 rounded-lg border bg-popover shadow-lg"
-          style={{
-            bottom: `calc(100% - ${autocompletePosition.top}px + 8px)`,
-            left: `${autocompletePosition.left}px`,
-          }}
-        >
-          <div className="max-h-60 overflow-y-auto p-1">
-            {suggestions.map((entity, index) => (
-              <button
-                key={entity.id}
-                type="button"
-                onClick={() => selectSuggestion(entity)}
-                onMouseEnter={() => setSelectedIndex(index)}
-                className={cn(
-                  "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors",
-                  index === selectedIndex
-                    ? "bg-accent text-accent-foreground"
-                    : "hover:bg-accent/50",
-                )}
-              >
-                <span
-                  className={cn(
-                    "text-xs font-medium",
-                    entity.type === "agent"
-                      ? "text-blue-600 dark:text-blue-400"
-                      : "text-green-600 dark:text-green-400",
-                  )}
-                >
-                  {entity.type === "agent" ? "@" : "#"}
-                </span>
-                <span className="flex-1 truncate">{entity.name}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
