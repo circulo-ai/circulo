@@ -1,7 +1,9 @@
 import { FieldDescription } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
-import { AuthView } from "@daveyplate/better-auth-ui";
+import { AuthView, SignedIn, SignedOut } from "@daveyplate/better-auth-ui";
 import { authViewPaths } from "@daveyplate/better-auth-ui/server";
+import { AlreadyLoggedInCard } from "./components/already-logged-in";
+
 
 export const dynamicParams = false;
 
@@ -18,15 +20,21 @@ export default async function AuthPage({
 
   return (
     <div className={cn("flex w-full flex-col gap-6")}>
-      <AuthView
-        socialLayout={"vertical"}
-        className={"flex flex-col gap-6"}
-        path={path}
-      />
-      <FieldDescription className="px-6 text-center">
-        By clicking continue, you agree to our <a href="#">Terms of Service</a>{" "}
-        and <a href="#">Privacy Policy</a>.
-      </FieldDescription>
+      <SignedOut>
+        <AuthView
+          redirectTo="/chats"
+          socialLayout={"vertical"}
+          className={"flex flex-col gap-6"}
+          path={path}
+        />
+        <FieldDescription className="px-6 text-center">
+          By clicking continue, you agree to our{" "}
+          <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.
+        </FieldDescription>
+      </SignedOut>
+      <SignedIn>
+        <AlreadyLoggedInCard />
+      </SignedIn>
     </div>
   );
 }

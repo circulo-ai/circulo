@@ -76,6 +76,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { filterEntitiesForAutocomplete, getCurrentMention, insertMention } from "@/lib/chat/mentions/client";
 
 // ============================================================================
 // Provider Context & Types
@@ -1444,3 +1445,307 @@ export const PromptInputCommandSeparator = ({
 }: PromptInputCommandSeparatorProps) => (
   <CommandSeparator className={cn(className)} {...props} />
 );
+
+export type PromptInputTextareaWithMentionsProps = Omit<
+  PromptInputTextareaProps,
+  "onChange"
+> & {
+  onChange?: (
+    e: ChangeEvent<HTMLTextAreaElement>,
+    mentions?: { agentIds: string[]; knowledgeBaseIds: string[] },
+  ) => void;
+};
+
+export const PromptInputTextareaWithMentions = ({
+                                                  onChange,
+                                                  className,
+                                                  placeholder = "Type @ to mention agents or # for knowledge bases...",
+                                                  ...props
+                                                }: PromptInputTextareaWithMentionsProps) => {
+  const controller = useOptionalPromptInputController();
+  const attachments = usePromptInputAttachments();
+  const mentionCtx = useMentionContext();
+  const [isComposing, setIsComposing] = useState(false);
+
+  // Mention autocomplete state
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const [suggestions, setSuggestions] = useState<MentionEntity[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [currentMention, setCurrentMention] = useState<ReturnType<
+    typeof getCurrentMention
+  > | null>(null);
+  const [autocompletePosition, setAutocompletePosition] = useState({
+    top: 0,
+    left: 0,
+  });
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Calculate autocomplete position based on cursor
+  const updateAutocompletePosition = useCallback(() => {
+    if (!textareaRef.current || !currentMention) return;
+
+    const textarea = textareaRef.current;
+    const { selectionStart } = textarea;
+
+    // Create a temporary span to measure text position
+    const div = document.createElement("div");
+    const style = window.getComputedStyle(textarea);
+
+    // Copy textarea styles
+    div.style.position = "absolute";
+    div.style.visibility = "hidden";
+    div.style.whiteSpace = "pre-wrap";
+    div.style.wordWrap = "break-word";
+    div.style.font = style.font;
+    div.style.padding = style.padding;
+    div.style.border = style.border;
+    div.style.width = `${textarea.clientWidth}px`;
+
+    // Add text up to cursor
+    div.textContent = textarea.value.substring(0, selectionStart);
+    document.body.appendChild(div);
+
+    const textareaRect = textarea.getBoundingClientRect();
+    const divRect = div.getBoundingClientRect();
+
+    document.body.removeChild(div);
+
+    setAutocompletePosition({
+      top: divRect.height - textarea.scrollTop,
+      left: 0, // Left-align for simplicity
+    });
+  }, [currentMention]);
+
+  // Handle mention detection
+  const handleTextChange = useCallback(
+    (text: string, cursorPosition: number) => {
+      if (!mentionCtx) return;
+
+      const mention = getCurrentMention(text, cursorPosition);
+      setCurrentMention(mention);
+
+      if (mention) {
+        const filtered = filterEntitiesForAutocomplete(
+          mentionCtx.entities,
+          mention.query,
+          mention.type,
+          10,
+        );
+        setSuggestions(filtered);
+        setShowAutocomplete(filtered.length > 0);
+        setSelectedIndex(0);
+        updateAutocompletePosition();
+      } else {
+        setShowAutocomplete(false);
+        setSuggestions([]);
+      }
+    },
+    [mentionCtx, updateAutocompletePosition],
+  );
+
+  // Handle suggestion selection
+  const selectSuggestion = useCallback(
+    (entity: MentionEntity) => {
+      if (!currentMention || !textareaRef.current) return;
+
+      const textarea = textareaRef.current;
+      const cursorPos = textarea.selectionStart;
+
+      const { text: newText, newCursorPosition } = insertMention(
+        textarea.value,
+        cursorPos,
+        entity,
+        currentMention.startIndex,
+      );
+
+      // Update value
+      if (controller) {
+        controller.textInput.setInput(newText);
+      } else {
+        textarea.value = newText;
+      }
+
+      // Trigger change event
+      const event = new Event("input", { bubbles: true });
+      textarea.dispatchEvent(event);
+
+      // Close autocomplete
+      setShowAutocomplete(false);
+
+      // Set cursor position
+      setTimeout(() => {
+        textarea.selectionStart = newCursorPosition;
+        textarea.selectionEnd = newCursorPosition;
+        textarea.focus();
+      }, 0);
+
+      // Notify parent
+      mentionCtx?.onMentionSelect?.(entity);
+    },
+    [currentMention, controller, mentionCtx],
+  );
+
+  const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
+    // Handle autocomplete navigation
+    if (showAutocomplete && mentionCtx) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSelectedIndex((prev) => Math.min(prev + 1, suggestions.length - 1));
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSelectedIndex((prev) => Math.max(prev - 1, 0));
+        return;
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        if (suggestions[selectedIndex]) {
+          e.preventDefault();
+          selectSuggestion(suggestions[selectedIndex]);
+          return;
+        }
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setShowAutocomplete(false);
+        return;
+      }
+    }
+
+    // Standard Enter handling
+    if (e.key === "Enter") {
+      if (isComposing || e.nativeEvent.isComposing) {
+        return;
+      }
+      if (e.shiftKey) {
+        return;
+      }
+      e.preventDefault();
+      e.currentTarget.form?.requestSubmit();
+    }
+
+    // Remove last attachment when Backspace is pressed and textarea is empty
+    if (
+      e.key === "Backspace" &&
+      e.currentTarget.value === "" &&
+      attachments.files.length > 0
+    ) {
+      e.preventDefault();
+      const lastAttachment = attachments.files.at(-1);
+      if (lastAttachment) {
+        attachments.remove(lastAttachment.id);
+      }
+    }
+  };
+
+  const handlePaste: ClipboardEventHandler<HTMLTextAreaElement> = (event) => {
+    const items = event.clipboardData?.items;
+
+    if (!items) {
+      return;
+    }
+
+    const files: File[] = [];
+
+    for (const item of items) {
+      if (item.kind === "file") {
+        const file = item.getAsFile();
+        if (file) {
+          files.push(file);
+        }
+      }
+    }
+
+    if (files.length > 0) {
+      event.preventDefault();
+      attachments.add(files);
+    }
+  };
+
+  const handleChange = useCallback(
+    (e: ChangeEvent<HTMLTextAreaElement>) => {
+      const newText = e.currentTarget.value;
+      const newCursor = e.currentTarget.selectionStart;
+
+      if (controller) {
+        controller.textInput.setInput(newText);
+      }
+
+      // Handle mention detection
+      if (mentionCtx) {
+        handleTextChange(newText, newCursor);
+      }
+
+      onChange?.(e);
+    },
+    [controller, mentionCtx, handleTextChange, onChange],
+  );
+
+  const controlledProps = controller
+    ? {
+      value: controller.textInput.value,
+      onChange: handleChange,
+    }
+    : {
+      onChange: handleChange,
+    };
+
+  return (
+    <div className="relative">
+      <InputGroupTextarea
+        ref={textareaRef}
+        className={cn("field-sizing-content max-h-48 min-h-16", className)}
+        name="message"
+        onCompositionEnd={() => setIsComposing(false)}
+        onCompositionStart={() => setIsComposing(true)}
+        onKeyDown={handleKeyDown}
+        onPaste={handlePaste}
+        placeholder={placeholder}
+        {...props}
+        {...controlledProps}
+      />
+
+      {/* Mention Autocomplete Dropdown */}
+      {showAutocomplete && mentionCtx && (
+        <div
+          className="absolute z-50 w-64 rounded-lg border bg-popover shadow-lg"
+          style={{
+            bottom: `calc(100% - ${autocompletePosition.top}px + 8px)`,
+            left: `${autocompletePosition.left}px`,
+          }}
+        >
+          <div className="max-h-60 overflow-y-auto p-1">
+            {suggestions.map((entity, index) => (
+              <button
+                key={entity.id}
+                type="button"
+                onClick={() => selectSuggestion(entity)}
+                onMouseEnter={() => setSelectedIndex(index)}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors",
+                  index === selectedIndex
+                    ? "bg-accent text-accent-foreground"
+                    : "hover:bg-accent/50",
+                )}
+              >
+                <span
+                  className={cn(
+                    "text-xs font-medium",
+                    entity.type === "agent"
+                      ? "text-blue-600 dark:text-blue-400"
+                      : "text-green-600 dark:text-green-400",
+                  )}
+                >
+                  {entity.type === "agent" ? "@" : "#"}
+                </span>
+                <span className="flex-1 truncate">{entity.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
