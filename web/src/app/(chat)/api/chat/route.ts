@@ -16,17 +16,13 @@ import {
 import type { ModelCatalog } from "tokenlens/core";
 import { fetchModels } from "tokenlens/fetch";
 import { getUsage } from "tokenlens/helpers";
-import { auth, type UserType } from "@/app/(auth)/auth";
 import type { VisibilityType } from "@/components/visibility-selector";
-import { entitlementsByUserType } from "@/lib/ai/entitlements";
 import type { ChatModel } from "@/lib/ai/models";
 import { type RequestHints, systemPrompt } from "@/lib/ai/prompts";
 import { myProvider } from "@/lib/ai/providers";
 import { createDocument } from "@/lib/ai/tools/create-document";
-import { getWeather } from "@/lib/ai/tools/get-weather";
 import { requestSuggestions } from "@/lib/ai/tools/request-suggestions";
 import { updateDocument } from "@/lib/ai/tools/update-document";
-import { isProductionEnvironment } from "@/lib/constants";
 import {
   createStreamId,
   deleteChatById,
@@ -35,15 +31,17 @@ import {
   getMessagesByChatId,
   saveChat,
   saveMessages,
-  updateChatLastContextById,
-} from "@/lib/db/queries";
-import type { DBMessage } from "@/lib/db/schema";
+} from "@/db/queries";
+import type { Message as DBMessage } from "@/db/schema";
 import { ChatSDKError } from "@/lib/errors";
 import type { ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { convertToUIMessages, generateUUID } from "@/lib/utils";
 import { generateTitleFromUserMessage } from "../../actions";
 import { type PostRequestBody, postRequestBodySchema } from "./schema";
+import { isProd } from "@/lib/environment";
+import { getSession } from "@/lib/auth";
+import { getAssistantAgentId } from "@/lib/chat/assistant-agent";
 
 export const maxDuration = 60;
 
@@ -108,22 +106,24 @@ export async function POST(request: Request) {
       selectedVisibilityType: VisibilityType;
     } = requestBody;
 
-    const session = await auth();
+    const session = await getSession();
 
     if (!session?.user) {
       return new ChatSDKError("unauthorized:chat").toResponse();
     }
 
-    const userType: UserType = session.user.type;
+    // TODO: handle entitlements and subscription plan limits
 
-    const messageCount = await getMessageCountByUserId({
-      id: session.user.id,
-      differenceInHours: 24,
-    });
+    // const userType: UserType = "free";
 
-    if (messageCount > entitlementsByUserType[userType].maxMessagesPerDay) {
-      return new ChatSDKError("rate_limit:chat").toResponse();
-    }
+    // const messageCount = await getMessageCountByUserId({
+    //   id: session.user.id,
+    //   differenceInHours: 24,
+    // });
+
+    // if (messageCount > entitlementsByUserType[userType].maxMessagesPerDay) {
+    //   return new ChatSDKError("rate_limit:chat").toResponse();
+    // }
 
     const chat = await getChatById({ id });
     let messagesFromDb: DBMessage[] = [];
@@ -168,8 +168,16 @@ export async function POST(request: Request) {
           parts: message.parts,
           attachments: [],
           createdAt: new Date(),
+          userId: session.user.id,
+          agentId: null,
+          content: "",
+          tokenCount: 0,
+          cost: "0.000000",
+          quotedMessageId: null,
+          mentionedAgentIds: [],
+          mentionedKnowledgeBaseIds: [],
         },
-      ],
+      ] as unknown as DBMessage[],
     });
 
     const streamId = generateUUID();
@@ -184,18 +192,16 @@ export async function POST(request: Request) {
           system: systemPrompt({ selectedChatModel, requestHints }),
           messages: convertToModelMessages(uiMessages),
           stopWhen: stepCountIs(5),
-          experimental_activeTools:
+          activeTools:
             selectedChatModel === "chat-model-reasoning"
               ? []
               : [
-                  "getWeather",
                   "createDocument",
                   "updateDocument",
                   "requestSuggestions",
                 ],
           experimental_transform: smoothStream({ chunking: "word" }),
           tools: {
-            getWeather,
             createDocument: createDocument({ session, dataStream }),
             updateDocument: updateDocument({ session, dataStream }),
             requestSuggestions: requestSuggestions({
@@ -204,7 +210,7 @@ export async function POST(request: Request) {
             }),
           },
           experimental_telemetry: {
-            isEnabled: isProductionEnvironment,
+            isEnabled: isProd,
             functionId: "stream-text",
           },
           onFinish: async ({ usage }) => {
@@ -213,7 +219,7 @@ export async function POST(request: Request) {
               const modelId =
                 myProvider.languageModel(selectedChatModel).modelId;
               if (!modelId) {
-                finalMergedUsage = usage;
+                finalMergedUsage = JSON.parse(JSON.stringify(usage));
                 dataStream.write({
                   type: "data-usage",
                   data: finalMergedUsage,
@@ -222,7 +228,7 @@ export async function POST(request: Request) {
               }
 
               if (!providers) {
-                finalMergedUsage = usage;
+                finalMergedUsage = JSON.parse(JSON.stringify(usage));
                 dataStream.write({
                   type: "data-usage",
                   data: finalMergedUsage,
@@ -231,11 +237,15 @@ export async function POST(request: Request) {
               }
 
               const summary = getUsage({ modelId, usage, providers });
-              finalMergedUsage = { ...usage, ...summary, modelId } as AppUsage;
+              finalMergedUsage = {
+                ...JSON.parse(JSON.stringify(usage)),
+                ...summary,
+                modelId,
+              } as AppUsage;
               dataStream.write({ type: "data-usage", data: finalMergedUsage });
             } catch (err) {
               console.warn("TokenLens enrichment failed", err);
-              finalMergedUsage = usage;
+              finalMergedUsage = JSON.parse(JSON.stringify(usage));
               dataStream.write({ type: "data-usage", data: finalMergedUsage });
             }
           },
@@ -251,23 +261,25 @@ export async function POST(request: Request) {
       },
       generateId: generateUUID,
       onFinish: async ({ messages }) => {
-        await saveMessages({
-          messages: messages.map((currentMessage) => ({
-            id: currentMessage.id,
-            role: currentMessage.role,
-            parts: currentMessage.parts,
-            createdAt: new Date(),
-            attachments: [],
-            chatId: id,
-          })),
-        });
+        // TODO: important => port the message to db message
+        // await saveMessages({
+        //   messages: messages.map((currentMessage) => ({
+        //     id: currentMessage.id,
+        //     role: currentMessage.role,
+        //     parts: currentMessage.parts,
+        //     createdAt: new Date(),
+        //     attachments: [],
+        //     chatId: id,
+        //   })),
+        // });
 
         if (finalMergedUsage) {
           try {
-            await updateChatLastContextById({
-              chatId: id,
-              context: finalMergedUsage,
-            });
+            // TODO: handle usage metrics and bill in here
+            // await updateChatLastContextById({
+            //   chatId: id,
+            //   context: finalMergedUsage,
+            // });
           } catch (err) {
             console.warn("Unable to persist last usage for chat", id, err);
           }
@@ -319,7 +331,7 @@ export async function DELETE(request: Request) {
     return new ChatSDKError("bad_request:api").toResponse();
   }
 
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user) {
     return new ChatSDKError("unauthorized:chat").toResponse();

@@ -1,8 +1,7 @@
-import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { auth } from "@/app/(auth)/auth";
+import { getSession } from "@/lib/auth";
 
 // Use Blob instead of File since File is not available in Node.js environment
 const FileSchema = z.object({
@@ -18,7 +17,7 @@ const FileSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const session = await auth();
+  const session = await getSession();
 
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -39,8 +38,8 @@ export async function POST(request: Request) {
     const validatedFile = FileSchema.safeParse({ file });
 
     if (!validatedFile.success) {
-      const errorMessage = validatedFile.error.errors
-        .map((error) => error.message)
+      const errorMessage = validatedFile.error.issues
+        .map((issue) => issue.message)
         .join(", ");
 
       return NextResponse.json({ error: errorMessage }, { status: 400 });
@@ -51,6 +50,7 @@ export async function POST(request: Request) {
     const fileBuffer = await file.arrayBuffer();
 
     try {
+      const { put } = (await import("@vercel/blob")) as any;
       const data = await put(`${filename}`, fileBuffer, {
         access: "public",
       });

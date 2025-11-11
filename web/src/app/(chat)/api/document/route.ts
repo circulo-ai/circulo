@@ -1,10 +1,10 @@
-import { auth } from "@/app/(auth)/auth";
-import type { ArtifactKind } from "@/components/artifact";
+import { getSession } from "@/lib/auth";
+import type { ArtifactKind } from "@/components/artifacts/artifact";
 import {
   deleteDocumentsByIdAfterTimestamp,
   getDocumentsById,
   saveDocument,
-} from "@/lib/db/queries";
+} from "@/db/queries";
 import { ChatSDKError } from "@/lib/errors";
 
 export async function GET(request: Request) {
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     ).toResponse();
   }
 
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user) {
     return new ChatSDKError("unauthorized:document").toResponse();
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     ).toResponse();
   }
 
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user) {
     return new ChatSDKError("not_found:document").toResponse();
@@ -103,7 +103,7 @@ export async function DELETE(request: Request) {
     ).toResponse();
   }
 
-  const session = await auth();
+  const session = await getSession();
 
   if (!session?.user) {
     return new ChatSDKError("unauthorized:document").toResponse();

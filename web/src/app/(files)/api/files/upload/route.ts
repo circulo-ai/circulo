@@ -6,7 +6,7 @@ import {
   createErrorResponse,
   createOptionsResponse,
   InvalidRequestError,
-} from '@/app/api/files/utils'
+} from '@/app/(files)/api/files/utils'
 
 const ALLOWED_EXTENSIONS = new Set([
   'pdf',

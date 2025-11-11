@@ -1,6 +1,5 @@
 "use client";
 
-import type { UseChatHelpers } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
 import equal from "fast-deep-equal";
 import {
@@ -17,7 +16,7 @@ import {
 import { toast } from "sonner";
 import { useLocalStorage, useWindowSize } from "usehooks-ts";
 import { myProvider } from "@/lib/ai/providers";
-import type { Attachment, ChatMessage } from "@/lib/types";
+import type { Attachment, ChatMessage, ChatStatus, SetMessages, SendMessage, Stop } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import {
   PromptInput,
@@ -54,13 +53,13 @@ function PureMultimodalInput({
   chatId: string;
   input: string;
   setInput: Dispatch<SetStateAction<string>>;
-  status: UseChatHelpers<ChatMessage>["status"];
+  status: ChatStatus;
   stop: () => void;
   attachments: Attachment[];
   setAttachments: Dispatch<SetStateAction<Attachment[]>>;
   messages: UIMessage[];
-  setMessages: UseChatHelpers<ChatMessage>["setMessages"];
-  sendMessage: UseChatHelpers<ChatMessage>["sendMessage"];
+  setMessages: SetMessages;
+  sendMessage: SendMessage;
   className?: string;
   selectedVisibilityType: VisibilityType;
   selectedModelId: string;
@@ -408,7 +407,7 @@ function PureAttachmentsButton({
   selectedModelId,
 }: {
   fileInputRef: React.MutableRefObject<HTMLInputElement | null>;
-  status: UseChatHelpers<ChatMessage>["status"];
+  status: ChatStatus;
   selectedModelId: string;
 }) {
   const isReasoningModel = selectedModelId === "chat-model-reasoning";
@@ -435,8 +434,8 @@ function PureStopButton({
   stop,
   setMessages,
 }: {
-  stop: () => void;
-  setMessages: UseChatHelpers<ChatMessage>["setMessages"];
+  stop: Stop;
+  setMessages: SetMessages;
 }) {
   return (
     <Button

@@ -12,7 +12,7 @@ import {
   FileNotFoundError,
   findLocalFile,
   getContentType,
-} from '@/app/api/files/utils'
+} from '@/app/(files)/api/files/utils'
 
 const logger = createLogger('FilesServeAPI')
 

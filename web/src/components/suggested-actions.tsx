@@ -1,6 +1,6 @@
 "use client";
 
-import type { UseChatHelpers } from "@ai-sdk/react";
+import type { SendMessage } from "@/lib/types";
 import { motion } from "framer-motion";
 import { memo } from "react";
 import type { ChatMessage } from "@/lib/types";
@@ -9,7 +9,7 @@ import type { VisibilityType } from "./visibility-selector";
 
 type SuggestedActionsProps = {
   chatId: string;
-  sendMessage: UseChatHelpers<ChatMessage>["sendMessage"];
+  sendMessage: SendMessage;
   selectedVisibilityType: VisibilityType;
 };
 

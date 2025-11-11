@@ -1,4 +1,4 @@
-import type { LanguageModelV2StreamPart } from "@ai-sdk/provider";
+// Using a broad type here to avoid tight coupling with internal SDK stream part versions.
 import { generateId, type ModelMessage } from "ai";
 import { TEST_PROMPTS } from "./basic";
 
@@ -48,7 +48,7 @@ export function compareMessages(
   return true;
 }
 
-const textToDeltas = (text: string): LanguageModelV2StreamPart[] => {
+const textToDeltas = (text: string): any[] => {
   const id = generateId();
 
   const deltas = text.split(" ").map((char) => ({
@@ -60,7 +60,7 @@ const textToDeltas = (text: string): LanguageModelV2StreamPart[] => {
   return [{ id, type: "text-start" }, ...deltas, { id, type: "text-end" }];
 };
 
-const reasoningToDeltas = (text: string): LanguageModelV2StreamPart[] => {
+const reasoningToDeltas = (text: string): any[] => {
   const id = generateId();
 
   const deltas = text.split(" ").map((char) => ({
@@ -79,7 +79,7 @@ const reasoningToDeltas = (text: string): LanguageModelV2StreamPart[] => {
 export const getResponseChunksByPrompt = (
   prompt: ModelMessage[],
   isReasoningEnabled = false
-): LanguageModelV2StreamPart[] => {
+): any[] => {
   const recentMessage = prompt.at(-1);
 
   if (!recentMessage) {

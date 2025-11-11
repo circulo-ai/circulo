@@ -13,7 +13,7 @@ import {
   isBlobPath,
   isCloudPath,
   isS3Path,
-} from '@/app/api/files/utils'
+} from '@/app/(files)/api/files/utils'
 
 export const dynamic = 'force-dynamic'
 

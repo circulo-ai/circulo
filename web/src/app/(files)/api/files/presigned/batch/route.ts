@@ -9,7 +9,7 @@ import {
   hasCloudStorage,
 } from '@/lib/uploads/core/storage-service'
 import { validateFileType } from '@/lib/uploads/utils/validation'
-import { createErrorResponse } from '@/app/api/files/utils'
+import { createErrorResponse } from '@/app/(files)/api/files/utils'
 
 const logger = createLogger('BatchPresignedUploadAPI')
 

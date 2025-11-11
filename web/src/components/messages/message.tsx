@@ -1,10 +1,9 @@
 "use client";
-import type { UseChatHelpers } from "@ai-sdk/react";
 import equal from "fast-deep-equal";
 import { motion } from "framer-motion";
 import { memo, useState } from "react";
 import type { Vote } from "@/db/schema";
-import type { ChatMessage } from "@/lib/types";
+import type { ChatMessage, Regenerate, SetMessages } from "@/lib/types";
 import { cn, sanitizeText } from "@/lib/utils";
 import { useDataStream } from "@/components/data-stream-provider";
 import { DocumentToolResult } from "@/components/document/document";
@@ -38,8 +37,8 @@ const PurePreviewMessage = ({
   message: ChatMessage;
   vote: Vote | undefined;
   isLoading: boolean;
-  setMessages: UseChatHelpers<ChatMessage>["setMessages"];
-  regenerate: UseChatHelpers<ChatMessage>["regenerate"];
+  setMessages: SetMessages;
+  regenerate: Regenerate;
   isReadonly: boolean;
   requiresScrollPadding: boolean;
 }) => {

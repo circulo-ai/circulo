@@ -1,4 +1,4 @@
-import { simulateReadableStream } from "ai";
+import { simulateReadableStream, type ModelMessage } from "ai";
 import { MockLanguageModelV3 } from "ai/test";
 import { getResponseChunksByPrompt } from "@/tests/prompts/utils";
 
@@ -10,11 +10,11 @@ export const chatModel = new MockLanguageModelV3({
     content: [{ type: "text", text: "Hello, world!" }],
     warnings: [],
   }),
-  doStream: async ({ prompt }) => ({
+  doStream: async ({ prompt }: { prompt: ModelMessage[] }) => ({
     stream: simulateReadableStream({
       chunkDelayInMs: 500,
       initialDelayInMs: 1000,
-      chunks: getResponseChunksByPrompt(prompt),
+      chunks: getResponseChunksByPrompt(prompt as ModelMessage[]),
     }),
     rawCall: { rawPrompt: null, rawSettings: {} },
   }),
@@ -28,11 +28,11 @@ export const reasoningModel = new MockLanguageModelV3({
     content: [{ type: "text", text: "Hello, world!" }],
     warnings: [],
   }),
-  doStream: async ({ prompt }) => ({
+  doStream: async ({ prompt }: { prompt: ModelMessage[] }) => ({
     stream: simulateReadableStream({
       chunkDelayInMs: 500,
       initialDelayInMs: 1000,
-      chunks: getResponseChunksByPrompt(prompt, true),
+      chunks: getResponseChunksByPrompt(prompt as ModelMessage[], true),
     }),
     rawCall: { rawPrompt: null, rawSettings: {} },
   }),
@@ -73,11 +73,11 @@ export const artifactModel = new MockLanguageModelV3({
     content: [{ type: "text", text: "Hello, world!" }],
     warnings: [],
   }),
-  doStream: async ({ prompt }) => ({
+  doStream: async ({ prompt }: { prompt: ModelMessage[] }) => ({
     stream: simulateReadableStream({
       chunkDelayInMs: 50,
       initialDelayInMs: 100,
-      chunks: getResponseChunksByPrompt(prompt),
+      chunks: getResponseChunksByPrompt(prompt as ModelMessage[]),
     }),
     rawCall: { rawPrompt: null, rawSettings: {} },
   }),

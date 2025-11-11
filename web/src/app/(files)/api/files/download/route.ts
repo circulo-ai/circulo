@@ -3,7 +3,7 @@ import { createLogger } from '@/lib/logs/console/logger'
 import type { StorageContext } from '@/lib/uploads/core/config-resolver'
 import { generatePresignedDownloadUrl, hasCloudStorage } from '@/lib/uploads/core/storage-service'
 import { getBaseUrl } from '@/lib/urls/utils'
-import { createErrorResponse } from '@/app/api/files/utils'
+import { createErrorResponse } from '@/app/(files)/api/files/utils'
 
 const logger = createLogger('FileDownload')
 
