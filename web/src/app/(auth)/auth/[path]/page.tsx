@@ -4,7 +4,6 @@ import { AuthView, SignedIn, SignedOut } from "@daveyplate/better-auth-ui";
 import { authViewPaths } from "@daveyplate/better-auth-ui/server";
 import { AlreadyLoggedInCard } from "./components/already-logged-in";
 
-
 export const dynamicParams = false;
 
 export function generateStaticParams() {

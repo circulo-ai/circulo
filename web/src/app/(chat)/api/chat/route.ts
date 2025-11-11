@@ -37,7 +37,7 @@ import type { Message as DBMessage } from "@/db/schema";
 import { ChatSDKError } from "@/lib/errors";
 import type { ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
-import { convertToUIMessages, generateUUID } from "@/lib/utils";
+import { convertToUIMessages, generateUUID, getTextFromMessage } from "@/lib/utils";
 import { generateTitleFromUserMessage } from "../../actions";
 import { type PostRequestBody, postRequestBodySchema } from "./schema";
 import { getSession } from "@/lib/auth";
@@ -128,7 +128,7 @@ export async function POST(request: Request) {
     let messagesFromDb: DBMessage[] = [];
 
     if (chat) {
-      if (chat.userId !== session.user.id) {
+      if (chat.creatorId !== session.user.id) {
         return new ChatSDKError("forbidden:chat").toResponse();
       }
       // Only fetch messages if chat already exists
@@ -167,15 +167,32 @@ export async function POST(request: Request) {
           role: "user",
           parts: message.parts,
           attachments: [],
+
+          // Required fields
+          content: "", // or derive from message.parts if possible
           createdAt: new Date(),
-          userId: session.user.id,  // Add this - it's a user message
-          agentId: null,            // Add this
-          content: "",              // Add this - extract from parts if needed
-          tokenCount: 0,            // Add this - or calculate actual count
-          cost: "0.000000",         // Add this
-          quotedMessageId: null,    // Add this
-          mentionedAgentIds: [],    // Add this
-          mentionedKnowledgeBaseIds: [], // Add this
+
+          // Sender
+          userId: session.user.id,
+          agentId: null,
+
+          // Counts and cost
+          tokenCount: 0,
+          cost: "0.000000",
+
+          // Quoting
+          quotedMessageId: null,
+
+          // Mentions
+          mentionedUserIds: [],
+          mentionedAgentIds: [],
+          mentionedKnowledgeBaseIds: [],
+
+          // Editing / deletion flags
+          isEdited: false,
+          editedAt: null,
+          deleted: false,
+          deletedAt: null,
         },
       ],
     });
@@ -265,14 +282,27 @@ export async function POST(request: Request) {
             createdAt: new Date(),
             attachments: [],
             chatId: id,
+
+            // Sender
             userId: currentMessage.role === "user" ? session.user.id : null,
-            agentId: currentMessage.role === "assistant" ? "system" : null, // or appropriate agent ID
-            content: "", // Extract from parts if needed
-            tokenCount: 0, // Calculate or use from usage data
-            cost: "0.000000", // Calculate from usage data
+            agentId: currentMessage.role === "assistant" ? "system" : null, // or actual agent ID
+
+            // Content and metadata
+            content: getTextFromMessage(currentMessage),
+            tokenCount: 0, // or actual token count
+            cost: "0.000000", // or calculated cost
             quotedMessageId: null,
+
+            // Mentions
+            mentionedUserIds: [],
             mentionedAgentIds: [],
             mentionedKnowledgeBaseIds: [],
+
+            // Editing/deletion metadata
+            isEdited: false,
+            editedAt: null,
+            deleted: false,
+            deletedAt: null,
           })),
         });
 
@@ -342,7 +372,7 @@ export async function DELETE(request: Request) {
 
   const chat = await getChatById({ id });
 
-  if (chat?.userId !== session.user.id) {
+  if (chat?.creatorId !== session.user.id) {
     return new ChatSDKError("forbidden:chat").toResponse();
   }
 

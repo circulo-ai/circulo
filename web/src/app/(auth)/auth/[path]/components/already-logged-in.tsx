@@ -3,9 +3,8 @@
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { authClient, signOut } from "@/lib/auth-client";
+import { signOut } from "@/lib/auth-client";
 import { useSession } from "@/providers/session-provider";
-import { Avatar, AvatarFallback, AvatarImage } from "@radix-ui/react-avatar";
 import { ArrowRight, LogOut } from "lucide-react";
 import Link from "next/link";
 import { UserAvatar } from "@daveyplate/better-auth-ui"

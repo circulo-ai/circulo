@@ -65,7 +65,7 @@ export async function saveChat({
     return await db.insert(chat).values({
       id,
       createdAt: new Date(),
-      userId,
+      creatorId: userId,
       title,
       visibility,
     });
@@ -98,7 +98,7 @@ export async function deleteAllChatsByUserId({ userId }: { userId: string }) {
     const userChats = await db
       .select({ id: chat.id })
       .from(chat)
-      .where(eq(chat.userId, userId));
+      .where(eq(chat.creatorId, userId));
 
     if (userChats.length === 0) {
       return { deletedCount: 0 };
@@ -112,7 +112,7 @@ export async function deleteAllChatsByUserId({ userId }: { userId: string }) {
 
     const deletedChats = await db
       .delete(chat)
-      .where(eq(chat.userId, userId))
+      .where(eq(chat.creatorId, userId))
       .returning();
 
     return { deletedCount: deletedChats.length };
@@ -144,8 +144,8 @@ export async function getChatsByUserId({
         .from(chat)
         .where(
           whereCondition
-            ? and(whereCondition, eq(chat.userId, id))
-            : eq(chat.userId, id)
+            ? and(whereCondition, eq(chat.creatorId, id))
+            : eq(chat.creatorId, id)
         )
         .orderBy(desc(chat.createdAt))
         .limit(extendedLimit);
@@ -237,10 +237,12 @@ export async function getMessagesByChatId({ id }: { id: string }) {
 }
 
 export async function voteMessage({
+  userId,
                                     chatId,
                                     messageId,
                                     type,
                                   }: {
+  userId: string,
   chatId: string;
   messageId: string;
   type: "up" | "down";
@@ -258,6 +260,7 @@ export async function voteMessage({
         .where(and(eq(vote.messageId, messageId), eq(vote.chatId, chatId)));
     }
     return await db.insert(vote).values({
+      userId,
       chatId,
       messageId,
       isUpvoted: type === "up",
@@ -490,7 +493,7 @@ export async function getMessageCountByUserId({
       .innerJoin(chat, eq(message.chatId, chat.id))
       .where(
         and(
-          eq(chat.userId, id),
+          eq(chat.creatorId, id),
           gte(message.createdAt, twentyFourHoursAgo),
           eq(message.role, "user")
         )
