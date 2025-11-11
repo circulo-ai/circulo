@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { initialArtifactData, useArtifact } from "@/hooks/chats/use-artifact";
-import { artifactDefinitions } from "./artifacts/artifact";
+import { artifactDefinitions } from "@/components/artifacts/artifact";
 import { useDataStream } from "./data-stream-provider";
 
 export function DataStreamHandler() {

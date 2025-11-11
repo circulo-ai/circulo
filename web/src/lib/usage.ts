@@ -1,11 +1,5 @@
-// JSON-safe value shape compatible with AI SDK JSONValue
-export type JSONValue =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: JSONValue }
-  | JSONValue[];
+import type { LanguageModelUsage } from "ai";
+import type { UsageData } from "tokenlens/helpers";
 
-// Usage payload written to UI data stream must be JSON-serializable
-export type AppUsage = Record<string, JSONValue>;
+// Server-merged usage: base usage + TokenLens summary + optional modelId
+export type AppUsage = LanguageModelUsage & UsageData & { modelId?: string };

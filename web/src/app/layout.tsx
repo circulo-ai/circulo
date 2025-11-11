@@ -1,4 +1,3 @@
-import { isDev } from "@/lib/environment";
 import { AuthClientProvider } from "@/providers/auth-client-provider";
 import { PointerProvider } from "@/providers/pointer-provider";
 import { SessionProvider } from "@/providers/session-provider";
@@ -9,6 +8,11 @@ import { ReactNode } from "react";
 import { Toaster } from "sonner";
 import "./globals.css";
 import { SWRProvider } from "@/providers/swr-provider";
+import { cn } from "@/lib/utils";
+
+export const viewport = {
+  maximumScale: 1, // Disable auto-zoom on mobile Safari
+};
 
 const fontSans = Sans({
   variable: "--font-sans",
@@ -26,7 +30,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       suppressHydrationWarning
       className="snap-y snap-mandatory scroll-smooth"
     >
-      <body className={fontSans.variable}>
+      <body className={cn(fontSans.variable, 'antialiased')}>
         <ThemeProvider>
           <SessionProvider>
             <SWRProvider>

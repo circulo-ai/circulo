@@ -1,6 +1,6 @@
 {
-  "id": "5b1463bc-12a8-41c3-8f68-11e582f9cce5",
-  "prevId": "05fba083-97ef-4745-8b75-f5f6f6cdefa0",
+  "id": "b72b4dd4-2e7a-4062-9f07-9eeedd493bbb",
+  "prevId": "da8b2724-3452-40dc-8e6b-9f6913c688f6",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -711,6 +711,12 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "model": {
           "name": "model",
@@ -2092,342 +2098,58 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.credits": {
-      "name": "credits",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "customer_id": {
-          "name": "customer_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "amount": {
-          "name": "amount",
-          "type": "numeric(10, 2)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "remaining": {
-          "name": "remaining",
-          "type": "numeric(10, 2)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "type": {
-          "name": "type",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "metadata": {
-          "name": "metadata",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "credits_customer_id_idx": {
-          "name": "credits_customer_id_idx",
-          "columns": [
-            {
-              "expression": "customer_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "credits_expires_at_idx": {
-          "name": "credits_expires_at_idx",
-          "columns": [
-            {
-              "expression": "expires_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "credits_customer_id_customers_id_fk": {
-          "name": "credits_customer_id_customers_id_fk",
-          "tableFrom": "credits",
-          "tableTo": "customers",
-          "columnsFrom": [
-            "customer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.customers": {
-      "name": "customers",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "email": {
-          "name": "email",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "billing_email": {
-          "name": "billing_email",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "tax_id": {
-          "name": "tax_id",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "address_line1": {
-          "name": "address_line1",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "address_line2": {
-          "name": "address_line2",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "city": {
-          "name": "city",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "state": {
-          "name": "state",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "postal_code": {
-          "name": "postal_code",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "country": {
-          "name": "country",
-          "type": "varchar(2)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "provider_customer_id": {
-          "name": "provider_customer_id",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "metadata": {
-          "name": "metadata",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "customers_user_id_idx": {
-          "name": "customers_user_id_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "customers_email_idx": {
-          "name": "customers_email_idx",
-          "columns": [
-            {
-              "expression": "email",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "customers_provider_customer_idx": {
-          "name": "customers_provider_customer_idx",
-          "columns": [
-            {
-              "expression": "provider_customer_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "customers_user_id_unique": {
-          "name": "customers_user_id_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "user_id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.invoice_line_items": {
       "name": "invoice_line_items",
       "schema": "",
       "columns": {
         "id": {
           "name": "id",
-          "type": "text",
+          "type": "serial",
           "primaryKey": true,
           "notNull": true
         },
         "invoice_id": {
           "name": "invoice_id",
-          "type": "text",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
         "description": {
           "name": "description",
-          "type": "text",
+          "type": "varchar(500)",
           "primaryKey": false,
           "notNull": true
         },
         "quantity": {
           "name": "quantity",
-          "type": "numeric(15, 4)",
+          "type": "integer",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": 1
         },
         "unit_price": {
           "name": "unit_price",
-          "type": "numeric(10, 4)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "amount": {
-          "name": "amount",
           "type": "numeric(10, 2)",
           "primaryKey": false,
           "notNull": true
         },
-        "plan_id": {
-          "name": "plan_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "usage_metric_id": {
-          "name": "usage_metric_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "item_type": {
-          "name": "item_type",
-          "type": "varchar(50)",
+        "total_price": {
+          "name": "total_price",
+          "type": "numeric(10, 2)",
           "primaryKey": false,
           "notNull": true
+        },
+        "reference_type": {
+          "name": "reference_type",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reference_id": {
+          "name": "reference_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         },
         "metadata": {
           "name": "metadata",
@@ -2444,11 +2166,32 @@
         }
       },
       "indexes": {
-        "invoice_line_items_invoice_id_idx": {
-          "name": "invoice_line_items_invoice_id_idx",
+        "line_items_invoice_idx": {
+          "name": "line_items_invoice_idx",
           "columns": [
             {
               "expression": "invoice_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "line_items_reference_idx": {
+          "name": "line_items_reference_idx",
+          "columns": [
+            {
+              "expression": "reference_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "reference_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -2473,32 +2216,6 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
-        },
-        "invoice_line_items_plan_id_plans_id_fk": {
-          "name": "invoice_line_items_plan_id_plans_id_fk",
-          "tableFrom": "invoice_line_items",
-          "tableTo": "plans",
-          "columnsFrom": [
-            "plan_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "invoice_line_items_usage_metric_id_usage_metrics_id_fk": {
-          "name": "invoice_line_items_usage_metric_id_usage_metrics_id_fk",
-          "tableFrom": "invoice_line_items",
-          "tableTo": "usage_metrics",
-          "columnsFrom": [
-            "usage_metric_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2513,27 +2230,48 @@
       "columns": {
         "id": {
           "name": "id",
-          "type": "text",
+          "type": "serial",
           "primaryKey": true,
           "notNull": true
         },
-        "customer_id": {
-          "name": "customer_id",
+        "user_id": {
+          "name": "user_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
         "subscription_id": {
           "name": "subscription_id",
-          "type": "text",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
-        "invoice_number": {
-          "name": "invoice_number",
-          "type": "varchar(100)",
+        "type": {
+          "name": "type",
+          "type": "invoice_type",
+          "typeSchema": "public",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": "'one_time'"
+        },
+        "provider": {
+          "name": "provider",
+          "type": "payment_provider",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider_invoice_id": {
+          "name": "provider_invoice_id",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "usd_amount": {
+          "name": "usd_amount",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": true
         },
         "status": {
           "name": "status",
@@ -2541,137 +2279,11 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
-          "default": "'draft'"
+          "default": "'pending'"
         },
-        "subtotal": {
-          "name": "subtotal",
-          "type": "numeric(10, 2)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "tax": {
-          "name": "tax",
-          "type": "numeric(10, 2)",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'0'"
-        },
-        "discount": {
-          "name": "discount",
-          "type": "numeric(10, 2)",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'0'"
-        },
-        "total": {
-          "name": "total",
-          "type": "numeric(10, 2)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "amount_paid": {
-          "name": "amount_paid",
-          "type": "numeric(10, 2)",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'0'"
-        },
-        "amount_due": {
-          "name": "amount_due",
-          "type": "numeric(10, 2)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "currency": {
-          "name": "currency",
-          "type": "varchar(3)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'USD'"
-        },
-        "period_start": {
-          "name": "period_start",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "period_end": {
-          "name": "period_end",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "issue_date": {
-          "name": "issue_date",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "due_date": {
-          "name": "due_date",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "paid_at": {
-          "name": "paid_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "voided_at": {
-          "name": "voided_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "attempt_count": {
-          "name": "attempt_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "default": 0
-        },
-        "next_payment_attempt": {
-          "name": "next_payment_attempt",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "provider_invoice_id": {
-          "name": "provider_invoice_id",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "provider_status": {
-          "name": "provider_status",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "hosted_invoice_url": {
-          "name": "hosted_invoice_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "invoice_pdf_url": {
-          "name": "invoice_pdf_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "memo": {
-          "name": "memo",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "footer": {
-          "name": "footer",
-          "type": "text",
+        "description": {
+          "name": "description",
+          "type": "varchar(500)",
           "primaryKey": false,
           "notNull": false
         },
@@ -2688,20 +2300,37 @@
           "notNull": true,
           "default": "now()"
         },
-        "updated_at": {
-          "name": "updated_at",
+        "paid_at": {
+          "name": "paid_at",
           "type": "timestamp",
           "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
+          "notNull": false
+        },
+        "failed_at": {
+          "name": "failed_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "due_date": {
+          "name": "due_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
-        "invoices_customer_id_idx": {
-          "name": "invoices_customer_id_idx",
+        "invoices_provider_invoice_idx": {
+          "name": "invoices_provider_invoice_idx",
           "columns": [
             {
-              "expression": "customer_id",
+              "expression": "provider",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "provider_invoice_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -2712,11 +2341,41 @@
           "method": "btree",
           "with": {}
         },
-        "invoices_subscription_id_idx": {
-          "name": "invoices_subscription_id_idx",
+        "invoices_user_idx": {
+          "name": "invoices_user_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "invoices_subscription_idx": {
+          "name": "invoices_subscription_idx",
           "columns": [
             {
               "expression": "subscription_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "invoices_type_idx": {
+          "name": "invoices_type_idx",
+          "columns": [
+            {
+              "expression": "type",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -2741,60 +2400,15 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "invoices_due_date_idx": {
-          "name": "invoices_due_date_idx",
-          "columns": [
-            {
-              "expression": "due_date",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "invoices_provider_invoice_idx": {
-          "name": "invoices_provider_invoice_idx",
-          "columns": [
-            {
-              "expression": "provider_invoice_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "invoices_invoice_number_idx": {
-          "name": "invoices_invoice_number_idx",
-          "columns": [
-            {
-              "expression": "invoice_number",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
-        "invoices_customer_id_customers_id_fk": {
-          "name": "invoices_customer_id_customers_id_fk",
+        "invoices_user_id_user_id_fk": {
+          "name": "invoices_user_id_user_id_fk",
           "tableFrom": "invoices",
-          "tableTo": "customers",
+          "tableTo": "user",
           "columnsFrom": [
-            "customer_id"
+            "user_id"
           ],
           "columnsTo": [
             "id"
@@ -2817,89 +2431,52 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "invoices_invoice_number_unique": {
-          "name": "invoices_invoice_number_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "invoice_number"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.payment_methods": {
-      "name": "payment_methods",
+    "public.subscription_history": {
+      "name": "subscription_history",
       "schema": "",
       "columns": {
         "id": {
           "name": "id",
-          "type": "text",
+          "type": "serial",
           "primaryKey": true,
           "notNull": true
         },
-        "customer_id": {
-          "name": "customer_id",
-          "type": "text",
+        "subscription_id": {
+          "name": "subscription_id",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
-        "type": {
-          "name": "type",
-          "type": "varchar(50)",
+        "plan_id": {
+          "name": "plan_id",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
-        "is_default": {
-          "name": "is_default",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "last4": {
-          "name": "last4",
-          "type": "varchar(4)",
+        "old_status": {
+          "name": "old_status",
+          "type": "subscription_status",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": false
         },
-        "brand": {
-          "name": "brand",
-          "type": "varchar(50)",
+        "new_status": {
+          "name": "new_status",
+          "type": "subscription_status",
+          "typeSchema": "public",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
-        "expiry_month": {
-          "name": "expiry_month",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "expiry_year": {
-          "name": "expiry_year",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "bank_name": {
-          "name": "bank_name",
+        "reason": {
+          "name": "reason",
           "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false
-        },
-        "account_last4": {
-          "name": "account_last4",
-          "type": "varchar(4)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "provider_payment_method_id": {
-          "name": "provider_payment_method_id",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": true
         },
         "metadata": {
           "name": "metadata",
@@ -2907,15 +2484,8 @@
           "primaryKey": false,
           "notNull": false
         },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
+        "changed_at": {
+          "name": "changed_at",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": true,
@@ -2923,11 +2493,11 @@
         }
       },
       "indexes": {
-        "payment_methods_customer_id_idx": {
-          "name": "payment_methods_customer_id_idx",
+        "history_subscription_idx": {
+          "name": "history_subscription_idx",
           "columns": [
             {
-              "expression": "customer_id",
+              "expression": "subscription_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -2938,11 +2508,11 @@
           "method": "btree",
           "with": {}
         },
-        "payment_methods_provider_pm_idx": {
-          "name": "payment_methods_provider_pm_idx",
+        "history_changed_at_idx": {
+          "name": "history_changed_at_idx",
           "columns": [
             {
-              "expression": "provider_payment_method_id",
+              "expression": "changed_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -2955,171 +2525,30 @@
         }
       },
       "foreignKeys": {
-        "payment_methods_customer_id_customers_id_fk": {
-          "name": "payment_methods_customer_id_customers_id_fk",
-          "tableFrom": "payment_methods",
-          "tableTo": "customers",
+        "subscription_history_subscription_id_subscriptions_id_fk": {
+          "name": "subscription_history_subscription_id_subscriptions_id_fk",
+          "tableFrom": "subscription_history",
+          "tableTo": "subscriptions",
           "columnsFrom": [
-            "customer_id"
+            "subscription_id"
           ],
           "columnsTo": [
             "id"
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.plan_features": {
-      "name": "plan_features",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
         },
-        "plan_id": {
-          "name": "plan_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "feature_key": {
-          "name": "feature_key",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "feature_name": {
-          "name": "feature_name",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "feature_type": {
-          "name": "feature_type",
-          "type": "feature_type",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "boolean_value": {
-          "name": "boolean_value",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "numeric_value": {
-          "name": "numeric_value",
-          "type": "numeric(15, 2)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "text_value": {
-          "name": "text_value",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "metadata": {
-          "name": "metadata",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "plan_features_plan_id_idx": {
-          "name": "plan_features_plan_id_idx",
-          "columns": [
-            {
-              "expression": "plan_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "plan_features_key_idx": {
-          "name": "plan_features_key_idx",
-          "columns": [
-            {
-              "expression": "feature_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "unique_plan_feature": {
-          "name": "unique_plan_feature",
-          "columns": [
-            {
-              "expression": "plan_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "feature_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "plan_features_plan_id_plans_id_fk": {
-          "name": "plan_features_plan_id_plans_id_fk",
-          "tableFrom": "plan_features",
-          "tableTo": "plans",
+        "subscription_history_plan_id_subscription_plans_id_fk": {
+          "name": "subscription_history_plan_id_subscription_plans_id_fk",
+          "tableFrom": "subscription_history",
+          "tableTo": "subscription_plans",
           "columnsFrom": [
             "plan_id"
           ],
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         }
       },
@@ -3129,176 +2558,21 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.plan_limits": {
-      "name": "plan_limits",
+    "public.subscription_plans": {
+      "name": "subscription_plans",
       "schema": "",
       "columns": {
         "id": {
           "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "plan_id": {
-          "name": "plan_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "limit_key": {
-          "name": "limit_key",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "limit_name": {
-          "name": "limit_name",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "max_value": {
-          "name": "max_value",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "period": {
-          "name": "period",
-          "type": "limit_period",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "'month'"
-        },
-        "soft_limit": {
-          "name": "soft_limit",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "soft_limit_warning": {
-          "name": "soft_limit_warning",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "metadata": {
-          "name": "metadata",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "plan_limits_plan_id_idx": {
-          "name": "plan_limits_plan_id_idx",
-          "columns": [
-            {
-              "expression": "plan_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "plan_limits_key_idx": {
-          "name": "plan_limits_key_idx",
-          "columns": [
-            {
-              "expression": "limit_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "unique_plan_limit": {
-          "name": "unique_plan_limit",
-          "columns": [
-            {
-              "expression": "plan_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "limit_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "plan_limits_plan_id_plans_id_fk": {
-          "name": "plan_limits_plan_id_plans_id_fk",
-          "tableFrom": "plan_limits",
-          "tableTo": "plans",
-          "columnsFrom": [
-            "plan_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.plans": {
-      "name": "plans",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
+          "type": "serial",
           "primaryKey": true,
           "notNull": true
         },
         "name": {
           "name": "name",
-          "type": "varchar(255)",
+          "type": "varchar(100)",
           "primaryKey": false,
           "notNull": true
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "slug": {
           "name": "slug",
@@ -3306,47 +2580,30 @@
           "primaryKey": false,
           "notNull": true
         },
-        "pricing_model": {
-          "name": "pricing_model",
-          "type": "pricing_model",
-          "typeSchema": "public",
+        "description": {
+          "name": "description",
+          "type": "varchar(500)",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'flat'"
+          "notNull": false
         },
-        "base_price": {
-          "name": "base_price",
+        "usd_price": {
+          "name": "usd_price",
           "type": "numeric(10, 2)",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
-        "currency": {
-          "name": "currency",
-          "type": "varchar(3)",
+        "billing_interval_days": {
+          "name": "billing_interval_days",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "default": "'USD'"
+          "default": 30
         },
-        "billing_interval": {
-          "name": "billing_interval",
-          "type": "billing_interval",
-          "typeSchema": "public",
+        "features": {
+          "name": "features",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
-        },
-        "interval_count": {
-          "name": "interval_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "default": 1
-        },
-        "trial_days": {
-          "name": "trial_days",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "default": 0
         },
         "is_active": {
           "name": "is_active",
@@ -3355,40 +2612,8 @@
           "notNull": true,
           "default": true
         },
-        "is_public": {
-          "name": "is_public",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "provider_plan_id": {
-          "name": "provider_plan_id",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "provider_product_id": {
-          "name": "provider_product_id",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "metadata": {
-          "name": "metadata",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": true,
@@ -3406,21 +2631,6 @@
               "nulls": "last"
             }
           ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "plans_provider_plan_idx": {
-          "name": "plans_provider_plan_idx",
-          "columns": [
-            {
-              "expression": "provider_plan_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
           "isUnique": false,
           "concurrently": false,
           "method": "btree",
@@ -3430,8 +2640,8 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "plans_slug_unique": {
-          "name": "plans_slug_unique",
+        "subscription_plans_slug_unique": {
+          "name": "subscription_plans_slug_unique",
           "nullsNotDistinct": false,
           "columns": [
             "slug"
@@ -3442,174 +2652,25 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.subscription_schedules": {
-      "name": "subscription_schedules",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "subscription_id": {
-          "name": "subscription_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "scheduled_at": {
-          "name": "scheduled_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "executed_at": {
-          "name": "executed_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "action": {
-          "name": "action",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "target_plan_id": {
-          "name": "target_plan_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "metadata": {
-          "name": "metadata",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "subscription_schedules_subscription_id_idx": {
-          "name": "subscription_schedules_subscription_id_idx",
-          "columns": [
-            {
-              "expression": "subscription_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "subscription_schedules_scheduled_at_idx": {
-          "name": "subscription_schedules_scheduled_at_idx",
-          "columns": [
-            {
-              "expression": "scheduled_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "subscription_schedules_status_idx": {
-          "name": "subscription_schedules_status_idx",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "subscription_schedules_subscription_id_subscriptions_id_fk": {
-          "name": "subscription_schedules_subscription_id_subscriptions_id_fk",
-          "tableFrom": "subscription_schedules",
-          "tableTo": "subscriptions",
-          "columnsFrom": [
-            "subscription_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "subscription_schedules_target_plan_id_plans_id_fk": {
-          "name": "subscription_schedules_target_plan_id_plans_id_fk",
-          "tableFrom": "subscription_schedules",
-          "tableTo": "plans",
-          "columnsFrom": [
-            "target_plan_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.subscriptions": {
       "name": "subscriptions",
       "schema": "",
       "columns": {
         "id": {
           "name": "id",
-          "type": "text",
+          "type": "serial",
           "primaryKey": true,
           "notNull": true
         },
-        "customer_id": {
-          "name": "customer_id",
+        "user_id": {
+          "name": "user_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
         "plan_id": {
           "name": "plan_id",
-          "type": "text",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
@@ -3619,93 +2680,27 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
-          "default": "'active'"
+          "default": "'inactive'"
         },
-        "current_period_start": {
-          "name": "current_period_start",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "current_period_end": {
-          "name": "current_period_end",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "trial_start": {
-          "name": "trial_start",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "trial_end": {
-          "name": "trial_end",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "cancel_at": {
-          "name": "cancel_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "cancel_at_period_end": {
-          "name": "cancel_at_period_end",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "canceled_at": {
-          "name": "canceled_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "cancellation_reason": {
-          "name": "cancellation_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "started_at": {
-          "name": "started_at",
+        "start_date": {
+          "name": "start_date",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
         },
-        "ended_at": {
-          "name": "ended_at",
+        "end_date": {
+          "name": "end_date",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": false
         },
-        "provider_subscription_id": {
-          "name": "provider_subscription_id",
-          "type": "varchar(255)",
+        "auto_renew": {
+          "name": "auto_renew",
+          "type": "boolean",
           "primaryKey": false,
-          "notNull": false
-        },
-        "provider_status": {
-          "name": "provider_status",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "custom_price": {
-          "name": "custom_price",
-          "type": "numeric(10, 2)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "metadata": {
-          "name": "metadata",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": true
         },
         "created_at": {
           "name": "created_at",
@@ -3713,36 +2708,14 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
         }
       },
       "indexes": {
-        "subscriptions_customer_id_idx": {
-          "name": "subscriptions_customer_id_idx",
+        "subscriptions_user_idx": {
+          "name": "subscriptions_user_idx",
           "columns": [
             {
-              "expression": "customer_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "subscriptions_plan_id_idx": {
-          "name": "subscriptions_plan_id_idx",
-          "columns": [
-            {
-              "expression": "plan_id",
+              "expression": "user_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -3768,26 +2741,11 @@
           "method": "btree",
           "with": {}
         },
-        "subscriptions_provider_sub_idx": {
-          "name": "subscriptions_provider_sub_idx",
+        "subscriptions_end_date_idx": {
+          "name": "subscriptions_end_date_idx",
           "columns": [
             {
-              "expression": "provider_subscription_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "subscriptions_period_end_idx": {
-          "name": "subscriptions_period_end_idx",
-          "columns": [
-            {
-              "expression": "current_period_end",
+              "expression": "end_date",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -3800,12 +2758,12 @@
         }
       },
       "foreignKeys": {
-        "subscriptions_customer_id_customers_id_fk": {
-          "name": "subscriptions_customer_id_customers_id_fk",
+        "subscriptions_user_id_user_id_fk": {
+          "name": "subscriptions_user_id_user_id_fk",
           "tableFrom": "subscriptions",
-          "tableTo": "customers",
+          "tableTo": "user",
           "columnsFrom": [
-            "customer_id"
+            "user_id"
           ],
           "columnsTo": [
             "id"
@@ -3813,368 +2771,17 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "subscriptions_plan_id_plans_id_fk": {
-          "name": "subscriptions_plan_id_plans_id_fk",
+        "subscriptions_plan_id_subscription_plans_id_fk": {
+          "name": "subscriptions_plan_id_subscription_plans_id_fk",
           "tableFrom": "subscriptions",
-          "tableTo": "plans",
+          "tableTo": "subscription_plans",
           "columnsFrom": [
             "plan_id"
           ],
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.usage_aggregates": {
-      "name": "usage_aggregates",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "subscription_id": {
-          "name": "subscription_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "customer_id": {
-          "name": "customer_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "metric_key": {
-          "name": "metric_key",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "quantity": {
-          "name": "quantity",
-          "type": "numeric(15, 4)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'0'"
-        },
-        "period_start": {
-          "name": "period_start",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "period_end": {
-          "name": "period_end",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_reset": {
-          "name": "last_reset",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "aggregation_period": {
-          "name": "aggregation_period",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'month'"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "usage_aggregates_sub_metric_period_idx": {
-          "name": "usage_aggregates_sub_metric_period_idx",
-          "columns": [
-            {
-              "expression": "subscription_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "metric_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "aggregation_period",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "period_start",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "usage_aggregates_customer_id_idx": {
-          "name": "usage_aggregates_customer_id_idx",
-          "columns": [
-            {
-              "expression": "customer_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "usage_aggregates_period_idx": {
-          "name": "usage_aggregates_period_idx",
-          "columns": [
-            {
-              "expression": "period_start",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "period_end",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "usage_aggregates_subscription_id_subscriptions_id_fk": {
-          "name": "usage_aggregates_subscription_id_subscriptions_id_fk",
-          "tableFrom": "usage_aggregates",
-          "tableTo": "subscriptions",
-          "columnsFrom": [
-            "subscription_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "usage_aggregates_customer_id_customers_id_fk": {
-          "name": "usage_aggregates_customer_id_customers_id_fk",
-          "tableFrom": "usage_aggregates",
-          "tableTo": "customers",
-          "columnsFrom": [
-            "customer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.usage_events": {
-      "name": "usage_events",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "subscription_id": {
-          "name": "subscription_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "customer_id": {
-          "name": "customer_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "metric_key": {
-          "name": "metric_key",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "quantity": {
-          "name": "quantity",
-          "type": "numeric(15, 4)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "event_type": {
-          "name": "event_type",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "idempotency_key": {
-          "name": "idempotency_key",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "timestamp": {
-          "name": "timestamp",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "metadata": {
-          "name": "metadata",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "usage_events_subscription_id_idx": {
-          "name": "usage_events_subscription_id_idx",
-          "columns": [
-            {
-              "expression": "subscription_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "usage_events_customer_id_idx": {
-          "name": "usage_events_customer_id_idx",
-          "columns": [
-            {
-              "expression": "customer_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "usage_events_metric_key_idx": {
-          "name": "usage_events_metric_key_idx",
-          "columns": [
-            {
-              "expression": "metric_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "usage_events_timestamp_idx": {
-          "name": "usage_events_timestamp_idx",
-          "columns": [
-            {
-              "expression": "timestamp",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "usage_events_idempotency_idx": {
-          "name": "usage_events_idempotency_idx",
-          "columns": [
-            {
-              "expression": "idempotency_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "usage_events_subscription_id_subscriptions_id_fk": {
-          "name": "usage_events_subscription_id_subscriptions_id_fk",
-          "tableFrom": "usage_events",
-          "tableTo": "subscriptions",
-          "columnsFrom": [
-            "subscription_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "usage_events_customer_id_customers_id_fk": {
-          "name": "usage_events_customer_id_customers_id_fk",
-          "tableFrom": "usage_events",
-          "tableTo": "customers",
-          "columnsFrom": [
-            "customer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
+          "onDelete": "restrict",
           "onUpdate": "no action"
         }
       },
@@ -4190,157 +2797,124 @@
       "columns": {
         "id": {
           "name": "id",
-          "type": "text",
+          "type": "serial",
           "primaryKey": true,
           "notNull": true
         },
-        "plan_id": {
-          "name": "plan_id",
+        "user_id": {
+          "name": "user_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "metric_key": {
-          "name": "metric_key",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "metric_name": {
-          "name": "metric_name",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "unit": {
-          "name": "unit",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "pricing_type": {
-          "name": "pricing_type",
-          "type": "usage_metric_type",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "unit_price": {
-          "name": "unit_price",
-          "type": "numeric(10, 4)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "package_size": {
-          "name": "package_size",
+        "subscription_id": {
+          "name": "subscription_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
-        "tiers": {
-          "name": "tiers",
-          "type": "jsonb",
+        "metric": {
+          "name": "metric",
+          "type": "varchar(100)",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
-        "reset_interval": {
-          "name": "reset_interval",
-          "type": "varchar(50)",
+        "count": {
+          "name": "count",
+          "type": "integer",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": 1
         },
-        "provider_metric_id": {
-          "name": "provider_metric_id",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "metadata": {
-          "name": "metadata",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
+        "recorded_at": {
+          "name": "recorded_at",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
         },
-        "updated_at": {
-          "name": "updated_at",
+        "period_start": {
+          "name": "period_start",
           "type": "timestamp",
           "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
+          "notNull": true
+        },
+        "period_end": {
+          "name": "period_end",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
         }
       },
       "indexes": {
-        "usage_metrics_plan_id_idx": {
-          "name": "usage_metrics_plan_id_idx",
+        "usage_user_metric_period_idx": {
+          "name": "usage_user_metric_period_idx",
           "columns": [
             {
-              "expression": "plan_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "usage_metrics_key_idx": {
-          "name": "usage_metrics_key_idx",
-          "columns": [
-            {
-              "expression": "metric_key",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "unique_plan_metric": {
-          "name": "unique_plan_metric",
-          "columns": [
-            {
-              "expression": "plan_id",
+              "expression": "user_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             },
             {
-              "expression": "metric_key",
+              "expression": "metric",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "period_start",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             }
           ],
-          "isUnique": true,
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "usage_subscription_idx": {
+          "name": "usage_subscription_idx",
+          "columns": [
+            {
+              "expression": "subscription_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
         }
       },
       "foreignKeys": {
-        "usage_metrics_plan_id_plans_id_fk": {
-          "name": "usage_metrics_plan_id_plans_id_fk",
+        "usage_metrics_user_id_user_id_fk": {
+          "name": "usage_metrics_user_id_user_id_fk",
           "tableFrom": "usage_metrics",
-          "tableTo": "plans",
+          "tableTo": "user",
           "columnsFrom": [
-            "plan_id"
+            "user_id"
           ],
           "columnsTo": [
             "id"
           ],
           "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "usage_metrics_subscription_id_subscriptions_id_fk": {
+          "name": "usage_metrics_subscription_id_subscriptions_id_fk",
+          "tableFrom": "usage_metrics",
+          "tableTo": "subscriptions",
+          "columnsFrom": [
+            "subscription_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -4350,33 +2924,34 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.webhook_events": {
-      "name": "webhook_events",
+    "public.webhook_logs": {
+      "name": "webhook_logs",
       "schema": "",
       "columns": {
         "id": {
           "name": "id",
-          "type": "text",
+          "type": "serial",
           "primaryKey": true,
           "notNull": true
         },
         "provider": {
           "name": "provider",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "event_id": {
-          "name": "event_id",
-          "type": "varchar(255)",
+          "type": "payment_provider",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
         },
         "event_type": {
           "name": "event_type",
-          "type": "varchar(255)",
+          "type": "varchar(100)",
           "primaryKey": false,
           "notNull": true
+        },
+        "invoice_id": {
+          "name": "invoice_id",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
         },
         "payload": {
           "name": "payload",
@@ -4384,31 +2959,36 @@
           "primaryKey": false,
           "notNull": true
         },
-        "processed": {
-          "name": "processed",
-          "type": "boolean",
+        "signature": {
+          "name": "signature",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "error_message": {
+          "name": "error_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "default": false
+          "default": 1
         },
         "processed_at": {
           "name": "processed_at",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": false
-        },
-        "error": {
-          "name": "error",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "retry_count": {
-          "name": "retry_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "default": 0
         },
         "created_at": {
           "name": "created_at",
@@ -4419,32 +2999,11 @@
         }
       },
       "indexes": {
-        "webhook_events_event_id_idx": {
-          "name": "webhook_events_event_id_idx",
+        "webhook_provider_idx": {
+          "name": "webhook_provider_idx",
           "columns": [
             {
               "expression": "provider",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "event_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "webhook_events_processed_idx": {
-          "name": "webhook_events_processed_idx",
-          "columns": [
-            {
-              "expression": "processed",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -4455,8 +3014,23 @@
           "method": "btree",
           "with": {}
         },
-        "webhook_events_created_at_idx": {
-          "name": "webhook_events_created_at_idx",
+        "webhook_status_idx": {
+          "name": "webhook_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "webhook_created_at_idx": {
+          "name": "webhook_created_at_idx",
           "columns": [
             {
               "expression": "created_at",
@@ -4980,6 +3554,78 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.documents": {
+      "name": "documents",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content": {
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "text": {
+          "name": "text",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'text'"
+        },
+        "userId": {
+          "name": "userId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "documents_userId_user_id_fk": {
+          "name": "documents_userId_user_id_fk",
+          "tableFrom": "documents",
+          "tableTo": "user",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "documents_id_createdAt_pk": {
+          "name": "documents_id_createdAt_pk",
+          "columns": [
+            "id",
+            "createdAt"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.message": {
       "name": "message",
       "schema": "",
@@ -5028,18 +3674,23 @@
           "notNull": false,
           "default": "'0.000000'"
         },
-        "tool_calls": {
-          "name": "tool_calls",
-          "type": "jsonb",
+        "role": {
+          "name": "role",
+          "type": "varchar",
           "primaryKey": false,
-          "notNull": false,
-          "default": "'[]'"
+          "notNull": true
         },
-        "ui_message": {
-          "name": "ui_message",
+        "parts": {
+          "name": "parts",
           "type": "jsonb",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
+        },
+        "attachments": {
+          "name": "attachments",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
         },
         "quoted_message_id": {
           "name": "quoted_message_id",
@@ -5049,6 +3700,13 @@
         },
         "mentioned_agent_ids": {
           "name": "mentioned_agent_ids",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'[]'::jsonb"
+        },
+        "mentioned_knowledge_base_ids": {
+          "name": "mentioned_knowledge_base_ids",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false,
@@ -5143,6 +3801,36 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "message_mentioned_agents_idx": {
+          "name": "message_mentioned_agents_idx",
+          "columns": [
+            {
+              "expression": "mentioned_agent_ids",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
+        },
+        "message_mentioned_kbs_idx": {
+          "name": "message_mentioned_kbs_idx",
+          "columns": [
+            {
+              "expression": "mentioned_knowledge_base_ids",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "gin",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -5201,141 +3889,226 @@
       },
       "isRLSEnabled": false
     },
-    "public.document": {
-      "name": "document",
+    "public.stream": {
+      "name": "stream",
       "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
-          "primaryKey": true,
+          "primaryKey": false,
           "notNull": true
         },
-        "knowledge_base_id": {
-          "name": "knowledge_base_id",
+        "chatId": {
+          "name": "chatId",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "filename": {
-          "name": "filename",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "file_url": {
-          "name": "file_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "file_size": {
-          "name": "file_size",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "mime_type": {
-          "name": "mime_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "chunk_count": {
-          "name": "chunk_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "token_count": {
-          "name": "token_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "processing_status": {
-          "name": "processing_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "processing_error": {
-          "name": "processing_error",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
+        "createdAt": {
+          "name": "createdAt",
           "type": "timestamp",
           "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
+          "notNull": true
         }
       },
-      "indexes": {
-        "document_kb_id_idx": {
-          "name": "document_kb_id_idx",
-          "columns": [
-            {
-              "expression": "knowledge_base_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "document_status_idx": {
-          "name": "document_status_idx",
-          "columns": [
-            {
-              "expression": "processing_status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
-        "document_knowledge_base_id_knowledge_base_id_fk": {
-          "name": "document_knowledge_base_id_knowledge_base_id_fk",
-          "tableFrom": "document",
-          "tableTo": "knowledge_base",
+        "stream_chatId_chat_id_fk": {
+          "name": "stream_chatId_chat_id_fk",
+          "tableFrom": "stream",
+          "tableTo": "chat",
           "columnsFrom": [
-            "knowledge_base_id"
+            "chatId"
           ],
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "document_file_size_positive": {
-          "name": "document_file_size_positive",
-          "value": "file_size > 0"
-        },
-        "document_counts_non_negative": {
-          "name": "document_counts_non_negative",
-          "value": "chunk_count >= 0 AND token_count >= 0"
+      "compositePrimaryKeys": {
+        "stream_id_pk": {
+          "name": "stream_id_pk",
+          "columns": [
+            "id"
+          ]
         }
       },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.suggestion": {
+      "name": "suggestion",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "documentId": {
+          "name": "documentId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "documentCreatedAt": {
+          "name": "documentCreatedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "originalText": {
+          "name": "originalText",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "suggestedText": {
+          "name": "suggestedText",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "isResolved": {
+          "name": "isResolved",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "userId": {
+          "name": "userId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "suggestion_userId_user_id_fk": {
+          "name": "suggestion_userId_user_id_fk",
+          "tableFrom": "suggestion",
+          "tableTo": "user",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "suggestion_documentId_documentCreatedAt_documents_id_createdAt_fk": {
+          "name": "suggestion_documentId_documentCreatedAt_documents_id_createdAt_fk",
+          "tableFrom": "suggestion",
+          "tableTo": "documents",
+          "columnsFrom": [
+            "documentId",
+            "documentCreatedAt"
+          ],
+          "columnsTo": [
+            "id",
+            "createdAt"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "suggestion_id_pk": {
+          "name": "suggestion_id_pk",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.votes": {
+      "name": "votes",
+      "schema": "",
+      "columns": {
+        "chatId": {
+          "name": "chatId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "messageId": {
+          "name": "messageId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "isUpvoted": {
+          "name": "isUpvoted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "votes_chatId_chat_id_fk": {
+          "name": "votes_chatId_chat_id_fk",
+          "tableFrom": "votes",
+          "tableTo": "chat",
+          "columnsFrom": [
+            "chatId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "votes_messageId_message_id_fk": {
+          "name": "votes_messageId_message_id_fk",
+          "tableFrom": "votes",
+          "tableTo": "message",
+          "columnsFrom": [
+            "messageId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "votes_chatId_messageId_pk": {
+          "name": "votes_chatId_messageId_pk",
+          "columns": [
+            "chatId",
+            "messageId"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.embedding": {
@@ -5503,10 +4276,10 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "embedding_document_id_document_id_fk": {
-          "name": "embedding_document_id_document_id_fk",
+        "embedding_document_id_knowledge_document_id_fk": {
+          "name": "embedding_document_id_knowledge_document_id_fk",
           "tableFrom": "embedding",
-          "tableTo": "document",
+          "tableTo": "knowledge_document",
           "columnsFrom": [
             "document_id"
           ],
@@ -5671,6 +4444,143 @@
         }
       },
       "isRLSEnabled": false
+    },
+    "public.knowledge_document": {
+      "name": "knowledge_document",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "knowledge_base_id": {
+          "name": "knowledge_base_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "filename": {
+          "name": "filename",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "file_url": {
+          "name": "file_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "file_size": {
+          "name": "file_size",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mime_type": {
+          "name": "mime_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chunk_count": {
+          "name": "chunk_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "token_count": {
+          "name": "token_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "processing_status": {
+          "name": "processing_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "processing_error": {
+          "name": "processing_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "document_kb_id_idx": {
+          "name": "document_kb_id_idx",
+          "columns": [
+            {
+              "expression": "knowledge_base_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "document_status_idx": {
+          "name": "document_status_idx",
+          "columns": [
+            {
+              "expression": "processing_status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "knowledge_document_knowledge_base_id_knowledge_base_id_fk": {
+          "name": "knowledge_document_knowledge_base_id_knowledge_base_id_fk",
+          "tableFrom": "knowledge_document",
+          "tableTo": "knowledge_base",
+          "columnsFrom": [
+            "knowledge_base_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "document_file_size_positive": {
+          "name": "document_file_size_positive",
+          "value": "file_size > 0"
+        },
+        "document_counts_non_negative": {
+          "name": "document_counts_non_negative",
+          "value": "chunk_count >= 0 AND token_count >= 0"
+        }
+      },
+      "isRLSEnabled": false
     }
   },
   "enums": {
@@ -5702,54 +4612,35 @@
         "marketplace"
       ]
     },
-    "public.billing_interval": {
-      "name": "billing_interval",
-      "schema": "public",
-      "values": [
-        "day",
-        "week",
-        "month",
-        "year"
-      ]
-    },
-    "public.feature_type": {
-      "name": "feature_type",
-      "schema": "public",
-      "values": [
-        "boolean",
-        "limit",
-        "multiplier"
-      ]
-    },
     "public.invoice_status": {
       "name": "invoice_status",
       "schema": "public",
       "values": [
-        "draft",
-        "open",
+        "pending",
         "paid",
-        "void",
-        "uncollectible"
+        "failed",
+        "expired",
+        "canceled"
       ]
     },
-    "public.limit_period": {
-      "name": "limit_period",
+    "public.invoice_type": {
+      "name": "invoice_type",
       "schema": "public",
       "values": [
-        "hour",
-        "day",
-        "month",
-        "billing_cycle"
+        "subscription",
+        "one_time",
+        "usage_based",
+        "addon",
+        "credit",
+        "refund",
+        "custom"
       ]
     },
-    "public.pricing_model": {
-      "name": "pricing_model",
+    "public.payment_provider": {
+      "name": "payment_provider",
       "schema": "public",
       "values": [
-        "flat",
-        "tiered",
-        "usage",
-        "hybrid"
+        "changelly"
       ]
     },
     "public.subscription_status": {
@@ -5757,20 +4648,10 @@
       "schema": "public",
       "values": [
         "active",
-        "past_due",
+        "inactive",
         "canceled",
-        "trialing",
-        "paused",
-        "incomplete"
-      ]
-    },
-    "public.usage_metric_type": {
-      "name": "usage_metric_type",
-      "schema": "public",
-      "values": [
-        "per_unit",
-        "tiered",
-        "package"
+        "expired",
+        "trialing"
       ]
     },
     "public.chat_style": {
@@ -5787,8 +4668,8 @@
       "name": "chat_visibility",
       "schema": "public",
       "values": [
-        "public",
-        "private"
+        "private",
+        "public"
       ]
     }
   },

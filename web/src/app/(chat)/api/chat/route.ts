@@ -17,6 +17,7 @@ import type { ModelCatalog } from "tokenlens/core";
 import { fetchModels } from "tokenlens/fetch";
 import { getUsage } from "tokenlens/helpers";
 import type { VisibilityType } from "@/components/visibility-selector";
+import { entitlementsByUserType } from "@/lib/ai/entitlements";
 import type { ChatModel } from "@/lib/ai/models";
 import { type RequestHints, systemPrompt } from "@/lib/ai/prompts";
 import { myProvider } from "@/lib/ai/providers";
@@ -39,9 +40,8 @@ import type { AppUsage } from "@/lib/usage";
 import { convertToUIMessages, generateUUID } from "@/lib/utils";
 import { generateTitleFromUserMessage } from "../../actions";
 import { type PostRequestBody, postRequestBodySchema } from "./schema";
-import { isProd } from "@/lib/environment";
 import { getSession } from "@/lib/auth";
-import { getAssistantAgentId } from "@/lib/chat/assistant-agent";
+import { isProd } from "@/lib/environment";
 
 export const maxDuration = 60;
 
@@ -112,15 +112,14 @@ export async function POST(request: Request) {
       return new ChatSDKError("unauthorized:chat").toResponse();
     }
 
-    // TODO: handle entitlements and subscription plan limits
-
-    // const userType: UserType = "free";
-
+    // Enforce and check user rate limit
+    // const userType: UserType = session.user.type;
+    //
     // const messageCount = await getMessageCountByUserId({
     //   id: session.user.id,
     //   differenceInHours: 24,
     // });
-
+    //
     // if (messageCount > entitlementsByUserType[userType].maxMessagesPerDay) {
     //   return new ChatSDKError("rate_limit:chat").toResponse();
     // }
@@ -159,6 +158,7 @@ export async function POST(request: Request) {
       country,
     };
 
+    // TODO
     await saveMessages({
       messages: [
         {
@@ -168,16 +168,16 @@ export async function POST(request: Request) {
           parts: message.parts,
           attachments: [],
           createdAt: new Date(),
-          userId: session.user.id,
-          agentId: null,
-          content: "",
-          tokenCount: 0,
-          cost: "0.000000",
-          quotedMessageId: null,
-          mentionedAgentIds: [],
-          mentionedKnowledgeBaseIds: [],
+          userId: session.user.id,  // Add this - it's a user message
+          agentId: null,            // Add this
+          content: "",              // Add this - extract from parts if needed
+          tokenCount: 0,            // Add this - or calculate actual count
+          cost: "0.000000",         // Add this
+          quotedMessageId: null,    // Add this
+          mentionedAgentIds: [],    // Add this
+          mentionedKnowledgeBaseIds: [], // Add this
         },
-      ] as unknown as DBMessage[],
+      ],
     });
 
     const streamId = generateUUID();
@@ -192,7 +192,7 @@ export async function POST(request: Request) {
           system: systemPrompt({ selectedChatModel, requestHints }),
           messages: convertToModelMessages(uiMessages),
           stopWhen: stepCountIs(5),
-          activeTools:
+          experimental_activeTools:
             selectedChatModel === "chat-model-reasoning"
               ? []
               : [
@@ -219,7 +219,7 @@ export async function POST(request: Request) {
               const modelId =
                 myProvider.languageModel(selectedChatModel).modelId;
               if (!modelId) {
-                finalMergedUsage = JSON.parse(JSON.stringify(usage));
+                finalMergedUsage = usage;
                 dataStream.write({
                   type: "data-usage",
                   data: finalMergedUsage,
@@ -228,7 +228,7 @@ export async function POST(request: Request) {
               }
 
               if (!providers) {
-                finalMergedUsage = JSON.parse(JSON.stringify(usage));
+                finalMergedUsage = usage;
                 dataStream.write({
                   type: "data-usage",
                   data: finalMergedUsage,
@@ -237,15 +237,11 @@ export async function POST(request: Request) {
               }
 
               const summary = getUsage({ modelId, usage, providers });
-              finalMergedUsage = {
-                ...JSON.parse(JSON.stringify(usage)),
-                ...summary,
-                modelId,
-              } as AppUsage;
+              finalMergedUsage = { ...usage, ...summary, modelId } as AppUsage;
               dataStream.write({ type: "data-usage", data: finalMergedUsage });
             } catch (err) {
               console.warn("TokenLens enrichment failed", err);
-              finalMergedUsage = JSON.parse(JSON.stringify(usage));
+              finalMergedUsage = usage;
               dataStream.write({ type: "data-usage", data: finalMergedUsage });
             }
           },
@@ -261,21 +257,28 @@ export async function POST(request: Request) {
       },
       generateId: generateUUID,
       onFinish: async ({ messages }) => {
-        // TODO: important => port the message to db message
-        // await saveMessages({
-        //   messages: messages.map((currentMessage) => ({
-        //     id: currentMessage.id,
-        //     role: currentMessage.role,
-        //     parts: currentMessage.parts,
-        //     createdAt: new Date(),
-        //     attachments: [],
-        //     chatId: id,
-        //   })),
-        // });
+        await saveMessages({
+          messages: messages.map((currentMessage) => ({
+            id: currentMessage.id,
+            role: currentMessage.role,
+            parts: currentMessage.parts,
+            createdAt: new Date(),
+            attachments: [],
+            chatId: id,
+            userId: currentMessage.role === "user" ? session.user.id : null,
+            agentId: currentMessage.role === "assistant" ? "system" : null, // or appropriate agent ID
+            content: "", // Extract from parts if needed
+            tokenCount: 0, // Calculate or use from usage data
+            cost: "0.000000", // Calculate from usage data
+            quotedMessageId: null,
+            mentionedAgentIds: [],
+            mentionedKnowledgeBaseIds: [],
+          })),
+        });
 
         if (finalMergedUsage) {
           try {
-            // TODO: handle usage metrics and bill in here
+            // TODO: update usage metrics
             // await updateChatLastContextById({
             //   chatId: id,
             //   context: finalMergedUsage,

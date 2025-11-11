@@ -1,5 +1,7 @@
 "use client";
 
+import type { UseChatHelpers } from "@ai-sdk/react";
+import { Trigger } from "@radix-ui/react-select";
 import type { UIMessage } from "ai";
 import equal from "fast-deep-equal";
 import {
@@ -7,6 +9,7 @@ import {
   type Dispatch,
   memo,
   type SetStateAction,
+  startTransition,
   useCallback,
   useEffect,
   useMemo,
@@ -15,17 +18,26 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { useLocalStorage, useWindowSize } from "usehooks-ts";
+import { saveChatModelAsCookie } from "@/app/(chat)/actions";
+import { SelectItem } from "@/components/ui/select";
+import { chatModels } from "@/lib/ai/models";
 import { myProvider } from "@/lib/ai/providers";
-import type { Attachment, ChatMessage, ChatStatus, SetMessages, SendMessage, Stop } from "@/lib/types";
+import type { Attachment, ChatMessage } from "@/lib/types";
+import type { AppUsage } from "@/lib/usage";
 import { cn } from "@/lib/utils";
 import {
   PromptInput,
+  PromptInputModelSelect,
+  PromptInputModelSelectContent,
   PromptInputSubmit,
-  PromptInputTextarea, PromptInputToolbar,
-  PromptInputTools
-} from "./ai-elements/prompt-input";
+  PromptInputTextarea,
+  PromptInputToolbar,
+  PromptInputTools,
+} from "@/components/ai-elements/prompt-input";
 import {
   ArrowUpIcon,
+  ChevronDownIcon,
+  CpuIcon,
   PaperclipIcon,
   StopIcon,
 } from "@/components/icons/icons";
@@ -35,35 +47,37 @@ import { Button } from "./ui/button";
 import type { VisibilityType } from "./visibility-selector";
 
 function PureMultimodalInput({
-  chatId,
-  input,
-  setInput,
-  status,
-  stop,
-  attachments,
-  setAttachments,
-  messages,
-  setMessages,
-  sendMessage,
-  className,
-  selectedVisibilityType,
-  selectedModelId,
-  onModelChange,
-}: {
+                               chatId,
+                               input,
+                               setInput,
+                               status,
+                               stop,
+                               attachments,
+                               setAttachments,
+                               messages,
+                               setMessages,
+                               sendMessage,
+                               className,
+                               selectedVisibilityType,
+                               selectedModelId,
+                               onModelChange,
+                               usage,
+                             }: {
   chatId: string;
   input: string;
   setInput: Dispatch<SetStateAction<string>>;
-  status: ChatStatus;
+  status: UseChatHelpers<ChatMessage>["status"];
   stop: () => void;
   attachments: Attachment[];
   setAttachments: Dispatch<SetStateAction<Attachment[]>>;
   messages: UIMessage[];
-  setMessages: SetMessages;
-  sendMessage: SendMessage;
+  setMessages: UseChatHelpers<ChatMessage>["setMessages"];
+  sendMessage: UseChatHelpers<ChatMessage>["sendMessage"];
   className?: string;
   selectedVisibilityType: VisibilityType;
   selectedModelId: string;
   onModelChange?: (modelId: string) => void;
+  usage?: AppUsage;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
@@ -158,7 +172,7 @@ function PureMultimodalInput({
     formData.append("file", file);
 
     try {
-      const response = await fetch("/api/chat-files/upload", {
+      const response = await fetch("/api/files/upload", {
         method: "POST",
         body: formData,
       });
@@ -184,12 +198,12 @@ function PureMultimodalInput({
     return myProvider.languageModel(selectedModelId);
   }, [selectedModelId]);
 
-  // const contextProps = useMemo(
-  //   () => ({
-  //     usage,
-  //   }),
-  //   [usage]
-  // );
+  const contextProps = useMemo(
+    () => ({
+      usage,
+    }),
+    [usage]
+  );
 
   const handleFileChange = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
@@ -216,7 +230,7 @@ function PureMultimodalInput({
     },
     [setAttachments, uploadFile]
   );
-  
+
   const handlePaste = useCallback(
     async (event: ClipboardEvent) => {
       const items = event.clipboardData?.items;
@@ -295,6 +309,7 @@ function PureMultimodalInput({
       <PromptInput
         className="rounded-xl border border-border bg-background p-3 shadow-xs transition-all duration-200 focus-within:border-border hover:border-muted-foreground/50"
         onSubmit={(event) => {
+          event.preventDefault();
           if (status !== "ready") {
             toast.error("Please wait for the model to finish its response!");
           } else {
@@ -349,7 +364,7 @@ function PureMultimodalInput({
             rows={1}
             value={input}
           />{" "}
-          {/*TODO: <Context  />*/}
+          {/*<Context {...contextProps} />*/}
         </div>
         <PromptInputToolbar className="!border-top-0 border-t-0! p-0 shadow-none dark:border-0 dark:border-transparent!">
           <PromptInputTools className="gap-0 sm:gap-0.5">
@@ -357,6 +372,10 @@ function PureMultimodalInput({
               fileInputRef={fileInputRef}
               selectedModelId={selectedModelId}
               status={status}
+            />
+            <ModelSelectorCompact
+              onModelChange={onModelChange}
+              selectedModelId={selectedModelId}
             />
           </PromptInputTools>
 
@@ -367,7 +386,7 @@ function PureMultimodalInput({
               className="size-8 rounded-full bg-primary text-primary-foreground transition-colors duration-200 hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground"
               disabled={!input.trim() || uploadQueue.length > 0}
               status={status}
-	      data-testid="send-button"
+              data-testid="send-button"
             >
               <ArrowUpIcon size={14} />
             </PromptInputSubmit>
@@ -402,12 +421,12 @@ export const MultimodalInput = memo(
 );
 
 function PureAttachmentsButton({
-  fileInputRef,
-  status,
-  selectedModelId,
-}: {
+                                 fileInputRef,
+                                 status,
+                                 selectedModelId,
+                               }: {
   fileInputRef: React.MutableRefObject<HTMLInputElement | null>;
-  status: ChatStatus;
+  status: UseChatHelpers<ChatMessage>["status"];
   selectedModelId: string;
 }) {
   const isReasoningModel = selectedModelId === "chat-model-reasoning";
@@ -430,12 +449,70 @@ function PureAttachmentsButton({
 
 const AttachmentsButton = memo(PureAttachmentsButton);
 
+function PureModelSelectorCompact({
+                                    selectedModelId,
+                                    onModelChange,
+                                  }: {
+  selectedModelId: string;
+  onModelChange?: (modelId: string) => void;
+}) {
+  const [optimisticModelId, setOptimisticModelId] = useState(selectedModelId);
+
+  useEffect(() => {
+    setOptimisticModelId(selectedModelId);
+  }, [selectedModelId]);
+
+  const selectedModel = chatModels.find(
+    (model) => model.id === optimisticModelId
+  );
+
+  return (
+    <PromptInputModelSelect
+      onValueChange={(modelName) => {
+        const model = chatModels.find((m) => m.name === modelName);
+        if (model) {
+          setOptimisticModelId(model.id);
+          onModelChange?.(model.id);
+          startTransition(() => {
+            saveChatModelAsCookie(model.id);
+          });
+        }
+      }}
+      value={selectedModel?.name}
+    >
+      <Trigger asChild>
+        <Button variant="ghost" className="h-8 px-2">
+          <CpuIcon size={16} />
+          <span className="hidden font-medium text-xs sm:block">
+            {selectedModel?.name}
+          </span>
+          <ChevronDownIcon size={16} />
+        </Button>
+      </Trigger>
+      <PromptInputModelSelectContent className="min-w-[260px] p-0">
+        <div className="flex flex-col gap-px">
+          {chatModels.map((model) => (
+            <SelectItem key={model.id} value={model.name}>
+              <div className="truncate font-medium text-xs">{model.name}</div>
+              <div className="mt-px truncate text-[10px] text-muted-foreground leading-tight">
+                {model.description}
+              </div>
+            </SelectItem>
+          ))}
+        </div>
+      </PromptInputModelSelectContent>
+    </PromptInputModelSelect>
+  );
+}
+
+const ModelSelectorCompact = memo(PureModelSelectorCompact);
+
 function PureStopButton({
-  stop,
-  setMessages,
-}: {
-  stop: Stop;
-  setMessages: SetMessages;
+                          stop,
+                          setMessages,
+                        }: {
+  stop: () => void;
+  setMessages: UseChatHelpers<ChatMessage>["setMessages"];
 }) {
   return (
     <Button

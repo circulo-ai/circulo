@@ -134,6 +134,7 @@
     "react-hook-form": "^7.66.0",
     "react-syntax-highlighter": "^15.6.6",
     "react-virtuoso": "^4.14.1",
+    "redis": "^5.9.0",
     "resend": "^6.4.2",
     "resumable-stream": "^2.2.8",
     "shiki": "^3.15.0",

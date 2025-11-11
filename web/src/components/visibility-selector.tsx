@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -63,6 +63,7 @@ export function VisibilitySelector({
     <DropdownMenu onOpenChange={setOpen} open={open}>
       <DropdownMenuTrigger
         asChild
+        suppressHydrationWarning
         className={cn(
           "w-fit data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
           className

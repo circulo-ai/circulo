@@ -22,10 +22,7 @@ import { json } from "zod";
 import { nanoid } from "nanoid";
 import { generateUUID } from "@/lib/utils";
 
-export const chatVisibilityEnum = pgEnum("chat_visibility", [
-  "public",
-  "private",
-]);
+export const chatVisibilityEnum = pgEnum("chat_visibility", ["private", "public"]);
 export const chatStyleEnum = pgEnum("chat_style", [
   "brainstorm",
   "debate",
@@ -183,12 +180,6 @@ export const message = pgTable(
     ),
     quotedMessageIdx: index("message_quoted_idx").on(table.quotedMessageId),
 
-    // Enforce at most one stored message per UI message id within a chat
-    messageUiIdUniqueIdx: uniqueIndex("message_chat_ui_message_id_unique").on(
-      table.chatId,
-      sql`(ui_message ->> 'id')`
-    ),
-
     senderCheck: check(
       "message_sender_check",
       sql`(user_id IS NOT NULL AND agent_id IS NULL) OR (user_id IS NULL AND agent_id IS NOT NULL)`,
@@ -245,7 +236,7 @@ export type Stream = InferSelectModel<typeof stream>;
 export type Vote = InferSelectModel<typeof vote>;
 
 export const document = pgTable(
-  "Document",
+  "documents",
   {
     id: text("id").notNull().$defaultFn(generateUUID),
     createdAt: timestamp("createdAt").notNull(),
@@ -268,7 +259,7 @@ export const document = pgTable(
 export type Document = InferSelectModel<typeof document>;
 
 export const suggestion = pgTable(
-  "Suggestion",
+  "suggestion",
   {
     id: text("id").notNull().$defaultFn(generateUUID),
     documentId: text("documentId").notNull(),

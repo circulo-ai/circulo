@@ -1,28 +1,17 @@
 import useSWR, { SWRConfiguration, mutate as globalMutate, mutate } from "swr";
 import { ChatSDKError, ErrorCode } from "@/lib/errors";
 
-export const fetcher = async <T>(
-  url: string,
-  options?: RequestInit,
-): Promise<T> => {
-  const res = await fetch(url, options);
-  // Handle empty responses (e.g., 204 No Content) safely
-  if (res.status === 204) {
-    return undefined as unknown as T;
-  }
-  let json: any = null;
-  try {
-    json = await res.json();
-  } catch {
-    // Non-JSON or empty body — leave json as null
+export const fetcher = async (url: string) => {
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    const { code, cause } = await response.json();
+    throw new ChatSDKError(code as ErrorCode, cause);
   }
 
-  if (!res.ok) {
-    throw new Error((json && json.error) || "An error occurred while fetching data");
-  }
-
-  return json as T;
+  return response.json();
 };
+
 
 export async function fetchWithErrorHandlers(
   input: RequestInfo | URL,

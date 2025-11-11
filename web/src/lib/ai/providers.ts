@@ -1,36 +1,18 @@
 import {
   customProvider,
   extractReasoningMiddleware,
-  gateway,
   wrapLanguageModel
 } from "ai";
-import { isDev } from "@/lib/environment";
+import { google } from "@ai-sdk/google";
 
-export const myProvider = isDev
-  ? (() => {
-      const {
-        artifactModel,
-        chatModel,
-        reasoningModel,
-        titleModel,
-      } = require("./models.mock");
-      return customProvider({
-        languageModels: {
-          "chat-model": chatModel,
-          "chat-model-reasoning": reasoningModel,
-          "title-model": titleModel,
-          "artifact-model": artifactModel,
-        },
-      });
-    })()
-  : customProvider({
-      languageModels: {
-        "chat-model": gateway.languageModel("xai/grok-2-vision-1212"),
-        "chat-model-reasoning": wrapLanguageModel({
-          model: gateway.languageModel("xai/grok-3-mini"),
-          middleware: extractReasoningMiddleware({ tagName: "think" }),
-        }),
-        "title-model": gateway.languageModel("xai/grok-2-1212"),
-        "artifact-model": gateway.languageModel("xai/grok-2-1212"),
-      },
-    });
+export const myProvider = customProvider({
+  languageModels: {
+    "chat-model": google("gemini-2.5-flash"),
+    "chat-model-reasoning": wrapLanguageModel({
+      model: google("gemini-2.5-flash"),
+      middleware: extractReasoningMiddleware({ tagName: "think" }),
+    }),
+    "title-model": google("gemini-2.5-flash"),
+    "artifact-model": google("gemini-2.5-flash"),
+  },
+});
