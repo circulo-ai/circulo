@@ -28,7 +28,7 @@ export default async function Page(props: { params: Promise<{ id: string }> }) {
       return notFound();
     }
 
-    if (session.user.id !== chat.userId) {
+    if (session.user.id !== chat.creatorId) {
       return notFound();
     }
   }
@@ -51,7 +51,7 @@ export default async function Page(props: { params: Promise<{ id: string }> }) {
           initialChatModel={DEFAULT_CHAT_MODEL}
           initialMessages={uiMessages}
           initialVisibilityType={chat.visibility}
-          isReadonly={session?.user?.id !== chat.userId}
+          isReadonly={session?.user?.id !== chat.creatorId}
         />
         <DataStreamHandler />
       </>
@@ -66,7 +66,7 @@ export default async function Page(props: { params: Promise<{ id: string }> }) {
         initialChatModel={chatModelFromCookie.value}
         initialMessages={uiMessages}
         initialVisibilityType={chat.visibility}
-        isReadonly={session?.user?.id !== chat.userId}
+        isReadonly={session?.user?.id !== chat.creatorId}
       />
       <DataStreamHandler />
     </>

@@ -1,35 +1,76 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSWRConfig } from "swr";
+import useSWR from "swr";
 
 type ScrollFlag = ScrollBehavior | false;
-
-const SCROLL_KEY = "messages:should-scroll";
 
 export function useScrollToBottom() {
   const containerRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
-  const { cache, mutate } = useSWRConfig();
 
-  // Get current scroll behavior from cache
-  const scrollBehavior = (cache.get(SCROLL_KEY)?.data as ScrollFlag) || false;
-
-  const setScrollBehavior = useCallback(
-    (value: ScrollFlag) => {
-      mutate(SCROLL_KEY, value, { revalidate: false });
-    },
-    [mutate]
-  );
+  const { data: scrollBehavior = false, mutate: setScrollBehavior } =
+    useSWR<ScrollFlag>("messages:should-scroll", null, { fallbackData: false });
 
   const handleScroll = useCallback(() => {
     if (!containerRef.current) {
       return;
     }
     const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+
+    // Check if we are within 100px of the bottom (like v0 does)
     setIsAtBottom(scrollTop + clientHeight >= scrollHeight - 100);
   }, []);
 
-  // ... rest of your existing useEffect hooks ...
+  useEffect(() => {
+    if (!containerRef.current) {
+      return;
+    }
+
+    const container = containerRef.current;
+
+    const resizeObserver = new ResizeObserver(() => {
+      requestAnimationFrame(() => {
+        handleScroll();
+      });
+    });
+
+    const mutationObserver = new MutationObserver(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          handleScroll();
+        });
+      });
+    });
+
+    resizeObserver.observe(container);
+    mutationObserver.observe(container, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["style", "class", "data-state"],
+    });
+
+    handleScroll();
+
+    return () => {
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+    };
+  }, [handleScroll]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) {
+      return;
+    }
+
+    container.addEventListener("scroll", handleScroll);
+    handleScroll(); // Check initial state
+
+    return () => {
+      container.removeEventListener("scroll", handleScroll);
+    };
+  }, [handleScroll]);
 
   useEffect(() => {
     if (scrollBehavior && containerRef.current) {

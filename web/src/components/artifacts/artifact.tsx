@@ -1,3 +1,4 @@
+import type { UseChatHelpers } from "@ai-sdk/react";
 import { formatDistance } from "date-fns";
 import equal from "fast-deep-equal";
 import { AnimatePresence, motion } from "framer-motion";
@@ -17,7 +18,8 @@ import { sheetArtifact } from "@/artifacts/sheet/client";
 import { textArtifact } from "@/artifacts/text/client";
 import { useArtifact } from "@/hooks/chats/use-artifact";
 import type { Document, Vote } from "@/db/schema";
-import type { Attachment, ChatMessage, ChatStatus, Stop, SetMessages, SendMessage, Regenerate } from "@/lib/types";
+import type { Attachment, ChatMessage } from "@/lib/types";
+import { fetcher } from "@/lib/swr";
 import { ArtifactActions } from "./artifact-actions";
 import { ArtifactCloseButton } from "./artifact-close-button";
 import { ArtifactMessages } from "./artifact-messages";
@@ -26,7 +28,6 @@ import { Toolbar } from "@/components/toolbar";
 import { useSidebar } from "@/components/ui/sidebar";
 import { VersionFooter } from "@/components/version-footer";
 import type { VisibilityType } from "@/components/visibility-selector";
-import { fetcher } from "@/lib/swr";
 
 export const artifactDefinitions = [
   textArtifact,
@@ -71,15 +72,15 @@ function PureArtifact({
   chatId: string;
   input: string;
   setInput: Dispatch<SetStateAction<string>>;
-  status: ChatStatus;
-  stop: Stop;
+  status: UseChatHelpers<ChatMessage>["status"];
+  stop: UseChatHelpers<ChatMessage>["stop"];
   attachments: Attachment[];
   setAttachments: Dispatch<SetStateAction<Attachment[]>>;
   messages: ChatMessage[];
-  setMessages: SetMessages;
+  setMessages: UseChatHelpers<ChatMessage>["setMessages"];
   votes: Vote[] | undefined;
-  sendMessage: SendMessage;
-  regenerate: Regenerate;
+  sendMessage: UseChatHelpers<ChatMessage>["sendMessage"];
+  regenerate: UseChatHelpers<ChatMessage>["regenerate"];
   isReadonly: boolean;
   selectedVisibilityType: VisibilityType;
   selectedModelId: string;

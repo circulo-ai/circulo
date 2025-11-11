@@ -1,11 +1,11 @@
 import type { InferUITool, UIMessage } from "ai";
 import { z } from "zod";
+import type { ArtifactKind } from "@/components/artifacts/artifact";
 import type { createDocument } from "./ai/tools/create-document";
 import type { requestSuggestions } from "./ai/tools/request-suggestions";
 import type { updateDocument } from "./ai/tools/update-document";
-import { ArtifactKind } from "@/components/artifacts/artifact";
+import type { Suggestion } from "@/db/schema";
 import type { AppUsage } from "./usage";
-import { Suggestion } from "@/db";
 
 export type DataPart = { type: "append-message"; message: string };
 
@@ -33,13 +33,13 @@ export type CustomUIDataTypes = {
   sheetDelta: string;
   codeDelta: string;
   suggestion: Suggestion;
-  usage: AppUsage;
   appendMessage: string;
   id: string;
   title: string;
   kind: ArtifactKind;
   clear: null;
   finish: null;
+  usage: AppUsage;
 };
 
 export type ChatMessage = UIMessage<
@@ -47,18 +47,6 @@ export type ChatMessage = UIMessage<
   CustomUIDataTypes,
   ChatTools
 >;
-
-// Narrow status type used across UI without depending on external generics
-export type ChatStatus = "idle" | "submitted" | "streaming" | "error" | "ready";
-
-// Lightweight helper types to avoid importing external generics in UI layers
-export type SetMessages = (
-  updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])
-) => void;
-export type SendMessage = (...args: any[]) => Promise<void> | void;
-export type Regenerate = (...args: any[]) => Promise<void> | void;
-export type Stop = () => void;
-export type ResumeStream = () => void;
 
 export type Attachment = {
   name: string;

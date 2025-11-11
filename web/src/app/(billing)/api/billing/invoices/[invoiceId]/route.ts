@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { invoices } from "@/db/schema/billing";
-import { api, noContent, notFound, success } from "@/lib/server";
+import { api, notFound, success } from "@/lib/server";
 import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -11,7 +11,7 @@ export const GET = api(
   {
     auth: true,
     params: z.object({
-      invoiceId: z.number(),
+      invoiceId: z.coerce.number(),
     }),
   },
   async (req, ctx) => {

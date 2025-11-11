@@ -1,12 +1,12 @@
 import equal from "fast-deep-equal";
 import { memo } from "react";
 import { toast } from "sonner";
-import { useSWRConfig } from "swr";
 import { useCopyToClipboard } from "usehooks-ts";
 import type { ChatMessage } from "@/lib/types";
 import { Action, Actions } from "@/components/ai-elements/actions";
 import { CopyIcon, PencilEditIcon, ThumbDownIcon, ThumbUpIcon } from "@/components/icons/icons";
 import { Vote } from "@/db";
+import { useSWRConfig } from "swr";
 
 export function PureMessageActions({
   chatId,
@@ -103,6 +103,7 @@ export function PureMessageActions({
                   return [
                     ...votesWithoutCurrent,
                     {
+                      userId: vote?.userId ?? "noop",
                       chatId,
                       messageId: message.id,
                       isUpvoted: true,
@@ -152,6 +153,7 @@ export function PureMessageActions({
                   return [
                     ...votesWithoutCurrent,
                     {
+                      userId: vote?.userId ?? "noop",
                       chatId,
                       messageId: message.id,
                       isUpvoted: false,

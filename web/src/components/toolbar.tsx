@@ -1,4 +1,5 @@
 "use client";
+import type { UseChatHelpers } from "@ai-sdk/react";
 import cx from "classnames";
 import {
   AnimatePresence,
@@ -23,7 +24,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { ChatMessage, ChatStatus, SendMessage, Stop, SetMessages } from "@/lib/types";
+import type { ChatMessage } from "@/lib/types";
 import { type ArtifactKind, artifactDefinitions } from "@/components/artifacts/artifact";
 import type { ArtifactToolbarItem } from "@/components/artifacts/create-artifact";
 import { ArrowUpIcon, StopIcon, SummarizeIcon } from "@/components/icons/icons";
@@ -36,21 +37,25 @@ type ToolProps = {
   isToolbarVisible?: boolean;
   setIsToolbarVisible?: Dispatch<SetStateAction<boolean>>;
   isAnimating: boolean;
-  sendMessage: SendMessage;
-  onClick: ({ sendMessage }: { sendMessage: SendMessage }) => void;
+  sendMessage: UseChatHelpers<ChatMessage>["sendMessage"];
+  onClick: ({
+    sendMessage,
+  }: {
+    sendMessage: UseChatHelpers<ChatMessage>["sendMessage"];
+  }) => void;
 };
 
 const Tool = ({
-                description,
-                icon,
-                selectedTool,
-                setSelectedTool,
-                isToolbarVisible,
-                setIsToolbarVisible,
-                isAnimating,
-                sendMessage,
-                onClick,
-              }: ToolProps) => {
+  description,
+  icon,
+  selectedTool,
+  setSelectedTool,
+  isToolbarVisible,
+  setIsToolbarVisible,
+  isAnimating,
+  sendMessage,
+  onClick,
+}: ToolProps) => {
   const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
@@ -129,13 +134,13 @@ const Tool = ({
 const randomArr = [...new Array(6)].map((_x) => nanoid(5));
 
 const ReadingLevelSelector = ({
-                                setSelectedTool,
-                                sendMessage,
-                                isAnimating,
-                              }: {
+  setSelectedTool,
+  sendMessage,
+  isAnimating,
+}: {
   setSelectedTool: Dispatch<SetStateAction<string | null>>;
   isAnimating: boolean;
-  sendMessage: SendMessage;
+  sendMessage: UseChatHelpers<ChatMessage>["sendMessage"];
 }) => {
   const LEVELS = [
     "Elementary",
@@ -240,18 +245,18 @@ const ReadingLevelSelector = ({
 };
 
 export const Tools = ({
-                        isToolbarVisible,
-                        selectedTool,
-                        setSelectedTool,
-                        sendMessage,
-                        isAnimating,
-                        setIsToolbarVisible,
-                        tools,
-                      }: {
+  isToolbarVisible,
+  selectedTool,
+  setSelectedTool,
+  sendMessage,
+  isAnimating,
+  setIsToolbarVisible,
+  tools,
+}: {
   isToolbarVisible: boolean;
   selectedTool: string | null;
   setSelectedTool: Dispatch<SetStateAction<string | null>>;
-  sendMessage: SendMessage;
+  sendMessage: UseChatHelpers<ChatMessage>["sendMessage"];
   isAnimating: boolean;
   setIsToolbarVisible: Dispatch<SetStateAction<boolean>>;
   tools: ArtifactToolbarItem[];
@@ -297,24 +302,24 @@ export const Tools = ({
 };
 
 const PureToolbar = ({
-                       isToolbarVisible,
-                       setIsToolbarVisible,
-                       sendMessage,
-                       status,
-                       stop,
-                       setMessages,
-                       artifactKind,
-                     }: {
+  isToolbarVisible,
+  setIsToolbarVisible,
+  sendMessage,
+  status,
+  stop,
+  setMessages,
+  artifactKind,
+}: {
   isToolbarVisible: boolean;
   setIsToolbarVisible: Dispatch<SetStateAction<boolean>>;
-  status: ChatStatus;
-  sendMessage: SendMessage;
-  stop: Stop;
-  setMessages: SetMessages;
+  status: UseChatHelpers<ChatMessage>["status"];
+  sendMessage: UseChatHelpers<ChatMessage>["sendMessage"];
+  stop: UseChatHelpers<ChatMessage>["stop"];
+  setMessages: UseChatHelpers<ChatMessage>["setMessages"];
   artifactKind: ArtifactKind;
 }) => {
   const toolbarRef = useRef<HTMLDivElement>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -376,19 +381,19 @@ const PureToolbar = ({
           isToolbarVisible
             ? selectedTool === "adjust-reading-level"
               ? {
-                opacity: 1,
-                y: 0,
-                height: 6 * 43,
-                transition: { delay: 0 },
-                scale: 0.95,
-              }
+                  opacity: 1,
+                  y: 0,
+                  height: 6 * 43,
+                  transition: { delay: 0 },
+                  scale: 0.95,
+                }
               : {
-                opacity: 1,
-                y: 0,
-                height: toolsByArtifactKind.length * 50,
-                transition: { delay: 0 },
-                scale: 1,
-              }
+                  opacity: 1,
+                  y: 0,
+                  height: toolsByArtifactKind.length * 50,
+                  transition: { delay: 0 },
+                  scale: 1,
+                }
             : { opacity: 1, y: 0, height: 54, transition: { delay: 0 } }
         }
         className="absolute right-6 bottom-6 flex cursor-pointer flex-col justify-end rounded-full border bg-background p-1.5 shadow-lg"

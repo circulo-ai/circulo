@@ -1,7 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, type DataUIPart } from "ai";
+import { DefaultChatTransport } from "ai";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
@@ -22,7 +22,8 @@ import { useAutoResume } from "@/hooks/chats/use-auto-resume";
 import { useChatVisibility } from "@/hooks/chats/use-chat-visibility";
 import type { Vote } from "@/db/schema";
 import { ChatSDKError } from "@/lib/errors";
-import type { Attachment, ChatMessage, CustomUIDataTypes, SetMessages } from "@/lib/types";
+import type { Attachment, ChatMessage } from "@/lib/types";
+import type { AppUsage } from "@/lib/usage";
 import { generateUUID } from "@/lib/utils";
 import { Artifact } from "@/components/artifacts/artifact";
 import { useDataStream } from "./data-stream-provider";
@@ -40,6 +41,7 @@ export function Chat({
   initialVisibilityType,
   isReadonly,
   autoResume,
+  initialLastContext,
 }: {
   id: string;
   initialMessages: ChatMessage[];
@@ -47,6 +49,7 @@ export function Chat({
   initialVisibilityType: VisibilityType;
   isReadonly: boolean;
   autoResume: boolean;
+  initialLastContext?: AppUsage;
 }) {
   const { visibilityType } = useChatVisibility({
     chatId: id,
@@ -57,6 +60,7 @@ export function Chat({
   const { setDataStream } = useDataStream();
 
   const [input, setInput] = useState<string>("");
+  const [usage, setUsage] = useState<AppUsage | undefined>(initialLastContext);
   const [showCreditCardAlert, setShowCreditCardAlert] = useState(false);
   const [currentModelId, setCurrentModelId] = useState(initialChatModel);
   const currentModelIdRef = useRef(currentModelId);
@@ -73,9 +77,9 @@ export function Chat({
     stop,
     regenerate,
     resumeStream,
-  } = useChat({
+  } = useChat<ChatMessage>({
     id,
-    messages: initialMessages as any,
+    messages: initialMessages,
     experimental_throttle: 100,
     generateId: generateUUID,
     transport: new DefaultChatTransport({
@@ -94,12 +98,10 @@ export function Chat({
       },
     }),
     onData: (dataPart) => {
-      const typedPart = dataPart as DataUIPart<CustomUIDataTypes>;
-      setDataStream((ds) => [...ds, typedPart]);
-      // TODO
-      // if (dataPart.type === "data-usage") {
-      //   setUsage(dataPart.data);
-      // }
+      setDataStream((ds) => (ds ? [...ds, dataPart] : []));
+      if (dataPart.type === "data-usage") {
+        setUsage(dataPart.data);
+      }
     },
     onFinish: () => {
       mutate(unstable_serialize(getChatHistoryPaginationKey));
@@ -150,7 +152,7 @@ export function Chat({
     autoResume,
     initialMessages,
     resumeStream,
-    setMessages: setMessages as unknown as SetMessages,
+    setMessages,
   });
 
   return (
@@ -166,10 +168,10 @@ export function Chat({
           chatId={id}
           isArtifactVisible={isArtifactVisible}
           isReadonly={isReadonly}
-          messages={messages as unknown as ChatMessage[]}
+          messages={messages}
           regenerate={regenerate}
           selectedModelId={initialChatModel}
-          setMessages={setMessages as unknown as SetMessages}
+          setMessages={setMessages}
           status={status}
           votes={votes}
         />
@@ -180,16 +182,17 @@ export function Chat({
               attachments={attachments}
               chatId={id}
               input={input}
-              messages={messages as unknown as ChatMessage[]}
+              messages={messages}
               onModelChange={setCurrentModelId}
               selectedModelId={currentModelId}
               selectedVisibilityType={visibilityType}
               sendMessage={sendMessage}
               setAttachments={setAttachments}
               setInput={setInput}
-              setMessages={setMessages as unknown as SetMessages}
+              setMessages={setMessages}
               status={status}
               stop={stop}
+              usage={usage}
             />
           )}
         </div>
@@ -200,14 +203,14 @@ export function Chat({
         chatId={id}
         input={input}
         isReadonly={isReadonly}
-        messages={messages as unknown as ChatMessage[]}
+        messages={messages}
         regenerate={regenerate}
         selectedModelId={currentModelId}
         selectedVisibilityType={visibilityType}
         sendMessage={sendMessage}
         setAttachments={setAttachments}
         setInput={setInput}
-        setMessages={setMessages as unknown as SetMessages}
+        setMessages={setMessages}
         status={status}
         stop={stop}
         votes={votes}

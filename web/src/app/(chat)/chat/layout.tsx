@@ -2,7 +2,6 @@ import { cookies } from "next/headers";
 import { AppSidebar } from "@/components/app-sidebar";
 import { DataStreamProvider } from "@/components/data-stream-provider";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { useSession } from "@/providers/session-provider";
 import { getSession } from "@/lib/auth";
 
 // export const experimental_ppr = true;

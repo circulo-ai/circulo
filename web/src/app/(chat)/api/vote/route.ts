@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     return new ChatSDKError("not_found:chat").toResponse();
   }
 
-  if (chat.userId !== session.user.id) {
+  if (chat.creatorId !== session.user.id) {
     return new ChatSDKError("forbidden:vote").toResponse();
   }
 
@@ -61,11 +61,12 @@ export async function PATCH(request: Request) {
     return new ChatSDKError("not_found:vote").toResponse();
   }
 
-  if (chat.userId !== session.user.id) {
+  if (chat.creatorId !== session.user.id) {
     return new ChatSDKError("forbidden:vote").toResponse();
   }
 
   await voteMessage({
+    userId: session.user.id,
     chatId,
     messageId,
     type,

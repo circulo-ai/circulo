@@ -1,6 +1,6 @@
 "use client";
 
-import type { Regenerate, SetMessages } from "@/lib/types";
+import type { UseChatHelpers } from "@ai-sdk/react";
 import {
   type Dispatch,
   type SetStateAction,
@@ -18,8 +18,8 @@ import { Textarea } from "@/components/ui/textarea";
 export type MessageEditorProps = {
   message: ChatMessage;
   setMode: Dispatch<SetStateAction<"view" | "edit">>;
-  setMessages: SetMessages;
-  regenerate: Regenerate;
+  setMessages: UseChatHelpers<ChatMessage>["setMessages"];
+  regenerate: UseChatHelpers<ChatMessage>["regenerate"];
 };
 
 export function MessageEditor({

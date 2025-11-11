@@ -1,20 +1,5 @@
 "use client";
 
-import type { ArtifactKind, UIArtifact } from "@/components/artifacts/artifact";
-import { CodeEditor } from "@/components/editors/code/code-editor";
-import { ImageEditor } from "@/components/editors/image/image-editor";
-import { SpreadsheetEditor } from "@/components/editors/sheet/sheet-editor";
-import { Editor } from "@/components/editors/text/text-editor";
-import {
-  FileIcon,
-  FullscreenIcon,
-  ImageIcon,
-  LoaderIcon,
-} from "@/components/icons/icons";
-import type { Document } from "@/db/schema";
-import { useArtifact } from "@/hooks/chats/use-artifact";
-import { fetcher } from "@/lib/swr";
-import { cn } from "@/lib/utils";
 import equal from "fast-deep-equal";
 import {
   type MouseEvent,
@@ -25,8 +10,18 @@ import {
   useRef,
 } from "react";
 import useSWR from "swr";
+import { useArtifact } from "@/hooks/chats/use-artifact";
+import type { Document } from "@/db/schema";
+import { cn } from "@/lib/utils";
+import type { ArtifactKind, UIArtifact } from "@/components/artifacts/artifact";
 import { DocumentToolCall, DocumentToolResult } from "./document";
 import { InlineDocumentSkeleton } from "./document-skeleton";
+import { FileIcon, FullscreenIcon, ImageIcon, LoaderIcon } from "@/components/icons/icons";
+import { fetcher } from "@/lib/swr";
+import { Editor } from "../editors/text/text-editor";
+import { CodeEditor } from "../editors/code/code-editor";
+import { SpreadsheetEditor } from "../editors/sheet/sheet-editor";
+import { ImageEditor } from "../editors/image/image-editor";
 
 type DocumentPreviewProps = {
   isReadonly: boolean;
@@ -96,10 +91,11 @@ export function DocumentPreview({
       ? {
           title: artifact.title,
           kind: artifact.kind,
-          content: artifact.content,
+          content: artifact.content ?? null,
           id: artifact.documentId,
           createdAt: new Date(),
           userId: "noop",
+          chatId: null,
         }
       : null;
 
@@ -126,23 +122,23 @@ export function DocumentPreview({
 
 const LoadingSkeleton = ({ artifactKind }: { artifactKind: ArtifactKind }) => (
   <div className="w-full">
-    <div className="dark:bg-muted flex h-[57px] flex-row items-center justify-between gap-2 rounded-t-2xl border border-b-0 p-4 dark:border-zinc-700">
+    <div className="flex h-[57px] flex-row items-center justify-between gap-2 rounded-t-2xl border border-b-0 p-4 dark:border-zinc-700 dark:bg-muted">
       <div className="flex flex-row items-center gap-3">
         <div className="text-muted-foreground">
-          <div className="bg-muted-foreground/20 size-4 animate-pulse rounded-md" />
+          <div className="size-4 animate-pulse rounded-md bg-muted-foreground/20" />
         </div>
-        <div className="bg-muted-foreground/20 h-4 w-24 animate-pulse rounded-lg" />
+        <div className="h-4 w-24 animate-pulse rounded-lg bg-muted-foreground/20" />
       </div>
       <div>
         <FullscreenIcon />
       </div>
     </div>
     {artifactKind === "image" ? (
-      <div className="bg-muted overflow-y-scroll rounded-b-2xl border border-t-0 dark:border-zinc-700">
-        <div className="bg-muted-foreground/20 h-[257px] w-full animate-pulse" />
+      <div className="overflow-y-scroll rounded-b-2xl border border-t-0 bg-muted dark:border-zinc-700">
+        <div className="h-[257px] w-full animate-pulse bg-muted-foreground/20" />
       </div>
     ) : (
-      <div className="bg-muted overflow-y-scroll rounded-b-2xl border border-t-0 p-8 pt-4 dark:border-zinc-700">
+      <div className="overflow-y-scroll rounded-b-2xl border border-t-0 bg-muted p-8 pt-4 dark:border-zinc-700">
         <InlineDocumentSkeleton />
       </div>
     )}
@@ -157,7 +153,7 @@ const PureHitboxLayer = ({
   hitboxRef: React.RefObject<HTMLDivElement | null>;
   result: any;
   setArtifact: (
-    updaterFn: UIArtifact | ((currentArtifact: UIArtifact) => UIArtifact),
+    updaterFn: UIArtifact | ((currentArtifact: UIArtifact) => UIArtifact)
   ) => void;
 }) => {
   const handleClick = useCallback(
@@ -179,10 +175,10 @@ const PureHitboxLayer = ({
                 width: boundingBox.width,
                 height: boundingBox.height,
               },
-            },
+            }
       );
     },
-    [setArtifact, result],
+    [setArtifact, result]
   );
 
   return (
@@ -218,7 +214,7 @@ const PureDocumentHeader = ({
   kind: ArtifactKind;
   isStreaming: boolean;
 }) => (
-  <div className="dark:bg-muted flex flex-row items-start justify-between gap-2 rounded-t-2xl border border-b-0 p-4 sm:items-center dark:border-zinc-700">
+  <div className="flex flex-row items-start justify-between gap-2 rounded-t-2xl border border-b-0 p-4 sm:items-center dark:border-zinc-700 dark:bg-muted">
     <div className="flex flex-row items-start gap-3 sm:items-center">
       <div className="text-muted-foreground">
         {isStreaming ? (
@@ -252,11 +248,11 @@ const DocumentContent = ({ document }: { document: Document }) => {
   const { artifact } = useArtifact();
 
   const containerClassName = cn(
-    "dark:bg-muted h-[257px] overflow-y-scroll rounded-b-2xl border border-t-0 dark:border-zinc-700",
+    "h-[257px] overflow-y-scroll rounded-b-2xl border border-t-0 dark:border-zinc-700 dark:bg-muted",
     {
       "p-4 sm:px-14 sm:py-16": document.kind === "text",
       "p-0": document.kind === "code",
-    },
+    }
   );
 
   const commonProps = {

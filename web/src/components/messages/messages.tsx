@@ -1,10 +1,11 @@
+import type { UseChatHelpers } from "@ai-sdk/react";
 import equal from "fast-deep-equal";
 import { AnimatePresence } from "framer-motion";
 import { ArrowDownIcon } from "lucide-react";
 import { memo, useEffect } from "react";
 import { useMessages } from "@/hooks/chats/use-messages";
 import type { Vote } from "@/db/schema";
-import type { ChatMessage, ChatStatus, SetMessages, Regenerate } from "@/lib/types";
+import type { ChatMessage } from "@/lib/types";
 import { useDataStream } from "@/components/data-stream-provider";
 import { Conversation, ConversationContent } from "@/components/ai-elements/conversation";
 import { Greeting } from "@/components/greeting";
@@ -12,11 +13,11 @@ import { PreviewMessage, ThinkingMessage } from "./message";
 
 type MessagesProps = {
   chatId: string;
-  status: ChatStatus;
+  status: UseChatHelpers<ChatMessage>["status"];
   votes: Vote[] | undefined;
   messages: ChatMessage[];
-  setMessages: SetMessages;
-  regenerate: Regenerate;
+  setMessages: UseChatHelpers<ChatMessage>["setMessages"];
+  regenerate: UseChatHelpers<ChatMessage>["regenerate"];
   isReadonly: boolean;
   isArtifactVisible: boolean;
   selectedModelId: string;

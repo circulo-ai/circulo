@@ -18,6 +18,7 @@ import { user } from "@/db";
 // -------------------- TYPES --------------------
 
 export type PlanFeatures = {
+  maxMessagesPerDay: number;
   rateLimitPerMinute: number;
   maxAgents: number | null; // null = unlimited
   maxChats: number | null;

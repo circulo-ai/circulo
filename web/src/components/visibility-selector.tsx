@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -8,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useChatVisibility } from "@/hooks/chats/use-chat-visibility";
 import { cn } from "@/lib/utils";
 import {
   CheckCircleFillIcon,
@@ -15,7 +16,6 @@ import {
   GlobeIcon,
   LockIcon,
 } from "@/components/icons/icons";
-import { useChatVisibility } from "@/hooks/chats/use-chat-visibility";
 
 export type VisibilityType = "private" | "public";
 
@@ -63,7 +63,6 @@ export function VisibilitySelector({
     <DropdownMenu onOpenChange={setOpen} open={open}>
       <DropdownMenuTrigger
         asChild
-        suppressHydrationWarning
         className={cn(
           "w-fit data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
           className
