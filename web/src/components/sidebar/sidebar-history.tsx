@@ -25,8 +25,8 @@ import {
 import type { Chat } from "@/db/schema";
 import { LoaderIcon } from "@/components/icons/icons";
 import { ChatItem } from "./sidebar-history-item";
-import { User } from "better-auth";
 import { fetcher } from "@/lib/swr";
+import { User } from "@/providers/session-provider";
 
 type GroupedChats = {
   today: Chat[];

@@ -50,6 +50,13 @@
       "when": 1762714235046,
       "tag": "0006_gifted_lorna_dane",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1762871844682,
+      "tag": "0007_minor_ravenous",
+      "breakpoints": true
     }
   ]
 }
