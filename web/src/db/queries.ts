@@ -21,6 +21,7 @@ import {
   type Chat,
   chat,
   type Message as DBMessage,
+  chatMember,
   document,
   message,
   type Suggestion,
@@ -196,6 +197,145 @@ export async function getChatsByUserId({
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to get chats by user id"
+    );
+  }
+}
+
+export type ConversationSummary = {
+  id: string;
+  name: string;
+  avatar: string;
+  lastMessage: string;
+  timestamp: string;
+  unread?: boolean;
+  verified?: boolean;
+  hasAttachment?: boolean;
+  badges?: string[];
+  type: "channel" | "dm";
+};
+
+export async function getConversationSummariesByUserId({
+                                                         id,
+                                                         limit,
+                                                         startingAfter,
+                                                         endingBefore,
+                                                       }: {
+  id: string;
+  limit: number;
+  startingAfter: string | null;
+  endingBefore: string | null;
+}): Promise<{ conversations: ConversationSummary[]; hasMore: boolean }> {
+  try {
+    const extendedLimit = limit + 1;
+
+    const query = (whereCondition?: SQL<any>) =>
+      db
+        .select()
+        .from(chat)
+        .where(
+          whereCondition ? and(whereCondition, eq(chat.creatorId, id)) : eq(chat.creatorId, id)
+        )
+        .orderBy(desc(chat.createdAt))
+        .limit(extendedLimit);
+
+    let filteredChats: Chat[] = [];
+
+    if (startingAfter) {
+      const [selectedChat] = await db
+        .select()
+        .from(chat)
+        .where(eq(chat.id, startingAfter))
+        .limit(1);
+
+      if (!selectedChat) {
+        throw new ChatSDKError(
+          "not_found:database",
+          `Chat with id ${startingAfter} not found`
+        );
+      }
+
+      filteredChats = await query(gt(chat.createdAt, selectedChat.createdAt));
+    } else if (endingBefore) {
+      const [selectedChat] = await db
+        .select()
+        .from(chat)
+        .where(eq(chat.id, endingBefore))
+        .limit(1);
+
+      if (!selectedChat) {
+        throw new ChatSDKError(
+          "not_found:database",
+          `Chat with id ${endingBefore} not found`
+        );
+      }
+
+      filteredChats = await query(lt(chat.createdAt, selectedChat.createdAt));
+    } else {
+      filteredChats = await query();
+    }
+
+    const hasMore = filteredChats.length > limit;
+    const chatsPage = hasMore ? filteredChats.slice(0, limit) : filteredChats;
+
+    const chatIds = chatsPage.map((c) => c.id);
+
+    // Fetch latest message per chat (single query then reduce)
+    const latestMessages = await db
+      .select()
+      .from(message)
+      .where(inArray(message.chatId, chatIds))
+      .orderBy(desc(message.createdAt));
+
+    const latestByChat = new Map<string, DBMessage>();
+    for (const m of latestMessages) {
+      if (!latestByChat.has(m.chatId)) {
+        latestByChat.set(m.chatId, m);
+      }
+    }
+
+    // Fetch member unread counts for current user across chats
+    const memberRows = await db
+      .select({ chatId: chatMember.chatId, unreadCount: chatMember.unreadCount })
+      .from(chatMember)
+      .where(and(inArray(chatMember.chatId, chatIds), eq(chatMember.userId, id)));
+    const unreadByChat = new Map<string, number>();
+    for (const row of memberRows) {
+      unreadByChat.set(row.chatId, row.unreadCount ?? 0);
+    }
+
+    const conversations: ConversationSummary[] = chatsPage.map((c) => {
+      const latest = latestByChat.get(c.id);
+      const lastMessageText = latest?.content ?? "";
+      const ts = latest?.createdAt ?? c.updatedAt ?? c.createdAt;
+      const attachments = latest?.attachments as unknown as any[] | Record<string, unknown> | undefined;
+      const hasAttachment = Array.isArray(attachments)
+        ? attachments.length > 0
+        : attachments && Object.keys(attachments).length > 0;
+      const unread = (unreadByChat.get(c.id) ?? 0) > 0;
+
+      const badges: string[] = [];
+      if (c.visibility === "public") badges.push("Public");
+      if (c.type === "group") badges.push("Group");
+
+      return {
+        id: c.id,
+        name: c.title,
+        avatar: "",
+        lastMessage: lastMessageText,
+        timestamp: ts ? new Date(ts).toISOString() : new Date().toISOString(),
+        unread,
+        verified: c.visibility === "public",
+        hasAttachment: Boolean(hasAttachment),
+        badges,
+        type: c.type === "group" ? "channel" : "dm",
+      };
+    });
+
+    return { conversations, hasMore };
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get conversation summaries by user id"
     );
   }
 }

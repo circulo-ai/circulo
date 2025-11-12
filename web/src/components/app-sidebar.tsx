@@ -1,23 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useSWRConfig } from "swr";
 import { unstable_serialize } from "swr/infinite";
-import { PlusIcon, TrashIcon } from "@/components/icons/icons";
-import { SidebarHistory, getChatHistoryPaginationKey } from "@/components/sidebar/sidebar-history";
+import useSWRInfinite from "swr/infinite";
+import { Conversation } from "@/components/sidebar/telegram/types";
+import { ConversationItem } from "@/components/sidebar/telegram/conversation-item";
+import { CollapsedConversationItem } from "@/components/sidebar/telegram/collapsed-conversation-item";
+import { SidebarHeader as TelegramSidebarHeader } from "@/components/sidebar/telegram/sidebar-header";
+import { fetcher } from "@/lib/swr";
 import { Button } from "@/components/ui/button";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
+  SidebarGroup,
+  SidebarGroupContent,
   SidebarMenu,
+  SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,9 +39,81 @@ import { User } from "@/providers/session-provider";
 
 export function AppSidebar({user}: {user: User}) {
   const router = useRouter();
-  const { setOpenMobile } = useSidebar();
+  const { state, setOpenMobile } = useSidebar();
   const { mutate } = useSWRConfig();
   const [showDeleteAllDialog, setShowDeleteAllDialog] = useState(false);
+
+  const PAGE_SIZE = 20;
+
+  type ConversationPage = {
+    conversations: Conversation[];
+    hasMore: boolean;
+  };
+
+  const getConversationsPaginationKey = (
+    pageIndex: number,
+    previousPageData: ConversationPage | undefined
+  ) => {
+    if (previousPageData && previousPageData.hasMore === false) {
+      return null;
+    }
+    if (pageIndex === 0) {
+      return `/api/conversations?limit=${PAGE_SIZE}`;
+    }
+    const last = previousPageData?.conversations.at(-1);
+    if (!last) return null;
+    return `/api/conversations?ending_before=${last.id}&limit=${PAGE_SIZE}`;
+  };
+
+  const {
+    data: paginatedConversations,
+    setSize,
+    isValidating,
+    isLoading,
+    mutate: mutateConversations,
+  } = useSWRInfinite<ConversationPage>(getConversationsPaginationKey, fetcher, {
+    fallbackData: [],
+  });
+
+  const hasReachedEnd = paginatedConversations
+    ? paginatedConversations.some((p) => p.hasMore === false)
+    : false;
+
+  const loaderRef = useState<HTMLDivElement | null>(null)[0];
+
+  const formatTimestamp = (iso: string) => {
+    const d = new Date(iso);
+    const now = new Date();
+    const sameDay = d.toDateString() === now.toDateString();
+    return sameDay
+      ? new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(d)
+      : new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(d);
+  };
+
+  const { id } = useParams();
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => setScrollTop(el.scrollTop);
+    el.addEventListener("scroll", onScroll);
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [scrollRef]);
+
+  const collapsed = state === "collapsed";
+  const itemHeight = collapsed ? 48 : 56;
+
+  const sentinelRef = (node: HTMLDivElement | null) => {
+    if (!node) return;
+    const observer = new IntersectionObserver((entries) => {
+      const entry = entries[0];
+      if (entry.isIntersecting && !isValidating && !hasReachedEnd) {
+        setSize((s) => s + 1);
+      }
+    }, { root: null, rootMargin: "0px", threshold: 0.1 });
+    observer.observe(node);
+  };
 
   const handleDeleteAll = () => {
     const deletePromise = fetch("/api/history", {
@@ -45,7 +123,7 @@ export function AppSidebar({user}: {user: User}) {
     toast.promise(deletePromise, {
       loading: "Deleting all chats...",
       success: () => {
-        mutate(unstable_serialize(getChatHistoryPaginationKey));
+        mutate(unstable_serialize(getConversationsPaginationKey));
         router.push("/");
         setShowDeleteAllDialog(false);
         return "All chats deleted successfully";
@@ -56,64 +134,88 @@ export function AppSidebar({user}: {user: User}) {
 
   return (
     <>
-      <Sidebar className="group-data-[side=left]:border-r-0">
+      <Sidebar collapsible="icon" className="group-data-[side=left]:border-r-0">
         <SidebarHeader>
-          <SidebarMenu>
-            <div className="flex flex-row items-center justify-between">
-              <Link
-                className="flex flex-row items-center gap-3"
-                href="/"
-                onClick={() => {
-                  setOpenMobile(false);
-                }}
-              >
-                <span className="cursor-pointer rounded-md px-2 font-semibold text-lg hover:bg-muted">
-                  Chatbot
-                </span>
-              </Link>
-              <div className="flex flex-row gap-1">
-                {user && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        className="h-8 p-1 md:h-fit md:p-2"
-                        onClick={() => setShowDeleteAllDialog(true)}
-                        type="button"
-                        variant="ghost"
-                      >
-                        <TrashIcon />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent align="end" className="hidden md:block">
-                      Delete All Chats
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      className="h-8 p-1 md:h-fit md:p-2"
-                      onClick={() => {
-                        setOpenMobile(false);
-                        router.push("/");
-                        router.refresh();
-                      }}
-                      type="button"
-                      variant="ghost"
-                    >
-                      <PlusIcon />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent align="end" className="hidden md:block">
-                    New Chat
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-            </div>
-          </SidebarMenu>
+          <TelegramSidebarHeader
+            collapsed={state === "collapsed"}
+            onNewChat={() => {
+              setOpenMobile(false);
+              router.push("/");
+              router.refresh();
+            }}
+            onDeleteAll={() => setShowDeleteAllDialog(true)}
+          />
         </SidebarHeader>
         <SidebarContent>
-          {user && <SidebarHistory user={user} />}
+          {user && (() => {
+            if (isLoading) {
+              return (
+                <div className="flex flex-col gap-2 p-2">
+                  {[44, 32, 28, 64, 52].map((w, i) => (
+                    <div key={i} className="h-8 rounded-md bg-sidebar-accent-foreground/10" />
+                  ))}
+                </div>
+              );
+            }
+            const conversations = (paginatedConversations?.flatMap((p) => p.conversations) ?? []).map((c) => ({
+              ...c,
+              timestamp: formatTimestamp(c.timestamp),
+            }));
+            const viewport = scrollRef.current?.clientHeight ?? 0;
+            const total = conversations.length;
+            const startIndex = Math.max(Math.floor(scrollTop / itemHeight) - 5, 0);
+            const visibleCount = Math.ceil(viewport / itemHeight) + 10;
+            const endIndex = Math.min(startIndex + visibleCount, total);
+            const visibleConversations = conversations.slice(startIndex, endIndex);
+            const topSpacer = startIndex * itemHeight;
+            const bottomSpacer = (total - endIndex) * itemHeight;
+            return (
+              <SidebarGroup>
+                <SidebarGroupContent>
+                  <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto" style={{ scrollbarGutter: "stable", overscrollBehavior: "contain" }}>
+                    <SidebarMenu>
+                      {visibleConversations.map((conversation) =>
+                      collapsed ? (
+                        <SidebarMenuItem key={conversation.id}>
+                          <CollapsedConversationItem conversation={conversation} onClick={() => {
+                            setOpenMobile(false);
+                            router.push(`/chat/${conversation.id}`);
+                          }} />
+                        </SidebarMenuItem>
+                      ) : (
+                        <SidebarMenuItem key={conversation.id}>
+                          <ConversationItem conversation={conversation} isActive={conversation.id === id} onClick={() => {
+                            setOpenMobile(false);
+                            router.push(`/chat/${conversation.id}`);
+                          }} onDelete={async (id) => {
+                            const deletePromise = fetch(`/api/chat?id=${id}`, { method: "DELETE" });
+                            toast.promise(deletePromise, {
+                              loading: "Deleting chat...",
+                              success: () => {
+                                mutateConversations((pages) => {
+                                  if (!pages) return pages;
+                                  return pages.map((p) => ({
+                                    ...p,
+                                    conversations: p.conversations.filter((c) => c.id !== id),
+                                  }));
+                                });
+                                return "Chat deleted successfully";
+                              },
+                              error: "Failed to delete chat",
+                            });
+                          }} />
+                        </SidebarMenuItem>
+                      )
+                      )}
+                      <div style={{ height: topSpacer }} />
+                      <div style={{ height: bottomSpacer }} />
+                    </SidebarMenu>
+                    <div className="py-2" ref={sentinelRef} />
+                  </div>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            );
+          })()}
         </SidebarContent>
         <SidebarFooter>{user && <UserButton variant={"ghost"}/>}</SidebarFooter>
       </Sidebar>

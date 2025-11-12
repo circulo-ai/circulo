@@ -9,7 +9,7 @@ interface SidebarContentProps {
 
 export function SidebarContent({ conversations, collapsed }: SidebarContentProps) {
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 overflow-y-auto w-full">
       {conversations.map((conversation) =>
         collapsed ? (
           <CollapsedConversationItem key={conversation.id} conversation={conversation} />

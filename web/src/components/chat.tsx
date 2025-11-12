@@ -32,7 +32,7 @@ import { MultimodalInput } from "./multimodal-input";
 import { getChatHistoryPaginationKey } from "@/components/sidebar/sidebar-history";
 import { toast } from "./toast";
 import type { VisibilityType } from "./visibility-selector";
-import { fetcher, fetchWithErrorHandlers } from "@/lib/swr";
+import { fetcher, fetchWithErrorHandlers, clearCachePattern, globalMutate } from "@/lib/swr";
 
 export function Chat({
   id,
@@ -103,8 +103,10 @@ export function Chat({
         setUsage(dataPart.data);
       }
     },
-    onFinish: () => {
+    onFinish: async () => {
       mutate(unstable_serialize(getChatHistoryPaginationKey));
+      await clearCachePattern(/\/api\/conversations.*/);
+      await globalMutate(key => typeof key === 'string' && key.startsWith('/api/conversations'));
     },
     onError: (error) => {
       if (error instanceof ChatSDKError) {
