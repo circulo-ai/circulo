@@ -29,7 +29,7 @@ const Temporary = ({
 
   return (
     <BaseEdge
-      className="stroke-ring stroke-1"
+      className="stroke-1 stroke-ring"
       id={id}
       path={edgePath}
       style={{
@@ -41,17 +41,17 @@ const Temporary = ({
 
 const getHandleCoordsByPosition = (
   node: InternalNode<Node>,
-  handlePosition: Position,
+  handlePosition: Position
 ) => {
   // Choose the handle type based on position - Left is for target, Right is for source
   const handleType = handlePosition === Position.Left ? "target" : "source";
 
   const handle = node.internals.handleBounds?.[handleType]?.find(
-    (h) => h.position === handlePosition,
+    (h) => h.position === handlePosition
   );
 
   if (!handle) {
-    return [0, 0];
+    return [0, 0] as const;
   }
 
   let offsetX = handle.width / 2;
@@ -80,12 +80,12 @@ const getHandleCoordsByPosition = (
   const x = node.internals.positionAbsolute.x + handle.x + offsetX;
   const y = node.internals.positionAbsolute.y + handle.y + offsetY;
 
-  return [x, y];
+  return [x, y] as const;
 };
 
 const getEdgeParams = (
   source: InternalNode<Node>,
-  target: InternalNode<Node>,
+  target: InternalNode<Node>
 ) => {
   const sourcePos = Position.Right;
   const [sx, sy] = getHandleCoordsByPosition(source, sourcePos);
@@ -112,7 +112,7 @@ const Animated = ({ id, source, target, markerEnd, style }: EdgeProps) => {
 
   const { sx, sy, tx, ty, sourcePos, targetPos } = getEdgeParams(
     sourceNode,
-    targetNode,
+    targetNode
   );
 
   const [edgePath] = getBezierPath({

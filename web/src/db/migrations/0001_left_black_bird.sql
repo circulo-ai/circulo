@@ -1,0 +1,1 @@
+DROP INDEX "message_chat_ui_message_id_unique";

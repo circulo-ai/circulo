@@ -1,15 +1,13 @@
 import { chat, db, chatAgent } from "@/db";
 import { and, eq, sql } from "drizzle-orm";
 import { makeRepo } from "../helpers/repo";
-import { desc, max } from "drizzle-orm";
-import { nanoid } from "nanoid";
 
 const chatRepoFactory = makeRepo(chat, (base) => ({
   findLatest(limit = 20) {
     return base.findMany({ orderBy: sql`created_at desc`, limit });
   },
   findForUser(userId: string) {
-    return base.findMany({ where: eq(chat.userId, userId) });
+    return base.findMany({ where: eq(chat.creatorId, userId) });
   },
   /**
    * Retrieve agents linked to a chat, ordered by speakOrder.
@@ -36,30 +34,6 @@ const chatRepoFactory = makeRepo(chat, (base) => ({
     .from(chatAgent)
     .where(eq(chatAgent.chatId, chatId));
     return (result[0]?.maxOrder ?? -1) + 1;
-  },
-  /**
-   * Add an agent to a chat.
-   */
-  async addAgent(
-    chatId: string,
-    agentId: string,
-    options?: {
-      speakOrder?: number;
-      customSystemPrompt?: string | null;
-      customTemperature?: number | null;
-    }
-  ) {
-    const result = await db.insert(chatAgent).values({
-      id: nanoid(),
-      chatId,
-      agentId,
-      speakOrder: options?.speakOrder ?? (await this.getNextSpeakOrder(chatId)),
-      customSystemPrompt: options?.customSystemPrompt ?? null,
-      customTemperature: options?.customTemperature ? String(options.customTemperature) : null,
-      enabled: true,
-      createdAt: new Date(),
-    }).returning();
-    return result[0];
   },
   /**
    * Update an agent's chat configuration.

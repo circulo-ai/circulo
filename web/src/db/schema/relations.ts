@@ -1,19 +1,53 @@
 import { relations } from "drizzle-orm";
-import { agent, agentPurchase, agentReview, agentTemplate } from "@/db/schema/agent";
+import {
+  agent,
+  agentTemplate,
+  tool,
+  mcpServer,
+} from "@/db/schema/agent";
 import { account, session, user } from "@/db/schema/auth";
-import { document, embedding, knowledgeBase } from "@/db/schema/knowledge";
-import { chat, chatAgent, chatKnowledgeBase, message } from "@/db/schema/chat";
+import {
+  knowledgeDocument,
+  embedding,
+  knowledgeBase,
+  documentProcessingQueue,
+} from "@/db/schema/knowledge";
+import {
+  chat,
+  chatAgent,
+  chatKnowledgeBase,
+  chatMember,
+  chatInvitation,
+  message,
+  messageReaction,
+  document,
+  suggestion,
+} from "@/db/schema/chat";
 
-export const userRelations = relations(user, ({ many, one }) => ({
+// ==================== USER RELATIONS ====================
+
+export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
+
+  // Agent relations
   agents: many(agent),
   agentTemplates: many(agentTemplate),
-  agentPurchases: many(agentPurchase),
-  agentReviews: many(agentReview),
+  tools: many(tool),
+  mcpServers: many(mcpServer),
+
+  // Knowledge relations
   knowledgeBases: many(knowledgeBase),
-  chats: many(chat),
+
+  // Chat relations
+  createdChats: many(chat),
+  chatMemberships: many(chatMember),
+  sentInvitations: many(chatInvitation, { relationName: "sentInvitations" }),
+  receivedInvitations: many(chatInvitation, { relationName: "receivedInvitations" }),
   messages: many(message),
+  messageReactions: many(messageReaction),
+  documents: many(document),
+  suggestions: many(suggestion),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -30,18 +64,19 @@ export const accountRelations = relations(account, ({ one }) => ({
   }),
 }));
 
-// Agent Template Relations
-export const agentTemplateRelations = relations(agentTemplate, ({ one, many }) => ({
-  creator: one(user, {
-    fields: [agentTemplate.creatorId],
-    references: [user.id],
-  }),
-  instances: many(agent),
-  purchases: many(agentPurchase),
-  reviews: many(agentReview),
-}));
+// ==================== AGENT RELATIONS ====================
 
-// Agent Relations
+export const agentTemplateRelations = relations(
+  agentTemplate,
+  ({ one, many }) => ({
+    creator: one(user, {
+      fields: [agentTemplate.creatorId],
+      references: [user.id],
+    }),
+    instances: many(agent),
+  })
+);
+
 export const agentRelations = relations(agent, ({ one, many }) => ({
   user: one(user, {
     fields: [agent.userId],
@@ -55,40 +90,27 @@ export const agentRelations = relations(agent, ({ one, many }) => ({
   messages: many(message),
 }));
 
-// Agent Purchase Relations
-export const agentPurchaseRelations = relations(agentPurchase, ({ one, many }) => ({
-  buyer: one(user, {
-    fields: [agentPurchase.buyerId],
-    references: [user.id],
-  }),
-  template: one(agentTemplate, {
-    fields: [agentPurchase.templateId],
-    references: [agentTemplate.id],
-  }),
-  agent: one(agent, {
-    fields: [agentPurchase.agentId],
-    references: [agent.id],
-  }),
-  reviews: many(agentReview),
-}));
-
-// Agent Review Relations
-export const agentReviewRelations = relations(agentReview, ({ one }) => ({
-  template: one(agentTemplate, {
-    fields: [agentReview.templateId],
-    references: [agentTemplate.id],
-  }),
+export const toolRelations = relations(tool, ({ one }) => ({
   user: one(user, {
-    fields: [agentReview.userId],
+    fields: [tool.userId],
     references: [user.id],
   }),
-  purchase: one(agentPurchase, {
-    fields: [agentReview.purchaseId],
-    references: [agentPurchase.id],
+  mcpServer: one(mcpServer, {
+    fields: [tool.mcpServerId],
+    references: [mcpServer.id],
   }),
 }));
 
-// Knowledge Base Relations
+export const mcpServerRelations = relations(mcpServer, ({ one, many }) => ({
+  user: one(user, {
+    fields: [mcpServer.userId],
+    references: [user.id],
+  }),
+  tools: many(tool),
+}));
+
+// ==================== KNOWLEDGE RELATIONS ====================
+
 export const knowledgeBaseRelations = relations(
   knowledgeBase,
   ({ one, many }) => ({
@@ -96,40 +118,93 @@ export const knowledgeBaseRelations = relations(
       fields: [knowledgeBase.userId],
       references: [user.id],
     }),
-    documents: many(document),
+    documents: many(knowledgeDocument),
+    embeddings: many(embedding),
     chatKnowledgeBases: many(chatKnowledgeBase),
-  }),
+  })
 );
 
-export const documentRelations = relations(document, ({ one, many }) => ({
-  knowledgeBase: one(knowledgeBase, {
-    fields: [document.knowledgeBaseId],
-    references: [knowledgeBase.id],
-  }),
-  embeddings: many(embedding),
-}));
+export const knowledgeDocumentRelations = relations(
+  knowledgeDocument,
+  ({ one, many }) => ({
+    knowledgeBase: one(knowledgeBase, {
+      fields: [knowledgeDocument.knowledgeBaseId],
+      references: [knowledgeBase.id],
+    }),
+    embeddings: many(embedding),
+    processingQueue: one(documentProcessingQueue, {
+      fields: [knowledgeDocument.id],
+      references: [documentProcessingQueue.documentId],
+    }),
+  })
+);
 
 export const embeddingRelations = relations(embedding, ({ one }) => ({
   knowledgeBase: one(knowledgeBase, {
     fields: [embedding.knowledgeBaseId],
     references: [knowledgeBase.id],
   }),
-  document: one(document, {
+  document: one(knowledgeDocument, {
     fields: [embedding.documentId],
-    references: [document.id],
+    references: [knowledgeDocument.id],
   }),
 }));
 
-// Chat Relations
+export const documentProcessingQueueRelations = relations(
+  documentProcessingQueue,
+  ({ one }) => ({
+    document: one(knowledgeDocument, {
+      fields: [documentProcessingQueue.documentId],
+      references: [knowledgeDocument.id],
+    }),
+  })
+);
+
+// ==================== CHAT RELATIONS ====================
+
 export const chatRelations = relations(chat, ({ one, many }) => ({
-  user: one(user, {
-    fields: [chat.userId],
+  creator: one(user, {
+    fields: [chat.creatorId],
     references: [user.id],
   }),
+  members: many(chatMember),
+  invitations: many(chatInvitation),
   messages: many(message),
   chatAgents: many(chatAgent),
   chatKnowledgeBases: many(chatKnowledgeBase),
+  documents: many(document),
 }));
+
+export const chatMemberRelations = relations(chatMember, ({ one }) => ({
+  chat: one(chat, {
+    fields: [chatMember.chatId],
+    references: [chat.id],
+  }),
+  user: one(user, {
+    fields: [chatMember.userId],
+    references: [user.id],
+  }),
+}));
+
+export const chatInvitationRelations = relations(
+  chatInvitation,
+  ({ one }) => ({
+    chat: one(chat, {
+      fields: [chatInvitation.chatId],
+      references: [chat.id],
+    }),
+    inviter: one(user, {
+      fields: [chatInvitation.inviterId],
+      references: [user.id],
+      relationName: "sentInvitations",
+    }),
+    invitee: one(user, {
+      fields: [chatInvitation.inviteeId],
+      references: [user.id],
+      relationName: "receivedInvitations",
+    }),
+  })
+);
 
 export const chatAgentRelations = relations(chatAgent, ({ one }) => ({
   chat: one(chat, {
@@ -139,6 +214,10 @@ export const chatAgentRelations = relations(chatAgent, ({ one }) => ({
   agent: one(agent, {
     fields: [chatAgent.agentId],
     references: [agent.id],
+  }),
+  addedByUser: one(user, {
+    fields: [chatAgent.addedBy],
+    references: [user.id],
   }),
 }));
 
@@ -153,10 +232,13 @@ export const chatKnowledgeBaseRelations = relations(
       fields: [chatKnowledgeBase.knowledgeBaseId],
       references: [knowledgeBase.id],
     }),
-  }),
+    addedByUser: one(user, {
+      fields: [chatKnowledgeBase.addedBy],
+      references: [user.id],
+    }),
+  })
 );
 
-// Message Relations
 export const messageRelations = relations(message, ({ one, many }) => ({
   chat: one(chat, {
     fields: [message.chatId],
@@ -177,5 +259,43 @@ export const messageRelations = relations(message, ({ one, many }) => ({
   }),
   quotes: many(message, {
     relationName: "messageQuotes",
+  }),
+  reactions: many(messageReaction),
+}));
+
+export const messageReactionRelations = relations(
+  messageReaction,
+  ({ one }) => ({
+    message: one(message, {
+      fields: [messageReaction.messageId],
+      references: [message.id],
+    }),
+    user: one(user, {
+      fields: [messageReaction.userId],
+      references: [user.id],
+    }),
+  })
+);
+
+export const documentRelations = relations(document, ({ one, many }) => ({
+  user: one(user, {
+    fields: [document.userId],
+    references: [user.id],
+  }),
+  chat: one(chat, {
+    fields: [document.chatId],
+    references: [chat.id],
+  }),
+  suggestions: many(suggestion),
+}));
+
+export const suggestionRelations = relations(suggestion, ({ one }) => ({
+  document: one(document, {
+    fields: [suggestion.documentId, suggestion.documentCreatedAt],
+    references: [document.id, document.createdAt],
+  }),
+  user: one(user, {
+    fields: [suggestion.userId],
+    references: [user.id],
   }),
 }));

@@ -1,4 +1,4 @@
-import { getSubscriptionPlans } from "@/actions/subscription/get-plans";
+import { getSubscriptionPlans } from "@/app/(billing)/actions/get-plans";
 
 export async function PricingSection() {
   const plans = await getSubscriptionPlans();

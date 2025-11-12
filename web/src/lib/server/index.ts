@@ -137,9 +137,12 @@ type Handler<
   ctx: Context<TBody, TQuery, TParams, TAuth>,
 ) => Promise<unknown> | unknown;
 
-type NextRouteHandler<TParams = unknown> = (
+// Next.js expects raw string params in the route context.
+type StringParams<T> = { [K in keyof T]: string };
+
+type NextRouteHandler<TParams = Record<string, never>> = (
   req: NextRequest,
-  routeContext?: { params: TParams },
+  routeContext: { params: TParams | Promise<TParams> },
 ) => Promise<NextResponse>;
 
 // ============================================================================
@@ -169,7 +172,7 @@ export function api<
     InferZodSchema<TParams>,
     true
   >,
-): NextRouteHandler<InferZodSchema<TParams>>;
+): NextRouteHandler<StringParams<InferZodSchema<TParams>>>;
 
 // Overload 3: Config without auth
 export function api<
@@ -184,7 +187,7 @@ export function api<
     InferZodSchema<TParams>,
     false
   >,
-): NextRouteHandler<InferZodSchema<TParams>>;
+): NextRouteHandler<StringParams<InferZodSchema<TParams>>>;
 
 // Implementation
 export function api<
@@ -202,7 +205,7 @@ export function api<
         boolean // Use boolean here to cover both true and false in overloads
       >,
   handler?: Handler<output<TBody>, output<TQuery>, output<TParams>, TAuth>,
-): NextRouteHandler<InferZodSchema<TParams>> {
+): NextRouteHandler<StringParams<InferZodSchema<TParams>>> {
   // Determine if first arg is config or handler
   const isConfig =
     (typeof configOrHandler === "object" &&
@@ -227,29 +230,32 @@ export function api<
 
   return async (
     req: NextRequest,
-    routeContext?: { params: output<TParams> },
+    routeContext: {
+      params:
+        | StringParams<InferZodSchema<TParams>>
+        | Promise<StringParams<InferZodSchema<TParams>>>;
+    },
   ): Promise<NextResponse> => {
     try {
-      // Parse params (Next 15+: params may be a Promise and must be unwrapped)
+      // --- 1️⃣  Handle params (Next.js 15: may be a Promise) ---
       let rawParams: unknown = {};
-      if (routeContext?.params) {
-        const maybeParams = routeContext.params as unknown;
-        const isThenable =
-          typeof (maybeParams as any)?.then === "function" ||
-          Object.prototype.toString.call(maybeParams) === "[object Promise]";
-        rawParams = isThenable ? await (maybeParams as Promise<unknown>) : maybeParams;
+
+      if (routeContext?.params !== undefined) {
+        // Await if it's a Promise
+        rawParams = await Promise.resolve(routeContext.params);
       }
+
       const validatedParams = actualConfig.params
         ? actualConfig.params.parse(rawParams)
         : (rawParams as output<TParams>);
 
-      // Parse query
+      // --- 2️⃣  Parse query string ---
       const queryObj = Object.fromEntries(req.nextUrl.searchParams);
       const validatedQuery = actualConfig.query
         ? actualConfig.query.parse(queryObj)
         : (queryObj as output<TQuery>);
 
-      // Parse body only when a body schema is configured
+      // --- 3️⃣  Parse body (if configured) ---
       let validatedBody: InferZodSchema<TBody>;
       if (actualConfig.body) {
         try {
@@ -265,41 +271,38 @@ export function api<
         validatedBody = {} as output<TBody>;
       }
 
-      // Auth check
+      // --- 4️⃣  Optional auth check ---
       let user: Session["user"] | undefined;
       if (actualConfig.auth) {
         const potentialUser = await getUser(req);
         if (!potentialUser) throw Errors.unauthorized();
-        user = potentialUser; // user is now guaranteed NonNullable
+        user = potentialUser;
       }
 
-      // Build context
+      // --- 5️⃣  Build context ---
       const ctx = (
         actualConfig.auth
           ? {
-              body: validatedBody,
-              query: validatedQuery,
-              params: validatedParams,
-              user: user!, // Non-null assertion is safe here because of the check above
-            }
+            body: validatedBody,
+            query: validatedQuery,
+            params: validatedParams,
+            user: user!,
+          }
           : {
-              body: validatedBody,
-              query: validatedQuery,
-              params: validatedParams,
-            }
+            body: validatedBody,
+            query: validatedQuery,
+            params: validatedParams,
+          }
       ) as Context<output<TBody>, output<TQuery>, output<TParams>, TAuth>;
 
-      // Execute handler
+      // --- 6️⃣  Execute actual handler ---
       const result = await actualHandler(req, ctx);
 
-      // Return Response/NextResponse as-is
+      // --- 7️⃣  Return result ---
       if (result instanceof Response) {
-        // We cast to NextResponse to satisfy the return type,
-        // acknowledging that Next.js treats simple Response as a valid response.
         return result as NextResponse;
       }
 
-      // Wrap other results in JSON
       return NextResponse.json(result);
     } catch (error) {
       return handleError(error);
