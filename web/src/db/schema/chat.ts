@@ -14,6 +14,7 @@ import {
   timestamp,
   unique,
   uniqueIndex,
+  uuid,
   varchar,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
@@ -199,7 +200,7 @@ export const chatAgent = pgTable(
     chatId: text("chat_id")
       .notNull()
       .references(() => chat.id, { onDelete: "cascade" }),
-    agentId: text("agent_id")
+    agentId: uuid("agent_id")
       .notNull()
       .references(() => agent.id, { onDelete: "cascade" }),
 
@@ -279,7 +280,7 @@ export const message = pgTable(
 
     // Sender (either user or agent)
     userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
-    agentId: text("agent_id").references(() => agent.id, {
+    agentId: uuid("agent_id").references(() => agent.id, {
       onDelete: "set null",
     }),
 

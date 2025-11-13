@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1762883744972,
-      "tag": "0000_fluffy_cerebro",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1762883774248,
-      "tag": "0001_left_black_bird",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1762884986992,
-      "tag": "0002_left_nextwave",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1762894472261,
-      "tag": "0003_stale_terror",
+      "when": 1763047197630,
+      "tag": "0000_flat_caretaker",
       "breakpoints": true
     }
   ]

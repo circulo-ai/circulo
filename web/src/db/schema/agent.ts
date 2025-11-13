@@ -105,7 +105,7 @@ export const agent = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
 
     // Link to template (nullable for custom agents)
-    templateId: text("template_id").references(() => agentTemplate.id, {
+    templateId: uuid("template_id").references(() => agentTemplate.id, {
       onDelete: "set null",
     }),
 
@@ -165,7 +165,7 @@ export const tool = pgTable(
       .notNull(),
 
     // For MCP servers
-    mcpServerId: text("mcp_server_id").references(() => mcpServer.id, {
+    mcpServerId: uuid("mcp_server_id").references(() => mcpServer.id, {
       onDelete: "set null",
     }),
 
