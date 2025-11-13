@@ -294,13 +294,6 @@ export const message = pgTable(
 
     quotedMessageId: text("quoted_message_id"),
 
-    // Mentions
-    mentionedUserIds: jsonb("mentioned_user_ids").$type<string[]>().default([]),
-    mentionedAgentIds: jsonb("mentioned_agent_ids").$type<string[]>().default([]),
-    mentionedKnowledgeBaseIds: jsonb("mentioned_knowledge_base_ids")
-      .$type<string[]>()
-      .default([]),
-
     // Message metadata
     isEdited: boolean("is_edited").notNull().default(false),
     editedAt: timestamp("edited_at"),
@@ -326,18 +319,6 @@ export const message = pgTable(
     countsNonNegative: check(
       "message_counts_non_negative",
       sql`token_count >= 0 AND cost >= 0`
-    ),
-    mentionedUsersIdx: index("message_mentioned_users_idx").using(
-      "gin",
-      table.mentionedUserIds
-    ),
-    mentionedAgentsIdx: index("message_mentioned_agents_idx").using(
-      "gin",
-      table.mentionedAgentIds
-    ),
-    mentionedKbsIdx: index("message_mentioned_kbs_idx").using(
-      "gin",
-      table.mentionedKnowledgeBaseIds
     ),
   })
 );
