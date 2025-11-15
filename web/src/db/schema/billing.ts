@@ -18,6 +18,7 @@ import { user } from "@/db";
 // -------------------- TYPES --------------------
 
 export type PlanFeatures = {
+  maxMessagesPerDay: number;
   rateLimitPerMinute: number;
   maxAgents: number | null; // null = unlimited
   maxChats: number | null;
@@ -152,6 +153,7 @@ export const invoices = pgTable(
 
     type: invoiceTypeEnum("type").notNull().default("one_time"),
 
+    // TODO: maybe no provider is needed and we need another payment table
     provider: paymentProviderEnum("provider").notNull(),
     providerInvoiceId: varchar("provider_invoice_id", { length: 255 }).notNull(),
 
@@ -165,6 +167,7 @@ export const invoices = pgTable(
     paidAt: timestamp("paid_at"),
     failedAt: timestamp("failed_at"),
     dueDate: timestamp("due_date"),
+    // Add expire date maybe to cleanup invoices
   },
   (table) => ({
     providerInvoiceIdx: index("invoices_provider_invoice_idx").on(
@@ -325,3 +328,5 @@ export const usageRelations = relations(usageMetrics, ({ one }) => ({
     references: [subscriptions.id],
   }),
 }));
+
+export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;

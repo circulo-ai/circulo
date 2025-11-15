@@ -1,5 +1,6 @@
 import { UsageRateLimiter } from "@/lib/billing/rate-limiter";
 import { SubscriptionManager } from "@/lib/billing/subscription-manager";
+import { Metric } from "@/lib/billing/types";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
@@ -27,11 +28,12 @@ export async function requireSubscription(
  * Middleware to enforce rate limits
  */
 export async function enforceRateLimit(
-  req: NextRequest,
   userId: string,
+  metric?: Metric,
+  windowMs: number = 60000,
 ): Promise<NextResponse | null> {
   try {
-    await UsageRateLimiter.enforce(userId);
+    await UsageRateLimiter.enforce(userId, metric, windowMs);
     return null;
   } catch (error) {
     return NextResponse.json(

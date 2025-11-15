@@ -82,7 +82,6 @@ export const POST = api(
       temperature: ctx.body.temperature ?? (template?.temperature as unknown as string) ?? "0.7",
       maxTokens: ctx.body.maxTokens ?? template?.maxTokens ?? 2000,
       color: ctx.body.color ?? template?.color ?? "#3B82F6",
-      tools: ctx.body.tools ?? (template?.tools as any) ?? [],
       usageCount: 0,
       createdAt: now,
       updatedAt: now,
