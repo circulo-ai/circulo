@@ -28,7 +28,6 @@ export function FaqList(props: ComponentProps<typeof ScrollArea>) {
   }, [selectedTag]);
 
   return (
-    // @ts-ignore TODO
     <ScrollArea viewportRef={viewportRef} {...props}>
       <div className="from-background pointer-events-none absolute inset-x-0 top-0 z-10 h-16 bg-linear-to-b to-transparent" />
       <Accordion
