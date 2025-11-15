@@ -1,8 +1,8 @@
 // lib/audit/tool-audit.ts
 import { db } from "@/db";
 import { auditLog } from "@/db/schema";
-import { generateUUID } from "@/lib/utils";
 import { createLogger } from "@/lib/logs/console/logger";
+import { generateUUID } from "@/lib/utils";
 
 const logger = createLogger("ToolAudit");
 
@@ -41,7 +41,9 @@ class ToolAuditSystem {
   /**
    * Log tool execution
    */
-  async log(audit: Omit<ToolExecutionAudit, "id" | "timestamp">): Promise<void> {
+  async log(
+    audit: Omit<ToolExecutionAudit, "id" | "timestamp">,
+  ): Promise<void> {
     const fullAudit: ToolExecutionAudit = {
       ...audit,
       id: generateUUID(),
@@ -88,7 +90,7 @@ class ToolAuditSystem {
           metadata: null,
           ipAddress: audit.ipAddress,
           userAgent: audit.userAgent,
-        }))
+        })),
       );
 
       logger.debug(`Flushed ${toFlush.length} audit logs to database`);
@@ -124,7 +126,7 @@ class ToolAuditSystem {
         and(
           eq(logs.actorId, userId),
           eq(logs.entityType, "tool_execution"),
-          gte(logs.createdAt, startDate)
+          gte(logs.createdAt, startDate),
         ),
     });
 
@@ -169,7 +171,7 @@ class ToolAuditSystem {
    */
   async getRecentExecutions(
     userId: string,
-    limit: number = 20
+    limit: number = 20,
   ): Promise<ToolExecutionAudit[]> {
     const logs = await db.query.auditLog.findMany({
       where: (logs, { and, eq }) =>

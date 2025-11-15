@@ -1,12 +1,12 @@
-import { streamText, Tool as CoreTool } from "ai";
 import { myProvider } from "@/lib/ai/providers";
-import { toolRegistry } from "@/lib/ai/tools/registry";
-import type { ModelMessage, UIMessageStreamWriter } from "ai";
-import type { ChatMessage } from "@/lib/types";
-import { createLogger } from "@/lib/logs/console/logger";
-import { z } from "zod";
 import { agentFactory } from "@/lib/ai/tools/factory";
+import { toolRegistry } from "@/lib/ai/tools/registry";
+import { createLogger } from "@/lib/logs/console/logger";
+import type { ChatMessage } from "@/lib/types";
 import { google } from "@ai-sdk/google";
+import type { ModelMessage, UIMessageStreamWriter } from "ai";
+import { Tool as CoreTool, streamText } from "ai";
+import { z } from "zod";
 
 const logger = createLogger("AgentExecutor");
 
@@ -37,7 +37,7 @@ export async function executeAgentWithDynamicTools(context: ExecutorContext) {
   const agentTools = await toolRegistry.getAgentTools(agentId, chatId);
 
   logger.info(
-    `Agent ${agent.config.name} has ${agentTools.length} tools available`
+    `Agent ${agent.config.name} has ${agentTools.length} tools available`,
   );
 
   // Convert UnifiedTools to AI SDK tool format
@@ -112,7 +112,9 @@ export async function executeAgentWithDynamicTools(context: ExecutorContext) {
   return {
     result: streamText({
       // TODO: handle models
-      model: agent.config.model ? google(agent.config.model) : myProvider.languageModel("chat-model"),
+      model: agent.config.model
+        ? google(agent.config.model)
+        : myProvider.languageModel("chat-model"),
       system: agent.config.systemPrompt,
       messages,
       temperature: agent.config.temperature,
@@ -171,13 +173,12 @@ function convertSchemaToZod(schema: any): z.ZodObject<any> {
 
   if (normalized.additionalProperties) {
     objectSchema = objectSchema.catchall(
-      convertSchemaToZodInner(normalized.additionalProperties)
+      convertSchemaToZodInner(normalized.additionalProperties),
     );
   }
 
   return objectSchema;
 }
-
 
 /**
  * Helper function to convert individual schema types
@@ -194,20 +195,17 @@ function convertSchemaToZodInner(schema: any): z.ZodTypeAny {
   }
 
   if (schema.allOf) {
-    return schema.allOf.reduce(
-      (acc: z.ZodTypeAny, s: any) => {
-        const next = convertSchemaToZodInner(s);
+    return schema.allOf.reduce((acc: z.ZodTypeAny, s: any) => {
+      const next = convertSchemaToZodInner(s);
 
-        // Merge object shapes
-        if (acc instanceof z.ZodObject && next instanceof z.ZodObject) {
-          return acc.extend(next.shape);
-        }
+      // Merge object shapes
+      if (acc instanceof z.ZodObject && next instanceof z.ZodObject) {
+        return acc.extend(next.shape);
+      }
 
-        // If types differ, fallback to last schema
-        return next;
-      },
-      z.object({})
-    );
+      // If types differ, fallback to last schema
+      return next;
+    }, z.object({}));
   }
 
   if (schema.nullable === true) {
@@ -235,7 +233,7 @@ function convertSchemaToZodInner(schema: any): z.ZodTypeAny {
 
       if (schema.additionalProperties) {
         objectSchema = objectSchema.catchall(
-          convertSchemaToZodInner(schema.additionalProperties)
+          convertSchemaToZodInner(schema.additionalProperties),
         );
       }
 
@@ -290,7 +288,9 @@ function convertSchemaToZodInner(schema: any): z.ZodTypeAny {
         return z.tuple(schema.items.map(convertSchemaToZodInner));
       }
 
-      const item = schema.items ? convertSchemaToZodInner(schema.items) : z.any();
+      const item = schema.items
+        ? convertSchemaToZodInner(schema.items)
+        : z.any();
 
       let arr = z.array(item);
       if (schema.minItems !== undefined) arr = arr.min(schema.minItems);

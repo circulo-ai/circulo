@@ -1,23 +1,23 @@
 import { db } from "@/db";
-import { agent as agentTable, agentTemplate } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
-import { generateUUID } from "@/lib/utils";
-import { createLogger } from "@/lib/logs/console/logger";
-import { toolRegistry } from "@/lib/ai/tools/registry";
+import { agent as agentTable } from "@/db/schema";
 import type { UnifiedTool } from "@/lib/ai/tools/registry";
+import { toolRegistry } from "@/lib/ai/tools/registry";
+import { createLogger } from "@/lib/logs/console/logger";
+import { generateUUID } from "@/lib/utils";
+import { and, eq } from "drizzle-orm";
 
 const logger = createLogger("AgentFactory");
 
 export interface AgentConfig {
   name: string;
-  description?: string | null;  // Allow null
+  description?: string | null; // Allow null
   systemPrompt: string;
   model?: string;
   temperature?: number;
   maxTokens?: number;
   toolIds?: string[];
-  avatar?: string | null;  // Allow null
-  color?: string | null;   // Allow null
+  avatar?: string | null; // Allow null
+  color?: string | null; // Allow null
 }
 
 export interface AgentInstance {
@@ -38,9 +38,11 @@ class AgentFactory {
   async createFromTemplate(
     userId: string,
     templateId: string,
-    overrides?: Partial<AgentConfig>
+    overrides?: Partial<AgentConfig>,
   ): Promise<AgentInstance> {
-    logger.info(`Creating agent from template ${templateId} for user ${userId}`);
+    logger.info(
+      `Creating agent from template ${templateId} for user ${userId}`,
+    );
 
     // Get template
     const template = await db.query.agentTemplate.findFirst({
@@ -73,7 +75,7 @@ class AgentFactory {
   async create(
     userId: string,
     config: AgentConfig,
-    templateId?: string
+    templateId?: string,
   ): Promise<AgentInstance> {
     logger.info(`Creating agent ${config.name} for user ${userId}`);
 
@@ -131,7 +133,7 @@ class AgentFactory {
   async update(
     agentId: string,
     userId: string,
-    updates: Partial<AgentConfig>
+    updates: Partial<AgentConfig>,
   ): Promise<AgentInstance> {
     logger.info(`Updating agent ${agentId}`);
 
@@ -156,11 +158,15 @@ class AgentFactory {
     };
 
     if (updates.name !== undefined) updateData.name = updates.name;
-    if (updates.description !== undefined) updateData.description = updates.description;
-    if (updates.systemPrompt !== undefined) updateData.systemPrompt = updates.systemPrompt;
+    if (updates.description !== undefined)
+      updateData.description = updates.description;
+    if (updates.systemPrompt !== undefined)
+      updateData.systemPrompt = updates.systemPrompt;
     if (updates.model !== undefined) updateData.model = updates.model;
-    if (updates.temperature !== undefined) updateData.temperature = updates.temperature.toString();
-    if (updates.maxTokens !== undefined) updateData.maxTokens = updates.maxTokens;
+    if (updates.temperature !== undefined)
+      updateData.temperature = updates.temperature.toString();
+    if (updates.maxTokens !== undefined)
+      updateData.maxTokens = updates.maxTokens;
     if (updates.toolIds !== undefined) updateData.toolIds = updates.toolIds;
     if (updates.avatar !== undefined) updateData.avatar = updates.avatar;
     if (updates.color !== undefined) updateData.color = updates.color;
@@ -199,7 +205,7 @@ class AgentFactory {
   async clone(
     agentId: string,
     userId: string,
-    newName: string
+    newName: string,
   ): Promise<AgentInstance> {
     logger.info(`Cloning agent ${agentId}`);
 
@@ -235,7 +241,7 @@ class AgentFactory {
       categories?: string[];
       tags?: string[];
       maxTools?: number;
-    }
+    },
   ): Promise<string[]> {
     logger.info(`Auto-configuring tools for agent ${agentId}`);
 
@@ -295,7 +301,10 @@ class AgentFactory {
     };
   }
 
-  private async validateTools(toolIds: string[], userId: string): Promise<void> {
+  private async validateTools(
+    toolIds: string[],
+    userId: string,
+  ): Promise<void> {
     // For now, just check they're not empty
     // In production, validate each tool exists and user has access
     if (toolIds.length === 0) {
@@ -305,7 +314,7 @@ class AgentFactory {
 
   private async getAgentTools(
     agentId: string,
-    userId: string
+    userId: string,
   ): Promise<UnifiedTool[]> {
     const agent = await db.query.agent.findFirst({
       where: (agents, { eq }) => eq(agents.id, agentId),

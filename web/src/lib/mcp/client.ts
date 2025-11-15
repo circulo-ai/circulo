@@ -72,8 +72,8 @@ export class McpClient {
       {
         capabilities: {
           experimental: {
-            tools: {}
-          }
+            tools: {},
+          },
           // Resources and prompts can be added later
           // resources: {},
           // prompts: {},

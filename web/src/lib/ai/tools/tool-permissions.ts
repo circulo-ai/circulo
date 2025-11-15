@@ -1,4 +1,3 @@
-import { db } from "@/db";
 import { createLogger } from "@/lib/logs/console/logger";
 
 const logger = createLogger("ToolPermissions");
@@ -16,7 +15,7 @@ class ToolPermissionSystem {
 
   async canExecuteTool(
     userId: string,
-    toolId: string
+    toolId: string,
   ): Promise<{ allowed: boolean; reason?: string }> {
     // Check rate limits
     const key = `${userId}:${toolId}`;

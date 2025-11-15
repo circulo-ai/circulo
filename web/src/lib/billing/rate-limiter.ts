@@ -1,8 +1,8 @@
-import { agent, db, knowledgeBase, chat, chatAgent } from "@/db";
-import { count, eq, and } from "drizzle-orm";
+import { agent, chat, chatAgent, db, knowledgeBase } from "@/db";
+import { Action, Metric } from "@/lib/billing/types";
+import { count, eq } from "drizzle-orm";
 import { SubscriptionManager } from "./subscription-manager";
 import { UsageTracker } from "./usage-tracker";
-import { Action, Metric } from "@/lib/billing/types";
 
 function getBillingPeriod(subscriptionStartDate: Date, now = new Date()) {
   const start = new Date(subscriptionStartDate);
@@ -49,12 +49,12 @@ export class UsageRateLimiter {
       userId,
       metric,
       limit,
-      windowMs
+      windowMs,
     );
 
     if (exceeded) {
       throw new Error(
-        `Rate limit exceeded. Your plan allows ${limit} requests per ${Math.floor(windowMs/1000)} sec.`
+        `Rate limit exceeded. Your plan allows ${limit} requests per ${Math.floor(windowMs / 1000)} sec.`,
       );
     }
 
@@ -68,8 +68,13 @@ export class UsageRateLimiter {
   static async canPerformAction<T extends Action>(
     userId: string,
     action: T,
-    context?: ActionContext[T]
-  ): Promise<{ allowed: boolean; reason?: string; current?: number; limit?: number }> {
+    context?: ActionContext[T],
+  ): Promise<{
+    allowed: boolean;
+    reason?: string;
+    current?: number;
+    limit?: number;
+  }> {
     const subscription =
       await SubscriptionManager.getActiveSubscription(userId);
 
@@ -112,7 +117,7 @@ export class UsageRateLimiter {
           userId,
           "chats_created",
           monthStart,
-          now
+          now,
         );
 
         if (chatCount >= limit) {
@@ -153,11 +158,11 @@ export class UsageRateLimiter {
         if (limit === null) return { allowed: true };
 
         // Context is required for this action
-        if (!context || !('chatId' in context)) {
+        if (!context || !("chatId" in context)) {
           throw new Error("chatId is required for add_chat_agent action");
         }
 
-        const ctx = context as ActionContext['add_chat_agent'];
+        const ctx = context as ActionContext["add_chat_agent"];
 
         // First verify the chat belongs to the user
         const [chatRecord] = await db
@@ -204,9 +209,10 @@ export class UsageRateLimiter {
   static async trackOnly(
     userId: string,
     metric: string,
-    count: number = 1
+    count: number = 1,
   ): Promise<void> {
-    const subscription = await SubscriptionManager.getActiveSubscription(userId);
+    const subscription =
+      await SubscriptionManager.getActiveSubscription(userId);
     await UsageTracker.track(userId, metric, count, subscription?.id);
   }
 
@@ -214,7 +220,8 @@ export class UsageRateLimiter {
    * Get current usage stats for a user
    */
   static async getUsageStats(userId: string) {
-    const subscription = await SubscriptionManager.getActiveSubscription(userId);
+    const subscription =
+      await SubscriptionManager.getActiveSubscription(userId);
 
     if (!subscription) {
       return null;
@@ -239,7 +246,7 @@ export class UsageRateLimiter {
       userId,
       "chats_created",
       monthStart,
-      now
+      now,
     );
 
     return {

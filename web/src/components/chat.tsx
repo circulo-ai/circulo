@@ -1,12 +1,9 @@
 "use client";
 
-import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
-import { useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import useSWR, { useSWRConfig } from "swr";
-import { unstable_serialize } from "swr/infinite";
+import { Artifact } from "@/components/artifacts/artifact";
 import { ChatHeader } from "@/components/chat-header";
+import { Messages } from "@/components/messages/messages";
+import { getChatHistoryPaginationKey } from "@/components/sidebar/sidebar-history";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,22 +14,30 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import type { Vote } from "@/db/schema";
 import { useArtifactSelector } from "@/hooks/chats/use-artifact";
 import { useAutoResume } from "@/hooks/chats/use-auto-resume";
 import { useChatVisibility } from "@/hooks/chats/use-chat-visibility";
-import type { Vote } from "@/db/schema";
 import { ChatSDKError } from "@/lib/errors";
+import {
+  clearCachePattern,
+  fetcher,
+  fetchWithErrorHandlers,
+  globalMutate,
+} from "@/lib/swr";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { generateUUID } from "@/lib/utils";
-import { Artifact } from "@/components/artifacts/artifact";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import useSWR, { useSWRConfig } from "swr";
+import { unstable_serialize } from "swr/infinite";
 import { useDataStream } from "./data-stream-provider";
-import { Messages } from "@/components/messages/messages";
 import { MultimodalInput } from "./multimodal-input";
-import { getChatHistoryPaginationKey } from "@/components/sidebar/sidebar-history";
 import { toast } from "./toast";
 import type { VisibilityType } from "./visibility-selector";
-import { fetcher, fetchWithErrorHandlers, clearCachePattern, globalMutate } from "@/lib/swr";
 // Response shape: chatAgent rows with nested agent
 
 export function Chat({
@@ -70,7 +75,10 @@ export function Chat({
     currentModelIdRef.current = currentModelId;
   }, [currentModelId]);
 
-  const { data: agentsResponse } = useSWR<any>(`/api/chat/${id}/agents`, fetcher);
+  const { data: agentsResponse } = useSWR<any>(
+    `/api/chat/${id}/agents`,
+    fetcher,
+  );
 
   const {
     messages,
@@ -114,7 +122,10 @@ export function Chat({
     onFinish: async () => {
       mutate(unstable_serialize(getChatHistoryPaginationKey));
       await clearCachePattern(/\/api\/conversations.*/);
-      await globalMutate(key => typeof key === 'string' && key.startsWith('/api/conversations'));
+      await globalMutate(
+        (key) =>
+          typeof key === "string" && key.startsWith("/api/conversations"),
+      );
     },
     onError: (error) => {
       if (error instanceof ChatSDKError) {
@@ -152,7 +163,7 @@ export function Chat({
 
   const { data: votes } = useSWR<Vote[]>(
     messages.length >= 2 ? `/api/vote?chatId=${id}` : null,
-    fetcher
+    fetcher,
   );
 
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -169,13 +180,16 @@ export function Chat({
 
   const sendMessageWithPrechecks = (
     msg?: Parameters<typeof sendMessage>[0],
-    options?: Parameters<typeof sendMessage>[1]
+    options?: Parameters<typeof sendMessage>[1],
   ): ReturnType<typeof sendMessage> => {
     const enabledAgentCount = Array.isArray(agentsResponse?.data?.agents)
       ? agentsResponse.data.agents.length
       : 0;
     if (messages.length === 0 && enabledAgentCount === 0) {
-      toast({ type: "error", description: "Add at least one agent to start this chat" });
+      toast({
+        type: "error",
+        description: "Add at least one agent to start this chat",
+      });
       return Promise.resolve();
     }
     return sendMessage(msg, options);
@@ -183,7 +197,7 @@ export function Chat({
 
   return (
     <>
-      <div className="overscroll-behavior-contain flex h-dvh min-w-0 touch-pan-y flex-col bg-background">
+      <div className="overscroll-behavior-contain bg-background flex h-dvh min-w-0 touch-pan-y flex-col">
         <ChatHeader
           chatId={id}
           isReadonly={isReadonly}
@@ -202,7 +216,7 @@ export function Chat({
           votes={votes}
         />
 
-        <div className="sticky bottom-0 z-1 mx-auto flex w-full max-w-4xl gap-2 border-t-0 bg-background px-2 pb-3 md:px-4 md:pb-4">
+        <div className="bg-background sticky bottom-0 z-1 mx-auto flex w-full max-w-4xl gap-2 border-t-0 px-2 pb-3 md:px-4 md:pb-4">
           {!isReadonly && (
             <MultimodalInput
               attachments={attachments}
@@ -261,7 +275,7 @@ export function Chat({
               onClick={() => {
                 window.open(
                   "https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fai%3Fmodal%3Dadd-credit-card",
-                  "_blank"
+                  "_blank",
                 );
                 window.location.href = "/";
               }}

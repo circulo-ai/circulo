@@ -1,36 +1,45 @@
+import { generateTitleFromUserMessage } from "@/app/(chat)/actions";
+import { chat, chatAgent, db } from "@/db";
 import {
+  createStreamId,
   deleteChatById,
   getChatById,
   getMessagesByChatId,
   saveChat,
   saveMessages,
-  createStreamId,
 } from "@/db/queries";
+import { chatRepo } from "@/db/repositories/chat-repo";
+import { systemPrompt } from "@/lib/ai/prompts";
+import { myProvider } from "@/lib/ai/providers";
+import { executeAgentWithDynamicTools } from "@/lib/ai/tools/executor";
+import { agentFactory } from "@/lib/ai/tools/factory";
 import { getSession } from "@/lib/auth";
+import { UsageRateLimiter } from "@/lib/billing/rate-limiter";
+import { SubscriptionManager } from "@/lib/billing/subscription-manager";
+import { getAssistantAgentId } from "@/lib/chat/assistant-agent";
 import { ChatSDKError } from "@/lib/errors";
+import { calculateCostFromUsage } from "@/lib/server-utils";
+import {
+  convertToUIMessages,
+  generateUUID,
+  getTextFromMessage,
+} from "@/lib/utils";
+import {
+  convertToModelMessages,
+  createUIMessageStream,
+  JsonToSseTransformStream,
+  streamText,
+} from "ai";
+import { eq, sql } from "drizzle-orm";
 import { unstable_cache as cache } from "next/cache";
 import { after } from "next/server";
 import {
   createResumableStreamContext,
   type ResumableStreamContext,
 } from "resumable-stream";
-import { convertToModelMessages, createUIMessageStream, JsonToSseTransformStream, streamText } from "ai";
-import { systemPrompt } from "@/lib/ai/prompts";
-import { myProvider } from "@/lib/ai/providers";
-import { executeAgentWithDynamicTools } from "@/lib/ai/tools/executor";
-import { generateTitleFromUserMessage } from "@/app/(chat)/actions";
-import { convertToUIMessages, generateUUID, getTextFromMessage } from "@/lib/utils";
-import { postRequestBodySchema, type PostRequestBody } from "./schema";
-import { UsageRateLimiter } from "@/lib/billing/rate-limiter";
-import { SubscriptionManager } from "@/lib/billing/subscription-manager";
-import { db, chatAgent, chat } from "@/db";
-import { chatRepo } from "@/db/repositories/chat-repo";
-import { eq, sql } from "drizzle-orm";
-import { calculateCostFromUsage } from "@/lib/server-utils";
 import type { ModelCatalog } from "tokenlens/core";
 import { fetchModels } from "tokenlens/fetch";
-import { agentFactory } from "@/lib/ai/tools/factory";
-import { getAssistantAgentId } from "@/lib/chat/assistant-agent";
+import { postRequestBodySchema, type PostRequestBody } from "./schema";
 export const maxDuration = 60;
 
 let globalStreamContext: ResumableStreamContext | null = null;
@@ -81,17 +90,25 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { id, message, selectedVisibilityType, agentIds } = requestBody as any;
+    const { id, message, selectedVisibilityType, agentIds } =
+      requestBody as any;
     const session = await getSession();
     if (!session?.user) {
       return new ChatSDKError("unauthorized:chat").toResponse();
     }
 
-    const subscription = await SubscriptionManager.getActiveSubscription(session.user.id);
+    const subscription = await SubscriptionManager.getActiveSubscription(
+      session.user.id,
+    );
     if (subscription) {
       const dailyLimit = subscription.features.maxMessagesPerDay;
       if (dailyLimit !== null && dailyLimit !== undefined) {
-        const recentUserMsgCount = await (await import("@/db/queries")).getMessageCountByUserId({ id: session.user.id, differenceInHours: 24 });
+        const recentUserMsgCount = await (
+          await import("@/db/queries")
+        ).getMessageCountByUserId({
+          id: session.user.id,
+          differenceInHours: 24,
+        });
         if (recentUserMsgCount >= dailyLimit) {
           return new ChatSDKError("rate_limit:chat").toResponse();
         }
@@ -126,19 +143,35 @@ export async function POST(request: Request) {
         return new ChatSDKError("bad_request:chat").toResponse();
       }
       const title = await generateTitleFromUserMessage({ message });
-      await saveChat({ id, userId: session.user.id, title, visibility: selectedVisibilityType });
+      await saveChat({
+        id,
+        userId: session.user.id,
+        title,
+        visibility: selectedVisibilityType,
+      });
       createdNewChat = true;
       await UsageRateLimiter.trackOnly(session.user.id, "chats_created", 1);
     }
 
     if (createdNewChat && agentIds && agentIds.length > 0) {
       for (const aId of agentIds) {
-        const {allowed} = await UsageRateLimiter.canPerformAction(session.user.id, "add_chat_agent", { chatId: id });
+        const { allowed } = await UsageRateLimiter.canPerformAction(
+          session.user.id,
+          "add_chat_agent",
+          { chatId: id },
+        );
         if (!allowed) {
           break;
         }
         const speakOrder = await chatRepo.getNextSpeakOrder(id);
-        await db.insert(chatAgent).values({ id: generateUUID(), chatId: id, agentId: aId, speakOrder, enabled: true, addedBy: session.user.id });
+        await db.insert(chatAgent).values({
+          id: generateUUID(),
+          chatId: id,
+          agentId: aId,
+          speakOrder,
+          enabled: true,
+          addedBy: session.user.id,
+        });
       }
     }
 
@@ -189,7 +222,13 @@ export async function POST(request: Request) {
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
         if (agent && firstAgentId) {
-          const {result} = await executeAgentWithDynamicTools({ userId: session.user.id, chatId: id, agentId: firstAgentId, messages: convertToModelMessages(uiMessages), dataStream });
+          const { result } = await executeAgentWithDynamicTools({
+            userId: session.user.id,
+            chatId: id,
+            agentId: firstAgentId,
+            messages: convertToModelMessages(uiMessages),
+            dataStream,
+          });
           result.consumeStream();
           dataStream.merge(result.toUIMessageStream({ sendReasoning: true }));
         } else {
@@ -200,7 +239,22 @@ export async function POST(request: Request) {
             city: headers.get("x-vercel-ip-city") || "",
             country: headers.get("x-vercel-ip-country") || "",
           } as any;
-          const result = streamText({ model: myProvider.languageModel("chat-model"), system: systemPrompt({ selectedChatModel: "chat-model", requestHints }), messages: convertToModelMessages(uiMessages), onFinish: async ({ usage }) => { finalUsage = usage; dataStream.write({ type: "data-usage", data: usage as any, transient: true }); } });
+          const result = streamText({
+            model: myProvider.languageModel("chat-model"),
+            system: systemPrompt({
+              selectedChatModel: "chat-model",
+              requestHints,
+            }),
+            messages: convertToModelMessages(uiMessages),
+            onFinish: async ({ usage }) => {
+              finalUsage = usage;
+              dataStream.write({
+                type: "data-usage",
+                data: usage as any,
+                transient: true,
+              });
+            },
+          });
           result.consumeStream();
           dataStream.merge(result.toUIMessageStream({ sendReasoning: true }));
         }
@@ -209,20 +263,48 @@ export async function POST(request: Request) {
       onFinish: async ({ messages }) => {
         const toSave = messages
           .filter((m) => m.role === "assistant")
-          .map((m) => ({ id: m.id, role: m.role, parts: m.parts, createdAt: new Date(), attachments: [], chatId: id, userId: null, agentId: firstAgentId!, content: getTextFromMessage(m), tokenCount: 0, cost: "0.000000", quotedMessageId: null, isEdited: false, editedAt: null, deleted: false, deletedAt: null }));
+          .map((m) => ({
+            id: m.id,
+            role: m.role,
+            parts: m.parts,
+            createdAt: new Date(),
+            attachments: [],
+            chatId: id,
+            userId: null,
+            agentId: firstAgentId!,
+            content: getTextFromMessage(m),
+            tokenCount: 0,
+            cost: "0.000000",
+            quotedMessageId: null,
+            isEdited: false,
+            editedAt: null,
+            deleted: false,
+            deletedAt: null,
+          }));
         if (finalUsage) {
           const inputTokens = Number(finalUsage.inputTokens || 0);
           const outputTokens = Number(finalUsage.outputTokens || 0);
           const totalTokens = inputTokens + outputTokens;
-          const modelId = agent?.config?.model ?? 'gemini-2.5-flash';
-          const costNum = calculateCostFromUsage(String(modelId), inputTokens, outputTokens);
+          const modelId = agent?.config?.model ?? "gemini-2.5-flash";
+          const costNum = calculateCostFromUsage(
+            String(modelId),
+            inputTokens,
+            outputTokens,
+          );
           for (const msg of toSave) {
             if (msg.role === "assistant") {
               msg.tokenCount = totalTokens;
               msg.cost = String(costNum.toFixed ? costNum.toFixed(6) : costNum);
             }
           }
-          await db.update(chat).set({ messageCount: sql`message_count + ${toSave.length}`, totalTokens: sql`total_tokens + ${totalTokens}`, totalCost: sql`total_cost + ${costNum}` }).where(eq(chat.id, id));
+          await db
+            .update(chat)
+            .set({
+              messageCount: sql`message_count + ${toSave.length}`,
+              totalTokens: sql`total_tokens + ${totalTokens}`,
+              totalCost: sql`total_cost + ${costNum}`,
+            })
+            .where(eq(chat.id, id));
         }
         await saveMessages({ messages: toSave as any });
       },
@@ -233,7 +315,11 @@ export async function POST(request: Request) {
 
     const streamContext = getStreamContext();
     if (streamContext) {
-      return new Response(await streamContext.resumableStream(streamId, () => stream.pipeThrough(new JsonToSseTransformStream())));
+      return new Response(
+        await streamContext.resumableStream(streamId, () =>
+          stream.pipeThrough(new JsonToSseTransformStream()),
+        ),
+      );
     }
     return new Response(stream.pipeThrough(new JsonToSseTransformStream()));
   } catch (error) {
@@ -241,7 +327,12 @@ export async function POST(request: Request) {
     if (error instanceof ChatSDKError) {
       return error.toResponse();
     }
-    if (error instanceof Error && error.message?.includes("AI Gateway requires a valid credit card on file to service requests")) {
+    if (
+      error instanceof Error &&
+      error.message?.includes(
+        "AI Gateway requires a valid credit card on file to service requests",
+      )
+    ) {
       return new ChatSDKError("bad_request:activate_gateway").toResponse();
     }
     console.error("Unhandled error in chat API:", error, { vercelId });

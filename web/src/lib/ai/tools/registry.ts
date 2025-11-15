@@ -5,10 +5,10 @@ import { toolPermissions } from "@/lib/ai/tools/tool-permissions";
 import { createLogger } from "@/lib/logs/console/logger";
 import { mcpService } from "@/lib/mcp/service";
 import type { McpTool } from "@/lib/mcp/types";
-import { and, eq, sql } from "drizzle-orm";
+import { ChatMessage } from "@/lib/types";
 import { generateUUID } from "@/lib/utils";
 import { UIMessageStreamWriter } from "ai";
-import { ChatMessage } from "@/lib/types";
+import { and, eq, sql } from "drizzle-orm";
 
 const logger = createLogger("ToolRegistry");
 

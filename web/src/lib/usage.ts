@@ -13,7 +13,8 @@ export interface ToolExecutionMetadata {
 }
 
 // Server-merged usage: base usage + TokenLens summary + optional modelId
-export type AppUsage = LanguageModelUsage & UsageData & { modelId?: string } & {
-  // Additional metadata for tool executions
-  toolExecutions?: ToolExecutionMetadata[];
-};
+export type AppUsage = LanguageModelUsage &
+  UsageData & { modelId?: string } & {
+    // Additional metadata for tool executions
+    toolExecutions?: ToolExecutionMetadata[];
+  };

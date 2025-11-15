@@ -329,7 +329,9 @@ function PureMultimodalInput({
                   key={attachment.url}
                   onRemove={() => {
                     setAttachments((currentAttachments) =>
-                      currentAttachments.filter((a) => a.url !== attachment.url),
+                      currentAttachments.filter(
+                        (a) => a.url !== attachment.url,
+                      ),
                     );
                     if (fileInputRef.current) {
                       fileInputRef.current.value = "";
@@ -370,11 +372,11 @@ function PureMultimodalInput({
           </div>
           <PromptInputToolbar className="!border-top-0 border-t-0! p-0 shadow-none dark:border-0 dark:border-transparent!">
             <PromptInputTools className="gap-0 sm:gap-0.5">
-            <AttachmentsButton
-              fileInputRef={fileInputRef}
-              selectedModelId={selectedModelId}
-              status={status}
-            />
+              <AttachmentsButton
+                fileInputRef={fileInputRef}
+                selectedModelId={selectedModelId}
+                status={status}
+              />
               {/*<ModelSelectorCompact*/}
               {/*  onModelChange={onModelChange}*/}
               {/*  selectedModelId={selectedModelId}*/}
@@ -386,7 +388,10 @@ function PureMultimodalInput({
             ) : (
               <PromptInputSubmit
                 className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground size-8 rounded-full transition-colors duration-200"
-                disabled={(input.trim().length === 0 && attachments.length === 0) || uploadQueue.length > 0}
+                disabled={
+                  (input.trim().length === 0 && attachments.length === 0) ||
+                  uploadQueue.length > 0
+                }
                 status={status}
                 data-testid="send-button"
               >
@@ -435,18 +440,20 @@ function PureAttachmentsButton({
   const isReasoningModel = selectedModelId === "chat-model-reasoning";
 
   return (
-        <Button
-          className="hover:bg-accent aspect-square h-8 rounded-lg p-1 transition-colors"
-          data-testid="attachments-button"
-          disabled={status === "submitted" || status === "streaming" || isReasoningModel}
-          onClick={(event) => {
-            event.preventDefault();
-            fileInputRef.current?.click();
-          }}
-          variant="ghost"
-        >
-          <PaperclipIcon size={14} style={{ width: 14, height: 14 }} />
-        </Button>
+    <Button
+      className="hover:bg-accent aspect-square h-8 rounded-lg p-1 transition-colors"
+      data-testid="attachments-button"
+      disabled={
+        status === "submitted" || status === "streaming" || isReasoningModel
+      }
+      onClick={(event) => {
+        event.preventDefault();
+        fileInputRef.current?.click();
+      }}
+      variant="ghost"
+    >
+      <PaperclipIcon size={14} style={{ width: 14, height: 14 }} />
+    </Button>
   );
 }
 

@@ -1,9 +1,9 @@
-import { cookies } from "next/headers";
 import { AppSidebar } from "@/components/app-sidebar";
 import { DataStreamProvider } from "@/components/data-stream-provider";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { getSession } from "@/lib/auth";
 import { RedirectToSignIn, SignedIn } from "@daveyplate/better-auth-ui";
+import { cookies } from "next/headers";
 
 // export const experimental_ppr = true;
 
@@ -24,13 +24,11 @@ export default async function Layout({
       {/*/>*/}
       <SignedIn>
         <DataStreamProvider>
-        <SidebarProvider defaultOpen={!isCollapsed}>
-          {
-            session?.user && <AppSidebar user={session.user} />
-          }
-          <SidebarInset>{children}</SidebarInset>
-        </SidebarProvider>
-      </DataStreamProvider>
+          <SidebarProvider defaultOpen={!isCollapsed}>
+            {session?.user && <AppSidebar user={session.user} />}
+            <SidebarInset>{children}</SidebarInset>
+          </SidebarProvider>
+        </DataStreamProvider>
       </SignedIn>
     </>
   );

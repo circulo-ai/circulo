@@ -520,7 +520,7 @@ export const chatMemoryEmbeddings = pgTable(
     // CREATE INDEX ... USING ivfflat (embedding vector_cosine_ops)
     index("chat_memory_embedding_vector_idx").using(
       "ivfflat",
-      table.embedding.op("vector_cosine_ops")
+      table.embedding.op("vector_cosine_ops"),
     ),
   ],
 );
