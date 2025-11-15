@@ -5,6 +5,7 @@ import {
   check,
   index,
   integer,
+  json,
   jsonb,
   numeric,
   pgEnum,
@@ -15,6 +16,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import z from "zod";
+import { chat } from "./chat";
 
 export const agentVisibilityEnum = pgEnum("agent_visibility", [
   "private",
@@ -188,37 +190,56 @@ export const tool = pgTable(
 
 // MCP (Model Context Protocol) Server definitions
 export const mcpServer = pgTable(
-  "mcp_server",
+  "mcp_servers",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }), // null for system MCP servers
+    id: text("id").primaryKey(),
+    chatId: text("chat_id")
+      .notNull()
+      .references(() => chat.id, { onDelete: "cascade" }),
+
+    // Track who created the server, but chat owns it
+    createdBy: text("created_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
 
     name: text("name").notNull(),
     description: text("description"),
 
-    // Server connection details
-    endpoint: text("endpoint").notNull(),
-    authType: text("auth_type").notNull().default("none"), // 'none', 'api_key', 'oauth', etc.
-    authConfig: jsonb("auth_config").$type<Record<string, any>>(),
+    transport: text("transport").notNull(),
+    url: text("url"),
 
-    // Server metadata
-    version: text("version"),
-    capabilities: jsonb("capabilities").$type<string[]>().default([]),
+    headers: json("headers").default("{}"),
+    timeout: integer("timeout").default(30000),
+    retries: integer("retries").default(3),
 
-    isSystem: boolean("is_system").notNull().default(false),
-    isActive: boolean("is_active").notNull().default(true),
+    enabled: boolean("enabled").notNull().default(true),
+    lastConnected: timestamp("last_connected"),
+    connectionStatus: text("connection_status").default("disconnected"),
+    lastError: text("last_error"),
+
+    toolCount: integer("tool_count").default(0),
+    lastToolsRefresh: timestamp("last_tools_refresh"),
+    totalRequests: integer("total_requests").default(0),
+    lastUsed: timestamp("last_used"),
+
+    deletedAt: timestamp("deleted_at"),
 
     createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at")
-      .notNull()
-      .defaultNow()
-      .$onUpdate(() => new Date()),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
-  (table) => [
-    index("mcp_server_user_id_idx").on(table.userId),
-    index("mcp_server_is_system_idx").on(table.isSystem),
-    index("mcp_server_endpoint_idx").on(table.endpoint),
-  ],
+  (table) => ({
+    // Primary access pattern - active servers by chat
+    chatEnabledIdx: index("mcp_servers_chat_enabled_idx").on(
+      table.chatId,
+      table.enabled,
+    ),
+
+    // Soft delete pattern - chat + not deleted
+    chatDeletedIdx: index("mcp_servers_chat_deleted_idx").on(
+      table.chatId,
+      table.deletedAt,
+    ),
+  }),
 );
 
 // Types
@@ -240,25 +261,33 @@ export type NewMcpServer = typeof mcpServer.$inferInsert;
 // Generate base Zod schemas from Drizzle tables
 // Override numeric fields to work with numbers in API, convert to strings for DB
 export const insertAgentSchema = createInsertSchema(agent, {
-  temperature: z.number().min(0).max(2).transform(val => val.toString()),
+  temperature: z
+    .number()
+    .min(0)
+    .max(2)
+    .transform((val) => val.toString()),
 });
 
 export const selectAgentSchema = createSelectSchema(agent, {
-  temperature: z.string().transform(val => parseFloat(val)),
+  temperature: z.string().transform((val) => parseFloat(val)),
 });
 
 export const insertAgentTemplateSchema = createInsertSchema(agentTemplate, {
-  temperature: z.number().min(0).max(2).transform(val => val.toString()),
+  temperature: z
+    .number()
+    .min(0)
+    .max(2)
+    .transform((val) => val.toString()),
 });
 
 export const selectAgentTemplateSchema = createSelectSchema(agentTemplate, {
-  temperature: z.string().transform(val => parseFloat(val)),
+  temperature: z.string().transform((val) => parseFloat(val)),
 });
 
 // API input schema - accepts numbers, validates, then transforms to strings for DB
 export const createAgentSchema = insertAgentSchema
   .omit({
-    id: true,           // Exclude auto-generated fields
+    id: true, // Exclude auto-generated fields
     createdAt: true,
     updatedAt: true,
     usageCount: true,
@@ -280,18 +309,17 @@ export const createAgentSchema = insertAgentSchema
 export const updateAgentSchema = insertAgentSchema
   .omit({
     id: true,
-    userId: true,      // Can't change ownership
+    userId: true, // Can't change ownership
     createdAt: true,
     updatedAt: true,
     deleted: true,
   })
-  .partial()           // Make all fields optional for updates
+  .partial() // Make all fields optional for updates
   .extend({
     temperature: z.number().min(0).max(2).optional(),
   })
   .transform((data) => ({
     ...data,
-    temperature: data.temperature !== undefined
-      ? data.temperature.toString()
-      : undefined,
+    temperature:
+      data.temperature !== undefined ? data.temperature.toString() : undefined,
   }));

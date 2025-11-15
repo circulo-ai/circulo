@@ -1,10 +1,10 @@
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import { Chat } from "@/components/chat";
 import { DataStreamHandler } from "@/components/data-stream-handler";
 import { DEFAULT_CHAT_MODEL } from "@/lib/ai/models";
-import { generateUUID } from "@/lib/utils";
 import { getSession } from "@/lib/auth";
+import { generateUUID } from "@/lib/utils";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 export default async function Page() {
   const session = await getSession();
@@ -37,10 +37,11 @@ export default async function Page() {
 
   return (
     <>
+      {/* Show a telegram style empty chat page with a beautiful bacjground pattern */}
       <Chat
         autoResume={false}
         id={id}
-        initialChatModel={modelIdFromCookie.value}
+        initialChatModel={DEFAULT_CHAT_MODEL}
         initialMessages={[]}
         initialVisibilityType="private"
         isReadonly={false}

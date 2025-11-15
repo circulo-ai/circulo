@@ -1,14 +1,20 @@
-import { createHmac } from 'crypto';
-import crypto from 'crypto';
+import crypto, {
+  createCipheriv,
+  createDecipheriv,
+  createHmac,
+  randomBytes,
+} from "crypto";
+import { env } from "./env";
+import { createLogger } from "./logs/console/logger";
 
+const logger = createLogger("ServerUtils");
 
 /**
  * Generate a short request ID for correlation
  */
 export function generateRequestId(): string {
-  return crypto.randomUUID().slice(0, 8)
+  return crypto.randomUUID().slice(0, 8);
 }
-
 
 export function generateId() {
   return crypto.randomUUID();
@@ -59,21 +65,101 @@ export function calculateCostFromUsage(
   return Number(total.toFixed(6)) || 0;
 }
 
-
-export function aesEncryptBase64(plain: string, keyB64: string, ivB64: string): string {
-  const key = Buffer.from(keyB64, 'base64');
-  const iv = Buffer.from(ivB64, 'base64');
-  const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
-  const encrypted = Buffer.concat([cipher.update(Buffer.from(plain, 'utf8')), cipher.final()]);
-  return encrypted.toString('base64');
+export function aesEncryptBase64(
+  plain: string,
+  keyB64: string,
+  ivB64: string,
+): string {
+  const key = Buffer.from(keyB64, "base64");
+  const iv = Buffer.from(ivB64, "base64");
+  const cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
+  const encrypted = Buffer.concat([
+    cipher.update(Buffer.from(plain, "utf8")),
+    cipher.final(),
+  ]);
+  return encrypted.toString("base64");
 }
 
 export function hmacSha256Base64(data: string, secret: string): string {
-  return crypto.createHmac('sha256', secret).update(data, 'utf8').digest('base64');
+  return crypto
+    .createHmac("sha256", secret)
+    .update(data, "utf8")
+    .digest("base64");
 }
 
 export function sha256SignBase64(data: string, signKey: string): string {
-  const h = createHmac('sha256', signKey);
-  h.update(data, 'utf8');
-  return h.digest('base64');
+  const h = createHmac("sha256", signKey);
+  h.update(data, "utf8");
+  return h.digest("base64");
+}
+
+function getEncryptionKey(): Buffer {
+  const key = env.ENCRYPTION_KEY;
+  if (!key || key.length !== 64) {
+    throw new Error(
+      "ENCRYPTION_KEY must be set to a 64-character hex string (32 bytes)",
+    );
+  }
+  return Buffer.from(key, "hex");
+}
+
+/**
+ * Encrypts a secret using AES-256-GCM
+ * @param secret - The secret to encrypt
+ * @returns A promise that resolves to an object containing the encrypted secret and IV
+ */
+export async function encryptSecret(
+  secret: string,
+): Promise<{ encrypted: string; iv: string }> {
+  const iv = randomBytes(16);
+  const key = getEncryptionKey();
+
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  let encrypted = cipher.update(secret, "utf8", "hex");
+  encrypted += cipher.final("hex");
+
+  const authTag = cipher.getAuthTag();
+
+  // Format: iv:encrypted:authTag
+  return {
+    encrypted: `${iv.toString("hex")}:${encrypted}:${authTag.toString("hex")}`,
+    iv: iv.toString("hex"),
+  };
+}
+
+/**
+ * Decrypts an encrypted secret
+ * @param encryptedValue - The encrypted value in format "iv:encrypted:authTag"
+ * @returns A promise that resolves to an object containing the decrypted secret
+ */
+export async function decryptSecret(
+  encryptedValue: string,
+): Promise<{ decrypted: string }> {
+  const parts = encryptedValue.split(":");
+  const ivHex = parts[0];
+  const authTagHex = parts[parts.length - 1];
+  const encrypted = parts.slice(1, -1).join(":");
+
+  if (!ivHex || !encrypted || !authTagHex) {
+    throw new Error(
+      'Invalid encrypted value format. Expected "iv:encrypted:authTag"',
+    );
+  }
+
+  const key = getEncryptionKey();
+  const iv = Buffer.from(ivHex, "hex");
+  const authTag = Buffer.from(authTagHex, "hex");
+
+  try {
+    const decipher = createDecipheriv("aes-256-gcm", key, iv);
+    decipher.setAuthTag(authTag);
+
+    let decrypted = decipher.update(encrypted, "hex", "utf8");
+    decrypted += decipher.final("utf8");
+
+    return { decrypted };
+  } catch (error: any) {
+    logger.error("Decryption error:", { error: error.message });
+    throw error;
+  }
 }

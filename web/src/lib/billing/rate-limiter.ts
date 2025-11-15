@@ -34,7 +34,8 @@ export class UsageRateLimiter {
   static async enforce(
     userId: string,
     metric: Metric = "api_calls",
-    windowMs: number = 60_000
+    count: number = 1,
+    windowMs: number = 60_000,
   ): Promise<void> {
     const subscription =
       await SubscriptionManager.getActiveSubscription(userId);
@@ -53,11 +54,11 @@ export class UsageRateLimiter {
 
     if (exceeded) {
       throw new Error(
-        `Rate limit exceeded. Your plan allows ${limit} requests per minute.`
+        `Rate limit exceeded. Your plan allows ${limit} requests per ${Math.floor(windowMs/1000)} sec.`
       );
     }
 
-    await UsageTracker.track(userId, metric, 1, subscription.id);
+    await UsageTracker.track(userId, metric, count, subscription.id);
   }
 
   /**

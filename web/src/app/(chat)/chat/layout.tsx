@@ -3,6 +3,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { DataStreamProvider } from "@/components/data-stream-provider";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { getSession } from "@/lib/auth";
+import { RedirectToSignIn, SignedIn } from "@daveyplate/better-auth-ui";
 
 // export const experimental_ppr = true;
 
@@ -16,11 +17,13 @@ export default async function Layout({
 
   return (
     <>
+      <RedirectToSignIn />
       {/*<Script*/}
       {/*  src="https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js"*/}
       {/*  strategy="beforeInteractive"*/}
       {/*/>*/}
-      <DataStreamProvider>
+      <SignedIn>
+        <DataStreamProvider>
         <SidebarProvider defaultOpen={!isCollapsed}>
           {
             session?.user && <AppSidebar user={session.user} />
@@ -28,6 +31,7 @@ export default async function Layout({
           <SidebarInset>{children}</SidebarInset>
         </SidebarProvider>
       </DataStreamProvider>
+      </SignedIn>
     </>
   );
 }
