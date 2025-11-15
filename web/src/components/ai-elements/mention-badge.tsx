@@ -1,7 +1,7 @@
-import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { XIcon } from "lucide-react";
 import { MentionEntity } from "@/lib/chat/mentions/types";
+import { cn } from "@/lib/utils";
+import { XIcon } from "lucide-react";
 
 export type MentionBadgeProps = {
   mention: MentionEntity;
@@ -10,10 +10,10 @@ export type MentionBadgeProps = {
 };
 
 export const MentionBadge = ({
-                               mention,
-                               onRemove,
-                               className,
-                             }: MentionBadgeProps) => (
+  mention,
+  onRemove,
+  className,
+}: MentionBadgeProps) => (
   <Badge
     variant="secondary"
     className={cn(

@@ -4,7 +4,7 @@ import { TEST_PROMPTS } from "./basic";
 
 export function compareMessages(
   firstMessage: ModelMessage,
-  secondMessage: ModelMessage
+  secondMessage: ModelMessage,
 ): boolean {
   if (firstMessage.role !== secondMessage.role) {
     return false;
@@ -78,7 +78,7 @@ const reasoningToDeltas = (text: string): any[] => {
 
 export const getResponseChunksByPrompt = (
   prompt: ModelMessage[],
-  isReasoningEnabled = false
+  isReasoningEnabled = false,
 ): any[] => {
   const recentMessage = prompt.at(-1);
 
@@ -102,7 +102,7 @@ export const getResponseChunksByPrompt = (
     if (compareMessages(recentMessage, TEST_PROMPTS.USER_GRASS)) {
       return [
         ...reasoningToDeltas(
-          "Grass is green because of chlorophyll absorption!"
+          "Grass is green because of chlorophyll absorption!",
         ),
         ...textToDeltas("It's just green duh!"),
         {

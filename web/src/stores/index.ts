@@ -1,46 +1,46 @@
-'use client'
+"use client";
 
-import { useEffect } from 'react'
-import { createLogger } from '@/lib/logs/console/logger'
+import { createLogger } from "@/lib/logs/console/logger";
+import { useEffect } from "react";
 
-const logger = createLogger('Stores')
+const logger = createLogger("Stores");
 
 // Track initialization state
-let isInitializing = false
-let appFullyInitialized = false
-let dataInitialized = false // Flag for actual data loading completion
+let isInitializing = false;
+let appFullyInitialized = false;
+let dataInitialized = false; // Flag for actual data loading completion
 
 /**
  * Initialize the application state and sync system
  * localStorage persistence has been removed - relies on DB and Zustand stores only
  */
 async function initializeApplication(): Promise<void> {
-  if (typeof window === 'undefined' || isInitializing) return
+  if (typeof window === "undefined" || isInitializing) return;
 
-  isInitializing = true
-  appFullyInitialized = false
+  isInitializing = true;
+  appFullyInitialized = false;
 
   // Track initialization start time
-  const initStartTime = Date.now()
+  const initStartTime = Date.now();
 
   try {
     // Mark data as initialized only after sync managers have loaded data from DB
-    dataInitialized = true
+    dataInitialized = true;
 
     // Log initialization timing information
-    const initDuration = Date.now() - initStartTime
-    logger.info(`Application initialization completed in ${initDuration}ms`)
+    const initDuration = Date.now() - initStartTime;
+    logger.info(`Application initialization completed in ${initDuration}ms`);
 
     // Mark application as fully initialized
-    appFullyInitialized = true
+    appFullyInitialized = true;
   } catch (error) {
-    logger.error('Error during application initialization:', { error })
+    logger.error("Error during application initialization:", { error });
     // Still mark as initialized to prevent being stuck in initializing state
-    appFullyInitialized = true
+    appFullyInitialized = true;
     // But don't mark data as initialized on error
-    dataInitialized = false
+    dataInitialized = false;
   } finally {
-    isInitializing = false
+    isInitializing = false;
   }
 }
 
@@ -48,7 +48,7 @@ async function initializeApplication(): Promise<void> {
  * Checks if application is fully initialized
  */
 export function isAppInitialized(): boolean {
-  return appFullyInitialized
+  return appFullyInitialized;
 }
 
 /**
@@ -56,7 +56,7 @@ export function isAppInitialized(): boolean {
  * This should be checked before any sync operations
  */
 export function isDataInitialized(): boolean {
-  return dataInitialized
+  return dataInitialized;
 }
 
 /**
@@ -64,29 +64,29 @@ export function isDataInitialized(): boolean {
  */
 function handleBeforeUnload(event: BeforeUnloadEvent): void {
   // Check if we're on an authentication page and skip confirmation if we are
-  if (typeof window !== 'undefined') {
-    const path = window.location.pathname
+  if (typeof window !== "undefined") {
+    const path = window.location.pathname;
     // Skip confirmation for auth-related pages
     if (
-      path === '/login' ||
-      path === '/signup' ||
-      path === '/reset-password' ||
-      path === '/verify'
+      path === "/login" ||
+      path === "/signup" ||
+      path === "/reset-password" ||
+      path === "/verify"
     ) {
-      return
+      return;
     }
   }
 
   // Standard beforeunload pattern
-  event.preventDefault()
-  event.returnValue = ''
+  event.preventDefault();
+  event.returnValue = "";
 }
 
 /**
  * Clean up sync system
  */
 function cleanupApplication(): void {
-  window.removeEventListener('beforeunload', handleBeforeUnload)
+  window.removeEventListener("beforeunload", handleBeforeUnload);
   // Note: No sync managers to dispose - Socket.IO handles cleanup
 }
 
@@ -95,26 +95,28 @@ function cleanupApplication(): void {
  * localStorage persistence has been removed
  */
 export async function clearUserData(): Promise<void> {
-  if (typeof window === 'undefined') return
+  if (typeof window === "undefined") return;
 
   try {
     // Note: No sync managers to dispose - Socket.IO handles cleanup
 
     // Reset all stores to their initial state
-    resetAllStores()
+    resetAllStores();
 
     // Clear localStorage except for essential app settings (minimal usage)
-    const keysToKeep = ['next-favicon', 'theme']
-    const keysToRemove = Object.keys(localStorage).filter((key) => !keysToKeep.includes(key))
-    keysToRemove.forEach((key) => localStorage.removeItem(key))
+    const keysToKeep = ["next-favicon", "theme"];
+    const keysToRemove = Object.keys(localStorage).filter(
+      (key) => !keysToKeep.includes(key),
+    );
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
 
     // Reset application initialization state
-    appFullyInitialized = false
-    dataInitialized = false
+    appFullyInitialized = false;
+    dataInitialized = false;
 
-    logger.info('User data cleared successfully')
+    logger.info("User data cleared successfully");
   } catch (error) {
-    logger.error('Error clearing user data:', { error })
+    logger.error("Error clearing user data:", { error });
   }
 }
 
@@ -124,12 +126,12 @@ export async function clearUserData(): Promise<void> {
 export function useAppInitialization() {
   useEffect(() => {
     // Use Promise to handle async initialization
-    initializeApplication()
+    initializeApplication();
 
     return () => {
-      cleanupApplication()
-    }
-  }, [])
+      cleanupApplication();
+    };
+  }, []);
 }
 
 /**
@@ -138,8 +140,8 @@ export function useAppInitialization() {
  */
 export function useLoginInitialization() {
   useEffect(() => {
-    reinitializeAfterLogin()
-  }, [])
+    reinitializeAfterLogin();
+  }, []);
 }
 
 /**
@@ -147,46 +149,44 @@ export function useLoginInitialization() {
  * This ensures we load fresh data from the database for the new user
  */
 export async function reinitializeAfterLogin(): Promise<void> {
-  if (typeof window === 'undefined') return
+  if (typeof window === "undefined") return;
 
   try {
     // Reset application initialization state
-    appFullyInitialized = false
-    dataInitialized = false
+    appFullyInitialized = false;
+    dataInitialized = false;
 
     // Note: No sync managers to dispose - Socket.IO handles cleanup
 
     // Clean existing state to avoid stale data
-    resetAllStores()
+    resetAllStores();
 
     // Reset initialization flags to force a fresh load
-    isInitializing = false
+    isInitializing = false;
 
     // Reinitialize the application
-    await initializeApplication()
+    await initializeApplication();
 
-    logger.info('Application reinitialized after login')
+    logger.info("Application reinitialized after login");
   } catch (error) {
-    logger.error('Error reinitializing application:', { error })
+    logger.error("Error reinitializing application:", { error });
   }
 }
 
 // Initialize immediately when imported on client
-if (typeof window !== 'undefined') {
-  initializeApplication()
+if (typeof window !== "undefined") {
+  initializeApplication();
 }
-
 
 // Helper function to reset all stores
 export const resetAllStores = () => {
   // Reset all stores to initial state
   // Variables store has no tracking to reset; registry hydrates
-}
+};
 
 // Helper function to log all store states
 export const logAllStores = () => {
-  const state = {
-  }
+  const state = {};
 
-  return state
-}
+  return state;
+};

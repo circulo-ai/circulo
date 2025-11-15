@@ -1,12 +1,17 @@
+import type { ArtifactKind } from "@/components/artifacts/artifact";
+import {
+  FileIcon,
+  LoaderIcon,
+  MessageIcon,
+  PencilEditIcon,
+} from "@/components/icons/icons";
+import { useArtifact } from "@/hooks/chats/use-artifact";
 import { memo } from "react";
 import { toast } from "sonner";
-import { useArtifact } from "@/hooks/chats/use-artifact";
-import type { ArtifactKind } from "@/components/artifacts/artifact";
-import { FileIcon, LoaderIcon, MessageIcon, PencilEditIcon } from "@/components/icons/icons";
 
 const getActionText = (
   type: "create" | "update" | "request-suggestions",
-  tense: "present" | "past"
+  tense: "present" | "past",
 ) => {
   switch (type) {
     case "create":
@@ -37,11 +42,11 @@ function PureDocumentToolResult({
 
   return (
     <button
-      className="flex w-fit cursor-pointer flex-row items-start gap-3 rounded-xl border bg-background px-3 py-2"
+      className="bg-background flex w-fit cursor-pointer flex-row items-start gap-3 rounded-xl border px-3 py-2"
       onClick={(event) => {
         if (isReadonly) {
           toast.error(
-            "Viewing files in shared chats is currently not supported."
+            "Viewing files in shared chats is currently not supported.",
           );
           return;
         }
@@ -67,7 +72,7 @@ function PureDocumentToolResult({
       }}
       type="button"
     >
-      <div className="mt-1 text-muted-foreground">
+      <div className="text-muted-foreground mt-1">
         {type === "create" ? (
           <FileIcon />
         ) : type === "update" ? (
@@ -107,7 +112,7 @@ function PureDocumentToolCall({
       onClick={(event) => {
         if (isReadonly) {
           toast.error(
-            "Viewing files in shared chats is currently not supported."
+            "Viewing files in shared chats is currently not supported.",
           );
           return;
         }

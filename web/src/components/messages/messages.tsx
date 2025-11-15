@@ -1,14 +1,17 @@
+import {
+  Conversation,
+  ConversationContent,
+} from "@/components/ai-elements/conversation";
+import { useDataStream } from "@/components/data-stream-provider";
+import { Greeting } from "@/components/greeting";
+import type { Vote } from "@/db/schema";
+import { useMessages } from "@/hooks/chats/use-messages";
+import type { ChatMessage } from "@/lib/types";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import equal from "fast-deep-equal";
 import { AnimatePresence } from "framer-motion";
 import { ArrowDownIcon } from "lucide-react";
 import { memo, useEffect } from "react";
-import { useMessages } from "@/hooks/chats/use-messages";
-import type { Vote } from "@/db/schema";
-import type { ChatMessage } from "@/lib/types";
-import { useDataStream } from "@/components/data-stream-provider";
-import { Conversation, ConversationContent } from "@/components/ai-elements/conversation";
-import { Greeting } from "@/components/greeting";
 import { PreviewMessage, ThinkingMessage } from "./message";
 
 type MessagesProps = {
@@ -65,7 +68,7 @@ function PureMessages({
       ref={messagesContainerRef}
       style={{ overflowAnchor: "none" }}
     >
-      <Conversation className="mx-auto flex min-w-0 max-w-4xl flex-col gap-4 md:gap-6">
+      <Conversation className="mx-auto flex max-w-4xl min-w-0 flex-col gap-4 md:gap-6">
         <ConversationContent className="flex flex-col gap-4 px-2 py-4 md:gap-6 md:px-4">
           {messages.length === 0 && <Greeting />}
 
@@ -105,7 +108,7 @@ function PureMessages({
       {!isAtBottom && (
         <button
           aria-label="Scroll to bottom"
-          className="-translate-x-1/2 absolute bottom-40 left-1/2 z-10 rounded-full border bg-background p-2 shadow-lg transition-colors hover:bg-muted"
+          className="bg-background hover:bg-muted absolute bottom-40 left-1/2 z-10 -translate-x-1/2 rounded-full border p-2 shadow-lg transition-colors"
           onClick={() => scrollToBottom("smooth")}
           type="button"
         >

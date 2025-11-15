@@ -1,5 +1,5 @@
-import { getSession } from "@/lib/auth";
 import { getSuggestionsByDocumentId } from "@/db/queries";
+import { getSession } from "@/lib/auth";
 import { ChatSDKError } from "@/lib/errors";
 
 export async function GET(request: Request) {
@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   if (!documentId) {
     return new ChatSDKError(
       "bad_request:api",
-      "Parameter documentId is required."
+      "Parameter documentId is required.",
     ).toResponse();
   }
 

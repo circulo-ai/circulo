@@ -1,6 +1,5 @@
-import { parse, unparse } from "papaparse";
-import { toast } from "sonner";
 import { Artifact } from "@/components/artifacts/create-artifact";
+import { SpreadsheetEditor } from "@/components/editors/sheet/sheet-editor";
 import {
   CopyIcon,
   LineChartIcon,
@@ -8,7 +7,8 @@ import {
   SparklesIcon,
   UndoIcon,
 } from "@/components/icons/icons";
-import { SpreadsheetEditor } from "@/components/editors/sheet/sheet-editor";
+import { parse, unparse } from "papaparse";
+import { toast } from "sonner";
 
 type Metadata = any;
 
@@ -73,7 +73,7 @@ export const sheetArtifact = new Artifact<"sheet", Metadata>({
         const parsed = parse<string[]>(content, { skipEmptyLines: true });
 
         const nonEmptyRows = parsed.data.filter((row) =>
-          row.some((cell) => cell.trim() !== "")
+          row.some((cell) => cell.trim() !== ""),
         );
 
         const cleanedCsv = unparse(nonEmptyRows);

@@ -1,4 +1,3 @@
-import React from "react";
 import { baseStyles } from "./base-styles";
 import EmailFooter from "./footer";
 
@@ -9,7 +8,12 @@ interface SizpayRenewalEmailProps {
   renewLink: string;
 }
 
-export function SizpayRenewalEmail({ planName, userName, periodEnd, renewLink }: SizpayRenewalEmailProps) {
+export function SizpayRenewalEmail({
+  planName,
+  userName,
+  periodEnd,
+  renewLink,
+}: SizpayRenewalEmailProps) {
   const formattedDate = new Date(periodEnd).toLocaleDateString();
   const greetingName = userName ? ` ${userName}` : "";
 
@@ -17,15 +21,15 @@ export function SizpayRenewalEmail({ planName, userName, periodEnd, renewLink }:
     <div style={baseStyles.container}>
       <div style={baseStyles.container}>
         <h1 style={baseStyles.header}>Subscription Renewal Reminder</h1>
+        <p style={baseStyles.paragraph}>Hi{greetingName},</p>
         <p style={baseStyles.paragraph}>
-          Hi{greetingName},
-        </p>
-        <p style={baseStyles.paragraph}>
-          Your <strong>{planName}</strong> plan paid via <strong>Sizpay</strong> is due for renewal on
+          Your <strong>{planName}</strong> plan paid via <strong>Sizpay</strong>{" "}
+          is due for renewal on
           <strong> {formattedDate}</strong>.
         </p>
         <p style={baseStyles.paragraph}>
-          To avoid any interruption, please renew before your billing period ends.
+          To avoid any interruption, please renew before your billing period
+          ends.
         </p>
 
         <div style={{ textAlign: "center", marginTop: 16, marginBottom: 16 }}>
@@ -40,7 +44,8 @@ export function SizpayRenewalEmail({ planName, userName, periodEnd, renewLink }:
         </div>
 
         <p style={baseStyles.paragraph}>
-          If you have questions or need help, just reply to this email and we’ll assist.
+          If you have questions or need help, just reply to this email and we’ll
+          assist.
         </p>
 
         <EmailFooter />

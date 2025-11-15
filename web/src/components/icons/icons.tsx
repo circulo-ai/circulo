@@ -516,9 +516,9 @@ export const InfoIcon = ({ size = 16 }: { size?: number }) => {
 };
 
 export const ArrowUpIcon = ({
-                              size = 16,
-                              ...props
-                            }: { size?: number } & React.SVGProps<SVGSVGElement>) => {
+  size = 16,
+  ...props
+}: { size?: number } & React.SVGProps<SVGSVGElement>) => {
   return (
     <svg
       height={size}
@@ -539,9 +539,9 @@ export const ArrowUpIcon = ({
 };
 
 export const StopIcon = ({
-                           size = 16,
-                           ...props
-                         }: { size?: number } & React.SVGProps<SVGSVGElement>) => {
+  size = 16,
+  ...props
+}: { size?: number } & React.SVGProps<SVGSVGElement>) => {
   return (
     <svg
       height={size}
@@ -561,9 +561,9 @@ export const StopIcon = ({
 };
 
 export const PaperclipIcon = ({
-                                size = 16,
-                                ...props
-                              }: { size?: number } & React.SVGProps<SVGSVGElement>) => {
+  size = 16,
+  ...props
+}: { size?: number } & React.SVGProps<SVGSVGElement>) => {
   return (
     <svg
       className="-rotate-45"

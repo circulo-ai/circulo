@@ -37,7 +37,7 @@ export function getBaseDomain(): string {
     try {
       return new URL(fallbackUrl).host;
     } catch {
-      return isProd ? 'circulo.ir' : 'localhost:3000'
+      return isProd ? "circulo.ir" : "localhost:3000";
     }
   }
 }
@@ -51,6 +51,6 @@ export function getEmailDomain(): string {
     const baseDomain = getBaseDomain();
     return baseDomain.startsWith("www.") ? baseDomain.substring(4) : baseDomain;
   } catch (_e) {
-    return isProd ? 'circulo.ir' : 'localhost:3000'
+    return isProd ? "circulo.ir" : "localhost:3000";
   }
 }

@@ -8,60 +8,62 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: 'avatars.githubusercontent.com',
+        protocol: "https",
+        hostname: "avatars.githubusercontent.com",
       },
       {
-        protocol: 'https',
-        hostname: 'api.stability.ai',
+        protocol: "https",
+        hostname: "api.stability.ai",
       },
       // Azure Blob Storage
       {
-        protocol: 'https',
-        hostname: '*.blob.core.windows.net',
+        protocol: "https",
+        hostname: "*.blob.core.windows.net",
       },
       // AWS S3
       {
-        protocol: 'https',
-        hostname: '*.s3.amazonaws.com',
+        protocol: "https",
+        hostname: "*.s3.amazonaws.com",
       },
       {
-        protocol: 'https',
-        hostname: '*.s3.*.amazonaws.com',
+        protocol: "https",
+        hostname: "*.s3.*.amazonaws.com",
       },
       {
-        protocol: 'https',
-        hostname: 'lh3.googleusercontent.com',
+        protocol: "https",
+        hostname: "lh3.googleusercontent.com",
       },
       // Brand logo domain if configured
-      ...(getEnv('NEXT_PUBLIC_BRAND_LOGO_URL')
+      ...(getEnv("NEXT_PUBLIC_BRAND_LOGO_URL")
         ? (() => {
-          try {
-            return [
-              {
-                protocol: 'https' as const,
-                hostname: new URL(getEnv('NEXT_PUBLIC_BRAND_LOGO_URL')!).hostname,
-              },
-            ]
-          } catch {
-            return []
-          }
-        })()
+            try {
+              return [
+                {
+                  protocol: "https" as const,
+                  hostname: new URL(getEnv("NEXT_PUBLIC_BRAND_LOGO_URL")!)
+                    .hostname,
+                },
+              ];
+            } catch {
+              return [];
+            }
+          })()
         : []),
       // Brand favicon domain if configured
-      ...(getEnv('NEXT_PUBLIC_BRAND_FAVICON_URL')
+      ...(getEnv("NEXT_PUBLIC_BRAND_FAVICON_URL")
         ? (() => {
-          try {
-            return [
-              {
-                protocol: 'https' as const,
-                hostname: new URL(getEnv('NEXT_PUBLIC_BRAND_FAVICON_URL')!).hostname,
-              },
-            ]
-          } catch {
-            return []
-          }
-        })()
+            try {
+              return [
+                {
+                  protocol: "https" as const,
+                  hostname: new URL(getEnv("NEXT_PUBLIC_BRAND_FAVICON_URL")!)
+                    .hostname,
+                },
+              ];
+            } catch {
+              return [];
+            }
+          })()
         : []),
     ],
   },
@@ -69,25 +71,25 @@ const nextConfig: NextConfig = {
   turbopack: {
     resolveExtensions: [".tsx", ".ts", ".jsx", ".js", ".mjs", ".json"],
   },
-  serverExternalPackages: ['pdf-parse', 'postgres'],
+  serverExternalPackages: ["pdf-parse", "postgres"],
   transpilePackages: [
     "prettier",
     "@t3-oss/env-nextjs",
     "@t3-oss/env-core",
-    '@react-email/components',
-    '@react-email/render',
+    "@react-email/components",
+    "@react-email/render",
     "@ton/ton",
   ],
   ...(isDev && {
     allowedDevOrigins: [
       ...(env.NEXT_PUBLIC_APP_URL
         ? (() => {
-          try {
-            return [new URL(env.NEXT_PUBLIC_APP_URL).host];
-          } catch {
-            return [];
-          }
-        })()
+            try {
+              return [new URL(env.NEXT_PUBLIC_APP_URL).host];
+            } catch {
+              return [];
+            }
+          })()
         : []),
       "localhost:3000",
     ],
@@ -96,36 +98,36 @@ const nextConfig: NextConfig = {
     return [
       {
         // API routes CORS headers
-        source: '/api/:path*',
+        source: "/api/:path*",
         headers: [
-          { key: 'Access-Control-Allow-Credentials', value: 'true' },
+          { key: "Access-Control-Allow-Credentials", value: "true" },
           {
-            key: 'Access-Control-Allow-Origin',
-            value: env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+            key: "Access-Control-Allow-Origin",
+            value: env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
           },
           {
-            key: 'Access-Control-Allow-Methods',
-            value: 'GET,POST,OPTIONS,PUT,DELETE',
+            key: "Access-Control-Allow-Methods",
+            value: "GET,POST,OPTIONS,PUT,DELETE",
           },
           {
-            key: 'Access-Control-Allow-Headers',
+            key: "Access-Control-Allow-Headers",
             value:
-              'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, X-API-Key',
+              "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, X-API-Key",
           },
         ],
       },
       // Block access to sourcemap files (defense in depth)
       {
-        source: '/(.*)\\.map$',
+        source: "/(.*)\\.map$",
         headers: [
           {
-            key: 'x-robots-tag',
-            value: 'noindex',
+            key: "x-robots-tag",
+            value: "noindex",
           },
         ],
       },
-    ]
-  }
+    ];
+  },
 };
 
 export default withWorkflow(nextConfig);

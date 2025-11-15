@@ -1,5 +1,10 @@
+import {
+  Mention,
+  MentionEntity,
+  MentionType,
+  normalizeMentionName,
+} from "@/lib/chat/mentions/types";
 import { useState } from "react";
-import { Mention, MentionEntity, MentionType, normalizeMentionName } from "@/lib/chat/mentions/types";
 
 /**
  * Get current mention being typed (for autocomplete)
@@ -7,7 +12,7 @@ import { Mention, MentionEntity, MentionType, normalizeMentionName } from "@/lib
  */
 export function getCurrentMention(
   text: string,
-  cursorPosition: number
+  cursorPosition: number,
 ): { type: MentionType; query: string; startIndex: number } | null {
   // Find the last @ or # before cursor
   let lastMentionStart = -1;
@@ -16,14 +21,14 @@ export function getCurrentMention(
   for (let i = cursorPosition - 1; i >= 0; i--) {
     const char = text[i];
 
-    if (char === '@' || char === '#') {
+    if (char === "@" || char === "#") {
       lastMentionStart = i;
-      mentionType = char === '@' ? 'agent' : 'knowledge_base';
+      mentionType = char === "@" ? "agent" : "knowledge_base";
       break;
     }
 
     // Stop if we hit whitespace or start of text
-    if (char === ' ' || char === '\n') {
+    if (char === " " || char === "\n") {
       break;
     }
   }
@@ -34,7 +39,7 @@ export function getCurrentMention(
 
   // Check if there's a space between the mention start and cursor
   const textBetween = text.slice(lastMentionStart + 1, cursorPosition);
-  if (textBetween.includes(' ') || textBetween.includes('\n')) {
+  if (textBetween.includes(" ") || textBetween.includes("\n")) {
     return null;
   }
 
@@ -52,13 +57,13 @@ export function filterEntitiesForAutocomplete(
   entities: MentionEntity[],
   query: string,
   type: MentionType,
-  limit: number = 10
+  limit: number = 10,
 ): MentionEntity[] {
   const normalizedQuery = normalizeMentionName(query);
 
   return entities
-    .filter(e => e.type === type)
-    .filter(e => {
+    .filter((e) => e.type === type)
+    .filter((e) => {
       const normalizedName = normalizeMentionName(e.name);
       return normalizedName.includes(normalizedQuery);
     })
@@ -85,9 +90,9 @@ export function insertMention(
   text: string,
   cursorPosition: number,
   mention: MentionEntity,
-  currentMentionStart: number
+  currentMentionStart: number,
 ): { text: string; newCursorPosition: number } {
-  const prefix = mention.type === 'agent' ? '@' : '#';
+  const prefix = mention.type === "agent" ? "@" : "#";
   const mentionText = `${prefix}${mention.name} `;
 
   const before = text.slice(0, currentMentionStart);
@@ -114,14 +119,16 @@ export interface TextSegment {
 
 export function segmentTextWithMentions(
   content: string,
-  mentions: Mention[]
+  mentions: Mention[],
 ): TextSegment[] {
   if (mentions.length === 0) {
     return [{ text: content, isMention: false }];
   }
 
   const segments: TextSegment[] = [];
-  const sortedMentions = [...mentions].sort((a, b) => a.startIndex - b.startIndex);
+  const sortedMentions = [...mentions].sort(
+    (a, b) => a.startIndex - b.startIndex,
+  );
 
   let lastIndex = 0;
 
@@ -159,7 +166,7 @@ export function segmentTextWithMentions(
  * Strip mention syntax for plain text display
  */
 export function stripMentionSyntax(content: string): string {
-  return content.replace(/@/g, '').replace(/#/g, '');
+  return content.replace(/@/g, "").replace(/#/g, "");
 }
 
 /**
@@ -171,7 +178,7 @@ export interface MentionStats {
 }
 
 export function calculateMentionStats(
-  messages: Array<{ mentionedAgentIds?: string[] }>
+  messages: Array<{ mentionedAgentIds?: string[] }>,
 ): MentionStats[] {
   const counts = new Map<string, number>();
 
@@ -198,11 +205,12 @@ export function calculateMentionStats(
  */
 export function useMentionAutocomplete(
   entities: MentionEntity[],
-  onSelectMention?: (mention: MentionEntity) => void
+  onSelectMention?: (mention: MentionEntity) => void,
 ) {
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [suggestions, setSuggestions] = useState<MentionEntity[]>([]);
-  const [currentMention, setCurrentMention] = useState<ReturnType<typeof getCurrentMention>>(null);
+  const [currentMention, setCurrentMention] =
+    useState<ReturnType<typeof getCurrentMention>>(null);
 
   const handleTextChange = (text: string, cursorPosition: number) => {
     const mention = getCurrentMention(text, cursorPosition);
@@ -212,7 +220,7 @@ export function useMentionAutocomplete(
       const filtered = filterEntitiesForAutocomplete(
         entities,
         mention.query,
-        mention.type
+        mention.type,
       );
       setSuggestions(filtered);
       setShowAutocomplete(filtered.length > 0);

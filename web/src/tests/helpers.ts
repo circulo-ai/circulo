@@ -1,5 +1,3 @@
-import fs from "node:fs";
-import path from "node:path";
 import {
   type APIRequestContext,
   type Browser,
@@ -9,6 +7,8 @@ import {
 } from "@playwright/test";
 import { generateId } from "ai";
 import { getUnixTime } from "date-fns";
+import fs from "node:fs";
+import path from "node:path";
 import { ChatPage } from "./pages/chat";
 
 export type UserContext = {
@@ -18,9 +18,9 @@ export type UserContext = {
 };
 
 export async function createAuthenticatedContext({
-                                                   browser,
-                                                   name,
-                                                 }: {
+  browser,
+  name,
+}: {
   browser: Browser;
   name: string;
 }): Promise<UserContext> {
@@ -46,7 +46,7 @@ export async function createAuthenticatedContext({
   await page.getByRole("button", { name: "Sign Up" }).click();
 
   await expect(page.getByTestId("toast")).toContainText(
-    "Account created successfully!"
+    "Account created successfully!",
   );
 
   const chatPage = new ChatPage(page);

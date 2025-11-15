@@ -4,10 +4,10 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
 import { useWindowSize } from "usehooks-ts";
 
-import type { UISuggestion } from "@/lib/editor/suggestions";
-import { cn } from "@/lib/utils";
 import type { ArtifactKind } from "@/components/artifacts/artifact";
 import { CrossIcon, MessageIcon } from "@/components/icons/icons";
+import type { UISuggestion } from "@/lib/editor/suggestions";
+import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 
 export const Suggestion = ({
@@ -27,7 +27,7 @@ export const Suggestion = ({
       {isExpanded ? (
         <motion.div
           animate={{ opacity: 1, y: -20 }}
-          className="-right-12 md:-right-16 absolute z-50 flex w-56 flex-col gap-3 rounded-2xl border bg-background p-3 font-sans text-sm shadow-xl"
+          className="bg-background absolute -right-12 z-50 flex w-56 flex-col gap-3 rounded-2xl border p-3 font-sans text-sm shadow-xl md:-right-16"
           exit={{ opacity: 0, y: -10 }}
           initial={{ opacity: 0, y: -10 }}
           key={suggestion.id}
@@ -36,11 +36,11 @@ export const Suggestion = ({
         >
           <div className="flex flex-row items-center justify-between">
             <div className="flex flex-row items-center gap-2">
-              <div className="size-4 rounded-full bg-muted-foreground/25" />
+              <div className="bg-muted-foreground/25 size-4 rounded-full" />
               <div className="font-medium">Assistant</div>
             </div>
             <button
-              className="cursor-pointer text-gray-500 text-xs"
+              className="cursor-pointer text-xs text-gray-500"
               onClick={() => {
                 setIsExpanded(false);
               }}
@@ -60,8 +60,8 @@ export const Suggestion = ({
         </motion.div>
       ) : (
         <motion.div
-          className={cn("cursor-pointer p-1 text-muted-foreground", {
-            "-right-8 absolute": artifactKind === "text",
+          className={cn("text-muted-foreground cursor-pointer p-1", {
+            "absolute -right-8": artifactKind === "text",
             "sticky top-0 right-4": artifactKind === "code",
           })}
           onClick={() => {

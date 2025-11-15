@@ -1,12 +1,17 @@
+import { Action, Actions } from "@/components/ai-elements/actions";
+import {
+  CopyIcon,
+  PencilEditIcon,
+  ThumbDownIcon,
+  ThumbUpIcon,
+} from "@/components/icons/icons";
+import { Vote } from "@/db";
+import type { ChatMessage } from "@/lib/types";
 import equal from "fast-deep-equal";
 import { memo } from "react";
 import { toast } from "sonner";
-import { useCopyToClipboard } from "usehooks-ts";
-import type { ChatMessage } from "@/lib/types";
-import { Action, Actions } from "@/components/ai-elements/actions";
-import { CopyIcon, PencilEditIcon, ThumbDownIcon, ThumbUpIcon } from "@/components/icons/icons";
-import { Vote } from "@/db";
 import { useSWRConfig } from "swr";
+import { useCopyToClipboard } from "usehooks-ts";
 
 export function PureMessageActions({
   chatId,
@@ -51,7 +56,7 @@ export function PureMessageActions({
         <div className="relative">
           {setMode && (
             <Action
-              className="-left-10 absolute top-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover/message:opacity-100"
+              className="absolute top-0 -left-10 opacity-0 transition-opacity group-hover/message:opacity-100 focus-visible:opacity-100"
               data-testid="message-edit-button"
               onClick={() => setMode("edit")}
               tooltip="Edit"
@@ -97,7 +102,7 @@ export function PureMessageActions({
                   }
 
                   const votesWithoutCurrent = currentVotes.filter(
-                    (currentVote) => currentVote.messageId !== message.id
+                    (currentVote) => currentVote.messageId !== message.id,
                   );
 
                   return [
@@ -110,7 +115,7 @@ export function PureMessageActions({
                     },
                   ];
                 },
-                { revalidate: false }
+                { revalidate: false },
               );
 
               return "Upvoted Response!";
@@ -147,7 +152,7 @@ export function PureMessageActions({
                   }
 
                   const votesWithoutCurrent = currentVotes.filter(
-                    (currentVote) => currentVote.messageId !== message.id
+                    (currentVote) => currentVote.messageId !== message.id,
                   );
 
                   return [
@@ -160,7 +165,7 @@ export function PureMessageActions({
                     },
                   ];
                 },
-                { revalidate: false }
+                { revalidate: false },
               );
 
               return "Downvoted Response!";
@@ -187,5 +192,5 @@ export const MessageActions = memo(
     }
 
     return true;
-  }
+  },
 );

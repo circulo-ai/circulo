@@ -1,9 +1,20 @@
-import { toast } from "sonner";
-import { generateUUID } from "@/lib/utils";
-import { Console, ConsoleOutput, ConsoleOutputContent } from "@/components/ai-elements/console";
+import {
+  Console,
+  ConsoleOutput,
+  ConsoleOutputContent,
+} from "@/components/ai-elements/console";
 import { Artifact } from "@/components/artifacts/create-artifact";
 import { CodeEditor } from "@/components/editors/code/code-editor";
-import { CopyIcon, LogsIcon, MessageIcon, PlayIcon, RedoIcon, UndoIcon } from "@/components/icons/icons";
+import {
+  CopyIcon,
+  LogsIcon,
+  MessageIcon,
+  PlayIcon,
+  RedoIcon,
+  UndoIcon,
+} from "@/components/icons/icons";
+import { generateUUID } from "@/lib/utils";
+import { toast } from "sonner";
 
 const OUTPUT_HANDLERS = {
   matplotlib: `
@@ -158,12 +169,12 @@ export const codeArtifact = new Artifact<"code", Metadata>({
           for (const handler of requiredHandlers) {
             if (OUTPUT_HANDLERS[handler as keyof typeof OUTPUT_HANDLERS]) {
               await currentPyodideInstance.runPythonAsync(
-                OUTPUT_HANDLERS[handler as keyof typeof OUTPUT_HANDLERS]
+                OUTPUT_HANDLERS[handler as keyof typeof OUTPUT_HANDLERS],
               );
 
               if (handler === "matplotlib") {
                 await currentPyodideInstance.runPythonAsync(
-                  "setup_matplotlib_output()"
+                  "setup_matplotlib_output()",
                 );
               }
             }

@@ -5,13 +5,13 @@ import {
   OTPVerificationEmail,
   PlanWelcomeEmail,
   ResetPasswordEmail,
-  UsageThresholdEmail,
   SizpayRenewalEmail,
+  UsageThresholdEmail,
 } from "@/components/emails";
-import { getBrandConfig } from "@/lib/branding/branding";
-import { render } from "@react-email/components";
-import { getBaseUrl } from "@/lib/urls/utils";
 import EnterpriseSubscriptionEmail from "@/components/emails/enterprise-subscription-email";
+import { getBrandConfig } from "@/lib/branding/branding";
+import { getBaseUrl } from "@/lib/urls/utils";
+import { render } from "@react-email/components";
 
 export async function renderOTPEmail(
   otp: string,
@@ -39,12 +39,12 @@ export async function renderPasswordResetEmail(
 }
 
 export async function renderUsageThresholdEmail(params: {
-  userName?: string
-  planName: string
-  percentUsed: number
-  currentUsage: number
-  limit: number
-  ctaLink: string
+  userName?: string;
+  planName: string;
+  percentUsed: number;
+  currentUsage: number;
+  limit: number;
+  ctaLink: string;
 }): Promise<string> {
   return await render(
     UsageThresholdEmail({
@@ -55,17 +55,16 @@ export async function renderUsageThresholdEmail(params: {
       limit: params.limit,
       ctaLink: params.ctaLink,
       updatedDate: new Date(),
-    })
-  )
+    }),
+  );
 }
-
 
 export async function renderEnterpriseSubscriptionEmail(
   userName: string,
-  userEmail: string
+  userEmail: string,
 ): Promise<string> {
-  const baseUrl = getBaseUrl()
-  const loginLink = `${baseUrl}/auth/sign-in`
+  const baseUrl = getBaseUrl();
+  const loginLink = `${baseUrl}/auth/sign-in`;
 
   return await render(
     EnterpriseSubscriptionEmail({
@@ -73,15 +72,15 @@ export async function renderEnterpriseSubscriptionEmail(
       userEmail,
       loginLink,
       createdDate: new Date(),
-    })
-  )
+    }),
+  );
 }
 
 export async function renderInvitationEmail(
   inviterName: string,
   organizationName: string,
   invitationUrl: string,
-  email: string
+  email: string,
 ): Promise<string> {
   return await render(
     InvitationEmail({
@@ -90,16 +89,16 @@ export async function renderInvitationEmail(
       inviteLink: invitationUrl,
       invitedEmail: email,
       updatedDate: new Date(),
-    })
-  )
+    }),
+  );
 }
 
 export async function renderBatchInvitationEmail(
   inviterName: string,
   organizationName: string,
-  organizationRole: 'admin' | 'member',
+  organizationRole: "admin" | "member",
   workspaceInvitations: WorkspaceInvitation[],
-  acceptUrl: string
+  acceptUrl: string,
 ): Promise<string> {
   return await render(
     BatchInvitationEmail({
@@ -108,8 +107,8 @@ export async function renderBatchInvitationEmail(
       organizationRole,
       workspaceInvitations,
       acceptUrl,
-    })
-  )
+    }),
+  );
 }
 
 export async function renderMagicLinkEmail(
@@ -200,6 +199,6 @@ export async function renderSizpayRenewalEmail(params: {
       userName: params.userName,
       periodEnd: params.periodEnd,
       renewLink: params.renewLink,
-    })
-  )
+    }),
+  );
 }

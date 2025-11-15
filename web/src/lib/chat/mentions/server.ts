@@ -1,11 +1,12 @@
-import { sql } from "drizzle-orm";
 import {
   createEntityLookup,
   extractRawMentions,
   Mention,
-  MentionEntity, normalizeMentionName,
-  ParsedMessage
+  MentionEntity,
+  normalizeMentionName,
+  ParsedMessage,
 } from "@/lib/chat/mentions/types";
+import { sql } from "drizzle-orm";
 
 /**
  * Parse message content and resolve mentions to actual entities
@@ -13,7 +14,7 @@ import {
  */
 export function parseMessageMentions(
   content: string,
-  availableEntities: MentionEntity[]
+  availableEntities: MentionEntity[],
 ): ParsedMessage {
   const rawMentions = extractRawMentions(content);
   const entityLookup = createEntityLookup(availableEntities);
@@ -34,12 +35,12 @@ export function parseMessageMentions(
         name: entity.name,
         startIndex: raw.index,
         endIndex: raw.index + raw.text.length + 1, // +1 for @ or #
-        raw: (raw.type === 'agent' ? '@' : '#') + raw.text,
+        raw: (raw.type === "agent" ? "@" : "#") + raw.text,
       };
 
       resolvedMentions.push(mention);
 
-      if (raw.type === 'agent') {
+      if (raw.type === "agent") {
         agentIds.add(entity.id);
       } else {
         knowledgeBaseIds.add(entity.id);
@@ -63,7 +64,7 @@ export async function validateMentions(
   knowledgeBaseIds: string[],
   userId: string,
   chatId: string,
-  db: any // Your database instance
+  db: any, // Your database instance
 ): Promise<{ valid: boolean; errors: string[] }> {
   const errors: string[] = [];
 
@@ -71,15 +72,15 @@ export async function validateMentions(
   if (agentIds.length > 0) {
     const chatAgents = await db
       .select()
-      .from('chat_agent')
+      .from("chat_agent")
       .where({ chatId })
       .where(sql`agent_id = ANY(${agentIds})`);
 
     const validAgentIds = new Set(chatAgents.map((ca: any) => ca.agentId));
-    const invalidAgents = agentIds.filter(id => !validAgentIds.has(id));
+    const invalidAgents = agentIds.filter((id) => !validAgentIds.has(id));
 
     if (invalidAgents.length > 0) {
-      errors.push(`Agents not in chat: ${invalidAgents.join(', ')}`);
+      errors.push(`Agents not in chat: ${invalidAgents.join(", ")}`);
     }
   }
 
@@ -87,15 +88,15 @@ export async function validateMentions(
   if (knowledgeBaseIds.length > 0) {
     const kbs = await db
       .select()
-      .from('knowledge_base')
+      .from("knowledge_base")
       .where(sql`id = ANY(${knowledgeBaseIds})`)
       .where(sql`user_id = ${userId} OR is_public = true`);
 
     const validKbIds = new Set(kbs.map((kb: any) => kb.id));
-    const invalidKbs = knowledgeBaseIds.filter(id => !validKbIds.has(id));
+    const invalidKbs = knowledgeBaseIds.filter((id) => !validKbIds.has(id));
 
     if (invalidKbs.length > 0) {
-      errors.push(`Knowledge bases not accessible: ${invalidKbs.join(', ')}`);
+      errors.push(`Knowledge bases not accessible: ${invalidKbs.join(", ")}`);
     }
   }
 

@@ -1,4 +1,5 @@
 // src/db/schema/billing.ts
+import { user } from "@/db";
 import { relations } from "drizzle-orm";
 import {
   boolean,
@@ -10,11 +11,10 @@ import {
   pgEnum,
   pgTable,
   serial,
+  text,
   timestamp,
   varchar,
-  text
 } from "drizzle-orm/pg-core";
-import { user } from "@/db";
 
 // -------------------- TYPES --------------------
 
@@ -47,29 +47,31 @@ export const invoiceStatusEnum = pgEnum("invoice_status", [
   "canceled",
 ]);
 
-export const paymentProviderEnum = pgEnum("payment_provider", [
-  "changelly",
-]);
+export const paymentProviderEnum = pgEnum("payment_provider", ["changelly"]);
 
 // -------------------- SUBSCRIPTION PLANS --------------------
 
-export const subscriptionPlans = pgTable("subscription_plans", {
-  id: serial("id").primaryKey(),
-  name: varchar("name", { length: 100 }).notNull(),
-  slug: varchar("slug", { length: 100 }).notNull().unique(),
-  description: varchar("description", { length: 500 }),
+export const subscriptionPlans = pgTable(
+  "subscription_plans",
+  {
+    id: serial("id").primaryKey(),
+    name: varchar("name", { length: 100 }).notNull(),
+    slug: varchar("slug", { length: 100 }).notNull().unique(),
+    description: varchar("description", { length: 500 }),
 
-  // Pricing
-  usdPrice: numeric("usd_price", { precision: 10, scale: 2 }).notNull(),
-  billingIntervalDays: integer("billing_interval_days").notNull().default(30),
+    // Pricing
+    usdPrice: numeric("usd_price", { precision: 10, scale: 2 }).notNull(),
+    billingIntervalDays: integer("billing_interval_days").notNull().default(30),
 
-  features: jsonb('features').$type<PlanFeatures>(),
+    features: jsonb("features").$type<PlanFeatures>(),
 
-  isActive: boolean("is_active").notNull().default(true),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (table) => ({
-  slugIdx: index("plans_slug_idx").on(table.slug),
-}));
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    slugIdx: index("plans_slug_idx").on(table.slug),
+  }),
+);
 
 // -------------------- SUBSCRIPTIONS --------------------
 
@@ -129,13 +131,13 @@ export const subscriptionHistory = pgTable(
 // -------------------- INVOICE TYPES --------------------
 
 export const invoiceTypeEnum = pgEnum("invoice_type", [
-  "subscription",      // Recurring subscription payment
-  "one_time",         // One-time purchase
-  "usage_based",      // Pay-as-you-go usage charges
-  "addon",            // Add-on features
-  "credit",           // Account credit purchase
-  "refund",           // Refund (negative amount)
-  "custom",           // Custom/manual invoice
+  "subscription", // Recurring subscription payment
+  "one_time", // One-time purchase
+  "usage_based", // Pay-as-you-go usage charges
+  "addon", // Add-on features
+  "credit", // Account credit purchase
+  "refund", // Refund (negative amount)
+  "custom", // Custom/manual invoice
 ]);
 
 // -------------------- INVOICES --------------------
@@ -149,14 +151,18 @@ export const invoices = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
 
     // Optional subscription reference (only for subscription-related invoices)
-    subscriptionId: integer("subscription_id")
-      .references(() => subscriptions.id, { onDelete: "set null" }),
+    subscriptionId: integer("subscription_id").references(
+      () => subscriptions.id,
+      { onDelete: "set null" },
+    ),
 
     type: invoiceTypeEnum("type").notNull().default("one_time"),
 
     // TODO: maybe no provider is needed and we need another payment table
     provider: paymentProviderEnum("provider").notNull(),
-    providerInvoiceId: varchar("provider_invoice_id", { length: 255 }).notNull(),
+    providerInvoiceId: varchar("provider_invoice_id", {
+      length: 255,
+    }).notNull(),
 
     usdAmount: numeric("usd_amount", { precision: 10, scale: 2 }).notNull(),
     status: invoiceStatusEnum("status").notNull().default("pending"),
@@ -173,10 +179,12 @@ export const invoices = pgTable(
   (table) => ({
     providerInvoiceIdx: index("invoices_provider_invoice_idx").on(
       table.provider,
-      table.providerInvoiceId
+      table.providerInvoiceId,
     ),
     userIdx: index("invoices_user_idx").on(table.userId),
-    subscriptionIdx: index("invoices_subscription_idx").on(table.subscriptionId),
+    subscriptionIdx: index("invoices_subscription_idx").on(
+      table.subscriptionId,
+    ),
     typeIdx: index("invoices_type_idx").on(table.type),
     statusIdx: index("invoices_status_idx").on(table.status),
   }),
@@ -207,7 +215,10 @@ export const invoiceLineItems = pgTable(
   },
   (table) => ({
     invoiceIdx: index("line_items_invoice_idx").on(table.invoiceId),
-    referenceIdx: index("line_items_reference_idx").on(table.referenceType, table.referenceId),
+    referenceIdx: index("line_items_reference_idx").on(
+      table.referenceType,
+      table.referenceId,
+    ),
   }),
 );
 
@@ -220,8 +231,10 @@ export const usageMetrics = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    subscriptionId: integer("subscription_id")
-      .references(() => subscriptions.id, { onDelete: "set null" }),
+    subscriptionId: integer("subscription_id").references(
+      () => subscriptions.id,
+      { onDelete: "set null" },
+    ),
 
     metric: varchar("metric", { length: 100 }).notNull(), // api_calls, chat_messages, etc.
     count: integer("count").notNull().default(1),
@@ -235,29 +248,33 @@ export const usageMetrics = pgTable(
     userMetricPeriodIdx: uniqueIndex("usage_user_metric_period_idx").on(
       table.userId,
       table.metric,
-      table.periodStart
+      table.periodStart,
     ),
     subscriptionIdx: index("usage_subscription_idx").on(table.subscriptionId),
   }),
 );
 
-export const webhookLogs = pgTable("webhook_logs", {
-  id: serial("id").primaryKey(),
-  provider: paymentProviderEnum("provider").notNull(),
-  eventType: varchar("event_type", { length: 100 }).notNull(),
-  invoiceId: varchar("invoice_id", { length: 255 }),
-  payload: jsonb("payload").notNull(),
-  signature: text("signature"),
-  status: varchar("status", { length: 50 }).notNull(), // 'success', 'failed', 'pending'
-  errorMessage: text("error_message"),
-  attempts: integer("attempts").notNull().default(1),
-  processedAt: timestamp("processed_at"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (table) => ({
-  providerIdx: index("webhook_provider_idx").on(table.provider),
-  statusIdx: index("webhook_status_idx").on(table.status),
-  createdAtIdx: index("webhook_created_at_idx").on(table.createdAt),
-}));
+export const webhookLogs = pgTable(
+  "webhook_logs",
+  {
+    id: serial("id").primaryKey(),
+    provider: paymentProviderEnum("provider").notNull(),
+    eventType: varchar("event_type", { length: 100 }).notNull(),
+    invoiceId: varchar("invoice_id", { length: 255 }),
+    payload: jsonb("payload").notNull(),
+    signature: text("signature"),
+    status: varchar("status", { length: 50 }).notNull(), // 'success', 'failed', 'pending'
+    errorMessage: text("error_message"),
+    attempts: integer("attempts").notNull().default(1),
+    processedAt: timestamp("processed_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    providerIdx: index("webhook_provider_idx").on(table.provider),
+    statusIdx: index("webhook_status_idx").on(table.status),
+    createdAtIdx: index("webhook_created_at_idx").on(table.createdAt),
+  }),
+);
 
 // -------------------- RELATIONS --------------------
 
@@ -266,7 +283,7 @@ export const subscriptionPlansRelations = relations(
   ({ many }) => ({
     subscriptions: many(subscriptions),
     history: many(subscriptionHistory),
-  })
+  }),
 );
 
 export const subscriptionRelations = relations(
@@ -274,7 +291,7 @@ export const subscriptionRelations = relations(
   ({ one, many }) => ({
     user: one(user, {
       fields: [subscriptions.userId],
-      references: [user.id]
+      references: [user.id],
     }),
     plan: one(subscriptionPlans, {
       fields: [subscriptions.planId],
@@ -297,13 +314,13 @@ export const subscriptionHistoryRelations = relations(
       fields: [subscriptionHistory.planId],
       references: [subscriptionPlans.id],
     }),
-  })
+  }),
 );
 
 export const invoiceRelations = relations(invoices, ({ one, many }) => ({
   user: one(user, {
     fields: [invoices.userId],
-    references: [user.id]
+    references: [user.id],
   }),
   subscription: one(subscriptions, {
     fields: [invoices.subscriptionId],
@@ -312,17 +329,20 @@ export const invoiceRelations = relations(invoices, ({ one, many }) => ({
   lineItems: many(invoiceLineItems),
 }));
 
-export const invoiceLineItemsRelations = relations(invoiceLineItems, ({ one }) => ({
-  invoice: one(invoices, {
-    fields: [invoiceLineItems.invoiceId],
-    references: [invoices.id],
+export const invoiceLineItemsRelations = relations(
+  invoiceLineItems,
+  ({ one }) => ({
+    invoice: one(invoices, {
+      fields: [invoiceLineItems.invoiceId],
+      references: [invoices.id],
+    }),
   }),
-}));
+);
 
 export const usageRelations = relations(usageMetrics, ({ one }) => ({
   user: one(user, {
     fields: [usageMetrics.userId],
-    references: [user.id]
+    references: [user.id],
   }),
   subscription: one(subscriptions, {
     fields: [usageMetrics.subscriptionId],

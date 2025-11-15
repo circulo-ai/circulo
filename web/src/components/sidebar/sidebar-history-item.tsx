@@ -1,7 +1,3 @@
-import Link from "next/link";
-import { memo } from "react";
-import { useChatVisibility } from "@/hooks/chats/use-chat-visibility";
-import type { Chat } from "@/db/schema";
 import {
   CheckCircleFillIcon,
   GlobeIcon,
@@ -25,6 +21,10 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import type { Chat } from "@/db/schema";
+import { useChatVisibility } from "@/hooks/chats/use-chat-visibility";
+import Link from "next/link";
+import { memo } from "react";
 
 const PureChatItem = ({
   chat,
@@ -53,7 +53,7 @@ const PureChatItem = ({
       <DropdownMenu modal={true}>
         <DropdownMenuTrigger asChild>
           <SidebarMenuAction
-            className="mr-0.5 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+            className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground mr-0.5"
             showOnHover={!isActive}
           >
             <MoreHorizontalIcon />
@@ -100,7 +100,7 @@ const PureChatItem = ({
           </DropdownMenuSub>
 
           <DropdownMenuItem
-            className="cursor-pointer text-destructive focus:bg-destructive/15 focus:text-destructive dark:text-red-500"
+            className="text-destructive focus:bg-destructive/15 focus:text-destructive cursor-pointer dark:text-red-500"
             onSelect={() => onDelete(chat.id)}
           >
             <TrashIcon />

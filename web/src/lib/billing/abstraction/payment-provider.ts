@@ -1,10 +1,16 @@
-import { CreateInvoiceParams, CreateInvoiceResult, InvoiceStatus, PaymentProviderName, WebhookEvent } from "./types";
+import {
+  CreateInvoiceParams,
+  CreateInvoiceResult,
+  InvoiceStatus,
+  PaymentProviderName,
+  WebhookEvent,
+} from "./types";
 
 export abstract class PaymentProvider {
   abstract readonly name: PaymentProviderName;
 
   abstract createInvoice(
-    params: CreateInvoiceParams
+    params: CreateInvoiceParams,
   ): Promise<CreateInvoiceResult>;
 
   abstract getInvoiceStatus(invoiceId: string): Promise<InvoiceStatus>;

@@ -1,5 +1,10 @@
 "use client";
 
+import { deleteTrailingMessages } from "@/app/(chat)/actions";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import type { ChatMessage } from "@/lib/types";
+import { getTextFromMessage } from "@/lib/utils";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import {
   type Dispatch,
@@ -9,11 +14,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { deleteTrailingMessages } from "@/app/(chat)/actions";
-import type { ChatMessage } from "@/lib/types";
-import { getTextFromMessage } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 
 export type MessageEditorProps = {
   message: ChatMessage;
@@ -31,7 +31,7 @@ export function MessageEditor({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const [draftContent, setDraftContent] = useState<string>(
-    getTextFromMessage(message)
+    getTextFromMessage(message),
   );
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 

@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { SWRConfig } from 'swr';
-import { ReactNode } from 'react';
-import { fetcher, swrConfig } from "@/lib/swr";
+import { swrConfig } from "@/lib/swr";
+import { ReactNode } from "react";
+import { SWRConfig } from "swr";
 
 interface SWRProviderProps {
   children: ReactNode;
@@ -18,16 +18,16 @@ export function SWRProvider({ children }: SWRProviderProps) {
         onError: (error, key) => {
           // Ignore errors for internal state keys (not API endpoints)
           if (
-            key.includes(':should-') ||
-            key === 'artifact' ||
-            key === 'artifact-metadata-init' ||
-            key.endsWith('-visibility') || // Add this
-            (!key.startsWith('/') && !key.startsWith('http'))
+            key.includes(":should-") ||
+            key === "artifact" ||
+            key === "artifact-metadata-init" ||
+            key.endsWith("-visibility") || // Add this
+            (!key.startsWith("/") && !key.startsWith("http"))
           ) {
             return;
           }
 
-          console.error('SWR Error:', key, error);
+          console.error("SWR Error:", key, error);
 
           // You can add error tracking here (e.g., Sentry)
           // Sentry.captureException(error);

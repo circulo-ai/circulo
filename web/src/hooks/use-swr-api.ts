@@ -1,6 +1,6 @@
-import React from 'react';
-import useSWR, { SWRConfiguration, SWRResponse } from 'swr';
-import useSWRMutationLib, { SWRMutationConfiguration } from 'swr/mutation';
+import React from "react";
+import useSWR, { SWRConfiguration, SWRResponse } from "swr";
+import useSWRMutationLib, { SWRMutationConfiguration } from "swr/mutation";
 
 // Generic fetcher type
 type ApiFetcher<T, Args extends unknown[]> = (...args: Args) => Promise<T>;
@@ -17,7 +17,7 @@ type ApiFetcher<T, Args extends unknown[]> = (...args: Args) => Promise<T>;
 export function useSWRApi<T, Args extends unknown[] = []>(
   key: string | [string, ...Args] | null,
   fetcher: ApiFetcher<T, Args>,
-  config?: SWRConfiguration<T>
+  config?: SWRConfiguration<T>,
 ): SWRResponse<T> {
   return useSWR<T>(
     key,
@@ -34,7 +34,7 @@ export function useSWRApi<T, Args extends unknown[] = []>(
       revalidateOnReconnect: true,
       dedupingInterval: 2000,
       ...config,
-    }
+    },
   );
 }
 
@@ -53,7 +53,7 @@ export function useSWRApi<T, Args extends unknown[] = []>(
 export function useSWRMutation<T, Args>(
   key: string | [string, ...unknown[]],
   mutationFn: (key: string, options: { arg: Args }) => Promise<T>,
-  config?: SWRMutationConfiguration<T, Error, string, Args>
+  config?: SWRMutationConfiguration<T, Error, string, Args>,
 ) {
   return useSWRMutationLib<T, Error, string, Args>(
     Array.isArray(key) ? key[0] : key,
@@ -62,7 +62,7 @@ export function useSWRMutation<T, Args>(
       // Automatically revalidate related data after mutation
       revalidate: true,
       ...config,
-    }
+    },
   );
 }
 
@@ -86,23 +86,28 @@ export function useSWRResource<T, UpdateArgs = Partial<T>>(
     update?: (data: UpdateArgs) => Promise<T>;
     delete?: () => Promise<void>;
   },
-  config?: SWRConfiguration<T>
+  config?: SWRConfiguration<T>,
 ) {
-  const keyString = Array.isArray(key) ? key[0] : (key || '');
+  const keyString = Array.isArray(key) ? key[0] : key || "";
 
   // GET request - using flexible type
   const { data, error, isLoading, mutate, isValidating } = useSWRApi<T>(
     key as any, // Type assertion to handle flexible key format
     fetcher,
-    config
+    config,
   );
 
   // UPDATE mutation
-  const { trigger: updateTrigger, isMutating: isUpdating } = useSWRMutationLib<T, Error, string, UpdateArgs>(
+  const { trigger: updateTrigger, isMutating: isUpdating } = useSWRMutationLib<
+    T,
+    Error,
+    string,
+    UpdateArgs
+  >(
     keyString,
     async (key: string, { arg }: { arg: UpdateArgs }) => {
       if (!mutations?.update) {
-        throw new Error('Update mutation not provided');
+        throw new Error("Update mutation not provided");
       }
       return mutations.update(arg);
     },
@@ -112,15 +117,20 @@ export function useSWRResource<T, UpdateArgs = Partial<T>>(
         // Optimistically update the cache
         mutate(newData, false);
       },
-    }
+    },
   );
 
   // DELETE mutation
-  const { trigger: deleteTrigger, isMutating: isDeleting } = useSWRMutationLib<void, Error, string, void>(
+  const { trigger: deleteTrigger, isMutating: isDeleting } = useSWRMutationLib<
+    void,
+    Error,
+    string,
+    void
+  >(
     keyString,
     async () => {
       if (!mutations?.delete) {
-        throw new Error('Delete mutation not provided');
+        throw new Error("Delete mutation not provided");
       }
       return mutations.delete();
     },
@@ -130,7 +140,7 @@ export function useSWRResource<T, UpdateArgs = Partial<T>>(
         // Invalidate the cache
         mutate(undefined, false);
       },
-    }
+    },
   );
 
   return {
@@ -158,7 +168,10 @@ export function useSWRResource<T, UpdateArgs = Partial<T>>(
  */
 export function useSWRPagination<T>(
   baseKey: string,
-  fetcher: (page: number, pageSize: number) => Promise<{
+  fetcher: (
+    page: number,
+    pageSize: number,
+  ) => Promise<{
     data: T[];
     total: number;
     page: number;
@@ -168,17 +181,20 @@ export function useSWRPagination<T>(
     initialPage?: number;
     pageSize?: number;
     config?: SWRConfiguration;
-  }
+  },
 ) {
   const { initialPage = 1, pageSize = 20, config } = options || {};
   const [page, setPage] = React.useState(initialPage);
 
-  const { data, error, isLoading, mutate } = useSWRApi<
-    { data: T[]; total: number; page: number; pageSize: number }
-  >(
+  const { data, error, isLoading, mutate } = useSWRApi<{
+    data: T[];
+    total: number;
+    page: number;
+    pageSize: number;
+  }>(
     [baseKey, page, pageSize] as any, // Type assertion for flexible key
     () => fetcher(page, pageSize),
-    config
+    config,
   );
 
   const totalPages = data ? Math.ceil(data.total / data.pageSize) : 0;

@@ -1,4 +1,4 @@
-export type MentionType = 'agent' | 'knowledge_base';
+export type MentionType = "agent" | "knowledge_base";
 
 export interface Mention {
   type: MentionType;
@@ -40,17 +40,18 @@ export function extractRawMentions(text: string): Array<{
   text: string;
   index: number;
 }> {
-  const mentions: Array<{ type: MentionType; text: string; index: number }> = [];
+  const mentions: Array<{ type: MentionType; text: string; index: number }> =
+    [];
 
   // Find all mentions
-  const regex = new RegExp(MENTION_PATTERNS.both.source, 'g');
+  const regex = new RegExp(MENTION_PATTERNS.both.source, "g");
   let match;
 
   while ((match = regex.exec(text)) !== null) {
     const prefix = match[1];
     const name = match[2];
     mentions.push({
-      type: prefix === '@' ? 'agent' : 'knowledge_base',
+      type: prefix === "@" ? "agent" : "knowledge_base",
       text: name,
       index: match.index,
     });
@@ -64,14 +65,14 @@ export function extractRawMentions(text: string): Array<{
  * Handles case-insensitivity and special characters
  */
 export function normalizeMentionName(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+  return name.toLowerCase().replace(/[^a-z0-9_-]/g, "");
 }
 
 /**
  * Create a lookup map from entities for fast mention resolution
  */
 export function createEntityLookup(
-  entities: MentionEntity[]
+  entities: MentionEntity[],
 ): Map<string, MentionEntity> {
   const lookup = new Map<string, MentionEntity>();
 

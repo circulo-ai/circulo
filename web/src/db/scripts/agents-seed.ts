@@ -1,8 +1,8 @@
-import "dotenv/config";
-import { db, user } from "..";
 import { agentTemplate } from "@/db/schema";
-import { sql, eq } from "drizzle-orm";
+import "dotenv/config";
+import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
+import { db, user } from "..";
 
 type TemplateSeed = {
   name: string;
@@ -22,7 +22,8 @@ const templates: TemplateSeed[] = [
   {
     name: "Steve Jobs",
     slug: "steve-jobs",
-    description: "Visionary product designer and business strategist. Focuses on simplicity, user experience, and revolutionary thinking.",
+    description:
+      "Visionary product designer and business strategist. Focuses on simplicity, user experience, and revolutionary thinking.",
     systemPrompt: `You are Steve Jobs, co-founder of Apple and Pixar. You embody:
 
 CORE PRINCIPLES:
@@ -55,7 +56,8 @@ When discussing products or strategy, channel Jobs' vision for creating dent in 
   {
     name: "Elon Musk",
     slug: "elon-musk",
-    description: "First principles thinker and serial entrepreneur. Focuses on physics-based reasoning and ambitious goals.",
+    description:
+      "First principles thinker and serial entrepreneur. Focuses on physics-based reasoning and ambitious goals.",
     systemPrompt: `You are Elon Musk, entrepreneur and engineer. You embody:
 
 THINKING FRAMEWORK:
@@ -88,13 +90,20 @@ PRIORITIES:
 Apply engineering rigor and ambitious vision to any discussion. Always ask: "What would this look like if we started from first principles?"`,
     model: "claude-sonnet-4-20250514",
     temperature: "0.90",
-    tags: ["engineering", "business", "innovation", "first-principles", "space"],
+    tags: [
+      "engineering",
+      "business",
+      "innovation",
+      "first-principles",
+      "space",
+    ],
     color: "#E31937",
   },
   {
     name: "Ray Dalio",
     slug: "ray-dalio",
-    description: "Hedge fund manager and author of Principles. Expert in systems thinking, decision-making frameworks, and radical transparency.",
+    description:
+      "Hedge fund manager and author of Principles. Expert in systems thinking, decision-making frameworks, and radical transparency.",
     systemPrompt: `You are Ray Dalio, founder of Bridgewater Associates. You embody:
 
 CORE PRINCIPLES:
@@ -135,13 +144,20 @@ COMMUNICATION:
 Apply rigorous systems thinking and principled decision-making to evaluate any situation. Always seek truth over comfort.`,
     model: "claude-sonnet-4-20250514",
     temperature: "0.70",
-    tags: ["business", "finance", "decision-making", "systems-thinking", "principles"],
+    tags: [
+      "business",
+      "finance",
+      "decision-making",
+      "systems-thinking",
+      "principles",
+    ],
     color: "#1E3A8A",
   },
   {
     name: "Naval Ravikant",
     slug: "naval-ravikant",
-    description: "Entrepreneur, angel investor, and philosopher. Expert in wealth creation, happiness, and clear thinking.",
+    description:
+      "Entrepreneur, angel investor, and philosopher. Expert in wealth creation, happiness, and clear thinking.",
     systemPrompt: `You are Naval Ravikant, entrepreneur and philosopher. You embody:
 
 WEALTH & BUSINESS:
@@ -188,7 +204,8 @@ Share wisdom that combines practical business insight with philosophical depth. 
   {
     name: "Warren Buffett",
     slug: "warren-buffett",
-    description: "Value investor and CEO of Berkshire Hathaway. Expert in capital allocation, business analysis, and long-term thinking.",
+    description:
+      "Value investor and CEO of Berkshire Hathaway. Expert in capital allocation, business analysis, and long-term thinking.",
     systemPrompt: `You are Warren Buffett, legendary investor and CEO of Berkshire Hathaway. You embody:
 
 INVESTMENT PHILOSOPHY:
@@ -235,7 +252,8 @@ Apply value investing principles and long-term thinking to any business or inves
   {
     name: "Richard Feynman",
     slug: "richard-feynman",
-    description: "Nobel Prize-winning physicist. Master of clear thinking, curiosity, and explaining complex ideas simply.",
+    description:
+      "Nobel Prize-winning physicist. Master of clear thinking, curiosity, and explaining complex ideas simply.",
     systemPrompt: `You are Richard Feynman, theoretical physicist and teacher. You embody:
 
 LEARNING APPROACH:
@@ -282,7 +300,8 @@ Apply scientific reasoning and insatiable curiosity to any topic. Make complex i
   {
     name: "Brené Brown",
     slug: "brene-brown",
-    description: "Research professor studying courage, vulnerability, shame, and empathy. Expert in leadership and personal growth.",
+    description:
+      "Research professor studying courage, vulnerability, shame, and empathy. Expert in leadership and personal growth.",
     systemPrompt: `You are Brené Brown, research professor and author. You embody:
 
 CORE RESEARCH:
@@ -336,7 +355,8 @@ Apply empathy, research, and authenticity to discussions about leadership, relat
   {
     name: "Peter Thiel",
     slug: "peter-thiel",
-    description: "Entrepreneur, investor, and contrarian thinker. Expert in startups, monopolies, and unconventional strategy.",
+    description:
+      "Entrepreneur, investor, and contrarian thinker. Expert in startups, monopolies, and unconventional strategy.",
     systemPrompt: `You are Peter Thiel, entrepreneur and investor. You embody:
 
 CONTRARIAN THINKING:
@@ -390,7 +410,8 @@ Apply contrarian thinking and strategic analysis to identify non-obvious opportu
   {
     name: "Marcus Aurelius",
     slug: "marcus-aurelius",
-    description: "Roman Emperor and Stoic philosopher. Expert in wisdom, resilience, and virtuous living.",
+    description:
+      "Roman Emperor and Stoic philosopher. Expert in wisdom, resilience, and virtuous living.",
     systemPrompt: `You are Marcus Aurelius, Roman Emperor and Stoic philosopher. You embody:
 
 STOIC PRINCIPLES:
@@ -451,7 +472,8 @@ Apply Stoic wisdom to modern challenges. Help others find resilience, clarity, a
   {
     name: "Seth Godin",
     slug: "seth-godin",
-    description: "Marketing guru and author. Expert in tribes, permission marketing, and making meaningful work.",
+    description:
+      "Marketing guru and author. Expert in tribes, permission marketing, and making meaningful work.",
     systemPrompt: `You are Seth Godin, marketing expert and author. You embody:
 
 MARKETING PHILOSOPHY:
@@ -512,7 +534,8 @@ Apply marketing insights and creative thinking to help others build tribes, crea
   {
     name: "Carl Sagan",
     slug: "carl-sagan",
-    description: "Astronomer and science communicator. Master of wonder, skepticism, and making science accessible.",
+    description:
+      "Astronomer and science communicator. Master of wonder, skepticism, and making science accessible.",
     systemPrompt: `You are Carl Sagan, astronomer and science communicator. You embody:
 
 SCIENTIFIC WORLDVIEW:
@@ -580,7 +603,8 @@ Apply scientific rigor with a sense of wonder. Help people see themselves as par
   {
     name: "Sheryl Sandberg",
     slug: "sheryl-sandberg",
-    description: "Former COO of Meta and author of Lean In. Expert in leadership, resilience, and workplace equality.",
+    description:
+      "Former COO of Meta and author of Lean In. Expert in leadership, resilience, and workplace equality.",
     systemPrompt: `You are Sheryl Sandberg, former COO of Meta. You embody:
 
 LEADERSHIP PHILOSOPHY:
@@ -741,11 +765,10 @@ async function seed() {
       where: (templates, { eq }) => eq(templates.creatorId, SYSTEM_USER_ID),
     });
 
-    allTemplates.forEach(t => {
+    allTemplates.forEach((t) => {
       console.log(`  - ${t.name} (@${t.slug})`);
       console.log(`    Tags: ${t.tags?.join(", ") || "none"}`);
     });
-
   } catch (error) {
     console.error("✗ Error seeding agent templates:", error);
     throw error;

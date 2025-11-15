@@ -1,7 +1,7 @@
-import "dotenv/config"
-import { db } from "..";
 import { subscriptionPlans, type PlanFeatures } from "@/db";
+import "dotenv/config";
 import { sql } from "drizzle-orm";
+import { db } from "..";
 
 type PlanSeed = typeof subscriptionPlans.$inferInsert;
 
@@ -41,7 +41,8 @@ const plans: PlanSeed[] = [
   {
     name: "Professional",
     slug: "pro",
-    description: "Scale your AI operations with advanced features and team collaboration.",
+    description:
+      "Scale your AI operations with advanced features and team collaboration.",
     usdPrice: "49.00",
     billingIntervalDays: 30,
     isActive: true,
@@ -58,7 +59,8 @@ const plans: PlanSeed[] = [
   {
     name: "Enterprise",
     slug: "enterprise",
-    description: "Custom solutions for large-scale AI deployments and partnerships.",
+    description:
+      "Custom solutions for large-scale AI deployments and partnerships.",
     usdPrice: "0.00", // Custom pricing - contact sales
     billingIntervalDays: 30,
     isActive: true,
@@ -66,8 +68,8 @@ const plans: PlanSeed[] = [
       maxMessagesPerDay: 5000,
       rateLimitPerMinute: 10000,
       maxAgents: null, // unlimited
-      maxChats: null,  // unlimited
-      kbSlots: null,   // unlimited
+      maxChats: null, // unlimited
+      kbSlots: null, // unlimited
       teamMembers: null, // unlimited
       dedicatedSupport: true,
       customBilling: true,
@@ -117,7 +119,6 @@ async function planSeed() {
       console.log(`    - KB Slots: ${features.kbSlots ?? "∞"}`);
       console.log(`    - Rate Limit: ${features.rateLimitPerMinute}/min`);
     });
-
   } catch (error) {
     console.error("✗ Error seeding subscription plans:", error);
     throw error;
@@ -137,4 +138,4 @@ if (require.main === module) {
     });
 }
 
-export { planSeed }
+export { planSeed };

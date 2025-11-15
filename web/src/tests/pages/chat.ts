@@ -1,7 +1,7 @@
+import { chatModels } from "@/lib/ai/models";
+import { expect, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
-import { expect, type Page } from "@playwright/test";
-import { chatModels } from "@/lib/ai/models";
 
 const CHAT_ID_REGEX =
   /^http:\/\/localhost:3000\/chat\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -49,7 +49,7 @@ export class ChatPage {
 
   async isGenerationComplete() {
     const response = await this.page.waitForResponse((currentResponse) =>
-      currentResponse.url().includes("/api/chat")
+      currentResponse.url().includes("/api/chat"),
     );
 
     await response.finished();
@@ -57,7 +57,7 @@ export class ChatPage {
 
   async isVoteComplete() {
     const response = await this.page.waitForResponse((currentResponse) =>
-      currentResponse.url().includes("/api/vote")
+      currentResponse.url().includes("/api/vote"),
     );
 
     await response.finished();
@@ -87,7 +87,7 @@ export class ChatPage {
         process.cwd(),
         "public",
         "images",
-        "mouth of the seine, monet.jpg"
+        "mouth of the seine, monet.jpg",
       );
       const imageBuffer = fs.readFileSync(filePath);
 
@@ -108,7 +108,7 @@ export class ChatPage {
 
   async chooseModelFromSelector(chatModelId: string) {
     const chatModel = chatModels.find(
-      (currentChatModel) => currentChatModel.id === chatModelId
+      (currentChatModel) => currentChatModel.id === chatModelId,
     );
 
     if (!chatModel) {
@@ -158,7 +158,7 @@ export class ChatPage {
           ? await lastMessageElement
               .getByTestId("message-reasoning")
               .innerText()
-          : null
+          : null,
       )
       .catch(() => null);
 
@@ -213,7 +213,7 @@ export class ChatPage {
         await page.getByTestId("message-editor").fill(newMessage);
         await page.getByTestId("message-editor-send-button").click();
         await expect(
-          page.getByTestId("message-editor-send-button")
+          page.getByTestId("message-editor-send-button"),
         ).not.toBeVisible();
       },
     };
@@ -230,7 +230,7 @@ export class ChatPage {
 
   isScrolledToBottom(): Promise<boolean> {
     return this.scrollContainer.evaluate(
-      (el) => Math.abs(el.scrollHeight - el.scrollTop - el.clientHeight) < 1
+      (el) => Math.abs(el.scrollHeight - el.scrollTop - el.clientHeight) < 1,
     );
   }
 
@@ -249,7 +249,7 @@ export class ChatPage {
 
   async sendMultipleMessages(
     count: number,
-    makeMessage: (i: number) => string
+    makeMessage: (i: number) => string,
   ) {
     for (let i = 0; i < count; i++) {
       await this.sendUserMessage(makeMessage(i));

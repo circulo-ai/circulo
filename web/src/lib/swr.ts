@@ -1,5 +1,5 @@
-import useSWR, { SWRConfiguration, mutate as globalMutate, mutate } from "swr";
 import { ChatSDKError, ErrorCode } from "@/lib/errors";
+import useSWR, { SWRConfiguration, mutate as globalMutate, mutate } from "swr";
 
 export const fetcher = async (url: string) => {
   const response = await fetch(url);
@@ -11,7 +11,6 @@ export const fetcher = async (url: string) => {
 
   return response.json();
 };
-
 
 export async function fetchWithErrorHandlers(
   input: RequestInfo | URL,
@@ -27,8 +26,8 @@ export async function fetchWithErrorHandlers(
 
     return response;
   } catch (error: unknown) {
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      throw new ChatSDKError('offline:chat');
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      throw new ChatSDKError("offline:chat");
     }
 
     throw error;
@@ -42,25 +41,27 @@ export const swrConfig: SWRConfiguration = {
 };
 
 // Prefetch multiple resources
-export async function prefetchAll(resources: Array<{ key: any; fetcher: () => Promise<any> }>) {
+export async function prefetchAll(
+  resources: Array<{ key: any; fetcher: () => Promise<any> }>,
+) {
   await Promise.all(
     resources.map(({ key, fetcher }) =>
-      mutate(key, fetcher(), { revalidate: false })
-    )
+      mutate(key, fetcher(), { revalidate: false }),
+    ),
   );
 }
 
 export async function clearCachePattern(pattern: RegExp) {
   await mutate(
-    key => typeof key === 'string' && pattern.test(key),
+    (key) => typeof key === "string" && pattern.test(key),
     undefined,
-    { revalidate: false }
+    { revalidate: false },
   );
 }
 
 // Batch mutations
 export async function batchMutate(keys: string[]) {
-  await Promise.all(keys.map(key => mutate(key)));
+  await Promise.all(keys.map((key) => mutate(key)));
 }
 
 // convenient re-exports

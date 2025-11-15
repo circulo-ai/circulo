@@ -1,6 +1,6 @@
+import { getSession, Session } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { output, z, ZodError } from "zod";
-import { getSession, Session } from "@/lib/auth";
 
 // ============================================================================
 // Error Handling
@@ -283,16 +283,16 @@ export function api<
       const ctx = (
         actualConfig.auth
           ? {
-            body: validatedBody,
-            query: validatedQuery,
-            params: validatedParams,
-            user: user!,
-          }
+              body: validatedBody,
+              query: validatedQuery,
+              params: validatedParams,
+              user: user!,
+            }
           : {
-            body: validatedBody,
-            query: validatedQuery,
-            params: validatedParams,
-          }
+              body: validatedBody,
+              query: validatedQuery,
+              params: validatedParams,
+            }
       ) as Context<output<TBody>, output<TQuery>, output<TParams>, TAuth>;
 
       // --- 6️⃣  Execute actual handler ---

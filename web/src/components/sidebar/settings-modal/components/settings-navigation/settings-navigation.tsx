@@ -1,40 +1,22 @@
-import { env, getEnv, isTruthy } from "@/lib/env";
+import { env, isTruthy } from "@/lib/env";
 import { isHosted } from "@/lib/environment";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/providers/session-provider";
 import { useGeneralStore } from "@/stores/settings/general/store";
-import {
-  CreditCard,
-  Files,
-  Home,
-  Settings,
-  Shield,
-  User,
-  Users,
-} from "lucide-react";
+import { CreditCard, Home, Settings, Shield, User, Users } from "lucide-react";
 
 const isBillingEnabled = isTruthy(env.NEXT_PUBLIC_BILLING_ENABLED);
 
 interface SettingsNavigationProps {
   activeSection: string;
   onSectionChange: (
-    section:
-      | 'general'
-      | 'account'
-      | 'subscription'
-      | 'team'
-      | 'privacy'
+    section: "general" | "account" | "subscription" | "team" | "privacy",
   ) => void;
   hasOrganization: boolean;
 }
 
 type NavigationItem = {
-  id:
-    | 'general'
-    | 'account'
-    | 'subscription'
-    | 'team'
-    | 'privacy';
+  id: "general" | "account" | "subscription" | "team" | "privacy";
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   hideWhenBillingDisabled?: boolean;

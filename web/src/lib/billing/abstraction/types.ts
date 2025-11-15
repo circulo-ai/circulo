@@ -1,24 +1,24 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 export const invoiceStatusSchema = z.enum([
-  'pending',
-  'paid',
-  'failed',
-  'expired',
-  'canceled',
+  "pending",
+  "paid",
+  "failed",
+  "expired",
+  "canceled",
 ]);
 
 export const invoiceTypeSchema = z.enum([
-  'subscription',
-  'one_time',
-  'usage_based',
-  'addon',
-  'credit',
-  'refund',
-  'custom',
+  "subscription",
+  "one_time",
+  "usage_based",
+  "addon",
+  "credit",
+  "refund",
+  "custom",
 ]);
 
-export const paymentProviderSchema = z.enum(['changelly']);
+export const paymentProviderSchema = z.enum(["changelly"]);
 
 export type InvoiceStatus = z.infer<typeof invoiceStatusSchema>;
 export type InvoiceType = z.infer<typeof invoiceTypeSchema>;

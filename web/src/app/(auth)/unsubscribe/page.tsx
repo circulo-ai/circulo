@@ -1,3 +1,3 @@
-import Unsubscribe from './unsubscribe'
+import Unsubscribe from "./unsubscribe";
 
-export default Unsubscribe
+export default Unsubscribe;

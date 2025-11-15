@@ -62,11 +62,15 @@ export class ChangellyProvider extends PaymentProvider {
 
     const bodyJson = JSON.stringify(body);
 
-  // API expects X-Signature header — RSA-SHA256 signature over a payload
-  // PAYLOAD = METHOD + ":" + PATH + ":" + [EncodeBase64(BODY)] + ":" + TIMESTAMP
-  // Then header is EncodeBase64(SIGNATURE_BASE64 + ":" + TIMESTAMP)
-  const postUrl = new URL(`${this.baseUrl}/payments`).pathname; // e.g. /api/v1/payments
-  const signatureHeader = this.generateApiSignature("POST", postUrl, bodyJson);
+    // API expects X-Signature header — RSA-SHA256 signature over a payload
+    // PAYLOAD = METHOD + ":" + PATH + ":" + [EncodeBase64(BODY)] + ":" + TIMESTAMP
+    // Then header is EncodeBase64(SIGNATURE_BASE64 + ":" + TIMESTAMP)
+    const postUrl = new URL(`${this.baseUrl}/payments`).pathname; // e.g. /api/v1/payments
+    const signatureHeader = this.generateApiSignature(
+      "POST",
+      postUrl,
+      bodyJson,
+    );
 
     const response = await fetch(`${this.baseUrl}/payments`, {
       method: "POST",
@@ -132,7 +136,9 @@ export class ChangellyProvider extends PaymentProvider {
    */
   verifyWebhook(rawBody: string, signatureHeader: string): boolean {
     if (!signatureHeader || !this.callbackPublicKey) {
-      console.warn("Changelly Webhook: Missing signature header or public key.");
+      console.warn(
+        "Changelly Webhook: Missing signature header or public key.",
+      );
       return false;
     }
 
@@ -148,7 +154,9 @@ export class ChangellyProvider extends PaymentProvider {
 
     if (!decoded.includes(":")) {
       // fallback: header isn't in expected form
-      console.error("Changelly Webhook: X-Signature header format is invalid after decoding.");
+      console.error(
+        "Changelly Webhook: X-Signature header format is invalid after decoding.",
+      );
       return false;
     }
 
@@ -215,9 +223,14 @@ export class ChangellyProvider extends PaymentProvider {
     windowSeconds = 3600,
   ): string {
     // Body must be base64-encoded in the payload; if body is empty object, send empty string
-    const bodyBase64 = bodyJson && bodyJson !== "{}" ? Buffer.from(bodyJson).toString("base64") : "";
+    const bodyBase64 =
+      bodyJson && bodyJson !== "{}"
+        ? Buffer.from(bodyJson).toString("base64")
+        : "";
 
-    const timestamp = (Math.floor(Date.now() / 1000) + windowSeconds).toString();
+    const timestamp = (
+      Math.floor(Date.now() / 1000) + windowSeconds
+    ).toString();
     const payload = [method, path, bodyBase64, timestamp].join(":");
 
     let signatureBase64: string;
@@ -226,7 +239,11 @@ export class ChangellyProvider extends PaymentProvider {
     try {
       if (key.startsWith("-----BEGIN")) {
         // RSA sign the payload
-        const sig = crypto.sign("RSA-SHA256", Buffer.from(payload, "utf8"), key);
+        const sig = crypto.sign(
+          "RSA-SHA256",
+          Buffer.from(payload, "utf8"),
+          key,
+        );
         signatureBase64 = sig.toString("base64");
       } else {
         // Fallback: HMAC-SHA256 of payload
@@ -239,7 +256,9 @@ export class ChangellyProvider extends PaymentProvider {
     }
 
     // Per docs, the header contains base64(SIGNATURE_BASE64 + ':' + TIMESTAMP)
-    const headerValue = Buffer.from(`${signatureBase64}:${timestamp}`).toString("base64");
+    const headerValue = Buffer.from(`${signatureBase64}:${timestamp}`).toString(
+      "base64",
+    );
     return headerValue;
   }
 

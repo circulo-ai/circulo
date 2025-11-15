@@ -1,3 +1,16 @@
+import { codeArtifact } from "@/artifacts/code/client";
+import { imageArtifact } from "@/artifacts/image/client";
+import { sheetArtifact } from "@/artifacts/sheet/client";
+import { textArtifact } from "@/artifacts/text/client";
+import { MultimodalInput } from "@/components/multimodal-input";
+import { Toolbar } from "@/components/toolbar";
+import { useSidebar } from "@/components/ui/sidebar";
+import { VersionFooter } from "@/components/version-footer";
+import type { VisibilityType } from "@/components/visibility-selector";
+import type { Document, Vote } from "@/db/schema";
+import { useArtifact } from "@/hooks/chats/use-artifact";
+import { fetcher } from "@/lib/swr";
+import type { Attachment, ChatMessage } from "@/lib/types";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import { formatDistance } from "date-fns";
 import equal from "fast-deep-equal";
@@ -12,22 +25,9 @@ import {
 } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { useDebounceCallback, useWindowSize } from "usehooks-ts";
-import { codeArtifact } from "@/artifacts/code/client";
-import { imageArtifact } from "@/artifacts/image/client";
-import { sheetArtifact } from "@/artifacts/sheet/client";
-import { textArtifact } from "@/artifacts/text/client";
-import { useArtifact } from "@/hooks/chats/use-artifact";
-import type { Document, Vote } from "@/db/schema";
-import type { Attachment, ChatMessage } from "@/lib/types";
-import { fetcher } from "@/lib/swr";
 import { ArtifactActions } from "./artifact-actions";
 import { ArtifactCloseButton } from "./artifact-close-button";
 import { ArtifactMessages } from "./artifact-messages";
-import { MultimodalInput } from "@/components/multimodal-input";
-import { Toolbar } from "@/components/toolbar";
-import { useSidebar } from "@/components/ui/sidebar";
-import { VersionFooter } from "@/components/version-footer";
-import type { VisibilityType } from "@/components/visibility-selector";
 
 export const artifactDefinitions = [
   textArtifact,
@@ -95,7 +95,7 @@ function PureArtifact({
     artifact.documentId !== "init" && artifact.status !== "streaming"
       ? `/api/document?id=${artifact.documentId}`
       : null,
-    fetcher
+    fetcher,
   );
 
   const [mode, setMode] = useState<"edit" | "diff">("edit");
@@ -168,15 +168,15 @@ function PureArtifact({
           }
           return currentDocuments;
         },
-        { revalidate: false }
+        { revalidate: false },
       );
     },
-    [artifact, mutate]
+    [artifact, mutate],
   );
 
   const debouncedHandleContentChange = useDebounceCallback(
     handleContentChange,
-    2000
+    2000,
   );
 
   const saveContent = useCallback(
@@ -191,7 +191,7 @@ function PureArtifact({
         }
       }
     },
-    [document, debouncedHandleContentChange, handleContentChange]
+    [document, debouncedHandleContentChange, handleContentChange],
   );
 
   function getDocumentContentById(index: number) {
@@ -244,7 +244,7 @@ function PureArtifact({
   const isMobile = windowWidth ? windowWidth < 768 : false;
 
   const artifactDefinition = artifactDefinitions.find(
-    (definition) => definition.kind === artifact.kind
+    (definition) => definition.kind === artifact.kind,
   );
 
   if (!artifactDefinition) {
@@ -273,7 +273,7 @@ function PureArtifact({
           {!isMobile && (
             <motion.div
               animate={{ width: windowWidth, right: 0 }}
-              className="fixed h-dvh bg-background"
+              className="bg-background fixed h-dvh"
               exit={{
                 width: isSidebarOpen ? windowWidth - 256 : windowWidth,
                 right: 0,
@@ -298,7 +298,7 @@ function PureArtifact({
                   damping: 30,
                 },
               }}
-              className="relative h-dvh w-[400px] shrink-0 bg-muted dark:bg-background"
+              className="bg-muted dark:bg-background relative h-dvh w-[400px] shrink-0"
               exit={{
                 opacity: 0,
                 x: 0,
@@ -387,7 +387,7 @@ function PureArtifact({
                     },
                   }
             }
-            className="fixed flex h-dvh flex-col overflow-y-scroll border-zinc-200 bg-background md:border-l dark:border-zinc-700 dark:bg-muted"
+            className="bg-background dark:bg-muted fixed flex h-dvh flex-col overflow-y-scroll border-zinc-200 md:border-l dark:border-zinc-700"
             exit={{
               opacity: 0,
               scale: 0.5,
@@ -436,11 +436,11 @@ function PureArtifact({
                         new Date(),
                         {
                           addSuffix: true,
-                        }
+                        },
                       )}`}
                     </div>
                   ) : (
-                    <div className="mt-2 h-3 w-32 animate-pulse rounded-md bg-muted-foreground/20" />
+                    <div className="bg-muted-foreground/20 mt-2 h-3 w-32 animate-pulse rounded-md" />
                   )}
                 </div>
               </div>
@@ -456,7 +456,7 @@ function PureArtifact({
               />
             </div>
 
-            <div className="h-full max-w-full! items-center overflow-y-scroll bg-background dark:bg-muted">
+            <div className="bg-background dark:bg-muted h-full max-w-full! items-center overflow-y-scroll">
               <artifactDefinition.content
                 content={
                   isCurrentVersion

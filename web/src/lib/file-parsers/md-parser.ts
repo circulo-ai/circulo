@@ -1,32 +1,32 @@
-import { readFile } from 'fs/promises'
-import type { FileParseResult, FileParser } from './types'
-import { sanitizeTextForUTF8 } from './utils'
-import { createLogger } from '@/lib/logs/console/logger';
+import { createLogger } from "@/lib/logs/console/logger";
+import { readFile } from "fs/promises";
+import type { FileParseResult, FileParser } from "./types";
+import { sanitizeTextForUTF8 } from "./utils";
 
-const logger = createLogger('MdParser')
+const logger = createLogger("MdParser");
 
 export class MdParser implements FileParser {
   async parseFile(filePath: string): Promise<FileParseResult> {
     try {
       if (!filePath) {
-        throw new Error('No file path provided')
+        throw new Error("No file path provided");
       }
 
-      const buffer = await readFile(filePath)
+      const buffer = await readFile(filePath);
 
-      return this.parseBuffer(buffer)
+      return this.parseBuffer(buffer);
     } catch (error) {
-      logger.error('MD file error:', error)
-      throw new Error(`Failed to parse MD file: ${(error as Error).message}`)
+      logger.error("MD file error:", error);
+      throw new Error(`Failed to parse MD file: ${(error as Error).message}`);
     }
   }
 
   async parseBuffer(buffer: Buffer): Promise<FileParseResult> {
     try {
-      logger.info('Parsing buffer, size:', buffer.length)
+      logger.info("Parsing buffer, size:", buffer.length);
 
-      const result = buffer.toString('utf-8')
-      const content = sanitizeTextForUTF8(result)
+      const result = buffer.toString("utf-8");
+      const content = sanitizeTextForUTF8(result);
 
       return {
         content,
@@ -34,10 +34,10 @@ export class MdParser implements FileParser {
           characterCount: content.length,
           tokenCount: Math.floor(content.length / 4),
         },
-      }
+      };
     } catch (error) {
-      logger.error('MD buffer parsing error:', error)
-      throw new Error(`Failed to parse MD buffer: ${(error as Error).message}`)
+      logger.error("MD buffer parsing error:", error);
+      throw new Error(`Failed to parse MD buffer: ${(error as Error).message}`);
     }
   }
 }

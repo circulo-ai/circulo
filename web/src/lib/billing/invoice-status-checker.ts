@@ -1,7 +1,7 @@
-import { db } from '@/db';
-import { invoices } from '@/db/schema/billing';
-import { and, eq, inArray, isNull, lt } from 'drizzle-orm';
-import { getProvider } from '.';
+import { db } from "@/db";
+import { invoices } from "@/db/schema/billing";
+import { and, eq, inArray, lt } from "drizzle-orm";
+import { getProvider } from ".";
 
 export class InvoiceStatusChecker {
   /**
@@ -14,9 +14,9 @@ export class InvoiceStatusChecker {
     // Get pending invoices from last 24 hours
     const pendingInvoices = await db.query.invoices.findMany({
       where: and(
-        inArray(invoices.status, ['pending', 'failed']),
+        inArray(invoices.status, ["pending", "failed"]),
         // Only check recent invoices
-        lt(invoices.createdAt, oneDayAgo)
+        lt(invoices.createdAt, oneDayAgo),
       ),
       limit: 100, // Process in batches
     });
@@ -26,27 +26,35 @@ export class InvoiceStatusChecker {
     for (const invoice of pendingInvoices) {
       try {
         const provider = getProvider(invoice.provider);
-        const status = await provider.getInvoiceStatus(invoice.providerInvoiceId);
+        const status = await provider.getInvoiceStatus(
+          invoice.providerInvoiceId,
+        );
 
         // Update if status changed
         if (status !== invoice.status) {
-          console.log(`Invoice ${invoice.id} status changed: ${invoice.status} -> ${status}`);
+          console.log(
+            `Invoice ${invoice.id} status changed: ${invoice.status} -> ${status}`,
+          );
 
           await db
             .update(invoices)
             .set({
               status,
-              paidAt: status === 'paid' ? new Date() : undefined,
-              failedAt: status === 'failed' ? new Date() : undefined,
+              paidAt: status === "paid" ? new Date() : undefined,
+              failedAt: status === "failed" ? new Date() : undefined,
             })
             .where(eq(invoices.id, invoice.id));
 
           // Trigger subscription activation if paid
-          if (status === 'paid' && invoice.type === 'subscription' && invoice.subscriptionId) {
+          if (
+            status === "paid" &&
+            invoice.type === "subscription" &&
+            invoice.subscriptionId
+          ) {
             // Import BillingManager to avoid circular dependency
-            const { BillingManager } = await import('./billing-manager');
+            const { BillingManager } = await import("./billing-manager");
             const manager = new BillingManager(provider);
-            await manager['activateSubscription'](invoice.subscriptionId);
+            await manager["activateSubscription"](invoice.subscriptionId);
           }
         }
       } catch (error) {
@@ -63,16 +71,13 @@ export class InvoiceStatusChecker {
     const now = new Date();
 
     const overdueInvoices = await db.query.invoices.findMany({
-      where: and(
-        eq(invoices.status, 'pending'),
-        lt(invoices.dueDate, now)
-      ),
+      where: and(eq(invoices.status, "pending"), lt(invoices.dueDate, now)),
     });
 
     for (const invoice of overdueInvoices) {
       await db
         .update(invoices)
-        .set({ status: 'expired' })
+        .set({ status: "expired" })
         .where(eq(invoices.id, invoice.id));
 
       console.log(`Expired invoice ${invoice.id}`);

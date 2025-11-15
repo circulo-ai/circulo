@@ -1,9 +1,9 @@
+import { getDocumentById } from "@/db/queries";
+import { documentHandlersByArtifactKind } from "@/lib/artifacts/server";
+import { Session } from "@/lib/auth";
+import type { ChatMessage } from "@/lib/types";
 import { tool, type UIMessageStreamWriter } from "ai";
 import { z } from "zod";
-import { documentHandlersByArtifactKind } from "@/lib/artifacts/server";
-import { getDocumentById } from "@/db/queries";
-import type { ChatMessage } from "@/lib/types";
-import { Session } from "@/lib/auth";
 
 type UpdateDocumentProps = {
   session: Session;
@@ -36,7 +36,7 @@ export const updateDocument = ({ session, dataStream }: UpdateDocumentProps) =>
 
       const documentHandler = documentHandlersByArtifactKind.find(
         (documentHandlerByArtifactKind) =>
-          documentHandlerByArtifactKind.kind === document.kind
+          documentHandlerByArtifactKind.kind === document.kind,
       );
 
       if (!documentHandler) {

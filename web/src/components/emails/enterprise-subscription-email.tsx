@@ -1,3 +1,5 @@
+import { getBrandConfig } from "@/lib/branding/branding";
+import { getBaseUrl } from "@/lib/urls/utils";
 import {
   Body,
   Column,
@@ -10,29 +12,27 @@ import {
   Row,
   Section,
   Text,
-} from '@react-email/components'
-import { format } from 'date-fns'
-import { getBrandConfig } from '@/lib/branding/branding'
-import { getBaseUrl } from '@/lib/urls/utils'
-import { baseStyles } from './base-styles'
-import EmailFooter from './footer'
+} from "@react-email/components";
+import { format } from "date-fns";
+import { baseStyles } from "./base-styles";
+import EmailFooter from "./footer";
 
 interface EnterpriseSubscriptionEmailProps {
-  userName?: string
-  userEmail?: string
-  loginLink?: string
-  createdDate?: Date
+  userName?: string;
+  userEmail?: string;
+  loginLink?: string;
+  createdDate?: Date;
 }
 
 export const EnterpriseSubscriptionEmail = ({
-                                              userName = 'Valued User',
-                                              userEmail = '',
-                                              loginLink,
-                                              createdDate = new Date(),
-                                            }: EnterpriseSubscriptionEmailProps) => {
-  const brand = getBrandConfig()
-  const baseUrl = getBaseUrl()
-  const effectiveLoginLink = loginLink || `${baseUrl}/login`
+  userName = "Valued User",
+  userEmail = "",
+  loginLink,
+  createdDate = new Date(),
+}: EnterpriseSubscriptionEmailProps) => {
+  const brand = getBrandConfig();
+  const baseUrl = getBaseUrl();
+  const effectiveLoginLink = loginLink || `${baseUrl}/login`;
 
   return (
     <Html>
@@ -40,15 +40,17 @@ export const EnterpriseSubscriptionEmail = ({
       <Body style={baseStyles.main}>
         <Preview>Your Enterprise Plan is now active on Circulo</Preview>
         <Container style={baseStyles.container}>
-          <Section style={{ padding: '30px 0', textAlign: 'center' }}>
+          <Section style={{ padding: "30px 0", textAlign: "center" }}>
             <Row>
-              <Column style={{ textAlign: 'center' }}>
+              <Column style={{ textAlign: "center" }}>
                 <Img
-                  src={brand.logoUrl || `${baseUrl}/logo/reverse/text/medium.png`}
-                  width='114'
+                  src={
+                    brand.logoUrl || `${baseUrl}/logo/reverse/text/medium.png`
+                  }
+                  width="114"
                   alt={brand.name}
                   style={{
-                    margin: '0 auto',
+                    margin: "0 auto",
                   }}
                 />
               </Column>
@@ -66,17 +68,21 @@ export const EnterpriseSubscriptionEmail = ({
           <Section style={baseStyles.content}>
             <Text style={baseStyles.paragraph}>Hello {userName},</Text>
             <Text style={baseStyles.paragraph}>
-              Great news! Your <strong>Enterprise Plan</strong> has been activated on Circulo. You now
-              have access to advanced features and increased capacity for your workflows.
+              Great news! Your <strong>Enterprise Plan</strong> has been
+              activated on Circulo. You now have access to advanced features and
+              increased capacity for your workflows.
             </Text>
 
             <Text style={baseStyles.paragraph}>
-              Your account has been set up with full access to your organization. Click below to log
-              in and start exploring your new Enterprise features:
+              Your account has been set up with full access to your
+              organization. Click below to log in and start exploring your new
+              Enterprise features:
             </Text>
 
-            <Link href={effectiveLoginLink} style={{ textDecoration: 'none' }}>
-              <Text style={baseStyles.button}>Access Your Enterprise Account</Text>
+            <Link href={effectiveLoginLink} style={{ textDecoration: "none" }}>
+              <Text style={baseStyles.button}>
+                Access Your Enterprise Account
+              </Text>
             </Link>
 
             <Text style={baseStyles.paragraph}>
@@ -88,8 +94,8 @@ export const EnterpriseSubscriptionEmail = ({
             </Text>
 
             <Text style={baseStyles.paragraph}>
-              If you have any questions or need assistance getting started, our support team is here
-              to help.
+              If you have any questions or need assistance getting started, our
+              support team is here to help.
             </Text>
 
             <Text style={baseStyles.paragraph}>
@@ -101,12 +107,13 @@ export const EnterpriseSubscriptionEmail = ({
             <Text
               style={{
                 ...baseStyles.footerText,
-                marginTop: '40px',
-                textAlign: 'left',
-                color: '#666666',
+                marginTop: "40px",
+                textAlign: "left",
+                color: "#666666",
               }}
             >
-              This email was sent on {format(createdDate, 'MMMM do, yyyy')} to {userEmail}
+              This email was sent on {format(createdDate, "MMMM do, yyyy")} to{" "}
+              {userEmail}
               regarding your Enterprise plan activation on Circulo.
             </Text>
           </Section>
@@ -115,7 +122,7 @@ export const EnterpriseSubscriptionEmail = ({
         <EmailFooter baseUrl={baseUrl} />
       </Body>
     </Html>
-  )
-}
+  );
+};
 
-export default EnterpriseSubscriptionEmail
+export default EnterpriseSubscriptionEmail;

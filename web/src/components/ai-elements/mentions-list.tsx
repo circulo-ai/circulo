@@ -5,10 +5,10 @@ export type MentionsListProps = {
 };
 
 export const MentionsList = ({
-                               mentions,
-                               onRemove,
-                               className,
-                             }: MentionsListProps) => {
+  mentions,
+  onRemove,
+  className,
+}: MentionsListProps) => {
   if (mentions.length === 0) return null;
 
   return (
@@ -28,7 +28,7 @@ export const MentionsList = ({
     </InputGroupAddon>
   );
 };
-import { InputGroupAddon } from "@/components/ui/input-group";
 import { MentionBadge } from "@/components/ai-elements/mention-badge";
-import { cn } from "@/lib/utils";
+import { InputGroupAddon } from "@/components/ui/input-group";
 import type { MentionEntity } from "@/lib/chat/mentions/types";
+import { cn } from "@/lib/utils";

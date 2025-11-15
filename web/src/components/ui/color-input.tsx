@@ -1,9 +1,9 @@
+import { cn } from "@/lib/utils";
 import * as React from "react";
 import { Input } from "./input";
-import { cn } from "@/lib/utils";
 
 interface ColorInputProps
-  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'> {
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange"> {
   value?: string;
   onChange?: (value: string) => void;
 }
@@ -24,7 +24,7 @@ export const ColorInput = React.forwardRef<HTMLInputElement, ColorInputProps>(
     };
 
     return (
-      <div className="flex gap-2 items-center">
+      <div className="flex items-center gap-2">
         <Input
           ref={ref}
           type="color"
@@ -42,7 +42,7 @@ export const ColorInput = React.forwardRef<HTMLInputElement, ColorInputProps>(
         />
       </div>
     );
-  }
+  },
 );
 
 ColorInput.displayName = "ColorInput";

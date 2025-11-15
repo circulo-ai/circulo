@@ -1,12 +1,12 @@
+import { PreviewMessage, ThinkingMessage } from "@/components/messages/message";
+import type { Vote } from "@/db/schema";
+import { useMessages } from "@/hooks/chats/use-messages";
+import type { ChatMessage } from "@/lib/types";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import equal from "fast-deep-equal";
 import { AnimatePresence, motion } from "framer-motion";
 import { memo } from "react";
-import { useMessages } from "@/hooks/chats/use-messages";
-import type { Vote } from "@/db/schema";
-import type { ChatMessage } from "@/lib/types";
 import type { UIArtifact } from "./artifact";
-import { PreviewMessage, ThinkingMessage } from "@/components/messages/message";
 
 type ArtifactMessagesProps = {
   chatId: string;
@@ -79,7 +79,7 @@ function PureArtifactMessages({
 
 function areEqual(
   prevProps: ArtifactMessagesProps,
-  nextProps: ArtifactMessagesProps
+  nextProps: ArtifactMessagesProps,
 ) {
   if (
     prevProps.artifactStatus === "streaming" &&

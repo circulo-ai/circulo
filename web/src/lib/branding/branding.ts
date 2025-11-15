@@ -24,11 +24,11 @@ export interface BrandConfig {
  * Default brand configuration values
  */
 const defaultConfig: BrandConfig = {
-  name: 'Circulo',
+  name: "Circulo",
   logoUrl: undefined,
   faviconUrl: "/favicon/favicon.ico",
   customCssUrl: undefined,
-  supportEmail: 'help@circulo.ir',
+  supportEmail: "help@circulo.ir",
   documentationUrl: undefined,
   termsUrl: undefined,
   privacyUrl: undefined,

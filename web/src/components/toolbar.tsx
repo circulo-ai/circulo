@@ -1,4 +1,17 @@
 "use client";
+import {
+  artifactDefinitions,
+  type ArtifactKind,
+} from "@/components/artifacts/artifact";
+import type { ArtifactToolbarItem } from "@/components/artifacts/create-artifact";
+import { ArrowUpIcon, StopIcon, SummarizeIcon } from "@/components/icons/icons";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import type { ChatMessage } from "@/lib/types";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import cx from "classnames";
 import {
@@ -18,16 +31,6 @@ import {
   useState,
 } from "react";
 import { useOnClickOutside } from "usehooks-ts";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import type { ChatMessage } from "@/lib/types";
-import { type ArtifactKind, artifactDefinitions } from "@/components/artifacts/artifact";
-import type { ArtifactToolbarItem } from "@/components/artifacts/create-artifact";
-import { ArrowUpIcon, StopIcon, SummarizeIcon } from "@/components/icons/icons";
 
 type ToolProps = {
   description: string;
@@ -121,7 +124,7 @@ const Tool = ({
         </motion.div>
       </TooltipTrigger>
       <TooltipContent
-        className="rounded-2xl bg-foreground p-3 px-4 text-background"
+        className="bg-foreground text-background rounded-2xl p-3 px-4"
         side="left"
         sideOffset={16}
       >
@@ -179,7 +182,7 @@ const ReadingLevelSelector = ({
           key={id}
           transition={{ delay: 0.1 }}
         >
-          <div className="size-2 rounded-full bg-muted-foreground/40" />
+          <div className="bg-muted-foreground/40 size-2 rounded-full" />
         </motion.div>
       ))}
 
@@ -188,11 +191,11 @@ const ReadingLevelSelector = ({
           <TooltipTrigger asChild>
             <motion.div
               className={cx(
-                "absolute flex flex-row items-center rounded-full border bg-background p-3",
+                "bg-background absolute flex flex-row items-center rounded-full border p-3",
                 {
                   "bg-primary text-primary-foreground": currentLevel !== 2,
                   "bg-background text-foreground": currentLevel === 2,
-                }
+                },
               )}
               drag="y"
               dragConstraints={{ top: -dragConstraints, bottom: 0 }}
@@ -232,7 +235,7 @@ const ReadingLevelSelector = ({
             </motion.div>
           </TooltipTrigger>
           <TooltipContent
-            className="rounded-2xl bg-foreground p-3 px-4 text-background text-sm"
+            className="bg-foreground text-background rounded-2xl p-3 px-4 text-sm"
             side="left"
             sideOffset={16}
           >
@@ -324,10 +327,13 @@ const PureToolbar = ({
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
 
-  useOnClickOutside<HTMLDivElement>(toolbarRef as React.RefObject<HTMLDivElement>, () => {
-    setIsToolbarVisible(false);
-    setSelectedTool(null);
-  });
+  useOnClickOutside<HTMLDivElement>(
+    toolbarRef as React.RefObject<HTMLDivElement>,
+    () => {
+      setIsToolbarVisible(false);
+      setSelectedTool(null);
+    },
+  );
 
   const startCloseTimer = () => {
     if (timeoutRef.current) {
@@ -361,7 +367,7 @@ const PureToolbar = ({
   }, [status, setIsToolbarVisible]);
 
   const artifactDefinition = artifactDefinitions.find(
-    (definition) => definition.kind === artifactKind
+    (definition) => definition.kind === artifactKind,
   );
 
   if (!artifactDefinition) {
@@ -396,7 +402,7 @@ const PureToolbar = ({
                 }
             : { opacity: 1, y: 0, height: 54, transition: { delay: 0 } }
         }
-        className="absolute right-6 bottom-6 flex cursor-pointer flex-col justify-end rounded-full border bg-background p-1.5 shadow-lg"
+        className="bg-background absolute right-6 bottom-6 flex cursor-pointer flex-col justify-end rounded-full border p-1.5 shadow-lg"
         exit={{ opacity: 0, y: -20, transition: { duration: 0.1 } }}
         initial={{ opacity: 0, y: -20, scale: 1 }}
         onAnimationComplete={() => {

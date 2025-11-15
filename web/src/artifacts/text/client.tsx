@@ -1,7 +1,7 @@
-import { toast } from "sonner";
 import { Artifact } from "@/components/artifacts/create-artifact";
 import { DiffView } from "@/components/artifacts/diffview";
 import { DocumentSkeleton } from "@/components/document/document-skeleton";
+import { Editor } from "@/components/editors/text/text-editor";
 import {
   ClockRewind,
   CopyIcon,
@@ -10,8 +10,8 @@ import {
   RedoIcon,
   UndoIcon,
 } from "@/components/icons/icons";
-import { Editor } from "@/components/editors/text/text-editor";
 import type { Suggestion } from "@/db/schema";
+import { toast } from "sonner";
 import { getSuggestions } from "../actions";
 
 type TextArtifactMetadata = {

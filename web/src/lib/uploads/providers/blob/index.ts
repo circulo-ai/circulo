@@ -1,11 +1,11 @@
 export {
-  type CustomBlobConfig,
   deleteFromBlob,
   downloadFromBlob,
-  type FileInfo,
   getBlobServiceClient,
   getPresignedUrl,
   getPresignedUrlWithConfig,
   sanitizeFilenameForMetadata,
   uploadToBlob,
-} from '@/lib/uploads/providers/blob/blob-client'
+  type CustomBlobConfig,
+  type FileInfo,
+} from "@/lib/uploads/providers/blob/blob-client";

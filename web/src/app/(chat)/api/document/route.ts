@@ -1,10 +1,10 @@
-import { getSession } from "@/lib/auth";
 import type { ArtifactKind } from "@/components/artifacts/artifact";
 import {
   deleteDocumentsByIdAfterTimestamp,
   getDocumentsById,
   saveDocument,
 } from "@/db/queries";
+import { getSession } from "@/lib/auth";
 import { ChatSDKError } from "@/lib/errors";
 
 export async function GET(request: Request) {
@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   if (!id) {
     return new ChatSDKError(
       "bad_request:api",
-      "Parameter id is missing"
+      "Parameter id is missing",
     ).toResponse();
   }
 
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
   if (!id) {
     return new ChatSDKError(
       "bad_request:api",
-      "Parameter id is required."
+      "Parameter id is required.",
     ).toResponse();
   }
 
@@ -92,14 +92,14 @@ export async function DELETE(request: Request) {
   if (!id) {
     return new ChatSDKError(
       "bad_request:api",
-      "Parameter id is required."
+      "Parameter id is required.",
     ).toResponse();
   }
 
   if (!timestamp) {
     return new ChatSDKError(
       "bad_request:api",
-      "Parameter timestamp is required."
+      "Parameter timestamp is required.",
     ).toResponse();
   }
 

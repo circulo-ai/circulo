@@ -1,13 +1,13 @@
-import { and, eq, isNull } from 'drizzle-orm';
-import { db } from '@/db';
+import { db } from "@/db";
 import {
-  subscriptions,
   subscriptionHistory,
   subscriptionPlans,
+  subscriptions,
   type PlanFeatures,
-} from '@/db/schema/billing';
-import { BillingManager } from './billing-manager';
-import { getProvider } from '.';
+} from "@/db/schema/billing";
+import { and, eq } from "drizzle-orm";
+import { getProvider } from ".";
+import { BillingManager } from "./billing-manager";
 
 export class SubscriptionManager {
   /**
@@ -16,7 +16,7 @@ export class SubscriptionManager {
   static async createSubscription(
     userId: string,
     planSlug: string,
-    provider: 'changelly' = 'changelly'
+    provider: "changelly" = "changelly",
   ) {
     // Get plan
     const plan = await db.query.subscriptionPlans.findFirst({
@@ -31,12 +31,12 @@ export class SubscriptionManager {
     const existing = await db.query.subscriptions.findFirst({
       where: and(
         eq(subscriptions.userId, userId),
-        eq(subscriptions.status, 'active')
+        eq(subscriptions.status, "active"),
       ),
     });
 
     if (existing) {
-      throw new Error('User already has an active subscription');
+      throw new Error("User already has an active subscription");
     }
 
     // Create subscription
@@ -45,12 +45,12 @@ export class SubscriptionManager {
       .values({
         userId,
         planId: plan.id,
-        status: 'inactive',
+        status: "inactive",
         autoRenew: true,
       })
       .returning();
 
-    if(!subscription) {
+    if (!subscription) {
       return { subscription: undefined, invoice: null };
     }
 
@@ -59,8 +59,8 @@ export class SubscriptionManager {
       subscriptionId: subscription.id,
       planId: plan.id,
       oldStatus: null,
-      newStatus: 'inactive',
-      reason: 'subscription_created',
+      newStatus: "inactive",
+      reason: "subscription_created",
       changedAt: new Date(),
     });
 
@@ -70,7 +70,7 @@ export class SubscriptionManager {
       const invoice = await billingManager.createSubscriptionInvoice(
         userId,
         subscription.id,
-        plan.id
+        plan.id,
       );
 
       return {
@@ -83,18 +83,20 @@ export class SubscriptionManager {
     await db
       .update(subscriptions)
       .set({
-        status: 'active',
+        status: "active",
         startDate: new Date(),
-        endDate: new Date(Date.now() + plan.billingIntervalDays * 24 * 60 * 60 * 1000),
+        endDate: new Date(
+          Date.now() + plan.billingIntervalDays * 24 * 60 * 60 * 1000,
+        ),
       })
       .where(eq(subscriptions.id, subscription.id));
 
     await db.insert(subscriptionHistory).values({
       subscriptionId: subscription.id,
       planId: plan.id,
-      oldStatus: 'inactive',
-      newStatus: 'active',
-      reason: 'free_plan_activated',
+      oldStatus: "inactive",
+      newStatus: "active",
+      reason: "free_plan_activated",
       changedAt: new Date(),
     });
 
@@ -107,18 +109,18 @@ export class SubscriptionManager {
   static async changePlan(
     userId: string,
     newPlanSlug: string,
-    provider: 'changelly' = 'changelly'
+    provider: "changelly" = "changelly",
   ) {
     const subscription = await db.query.subscriptions.findFirst({
       where: and(
         eq(subscriptions.userId, userId),
-        eq(subscriptions.status, 'active')
+        eq(subscriptions.status, "active"),
       ),
       with: { plan: true },
     });
 
     if (!subscription) {
-      throw new Error('No active subscription found');
+      throw new Error("No active subscription found");
     }
 
     const newPlan = await db.query.subscriptionPlans.findFirst({
@@ -139,7 +141,7 @@ export class SubscriptionManager {
       .update(subscriptions)
       .set({
         planId: newPlan.id,
-        status: parseFloat(newPlan.usdPrice) === 0 ? 'active' : 'inactive',
+        status: parseFloat(newPlan.usdPrice) === 0 ? "active" : "inactive",
       })
       .where(eq(subscriptions.id, subscription.id));
 
@@ -148,8 +150,12 @@ export class SubscriptionManager {
       subscriptionId: subscription.id,
       planId: newPlan.id,
       oldStatus: subscription.status,
-      newStatus: parseFloat(newPlan.usdPrice) === 0 ? 'active' : 'inactive',
-      reason: isUpgrade ? 'upgraded' : isDowngrade ? 'downgraded' : 'plan_changed',
+      newStatus: parseFloat(newPlan.usdPrice) === 0 ? "active" : "inactive",
+      reason: isUpgrade
+        ? "upgraded"
+        : isDowngrade
+          ? "downgraded"
+          : "plan_changed",
       metadata: {
         oldPlanId: subscription.planId,
         oldPlanName: subscription.plan.name,
@@ -166,7 +172,7 @@ export class SubscriptionManager {
       let amount = newPlan.usdPrice;
       if (isUpgrade && subscription.endDate) {
         const remainingDays = Math.ceil(
-          (subscription.endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+          (subscription.endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
         );
         const totalDays = newPlan.billingIntervalDays;
         const proratedAmount =
@@ -177,9 +183,9 @@ export class SubscriptionManager {
       const invoice = await billingManager.createInvoice({
         userId,
         subscriptionId: subscription.id,
-        type: 'subscription',
+        type: "subscription",
         usdAmount: amount,
-        description: `${isUpgrade ? 'Upgrade' : isDowngrade ? 'Downgrade' : 'Change'} to ${newPlan.name}`,
+        description: `${isUpgrade ? "Upgrade" : isDowngrade ? "Downgrade" : "Change"} to ${newPlan.name}`,
         metadata: {
           planChange: true,
           oldPlanId: subscription.planId,
@@ -188,10 +194,10 @@ export class SubscriptionManager {
         },
         lineItems: [
           {
-            description: `${newPlan.name} Plan${isUpgrade ? ' (Prorated)' : ''}`,
+            description: `${newPlan.name} Plan${isUpgrade ? " (Prorated)" : ""}`,
             quantity: 1,
             unitPrice: amount,
-            referenceType: 'plan',
+            referenceType: "plan",
             referenceId: newPlan.id,
           },
         ],
@@ -208,17 +214,17 @@ export class SubscriptionManager {
    */
   static async cancelSubscription(
     userId: string,
-    immediately = false
+    immediately = false,
   ): Promise<void> {
     const subscription = await db.query.subscriptions.findFirst({
       where: and(
         eq(subscriptions.userId, userId),
-        eq(subscriptions.status, 'active')
+        eq(subscriptions.status, "active"),
       ),
     });
 
     if (!subscription) {
-      throw new Error('No active subscription found');
+      throw new Error("No active subscription found");
     }
 
     if (immediately) {
@@ -226,7 +232,7 @@ export class SubscriptionManager {
       await db
         .update(subscriptions)
         .set({
-          status: 'canceled',
+          status: "canceled",
           autoRenew: false,
           endDate: new Date(),
         })
@@ -235,9 +241,9 @@ export class SubscriptionManager {
       await db.insert(subscriptionHistory).values({
         subscriptionId: subscription.id,
         planId: subscription.planId,
-        oldStatus: 'active',
-        newStatus: 'canceled',
-        reason: 'canceled_immediately',
+        oldStatus: "active",
+        newStatus: "canceled",
+        reason: "canceled_immediately",
         changedAt: new Date(),
       });
     } else {
@@ -252,7 +258,7 @@ export class SubscriptionManager {
         planId: subscription.planId,
         oldStatus: subscription.status,
         newStatus: subscription.status,
-        reason: 'scheduled_cancellation',
+        reason: "scheduled_cancellation",
         metadata: { cancelsAt: subscription.endDate },
         changedAt: new Date(),
       });
@@ -266,19 +272,19 @@ export class SubscriptionManager {
     const subscription = await db.query.subscriptions.findFirst({
       where: and(
         eq(subscriptions.userId, userId),
-        eq(subscriptions.status, 'canceled')
+        eq(subscriptions.status, "canceled"),
       ),
       with: { plan: true },
     });
 
     if (!subscription) {
-      throw new Error('No canceled subscription found');
+      throw new Error("No canceled subscription found");
     }
 
     await db
       .update(subscriptions)
       .set({
-        status: 'active',
+        status: "active",
         autoRenew: true,
       })
       .where(eq(subscriptions.id, subscription.id));
@@ -286,9 +292,9 @@ export class SubscriptionManager {
     await db.insert(subscriptionHistory).values({
       subscriptionId: subscription.id,
       planId: subscription.planId,
-      oldStatus: 'canceled',
-      newStatus: 'active',
-      reason: 'reactivated',
+      oldStatus: "canceled",
+      newStatus: "active",
+      reason: "reactivated",
       changedAt: new Date(),
     });
   }
@@ -300,7 +306,7 @@ export class SubscriptionManager {
     const subscription = await db.query.subscriptions.findFirst({
       where: and(
         eq(subscriptions.userId, userId),
-        eq(subscriptions.status, 'active')
+        eq(subscriptions.status, "active"),
       ),
       with: { plan: true },
     });

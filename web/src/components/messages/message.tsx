@@ -1,14 +1,4 @@
 "use client";
-import type { UseChatHelpers } from "@ai-sdk/react";
-import equal from "fast-deep-equal";
-import { motion } from "framer-motion";
-import { memo, useState } from "react";
-import type { Vote } from "@/db/schema";
-import type { ChatMessage } from "@/lib/types";
-import { cn, sanitizeText } from "@/lib/utils";
-import { useDataStream } from "@/components/data-stream-provider";
-import { DocumentToolResult } from "@/components/document/document";
-import { DocumentPreview } from "@/components/document/document-preview";
 import { MessageContent } from "@/components/ai-elements/message";
 import { Response } from "@/components/ai-elements/response";
 import {
@@ -18,11 +8,21 @@ import {
   ToolInput,
   ToolOutput,
 } from "@/components/ai-elements/tool";
+import { useDataStream } from "@/components/data-stream-provider";
+import { DocumentToolResult } from "@/components/document/document";
+import { DocumentPreview } from "@/components/document/document-preview";
 import { SparklesIcon } from "@/components/icons/icons";
+import { PreviewAttachment } from "@/components/preview-attachment";
+import type { Vote } from "@/db/schema";
+import type { ChatMessage } from "@/lib/types";
+import { cn, sanitizeText } from "@/lib/utils";
+import type { UseChatHelpers } from "@ai-sdk/react";
+import equal from "fast-deep-equal";
+import { motion } from "framer-motion";
+import { memo, useState } from "react";
 import { MessageActions } from "./message-actions";
 import { MessageEditor } from "./message-editor";
 import { MessageReasoning } from "./message-reasoning";
-import { PreviewAttachment } from "@/components/preview-attachment";
 
 const PurePreviewMessage = ({
   chatId,
@@ -46,7 +46,7 @@ const PurePreviewMessage = ({
   const [mode, setMode] = useState<"view" | "edit">("view");
 
   const attachmentsFromMessage = message.parts.filter(
-    (part) => part.type === "file"
+    (part) => part.type === "file",
   );
 
   useDataStream();
@@ -66,7 +66,7 @@ const PurePreviewMessage = ({
         })}
       >
         {message.role === "assistant" && (
-          <div className="-mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-background ring-1 ring-border">
+          <div className="bg-background ring-border -mt-1 flex size-8 shrink-0 items-center justify-center rounded-full ring-1">
             <SparklesIcon size={14} />
           </div>
         )}
@@ -74,13 +74,13 @@ const PurePreviewMessage = ({
         <div
           className={cn("flex flex-col", {
             "gap-2 md:gap-4": message.parts?.some(
-              (p) => p.type === "text" && p.text?.trim()
+              (p) => p.type === "text" && p.text?.trim(),
             ),
             "min-h-96": message.role === "assistant" && requiresScrollPadding,
             "w-full":
               (message.role === "assistant" &&
                 message.parts?.some(
-                  (p) => p.type === "text" && p.text?.trim()
+                  (p) => p.type === "text" && p.text?.trim(),
                 )) ||
               mode === "edit",
             "max-w-[calc(100%-2.5rem)] sm:max-w-[min(fit-content,80%)]":
@@ -125,7 +125,7 @@ const PurePreviewMessage = ({
                   <div key={key}>
                     <MessageContent
                       className={cn({
-                        "w-fit break-words rounded-2xl px-3 py-2 text-right text-white":
+                        "w-fit rounded-2xl px-3 py-2 text-right break-words text-white":
                           message.role === "user",
                         "bg-transparent px-0 py-0 text-left":
                           message.role === "assistant",
@@ -284,7 +284,7 @@ export const PreviewMessage = memo(
     }
 
     return false;
-  }
+  },
 );
 
 export const ThinkingMessage = () => {
@@ -301,17 +301,14 @@ export const ThinkingMessage = () => {
       transition={{ duration: 0.2 }}
     >
       <div className="flex items-start justify-start gap-3">
-        <div className="-mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-background ring-1 ring-border">
+        <div className="bg-background ring-border -mt-1 flex size-8 shrink-0 items-center justify-center rounded-full ring-1">
           <SparklesIcon size={14} />
         </div>
 
         <div className="flex w-full flex-col gap-2 md:gap-4">
-          <div className="p-0 text-muted-foreground text-sm">
-            Thinking...
-          </div>
+          <div className="text-muted-foreground p-0 text-sm">Thinking...</div>
         </div>
       </div>
     </motion.div>
   );
 };
-

@@ -1,43 +1,43 @@
-import { readFile } from 'fs/promises'
-import mammoth from 'mammoth'
-import type { FileParseResult, FileParser } from './types'
-import { createLogger } from '@/lib/logs/console/logger';
+import { createLogger } from "@/lib/logs/console/logger";
+import { readFile } from "fs/promises";
+import mammoth from "mammoth";
+import type { FileParseResult, FileParser } from "./types";
 
-const logger = createLogger('DocxParser')
+const logger = createLogger("DocxParser");
 
 // Define interface for mammoth result
 interface MammothResult {
-  value: string
-  messages: any[]
+  value: string;
+  messages: any[];
 }
 
 export class DocxParser implements FileParser {
   async parseFile(filePath: string): Promise<FileParseResult> {
     try {
       if (!filePath) {
-        throw new Error('No file path provided')
+        throw new Error("No file path provided");
       }
 
-      const buffer = await readFile(filePath)
+      const buffer = await readFile(filePath);
 
-      return this.parseBuffer(buffer)
+      return this.parseBuffer(buffer);
     } catch (error) {
-      logger.error('DOCX file error:', error)
-      throw new Error(`Failed to parse DOCX file: ${(error as Error).message}`)
+      logger.error("DOCX file error:", error);
+      throw new Error(`Failed to parse DOCX file: ${(error as Error).message}`);
     }
   }
 
   async parseBuffer(buffer: Buffer): Promise<FileParseResult> {
     try {
-      logger.info('Parsing buffer, size:', buffer.length)
+      logger.info("Parsing buffer, size:", buffer.length);
 
-      const result = await mammoth.extractRawText({ buffer })
+      const result = await mammoth.extractRawText({ buffer });
 
-      let htmlResult: MammothResult = { value: '', messages: [] }
+      let htmlResult: MammothResult = { value: "", messages: [] };
       try {
-        htmlResult = await mammoth.convertToHtml({ buffer })
+        htmlResult = await mammoth.convertToHtml({ buffer });
       } catch (htmlError) {
-        logger.warn('HTML conversion warning:', htmlError)
+        logger.warn("HTML conversion warning:", htmlError);
       }
 
       return {
@@ -46,10 +46,12 @@ export class DocxParser implements FileParser {
           messages: [...result.messages, ...htmlResult.messages],
           html: htmlResult.value,
         },
-      }
+      };
     } catch (error) {
-      logger.error('DOCX buffer parsing error:', error)
-      throw new Error(`Failed to parse DOCX buffer: ${(error as Error).message}`)
+      logger.error("DOCX buffer parsing error:", error);
+      throw new Error(
+        `Failed to parse DOCX buffer: ${(error as Error).message}`,
+      );
     }
   }
 }
