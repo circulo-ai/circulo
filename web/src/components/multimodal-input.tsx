@@ -1,5 +1,28 @@
 "use client";
 
+import { saveChatModelAsCookie } from "@/app/(chat)/actions";
+import {
+  PromptInput,
+  PromptInputModelSelect,
+  PromptInputModelSelectContent,
+  PromptInputSubmit,
+  PromptInputTextarea,
+  PromptInputToolbar,
+  PromptInputTools,
+} from "@/components/ai-elements/prompt-input";
+import {
+  ArrowUpIcon,
+  ChevronDownIcon,
+  CpuIcon,
+  PaperclipIcon,
+  StopIcon,
+} from "@/components/icons/icons";
+import { SelectItem } from "@/components/ui/select";
+import { chatModels } from "@/lib/ai/models";
+import { myProvider } from "@/lib/ai/providers";
+import type { Attachment, ChatMessage } from "@/lib/types";
+import type { AppUsage } from "@/lib/usage";
+import { cn } from "@/lib/utils";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import { Trigger } from "@radix-ui/react-select";
 import type { UIMessage } from "ai";
@@ -18,51 +41,28 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { useLocalStorage, useWindowSize } from "usehooks-ts";
-import { saveChatModelAsCookie } from "@/app/(chat)/actions";
-import { SelectItem } from "@/components/ui/select";
-import { chatModels } from "@/lib/ai/models";
-import { myProvider } from "@/lib/ai/providers";
-import type { Attachment, ChatMessage } from "@/lib/types";
-import type { AppUsage } from "@/lib/usage";
-import { cn } from "@/lib/utils";
-import {
-  PromptInput,
-  PromptInputModelSelect,
-  PromptInputModelSelectContent,
-  PromptInputSubmit,
-  PromptInputTextarea,
-  PromptInputToolbar,
-  PromptInputTools,
-} from "@/components/ai-elements/prompt-input";
-import {
-  ArrowUpIcon,
-  ChevronDownIcon,
-  CpuIcon,
-  PaperclipIcon,
-  StopIcon,
-} from "@/components/icons/icons";
 import { PreviewAttachment } from "./preview-attachment";
 import { SuggestedActions } from "./suggested-actions";
 import { Button } from "./ui/button";
 import type { VisibilityType } from "./visibility-selector";
 
 function PureMultimodalInput({
-                               chatId,
-                               input,
-                               setInput,
-                               status,
-                               stop,
-                               attachments,
-                               setAttachments,
-                               messages,
-                               setMessages,
-                               sendMessage,
-                               className,
-                               selectedVisibilityType,
-                               selectedModelId,
-                               onModelChange,
-                               usage,
-                             }: {
+  chatId,
+  input,
+  setInput,
+  status,
+  stop,
+  attachments,
+  setAttachments,
+  messages,
+  setMessages,
+  sendMessage,
+  className,
+  selectedVisibilityType,
+  selectedModelId,
+  onModelChange,
+  usage,
+}: {
   chatId: string;
   input: string;
   setInput: Dispatch<SetStateAction<string>>;
@@ -102,7 +102,7 @@ function PureMultimodalInput({
 
   const [localStorageInput, setLocalStorageInput] = useLocalStorage(
     "input",
-    ""
+    "",
   );
 
   useEffect(() => {
@@ -202,7 +202,7 @@ function PureMultimodalInput({
     () => ({
       usage,
     }),
-    [usage]
+    [usage],
   );
 
   const handleFileChange = useCallback(
@@ -215,7 +215,7 @@ function PureMultimodalInput({
         const uploadPromises = files.map((file) => uploadFile(file));
         const uploadedAttachments = await Promise.all(uploadPromises);
         const successfullyUploadedAttachments = uploadedAttachments.filter(
-          (attachment) => attachment !== undefined
+          (attachment) => attachment !== undefined,
         );
 
         setAttachments((currentAttachments) => [
@@ -228,7 +228,7 @@ function PureMultimodalInput({
         setUploadQueue([]);
       }
     },
-    [setAttachments, uploadFile]
+    [setAttachments, uploadFile],
   );
 
   const handlePaste = useCallback(
@@ -237,7 +237,7 @@ function PureMultimodalInput({
       if (!items) return;
 
       const imageItems = Array.from(items).filter((item) =>
-        item.type.startsWith('image/'),
+        item.type.startsWith("image/"),
       );
 
       if (imageItems.length === 0) return;
@@ -245,7 +245,7 @@ function PureMultimodalInput({
       // Prevent default paste behavior for images
       event.preventDefault();
 
-      setUploadQueue((prev) => [...prev, 'Pasted image']);
+      setUploadQueue((prev) => [...prev, "Pasted image"]);
 
       try {
         const uploadPromises = imageItems.map(async (item) => {
@@ -267,8 +267,8 @@ function PureMultimodalInput({
           ...(successfullyUploadedAttachments as Attachment[]),
         ]);
       } catch (error) {
-        console.error('Error uploading pasted images:', error);
-        toast.error('Failed to upload pasted image(s)');
+        console.error("Error uploading pasted images:", error);
+        toast.error("Failed to upload pasted image(s)");
       } finally {
         setUploadQueue([]);
       }
@@ -281,8 +281,8 @@ function PureMultimodalInput({
     const textarea = textareaRef.current;
     if (!textarea) return;
 
-    textarea.addEventListener('paste', handlePaste);
-    return () => textarea.removeEventListener('paste', handlePaste);
+    textarea.addEventListener("paste", handlePaste);
+    return () => textarea.removeEventListener("paste", handlePaste);
   }, [handlePaste]);
 
   return (
@@ -298,7 +298,7 @@ function PureMultimodalInput({
         )}
 
       <input
-        className="-top-4 -left-4 pointer-events-none fixed size-0.5 opacity-0"
+        className="pointer-events-none fixed -top-4 -left-4 size-0.5 opacity-0"
         multiple
         onChange={handleFileChange}
         ref={fileInputRef}
@@ -307,7 +307,7 @@ function PureMultimodalInput({
       />
 
       <PromptInput
-        className="rounded-xl border border-border bg-background p-3 shadow-xs transition-all duration-200 focus-within:border-border hover:border-muted-foreground/50"
+        className="border-border bg-background focus-within:border-border hover:border-muted-foreground/50 rounded-xl border p-3 shadow-xs transition-all duration-200"
         onSubmit={(event) => {
           event.preventDefault();
           if (status !== "ready") {
@@ -328,7 +328,7 @@ function PureMultimodalInput({
                 key={attachment.url}
                 onRemove={() => {
                   setAttachments((currentAttachments) =>
-                    currentAttachments.filter((a) => a.url !== attachment.url)
+                    currentAttachments.filter((a) => a.url !== attachment.url),
                   );
                   if (fileInputRef.current) {
                     fileInputRef.current.value = "";
@@ -353,7 +353,7 @@ function PureMultimodalInput({
         <div className="flex flex-row items-start gap-1 sm:gap-2">
           <PromptInputTextarea
             autoFocus
-            className="grow resize-none border-0! border-none! bg-transparent p-2 text-sm outline-none ring-0 [-ms-overflow-style:none] [scrollbar-width:none] placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 [&::-webkit-scrollbar]:hidden"
+            className="placeholder:text-muted-foreground grow resize-none border-0! border-none! bg-transparent p-2 text-sm ring-0 outline-none [-ms-overflow-style:none] [scrollbar-width:none] focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none [&::-webkit-scrollbar]:hidden"
             data-testid="multimodal-input"
             disableAutoResize={true}
             maxHeight={200}
@@ -383,7 +383,7 @@ function PureMultimodalInput({
             <StopButton setMessages={setMessages} stop={stop} />
           ) : (
             <PromptInputSubmit
-              className="size-8 rounded-full bg-primary text-primary-foreground transition-colors duration-200 hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground size-8 rounded-full transition-colors duration-200"
               disabled={!input.trim() || uploadQueue.length > 0}
               status={status}
               data-testid="send-button"
@@ -417,14 +417,14 @@ export const MultimodalInput = memo(
     }
 
     return true;
-  }
+  },
 );
 
 function PureAttachmentsButton({
-                                 fileInputRef,
-                                 status,
-                                 selectedModelId,
-                               }: {
+  fileInputRef,
+  status,
+  selectedModelId,
+}: {
   fileInputRef: React.MutableRefObject<HTMLInputElement | null>;
   status: UseChatHelpers<ChatMessage>["status"];
   selectedModelId: string;
@@ -433,7 +433,7 @@ function PureAttachmentsButton({
 
   return (
     <Button
-      className="aspect-square h-8 rounded-lg p-1 transition-colors hover:bg-accent"
+      className="hover:bg-accent aspect-square h-8 rounded-lg p-1 transition-colors"
       data-testid="attachments-button"
       disabled={status !== "ready" || isReasoningModel}
       onClick={(event) => {
@@ -450,9 +450,9 @@ function PureAttachmentsButton({
 const AttachmentsButton = memo(PureAttachmentsButton);
 
 function PureModelSelectorCompact({
-                                    selectedModelId,
-                                    onModelChange,
-                                  }: {
+  selectedModelId,
+  onModelChange,
+}: {
   selectedModelId: string;
   onModelChange?: (modelId: string) => void;
 }) {
@@ -463,7 +463,7 @@ function PureModelSelectorCompact({
   }, [selectedModelId]);
 
   const selectedModel = chatModels.find(
-    (model) => model.id === optimisticModelId
+    (model) => model.id === optimisticModelId,
   );
 
   return (
@@ -483,7 +483,7 @@ function PureModelSelectorCompact({
       <Trigger asChild>
         <Button variant="ghost" className="h-8 px-2">
           <CpuIcon size={16} />
-          <span className="hidden font-medium text-xs sm:block">
+          <span className="hidden text-xs font-medium sm:block">
             {selectedModel?.name}
           </span>
           <ChevronDownIcon size={16} />
@@ -493,8 +493,8 @@ function PureModelSelectorCompact({
         <div className="flex flex-col gap-px">
           {chatModels.map((model) => (
             <SelectItem key={model.id} value={model.name}>
-              <div className="truncate font-medium text-xs">{model.name}</div>
-              <div className="mt-px truncate text-[10px] text-muted-foreground leading-tight">
+              <div className="truncate text-xs font-medium">{model.name}</div>
+              <div className="text-muted-foreground mt-px truncate text-[10px] leading-tight">
                 {model.description}
               </div>
             </SelectItem>
@@ -508,15 +508,15 @@ function PureModelSelectorCompact({
 const ModelSelectorCompact = memo(PureModelSelectorCompact);
 
 function PureStopButton({
-                          stop,
-                          setMessages,
-                        }: {
+  stop,
+  setMessages,
+}: {
   stop: () => void;
   setMessages: UseChatHelpers<ChatMessage>["setMessages"];
 }) {
   return (
     <Button
-      className="size-7 rounded-full bg-foreground p-1 text-background transition-colors duration-200 hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground"
+      className="bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground size-7 rounded-full p-1 transition-colors duration-200"
       data-testid="stop-button"
       onClick={(event) => {
         event.preventDefault();

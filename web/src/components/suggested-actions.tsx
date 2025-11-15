@@ -1,10 +1,10 @@
 "use client";
 
+import { Suggestion } from "@/components/ai-elements/suggestion";
+import type { ChatMessage } from "@/lib/types";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import { motion } from "framer-motion";
 import { memo } from "react";
-import type { ChatMessage } from "@/lib/types";
-import { Suggestion } from "@/components/ai-elements/suggestion";
 import type { VisibilityType } from "./visibility-selector";
 
 type SuggestedActionsProps = {
@@ -35,7 +35,7 @@ function PureSuggestedActions({ chatId, sendMessage }: SuggestedActionsProps) {
           transition={{ delay: 0.05 * index }}
         >
           <Suggestion
-            className="h-auto w-full whitespace-normal p-3 text-left"
+            className="h-auto w-full p-3 text-left whitespace-normal"
             onClick={(suggestion) => {
               window.history.replaceState({}, "", `/chat/${chatId}`);
               sendMessage({
@@ -64,5 +64,5 @@ export const SuggestedActions = memo(
     }
 
     return true;
-  }
+  },
 );

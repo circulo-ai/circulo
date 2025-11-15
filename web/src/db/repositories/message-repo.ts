@@ -20,7 +20,7 @@ const messageRepoFactory = makeRepo(
       });
     },
   }),
-  { primaryKey: "id" }
+  { primaryKey: "id" },
 );
 
 export const messageRepo = messageRepoFactory.with(db);

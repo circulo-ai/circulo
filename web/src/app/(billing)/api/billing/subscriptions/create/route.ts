@@ -1,13 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
 import { getSession } from "@/lib/auth";
 import { SubscriptionManager } from "@/lib/billing/subscription-manager";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 const createSubscriptionSchema = z.object({
   planSlug: z.string().min(1),
-  provider: z.enum(['changelly']).default('changelly'),
+  provider: z.enum(["changelly"]).default("changelly"),
 });
 
 export async function POST(req: NextRequest) {
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     const userId = session?.user.id;
 
     if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await req.json();
@@ -24,8 +24,8 @@ export async function POST(req: NextRequest) {
 
     if (!validation.success) {
       return NextResponse.json(
-        { error: 'Invalid request', details: validation.error.issues },
-        { status: 400 }
+        { error: "Invalid request", details: validation.error.issues },
+        { status: 400 },
       );
     }
 
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     const result = await SubscriptionManager.createSubscription(
       userId,
       planSlug,
-      provider
+      provider,
     );
 
     return NextResponse.json({
@@ -43,18 +43,15 @@ export async function POST(req: NextRequest) {
       invoiceId: result.invoice?.invoice?.id,
     });
   } catch (error) {
-    console.error('Error creating subscription:', error);
+    console.error("Error creating subscription:", error);
 
     if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
     return NextResponse.json(
-      { error: 'Failed to create subscription' },
-      { status: 500 }
+      { error: "Failed to create subscription" },
+      { status: 500 },
     );
   }
 }

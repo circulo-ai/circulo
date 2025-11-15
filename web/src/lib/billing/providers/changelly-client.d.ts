@@ -4,4026 +4,4473 @@
  */
 
 export interface paths {
-    "/currencies": {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get currencies
-         * @description Use it:
-         *     * to get the minimum payin amount
-         *     * to get supported currencies and networks
-         *
-         *     ⚠️ Do not strictly validate response fields to avoid immediate
-         *     failures each time we add a new field.
-         *
-         *     ℹ️ `minimum_payin_amount` pertains to payments that involve an exchange.
-         *     It represents the minimum amount required when a payment involves a
-         *     swap.
-         *
-         *     ℹ️ `minimum_direct_payin_amount` represents the minimum amount required
-         *     for payments that do not involve an exchange.
-         */
-        get: operations["getCurrencies"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/balances": {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get balances
-         * @description Returns balances for all available currencies including zero balances.
-         *
-         *     ⚠️ Do not strictly validate response fields to avoid immediate
-         *     failures each time we add a new field.
-         */
-        get: operations["getBalances"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/balances/{currency}": {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path: {
-                /** @description Currency code. */
-                currency: components["parameters"]["payments_pthCurrency"];
-            };
-            cookie?: never;
-        };
-        /**
-         * Get a balance
-         * @description ⚠️ Do not strictly validate response fields to avoid immediate
-         *     failures each time we add a new field.
-         */
-        get: operations["getBalance"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/swaps/rate": {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get the swap rate
-         * @description Returns an estimated or fixed swap rate.
-         *
-         *     Fixed swap rate (the one created with `fixed` equal `true`) is a promise
-         *     to swap on a returned rate within a `fixed_for` time period. To execute
-         *     a swap on a fixed rate, pass the exact amounts, rate and rate's ID
-         *     returned from this operation to the `POST /swaps/fixed` request.
-         *
-         *     ⚠️ This fixed rate can expire due to high price volatility.
-         *
-         *     ⚠️ Do not strictly validate response fields to avoid immediate
-         *     failures each time we add a new field.
-         */
-        get: operations["getSwapRate"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/swaps/now": {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Make a swap now
-         * @description Makes a swap without the fixed price.
-         *
-         *     ⚠️ Do not strictly validate response fields to avoid immediate failures
-         *     each time we add a new field.
-         *
-         *     ⚠️ `amount_from` or `amount_to` is required.
-         *
-         *     ⚠️ `amount_from` and `amount_to` are mutually exclusive.
-         */
-        post: operations["makeSwapNow"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/swaps/fixed": {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Make a fixed swap
-         * @description Makes a swap at fixed price.
-         *
-         *     ⚠️ Do not strictly validate response fields to avoid immediate failures
-         *     each time we add a new field.
-         *
-         *     ⚠️ `amount_from` or `amount_to` is required.
-         *
-         *     ⚠️ `amount_from` and `amount_to` are mutually exclusive.
-         */
-        post: operations["makeSwapFixed"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/swaps/{id}": {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get a swap
-         * @description Returns details of a swap.
-         *
-         *     ⚠️ Do not strictly validate response fields to avoid immediate failures
-         *     each time we add a new field.
-         */
-        get: operations["getSwap"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/addresses": {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get addresses
-         * @description Returns the list of allocated static addresses.
-         *
-         *     ⚠️ Do not strictly validate response fields to avoid immediate
-         *     failures each time we add a new field.
-         */
-        get: operations["getAddresses"];
-        put?: never;
-        /**
-         * Allocate an address
-         * @description Returns a static deposit address for a given combination of currency,
-         *     network, and customer.
-         *
-         *     ⚠️ Before allocating a static address, read
-         *     [Payments to Static Addresses](#section/Types-of-Payments/Payments-to-Static-Addresses).
-         *
-         *     ⚠️ Do not strictly validate response fields to avoid immediate
-         *     failures each time we add a new field.
-         *
-         *     ℹ️ If the existing address was de-allocated, allocates a new one.
-         */
-        post: operations["allocateAddress"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/addresses/{address_id}": {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path: {
-                address_id: components["parameters"]["payments_pthAddressId"];
-            };
-            cookie?: never;
-        };
-        /**
-         * Get an address
-         * @description Returns an allocated static deposit address.
-         *
-         *     ⚠️ Do not strictly validate response fields to avoid immediate
-         *     failures each time we add a new field.
-         */
-        get: operations["getAddress"];
-        put?: never;
-        post?: never;
-        /**
-         * Delete an address
-         * @description De-allocates a static deposit address.
-         *
-         *     ⚠️ Do not strictly validate response fields to avoid immediate
-         *     failures each time we add a new field.
-         */
-        delete: operations["deleteAddress"];
-        options?: never;
-        head?: never;
-        /**
-         * Update an address
-         * @description Updates an allocated static deposit address.
-         *
-         *     ⚠️ Do not strictly validate response fields to avoid immediate
-         *     failures each time we add a new field.
-         */
-        patch: operations["updateAddress"];
-        trace?: never;
-    };
-    "/withdrawals/amounts/calc": {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Estimate the amount
-         * @description Calculates estimated withdrawal amount, fees, and the exchange rate.
-         *
-         *     ⚠️ Do not strictly validate response fields to avoid immediate
-         *     failures each time we add a new field.
-         *
-         *     ⚠️  `receive`, `credit`, and `nominal_receive` parameters are
-         *     mutually exclusive.
-         *
-         *     ℹ️ Provide `receive_currency` and `receive` to calculate the amount
-         *     reduced by fees and denominated in target currency.
-         *
-         *     ℹ️ Provide `credit_currency` and `credit` to calculate the amount that
-         *     includes fees and denominated in holding currency.
-         *
-         *     ℹ️ Provide `nominal_receive_currency` and `nominal_receive` to calculate
-         *     the amount reduced by fees and denominated in fiat.
-         */
-        post: operations["calcAmounts"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/withdrawals": {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Create a withdrawal
-         * @description ⚠️ Do not strictly validate response fields to avoid immediate
-         *     failures each time we add a new field.
-         */
-        post: operations["createWithdrawal"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/withdrawals/{txn_id}": {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path: {
-                txn_id: components["parameters"]["payments_pthTxnId"];
-            };
-            cookie?: never;
-        };
-        /**
-         * Get a withdrawal
-         * @description ⚠️ Do not strictly validate response fields to avoid immediate
-         *     failures each time we add a new field.
-         */
-        get: operations["getWithdrawal"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/withdrawals/{txn_id}/callback": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                txn_id: components["parameters"]["payments_pthTxnId"];
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Send a withdrawal callback
-         * @description Triggers sending a callback notification with the withdrawal status.
-         *
-         *     ⚠️ Do not strictly validate response fields to avoid immediate
-         *     failures each time we add a new field.
-         *
-         *     ℹ️ An owner or a team member with the necessary roles can resend through
-         *     the dashboard.
-         */
-        post: operations["sendWithdrawalCallback"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/payments": {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Create a payment
-         * @description Initiates a new payment.
-         *
-         *     ⚠️ Do not strictly validate response fields to avoid immediate
-         *     failures each time we add a new field.
-         *
-         *     ⚠️ To create an invoice, provide `nominal_amount`, and omit it for
-         *     creating a deposit.
-         *
-         *     ⚠️ To make a payin inside a deposit, the customer must follow the
-         *     `payment_url` and send crypto to a new address each time.
-         *
-         *     ⚠️ To send crypto to the same address several times, allocate a static
-         *     deposit address by calling `POST /api/v1/payment/addresses` instead of
-         *     this call.
-         *
-         *     ℹ️ Provide `payment_method` to determine the payment method right away
-         *     and trigger allocation of a new deposit address.
-         */
-        post: operations["createPayment"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/payments/{payment_id}": {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path: {
-                /**
-                 * @description Payment ID.
-                 * @example 80036de2-7aef-4aaf-9205-992647ff730a
-                 */
-                payment_id: components["parameters"]["payments_pthPaymentId"];
-            };
-            cookie?: never;
-        };
-        /**
-         * Get a payment
-         * @description ⚠️ Do not strictly validate response fields to avoid immediate
-         *     failures each time we add a new field.
-         */
-        get: operations["getPayment"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Update a payment
-         * @description ⚠️ Do not strictly validate response fields to avoid immediate
-         *     failures each time we add a new field.
-         */
-        patch: operations["updatePayment"];
-        trace?: never;
-    };
-    "/payments/{payment_id}/payment_methods": {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path: {
-                /**
-                 * @description Payment ID.
-                 * @example 80036de2-7aef-4aaf-9205-992647ff730a
-                 */
-                payment_id: components["parameters"]["payments_pthPaymentId"];
-            };
-            cookie?: never;
-        };
-        /**
-         * Get payment methods
-         * @description Returns a list of payment methods available for a payment.
-         *
-         *     ⚠️ Do not strictly validate response fields to avoid immediate
-         *     failures each time we add a new field.
-         */
-        get: operations["getPaymentMethods"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/payments/payment_methods/calc": {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Calculate payment method amounts
-         * @description Returns needed amount in nominal currency given provided payin currency,
-         *     network, and amount.
-         *
-         *     ⚠️ Do not strictly validate response fields to avoid immediate
-         *     failures each time we add a new field.
-         *
-         *     ℹ️ Provides all data available on `payment_url` to that be handled on
-         *     the merchant frontend.
-         */
-        post: operations["calcPaymentMethodAmounts"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/payments/{payment_id}/payment_methods/{currency}": {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path: {
-                /**
-                 * @description Payment ID.
-                 * @example 80036de2-7aef-4aaf-9205-992647ff730a
-                 */
-                payment_id: components["parameters"]["payments_pthPaymentId"];
-                /** @description Currency code. */
-                currency: components["parameters"]["payments_pthCurrency"];
-            };
-            cookie?: never;
-        };
-        /**
-         * Get expected amount
-         * @description Returns an expected amount of the payment given the fees.
-         *
-         *     ⚠️ Do not strictly validate response fields to avoid immediate failures
-         *     each time we add a new field.
-         */
-        get: operations["getPaymentMethodsAmounts"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/payments/{payment_id}/selected_payment_method": {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path: {
-                /**
-                 * @description Payment ID.
-                 * @example 80036de2-7aef-4aaf-9205-992647ff730a
-                 */
-                payment_id: components["parameters"]["payments_pthPaymentId"];
-            };
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Set payment method
-         * @description Sets the payment method for a payment.
-         *
-         *     ⚠️ Do not strictly validate response fields to avoid immediate
-         *     failures each time we add a new field.
-         */
-        put: operations["updatePaymentMethod"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/payments/{payment_id}/callback": {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path: {
-                /**
-                 * @description Payment ID.
-                 * @example 80036de2-7aef-4aaf-9205-992647ff730a
-                 */
-                payment_id: components["parameters"]["payments_pthPaymentId"];
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Send a payment callback
-         * @description Triggers sending a callback notification with the payment status.
-         *
-         *     ⚠️ Do not strictly validate response fields to avoid immediate
-         *     failures each time we add a new field.
-         *
-         *     ℹ️ An owner or a team member with the necessary roles can resend through
-         *     the dashboard.
-         */
-        post: operations["sendPaymentCallback"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-}
-export interface webhooks {
-    "/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Callback notification
-         * @description Incoming POST request containing a payment/withdrawal notification.
-         *
-         *     ⚠️ Do not strictly validate request fields to avoid immediate failures
-         *     each time we add a new field.
-         *
-         *     ℹ️ Processing of this incoming request must be implemented on the
-         *     merchant's server side.
-         *
-         *     ℹ️ To receive callbacks, provide the URL in the cabinet.
-         */
-        post: operations["callback"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-}
-export interface components {
-    schemas: {
-        /**
-         * Signature
-         * @description Signature of a call passed to the receiver for verification of the call
-         *     origin.
-         */
-        payments_schSignature: string;
-        /** Code */
-        payments_schCode: string;
-        /**
-         * Network code
-         * @description Network code.
-         * @example ETH
-         */
-        "payments_schCode-Network": components["schemas"]["payments_schCode"];
-        /**
-         * Network name
-         * @description Network name.
-         * @example Ethereum
-         */
-        "payments_schName-Network": string;
-        /**
-         * Currency code
-         * @description Currency code.
-         * @example USDT
-         */
-        "payments_schCode-Currency": components["schemas"]["payments_schCode"];
-        /**
-         * Name
-         * @description Currency name.
-         * @example Tether
-         */
-        "payments_schName-Currency": string;
-        /**
-         * Amount
-         * @description Amount.
-         *
-         *     Format: decimal
-         * @example 14.08
-         */
-        payments_schAmount: string;
-        /** Network code */
-        "payments_ptyCode-Network": {
-            code?: components["schemas"]["payments_schCode-Network"];
-        };
-        /** Network name */
-        "payments_ptyName-Network": {
-            name?: components["schemas"]["payments_schName-Network"];
-        };
-        /** Currency code */
-        "payments_ptyCode-Currency": {
-            code?: components["schemas"]["payments_schCode-Currency"];
-        };
-        /** Currency name */
-        "payments_ptyName-Currency": {
-            name?: components["schemas"]["payments_schName-Currency"];
-        };
-        /**
-         * Precision
-         * Format: uint64
-         * @description The number of digits after the dot.
-         * @example 8
-         */
-        payments_schPrecision: number;
-        /** Precision */
-        payments_ptyPrecision: {
-            precision?: components["schemas"]["payments_schPrecision"];
-        };
-        /**
-         * Currency to
-         * @description Target currency.
-         * @example BTC
-         */
-        "payments_schCode-Currency-To": components["schemas"]["payments_schCode-Currency"];
-        /** Swappable to */
-        payments_ptySwappableTo: {
-            swappable_to?: components["schemas"]["payments_schCode-Currency-To"][];
-        };
-        /**
-         * Protocol
-         * @description The protocol or the standard powering the network.
-         * @example ERC20
-         */
-        payments_schProtocol: string;
-        /** Protocol */
-        payments_ptyProtocol: {
-            protocol?: components["schemas"]["payments_schProtocol"];
-        };
-        /**
-         * Address regex
-         * @description Regular expression for a deposit address.
-         * @example ^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,39}$
-         */
-        payments_schAddressRegex: string;
-        /** Address regex */
-        payments_ptyAddressRegex: {
-            address_regex?: components["schemas"]["payments_schAddressRegex"];
-        };
-        /**
-         * Address tag regex
-         * @description Regular expression for `address_tag`.
-         * @example ^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,39}$
-         */
-        payments_schAddressTagRegex: string;
-        /** Address tag regex */
-        payments_ptyAddressTagRegex: {
-            address_tag_regex?: components["schemas"]["payments_schAddressTagRegex"];
-        };
-        /** Networks */
-        payments_schNetworks: components["schemas"]["payments_ptyCode-Network"] & components["schemas"]["payments_ptyName-Network"] & components["schemas"]["payments_ptyProtocol"] & components["schemas"]["payments_ptyPrecision"] & components["schemas"]["payments_ptyPayinEnabled"] & components["schemas"]["payments_ptyPayoutEnabled"] & components["schemas"]["payments_ptyMinimumDirectPayinAmount"] & components["schemas"]["payments_ptyAddressRegex"] & components["schemas"]["payments_ptyAddressTagName"] & components["schemas"]["payments_ptyAddressTagRegex"] & components["schemas"]["payments_ptyCryptoExplorer"] & unknown & {
-            /**
-             * @description Minimum payin amount.
-             *
-             *     ℹ️ If swaps are needed, equals to the sum of
-             *     `minimum_direct_payin_amount` and `minimum_swap_amount`.
-             *
-             *     Format: decimal
-             */
-            minimum_payin_amount?: components["schemas"]["payments_schMinimumPayinAmount"];
-        };
-        /** Networks */
-        payments_ptyNetworks: {
-            /** @description Networks supporting the currency. */
-            networks?: components["schemas"]["payments_schNetworks"][];
-        };
-        /**
-         * Crypto
-         * @description Flag indicating whether the currency is a cryptocurrency.
-         */
-        payments_schCrypto: boolean;
-        /** Crypto */
-        payments_ptyCrypto: {
-            crypto?: components["schemas"]["payments_schCrypto"];
-        };
-        /** Minimum swap amount */
-        payments_ptyMinimumSwapAmount: {
-            /**
-             * @description Minimum swap amount.
-             *
-             *     ⚠️ Applied if nominal and holding currencies are different.
-             *
-             *     Format: decimal
-             * @example 0.00001494652018679495
-             */
-            minimum_swap_amount?: components["schemas"]["payments_schAmount"];
-        };
-        /**
-         * Minimum payin amount
-         * @description Minimum payin amount.
-         *
-         *     Format: decimal
-         * @example 0.00004244652018679495
-         */
-        payments_schMinimumPayinAmount: components["schemas"]["payments_schAmount"];
-        /** Minimum payin amount */
-        payments_ptyMinimumPayinAmount: {
-            minimum_payin_amount?: components["schemas"]["payments_schMinimumPayinAmount"];
-        };
-        /** Minimum direct payin amount */
-        payments_ptyMinimumDirectPayinAmount: {
-            minimum_direct_payin_amount?: components["schemas"]["payments_schMinimumDirectPayinAmount"];
-        };
-        /**
-         * Minimum direct payin amount
-         * @description Minimum payin amount considering network fees.
-         * @example 0.0000275
-         */
-        payments_schMinimumDirectPayinAmount: string & components["schemas"]["payments_schAmount"];
-        /**
-         * Priority
-         * @description The absolute position of the currency in the currency list.
-         * @example 1
-         */
-        payments_schPriority: number;
-        /** Priority */
-        payments_ptyPriority: {
-            priority?: components["schemas"]["payments_schPriority"];
-        };
-        /**
-         * Crypto explorer
-         * Format: url
-         * @description The link to the currency explorer with `{tx}` placeholder for a hash.
-         * @example http://omniexplorer.info/lookuptx.aspx?txid={tx}
-         */
-        payments_schCryptoExplorer: string;
-        /** Crypto explorer */
-        payments_ptyCryptoExplorer: {
-            crypto_explorer?: components["schemas"]["payments_schCryptoExplorer"];
-        };
-        /**
-         * Payin enabled
-         * @description Flag indicating generating deposit addresses is allowed for the
-         *     currency.
-         */
-        payments_schPayinEnabled: boolean;
-        /** Payin enabled */
-        payments_ptyPayinEnabled: {
-            payin_enabled?: components["schemas"]["payments_schPayinEnabled"];
-        };
-        /** Payout enabled */
-        payments_ptyPayoutEnabled: {
-            /** @description Flag indicating withdrawals are allowed for the currency. */
-            payout_enabled?: boolean;
-        };
-        /**
-         * Address tag name
-         * @description The name of the auxiliary identifier used in the network for
-         *     identification of the receiver.
-         * @example Memo
-         */
-        payments_schAddressTagName: string;
-        /** Address tag name */
-        payments_ptyAddressTagName: {
-            address_tag_name?: components["schemas"]["payments_schAddressTagName"];
-        };
-        /** Currency */
-        payments_resCurrency: components["schemas"]["payments_ptyCode-Currency"] & components["schemas"]["payments_ptyName-Currency"] & components["schemas"]["payments_ptyCrypto"] & components["schemas"]["payments_ptyPrecision"] & components["schemas"]["payments_ptyPriority"] & components["schemas"]["payments_ptyAddressTagName"] & components["schemas"]["payments_ptyCryptoExplorer"] & components["schemas"]["payments_ptyNetworks"] & components["schemas"]["payments_ptySwappableTo"] & components["schemas"]["payments_ptyPayinEnabled"] & components["schemas"]["payments_ptyPayoutEnabled"] & components["schemas"]["payments_ptyMinimumSwapAmount"] & unknown & {
-            /**
-             * @description Minimum payin amount.
-             *
-             *     ℹ️ If swaps are needed, equals to the sum of
-             *     `minimum_direct_payin_amount` and `minimum_swap_amount`.
-             */
-            minimum_payin_amount?: components["schemas"]["payments_schMinimumPayinAmount"];
-            /** @description Maximum `minimum_direct_payin_amount` among all networks. */
-            minimum_direct_payin_amount?: components["schemas"]["payments_schMinimumDirectPayinAmount"];
-        };
-        /** Currency */
-        payments_ptyCurrency: {
-            currency?: components["schemas"]["payments_schCode-Currency"];
-        };
-        /** Network */
-        payments_ptyNetwork: {
-            network?: components["schemas"]["payments_schCode-Network"];
-        };
-        /** Fiat equivalent currency */
-        payments_ptyFiatEquivalentCurrency: {
-            /**
-             * @description Fiat currency code.
-             * @example USD
-             */
-            fiat_equivalent_currency?: components["schemas"]["payments_schCode-Currency"];
-        };
-        /** Fiat equivalent amount */
-        payments_ptyFiatEquivalentAmount: {
-            /** @description Balance expressed in fiat. */
-            fiat_equivalent_amount?: components["schemas"]["payments_schAmount"];
-        };
-        /** Balance response */
-        payments_resBalance: components["schemas"]["payments_ptyCurrency"] & components["schemas"]["payments_ptyFiatEquivalentCurrency"] & components["schemas"]["payments_ptyFiatEquivalentAmount"] & unknown & {
-            /**
-             * @description Balance.
-             *
-             *     Format: decimal
-             */
-            amount?: components["schemas"]["payments_schAmount"];
-        };
-        /**
-         * Currency from
-         * @description Source currency.
-         */
-        payments_schCurrencyFrom: components["schemas"]["payments_schCode-Currency"];
-        /** Currency from */
-        payments_ptyCurrencyFrom: {
-            currency_from?: components["schemas"]["payments_schCurrencyFrom"];
-        };
-        /** Currency to */
-        payments_ptyCurrencyTo: {
-            currency_to?: components["schemas"]["payments_schCode-Currency-To"];
-        };
-        /**
-         * Amount from
-         * @description Amount in source currency.
-         * @example 2.37
-         */
-        payments_schAmountFrom: components["schemas"]["payments_schAmount"];
-        /** Amount from */
-        payments_ptyAmountFrom: {
-            amount_from?: components["schemas"]["payments_schAmountFrom"];
-        };
-        /**
-         * Amount to
-         * @description Estimated amount in target currency.
-         * @example 0.00007
-         */
-        payments_schAmountTo: components["schemas"]["payments_schAmount"];
-        /** Amount to */
-        payments_ptyAmountTo: {
-            amount_to?: components["schemas"]["payments_schAmountTo"];
-        };
-        /** Rate */
-        payments_ptyRate: {
-            rate?: components["schemas"]["payments_schRate"];
-        };
-        /** Fixed for */
-        payments_ptyFixedFor: {
-            /**
-             * @description For how long in seconds the rate is fixed.
-             * @example 120
-             */
-            fixed_for?: number;
-        };
-        /** Swap rate */
-        payments_resSwapRate: components["schemas"]["payments_ptyCurrencyFrom"] & components["schemas"]["payments_ptyCurrencyTo"] & components["schemas"]["payments_ptyAmountFrom"] & components["schemas"]["payments_ptyAmountTo"] & components["schemas"]["payments_ptyRate"] & components["schemas"]["payments_ptyFixedFor"] & unknown & {
-            id?: components["schemas"]["payments_schRateId"];
-        };
-        /** Make swap now request */
-        payments_reqMakeSwapNow: components["schemas"]["payments_ptyCurrencyFrom"] & components["schemas"]["payments_ptyCurrencyTo"] & components["schemas"]["payments_ptyAmountFrom"] & components["schemas"]["payments_ptyAmountTo"] & unknown;
-        /**
-         * Rate ID
-         * Format: uuid
-         * @description Swap rate UUID.
-         * @example 58380c1e-60e7-4d81-85ad-1867151641b2
-         */
-        payments_schRateId: string;
-        /** Rate ID */
-        payments_ptyRateId: {
-            rate_id?: components["schemas"]["payments_schRateId"];
-        };
-        /** Make swap fixed */
-        payments_reqMakeSwapFixed: components["schemas"]["payments_ptyCurrencyFrom"] & components["schemas"]["payments_ptyCurrencyTo"] & components["schemas"]["payments_ptyAmountFrom"] & components["schemas"]["payments_ptyAmountTo"] & components["schemas"]["payments_ptyRate"] & components["schemas"]["payments_ptyRateId"] & unknown;
-        /**
-         * Swap ID
-         * @description Swap ID.
-         * @example 7189236
-         */
-        "payments_schId-Swaps": string;
-        /** Swap ID */
-        "payments_ptyId-Swaps": {
-            id?: components["schemas"]["payments_schId-Swaps"];
-        };
-        /**
-         * Swap status
-         * @description Swap status.
-         * @enum {string}
-         */
-        "payments_schStatus-Swaps": "PENDING" | "COMPLETED" | "FAILED" | "ROLLED_BACK";
-        /** Swap status */
-        "payments_ptyStatus-Swaps": {
-            status?: components["schemas"]["payments_schStatus-Swaps"];
-        };
-        /** Swap */
-        payments_resSwap: components["schemas"]["payments_ptyId-Swaps"] & components["schemas"]["payments_ptyCurrencyFrom"] & components["schemas"]["payments_ptyCurrencyTo"] & components["schemas"]["payments_ptyAmountFrom"] & components["schemas"]["payments_ptyAmountTo"] & components["schemas"]["payments_ptyRate"] & components["schemas"]["payments_ptyStatus-Swaps"] & unknown;
-        /**
-         * Timestamp
-         * Format: date-time
-         * @example 2023-03-22T15:23:56.876Z
-         */
-        payments_schTimestamp: string;
-        /**
-         * Cursor
-         * @description Pointer to an adjacent result page if any.
-         * @example MjAyMy0xMC0xOFQxMTo1ODowOS41OTRaXzA4MzQ2NDhhLWI5YzktNDIwOC1iMzQ2LWUzNjY3NDcwYzIzN19mYWxzZQ==
-         */
-        payments_schCursor: string;
-        /** Cursors */
-        payments_resCursors: {
-            cursor_next?: components["schemas"]["payments_schCursor"];
-            cursor_prev?: components["schemas"]["payments_schCursor"];
-        };
-        /**
-         * Address
-         * @description Deposit address.
-         * @example 0xb794f5ea0ba39494ce839613fffba74279579268
-         */
-        payments_schAddress: string;
-        /**
-         * Address tag
-         * @description Address tag value.
-         * @example 33672098-c31e-4790-b4ed-27fd48638a3e
-         */
-        payments_schAddressTag: string;
-        /**
-         * Address ID
-         * Format: uuid
-         * @description Static deposit address UUID.
-         * @example 75bca384-cf5e-4afb-b1d8-ba488b03bf1e
-         */
-        payments_schAddressId: string;
-        /** Address */
-        payments_ptyAddress: {
-            address?: components["schemas"]["payments_schAddress"];
-        };
-        /** Address tag */
-        payments_ptyAddressTag: {
-            address_tag?: components["schemas"]["payments_schAddressTag"];
-        };
-        /** Payins enabled */
-        payments_ptyPayinsEnabled: {
-            payins_enabled?: components["schemas"]["payments_schPayinEnabled"];
-        };
-        /**
-         * Origin
-         * @description Flag indicating the way the address was created.
-         * @enum {string}
-         */
-        payments_schOrigin: "API" | "Cabinet";
-        /** Origin */
-        payments_ptyOrigin: {
-            origin?: components["schemas"]["payments_schOrigin"];
-        };
-        /** Address response */
-        payments_resAddress: components["schemas"]["payments_ptyProjectId"] & components["schemas"]["payments_ptyCurrency"] & components["schemas"]["payments_ptyNetwork"] & components["schemas"]["payments_ptyAddress"] & components["schemas"]["payments_ptyAddressTag"] & components["schemas"]["payments_ptyPayinsEnabled"] & components["schemas"]["payments_ptyMinimumPayinAmount"] & components["schemas"]["payments_ptyNominalCurrency"] & components["schemas"]["payments_ptyFeesPayer"] & components["schemas"]["payments_ptyCustomerId"] & components["schemas"]["payments_ptyCustomerEmail"] & components["schemas"]["payments_ptyPaymentData"] & components["schemas"]["payments_ptyOrigin"] & components["schemas"]["payments_ptyNewAddressGenerated"] & components["schemas"]["payments_ptyCustomerIpAddress"] & components["schemas"]["payments_ptyCustomerReferrerDomain"] & unknown & {
-            id?: components["schemas"]["payments_schAddressId"];
-            /** @description Date and time of the creation. */
-            created_at?: components["schemas"]["payments_schTimestamp"];
-            /** @description Date and time of the last update. */
-            updated_at?: components["schemas"]["payments_schTimestamp"];
-        };
-        /**
-         * New address generated
-         * @description Flag indicating if customer deposit address was replaced with a new one.
-         */
-        payments_schNewAddressGenerated: boolean;
-        /** New address generated */
-        payments_ptyNewAddressGenerated: {
-            new_address_generated?: components["schemas"]["payments_schNewAddressGenerated"];
-        };
-        /** Create address request */
-        payments_reqAllocateAddress: components["schemas"]["payments_ptyCurrency"] & components["schemas"]["payments_ptyNetwork"] & components["schemas"]["payments_ptyNominalCurrency"] & components["schemas"]["payments_ptyFeesPayer"] & components["schemas"]["payments_ptyCustomerId"] & components["schemas"]["payments_ptyCustomerEmail"] & components["schemas"]["payments_ptyPaymentData"] & components["schemas"]["payments_ptyCustomerIpAddress"] & components["schemas"]["payments_ptyCustomerReferrerDomain"] & unknown;
-        /** Update address request */
-        payments_reqUpdateAddress: components["schemas"]["payments_ptyCustomerId"] & components["schemas"]["payments_ptyCustomerEmail"] & components["schemas"]["payments_ptyPaymentData"] & components["schemas"]["payments_ptyFeesPayer"] & components["schemas"]["payments_ptyCustomerIpAddress"] & components["schemas"]["payments_ptyCustomerReferrerDomain"] & {
-            payment_data?: components["schemas"]["payments_schData"] | null;
-            nominal_currency?: components["schemas"]["payments_schNominalCurrency"] | null;
-            fees_payer?: components["schemas"]["payments_schFeesPayer"] | null;
-        } & unknown;
-        /** Receive network */
-        payments_ptyReceiveNetwork: {
-            receive_network?: components["schemas"]["payments_schCode-Network"];
-        };
-        payments_reqCalcAmounts: components["schemas"]["payments_reqCalcAmounts-Receive"] | components["schemas"]["payments_reqCalcAmounts-Credit"] | components["schemas"]["payments_reqCalcAmounts-Nominal"];
-        /** Receive currency */
-        payments_ptyReceiveCurrency: {
-            /** @description The currency credited to the merchant as the result of a withdrawal. */
-            receive_currency?: components["schemas"]["payments_schCode-Currency-To"];
-        };
-        /** Credit currency */
-        payments_ptyCreditCurrency: {
-            /** @description The holding currency. */
-            credit_currency?: components["schemas"]["payments_schCode-Currency"];
-        };
-        /** Nominal receive currency */
-        payments_ptyNominalReceiveCurrency: {
-            /**
-             * @description A fiat currency that denominates crypto the merchant receives as the
-             *     result of a withdrawal.
-             * @example USD
-             */
-            nominal_receive_currency?: components["schemas"]["payments_schCode-Currency-To"];
-        };
-        /** Receive currency */
-        "payments_reqCalcAmounts-Receive": components["schemas"]["payments_ptyReceiveCurrency"] & components["schemas"]["payments_ptyCreditCurrency"] & components["schemas"]["payments_ptyNominalReceiveCurrency"] & components["schemas"]["payments_ptyReceiveNetwork"] & unknown & {
-            amount?: {
-                /**
-                 * @description The amount of crypto the merchant must receive as the result
-                 *     of a withdrawals (fees not included).
-                 *
-                 *     Format: decimal
-                 */
-                receive: components["schemas"]["payments_schAmountTo"];
-            };
-        };
-        /** Credit currency */
-        "payments_reqCalcAmounts-Credit": components["schemas"]["payments_ptyReceiveCurrency"] & components["schemas"]["payments_ptyCreditCurrency"] & components["schemas"]["payments_ptyNominalReceiveCurrency"] & components["schemas"]["payments_ptyReceiveNetwork"] & unknown & {
-            amount?: {
-                /**
-                 * @description The amount of crypto the merchant withdraws from the holding
-                 *     account (fees included).
-                 *
-                 *     Format: decimal
-                 */
-                credit: components["schemas"]["payments_schAmount"];
-            };
-        };
-        /** Nominal receive currency */
-        "payments_reqCalcAmounts-Nominal": components["schemas"]["payments_ptyReceiveCurrency"] & components["schemas"]["payments_ptyCreditCurrency"] & components["schemas"]["payments_ptyNominalReceiveCurrency"] & components["schemas"]["payments_ptyReceiveNetwork"] & unknown & {
-            amount?: {
-                /**
-                 * @description The amount of fiat the merchant must receive as the
-                 *     result of a withdrawals (fees not included).
-                 *
-                 *     Format: decimal
-                 */
-                nominal_receive: components["schemas"]["payments_schAmount"];
-            };
-        };
-        /** Credit amount */
-        payments_ptyCreditAmount: {
-            /**
-             * @description The amount of crypto the merchant withdraws from the
-             *     holding account (fees included).
-             *
-             *     Format: decimal
-             */
-            credit_amount?: components["schemas"]["payments_schAmount"];
-        };
-        /** Receive amount */
-        payments_ptyReceiveAmount: {
-            /**
-             * @description The amount of crypto the merchant must receive as the result of
-             *     a withdrawals (fees not included).
-             *
-             *     Format: decimal
-             */
-            receive_amount?: components["schemas"]["payments_schAmountTo"];
-        };
-        /** Swap rate */
-        payments_ptySwapRate: {
-            swap_rate?: components["schemas"]["payments_schRate"];
-        };
-        /** Fee */
-        payments_ptyFee: {
-            /**
-             * @description Withdrawal fee amount.
-             *
-             *     Format: decimal
-             * @example 0.14
-             */
-            fee?: string;
-        };
-        /** Amounts */
-        payments_resCalcAmounts: components["schemas"]["payments_ptyCreditAmount"] & components["schemas"]["payments_ptyReceiveAmount"] & components["schemas"]["payments_ptySwapRate"] & components["schemas"]["payments_ptyFee"] & unknown;
-        /** Idempotency key */
-        payments_ptyIdempotencyKey: {
-            /**
-             * @description A unique arbitrary key identifying the request used for avoiding
-             *     repeated operations (maintain idempotency).
-             * @example 3f29dcb7-6b33-4fa6-9e37-b262d4810f31
-             */
-            idempotency_key?: string;
-        };
-        /** Create withdrawal request */
-        payments_reqCreateWithdrawal: components["schemas"]["payments_reqCalcAmounts"] & components["schemas"]["payments_ptyOrderId"] & components["schemas"]["payments_ptyAddress"] & components["schemas"]["payments_ptyAddressTag"] & components["schemas"]["payments_ptyCustomerIpAddress"] & components["schemas"]["payments_ptyCustomerReferrerDomain"] & components["schemas"]["payments_ptyIdempotencyKey"] & components["schemas"]["payments_ptyNote"] & unknown;
-        /**
-         * Transaction ID
-         * Format: uuid
-         * @description Transaction UUID.
-         * @example f4505800-772e-4502-88ed-48b1f9585070
-         */
-        payments_schTxnId: string;
-        /**
-         * State
-         * @description Withdrawal state.
-         *
-         *     Values:
-         *     * `PENDING`—a transaction has been created and either waiting to be sent
-         *       to the blockchain or has been sent to the blockchain and gains
-         *       confirmations;
-         *     * `CANCELED`—the transaction has been rolled back;
-         *     * `FAILED`—transaction has failed before being created or on latest
-         *       stages;
-         *     * `SUCCESS`—transaction has been successfully completed.
-         * @enum {string}
-         */
-        "payments_schState-Withdrawal": "PENDING" | "SUCCESS" | "CANCELED" | "FAILED";
-        /** State */
-        "payments_ptyState-Withdrawal": {
-            state?: components["schemas"]["payments_schState-Withdrawal"];
-        };
-        /**
-         * Hash
-         * @description Network transaction hash.
-         * @example 0xfb0ba568213d11230cd34d62fddd1cc1fe11fdc173l4f2007b0e47a06ad73d20
-         */
-        payments_schHash: string;
-        /** Hash */
-        payments_ptyHash: {
-            hash?: components["schemas"]["payments_schHash"];
-        };
-        /** Withdrawal ID */
-        "payments_ptyId-Withdrawals": {
-            id?: components["schemas"]["payments_schTxnId"];
-        };
-        /**
-         * Payout UUID
-         * @description UUID of the payout corresponding to this withdrawal.
-         * @example a0cdbe86-f568-4b7d-a696-8c31effe10b1
-         */
-        payments_schPayoutTxnTd: components["schemas"]["payments_schTxnId"];
-        /** Payout UUID */
-        payments_ptyPayoutTxnTd: {
-            payout_txn_id?: components["schemas"]["payments_schPayoutTxnTd"];
-        };
-        /** Canceled by */
-        payments_schCanceledBy: {
-            /**
-             * Format: uuid
-             * @description Cabinet user UUID.
-             */
-            id: string;
-            /** @description Cabinet user name */
-            name: string;
-            /**
-             * Format: email
-             * @description Cabinet user email.
-             */
-            email: string;
-        };
-        /** Note */
-        payments_ptyNote: {
-            /** @description Withdrawal text comment. */
-            note?: string;
-        };
-        /** withdrawal response */
-        payments_resWithdrawal: components["schemas"]["payments_resCalcAmounts"] & components["schemas"]["payments_ptyId-Withdrawals"] & components["schemas"]["payments_ptyAddress"] & components["schemas"]["payments_ptyState-Withdrawal"] & components["schemas"]["payments_ptyAddressTag"] & components["schemas"]["payments_ptyReceiveCurrency"] & components["schemas"]["payments_ptyCreditCurrency"] & components["schemas"]["payments_ptyNominalReceiveCurrency"] & components["schemas"]["payments_ptyReceiveNetwork"] & components["schemas"]["payments_ptyIdempotencyKey"] & components["schemas"]["payments_ptyPayoutTxnTd"] & components["schemas"]["payments_ptyHash"] & components["schemas"]["payments_ptyOrderId"] & components["schemas"]["payments_ptyCustomerIpAddress"] & components["schemas"]["payments_ptyCustomerReferrerDomain"] & components["schemas"]["payments_ptyNote"] & components["schemas"]["payments_ptyError"] & unknown & {
-            /** @description Withdrawal created. */
-            created_at?: components["schemas"]["payments_schTimestamp"];
-            /** @description Transaction rolled back. */
-            canceled_at?: components["schemas"]["payments_schTimestamp"];
-            /** @description Identity of the cabinet user who canceled the withdrawal. */
-            canceled_by?: components["schemas"]["payments_schCanceledBy"];
-            /** @description Transaction sent to the blockchain. */
-            sent_at?: components["schemas"]["payments_schTimestamp"];
-            /** @description Transaction committed in the blockchain. */
-            committed_at?: components["schemas"]["payments_schTimestamp"];
-            /** @description Withdrawal status updated. */
-            updated_at?: components["schemas"]["payments_schTimestamp"];
-        };
-        /**
-         * @description Arbitrary metadata associated with the payment.
-         * @example {
-         *       "order_id": 221163,
-         *       "customer_phone": "+999999999"
-         *     }
-         */
-        payments_schData: {
-            [key: string]: unknown;
-        };
-        /**
-         * Customer ID
-         * @description Arbitrary customer ID.
-         * @example 24fc0740-c6c6-48d8-9735-6b5f42a350d4
-         */
-        payments_schCustomerId: string;
-        /** Customer ID */
-        payments_ptyCustomerId: {
-            customer_id?: components["schemas"]["payments_schCustomerId"];
-        };
-        /**
-         * Format: email
-         * @description Customer email.
-         * @example johndoe@example.com
-         */
-        payments_schCustomerEmail: string;
-        /** Customer email */
-        payments_ptyCustomerEmail: {
-            customer_email?: components["schemas"]["payments_schCustomerEmail"];
-        };
-        /** Order ID */
-        payments_ptyOrderId: {
-            /**
-             * @description Arbitrary operation ID generated of the merchant side.
-             * @example 34d3149b-8eb0-4898-971a-63464ae73f1e
-             */
-            order_id?: string;
-        };
-        /**
-         * Title
-         * @description Payment custom name shown to the customer.
-         * @example DBA
-         */
-        payments_schTitle: string;
-        /** Title */
-        payments_ptyTitle: {
-            title?: components["schemas"]["payments_schTitle"];
-        };
-        /**
-         * Description
-         * @description Payment custom description.
-         * @example Lorem ipsum dolor sit amet consectetur adipiscing elit...
-         */
-        payments_schDescription: string;
-        /** Description */
-        payments_ptyDescription: {
-            description?: components["schemas"]["payments_schDescription"];
-        };
-        /** Success redirect URL */
-        payments_ptySuccessRedirectUrl: {
-            /**
-             * Format: uri
-             * @description Link to the merchant page displayed to the customer in the case
-             *     of success.
-             * @example https://example.com/payment/success
-             */
-            success_redirect_url?: string;
-        };
-        /** Failure redirect URL */
-        payments_ptyFailureRedirectUrl: {
-            /**
-             * Format: uri
-             * @description Link to the merchant page displayed to the customer in the case
-             *     of failure.
-             * @example https://example.com/payment/failure
-             */
-            failure_redirect_url?: string;
-        };
-        /**
-         * Nominal currency
-         * @description The desired currency of payment.
-         *
-         *     ℹ️ This currency also denominates the amount specified in
-         *     `nominal_amount`.
-         * @example USDT
-         */
-        payments_schNominalCurrency: string;
-        /** Nominal currency */
-        payments_ptyNominalCurrency: {
-            nominal_currency?: components["schemas"]["payments_schNominalCurrency"];
-        };
-        /** Nominal amount */
-        payments_ptyNominalAmount: {
-            /**
-             * @description The desired amount of a payment.
-             *
-             *     ⚠️ A payment will not complete until this amount is sent by
-             *     the customer.
-             *
-             *     Format: decimal
-             */
-            nominal_amount?: components["schemas"]["payments_schAmount"];
-        };
-        /**
-         * Fees payer
-         * @description The party that pays fees.
-         *
-         *     Values:
-         *     * `MERCHANT`—the amount of payment is not affected by fees;
-         *     * `CUSTOMER`—the amount of a payment is reduced by fees.
-         * @enum {string}
-         */
-        payments_schFeesPayer: "MERCHANT" | "CUSTOMER";
-        /** Fees payer */
-        payments_ptyFeesPayer: {
-            fees_payer?: components["schemas"]["payments_schFeesPayer"];
-        };
-        /** Payment data */
-        payments_ptyPaymentData: {
-            payment_data?: components["schemas"]["payments_schData"];
-        };
-        /** Loss config */
-        payments_schLossConfig: {
-            /**
-             * @description Maximum allowed underpaid percent of `expected_payin_amount`.
-             *
-             *     Calculated as 1 - 'remaining_payin_amount' / `expected_payin_amount`
-             *     where 'remaining_payin_amount' is the minimal accepted amount.
-             *
-             *     Format: decimal fraction (0.01 stands for 1%)
-             */
-            relative?: number;
-            absolute?: {
-                /**
-                 * @description Currency that denominates the absolute underpayment threshold.
-                 *
-                 *     ℹ️ To propose a new currency, contact our support team.
-                 * @enum {unknown}
-                 */
-                currency: "USD" | "EUR" | "GBP" | "AUD" | "BRL" | "CAD" | "INR" | "RUB" | "TRY" | "UAH";
-                /**
-                 * @description Maximum allowed underpaid amount.
-                 *
-                 *     Format: decimal
-                 */
-                amount: components["schemas"]["payments_schAmount"];
-            };
-        };
-        /** Loss config */
-        payments_ptyLossConfig: {
-            /**
-             * @description ⚠️ If both `relative` and `absolute` are provided,
-             *     the lowest of two calculated amounts will be chosen.
-             *
-             *     ℹ️ If omitted, we apply underpayment settings from the cabinet; and
-             *     0%—if no settings submitted.
-             */
-            loss_config?: components["schemas"]["payments_schLossConfig"];
-        };
-        /** Error */
-        payments_schError: {
-            /**
-             * @description Error message.
-             * @example The order has been failed because the payin amount is below the minimum amount
-             */
-            message?: string;
-        };
-        /** Error */
-        payments_ptyError: {
-            /** @description Error caused payment failure. */
-            error?: components["schemas"]["payments_schError"];
-        };
-        /** Pending deadline at */
-        payments_ptyPendingDeadlineAt: {
-            /**
-             * @description The deadline for payments in the `PENDING` state.
-             *
-             *     ℹ️ If the provided deadline exceeds the one in `deadline_at`
-             *     for the chosen method, it will not take effect.
-             *
-             *     ⚠️ If a payment violates the deadline, it will be
-             *     transferred to the `CANCELED` state.
-             * @example 2023-03-22T15:23:56.876Z
-             */
-            pending_deadline_at?: components["schemas"]["payments_schTimestamp"];
-        };
-        /** Payment method */
-        payments_ptyPaymentMethod: {
-            payment_method?: components["schemas"]["payments_ptyCurrency"] & components["schemas"]["payments_ptyNetwork"] & unknown & unknown;
-        };
-        /** Checkout template ID */
-        payments_checkoutTemplateId: {
-            /**
-             * Format: uuid
-             * @description UUID of the template that will be displayed on the checkout page.
-             *
-             *     ℹ️ If not set, default template will be applied.
-             *
-             *     ℹ️ See the templates settings in **My Merchant** >
-             *     **Checkout templates** section in the app.
-             * @example c1460010-ed46-49eb-8f02-4f0edd21c933
-             */
-            checkout_template_id?: string;
-        };
-        /** Deposit */
-        "payments_reqCreatePayment-Deposit": components["schemas"]["payments_ptyTitle"] & components["schemas"]["payments_ptyDescription"] & components["schemas"]["payments_ptyOrderId"] & components["schemas"]["payments_ptyCustomerId"] & components["schemas"]["payments_ptyCustomerEmail"] & components["schemas"]["payments_ptyPaymentData"] & components["schemas"]["payments_ptyNominalCurrency"] & components["schemas"]["payments_ptyRecommendedAmount"] & components["schemas"]["payments_ptySuccessRedirectUrl"] & components["schemas"]["payments_ptyFailureRedirectUrl"] & components["schemas"]["payments_ptyPendingDeadlineAt"] & components["schemas"]["payments_ptyPaymentMethod"] & components["schemas"]["payments_ptyFeesPayer"] & components["schemas"]["payments_checkoutTemplateId"] & components["schemas"]["payments_ptyCustomerIpAddress"] & components["schemas"]["payments_ptyCustomerReferrerDomain"] & unknown;
-        /** Invoice */
-        "payments_reqCreatePayment-Invoice": components["schemas"]["payments_ptyTitle"] & components["schemas"]["payments_ptyDescription"] & components["schemas"]["payments_ptyOrderId"] & components["schemas"]["payments_ptyCustomerId"] & components["schemas"]["payments_ptyCustomerEmail"] & components["schemas"]["payments_ptyPaymentData"] & components["schemas"]["payments_ptyNominalCurrency"] & components["schemas"]["payments_ptySuccessRedirectUrl"] & components["schemas"]["payments_ptyFailureRedirectUrl"] & components["schemas"]["payments_ptyPendingDeadlineAt"] & components["schemas"]["payments_ptyPaymentMethod"] & components["schemas"]["payments_ptyFeesPayer"] & components["schemas"]["payments_ptyNominalAmount"] & components["schemas"]["payments_ptyLossConfig"] & components["schemas"]["payments_checkoutTemplateId"] & components["schemas"]["payments_ptyCustomerIpAddress"] & components["schemas"]["payments_ptyCustomerReferrerDomain"] & components["schemas"]["payments_ptyUnderpaymentConfig"] & components["schemas"]["payments_ptyOverpaymentConfig"] & unknown;
-        /** Update payment request */
-        payments_reqUpdatePayment: components["schemas"]["payments_ptyOrderId"] & components["schemas"]["payments_ptyCustomerId"] & components["schemas"]["payments_ptyCustomerEmail"] & components["schemas"]["payments_ptyPaymentData"] & {
-            payment_title?: components["schemas"]["payments_schTitle"];
-            payment_description?: components["schemas"]["payments_schDescription"];
-        };
-        /** Other data */
-        payments_ptyOtherData: {
-            other_data?: components["schemas"]["payments_schData"];
-        };
-        /**
-         * Customer IP address
-         * @description IP address (IPv4 or IPv6) of the request sender.
-         *
-         *     ⚠️ Currently our validator accepts empty values for this field, but this
-         *     is only temporary. In the next release, this field will become
-         *     mandatory. To avoid unexpected integration failures when validation is
-         *     enforced, please populate this field from the beginning of your
-         *     integration implementation.
-         *
-         *     ℹ️ Used for API requests only.
-         * @example 0.0.0.0
-         */
-        payments_schCustomerIpAddress: string;
-        /** Customer IP address */
-        payments_ptyCustomerIpAddress: {
-            customer_ip_address?: components["schemas"]["callbacks_schCustomerIpAddress"];
-        };
-        /**
-         * Customer referrer domain
-         * @description The URL of the domain where the buyer is located at the moment of the
-         *     request for creating a one-time payment, static address, or initiation
-         *     of withdrawal.
-         *
-         *     ⚠️ Currently our validator accepts empty values for this field, but this
-         *     is only temporary. In the next release, this field will become
-         *     mandatory. To avoid unexpected integration failures when validation is
-         *     enforced, please populate this field from the beginning of your
-         *     integration implementation.
-         *
-         *     ℹ️ Used for API requests only.
-         */
-        payments_schCustomerReferrerDomain: string;
-        /** Customer referrer domain */
-        payments_ptyCustomerReferrerDomain: {
-            customer_referer_domain?: components["schemas"]["callbacks_schCustomerReferrerDomain"];
-        };
-        /** Underpayment config */
-        payments_ptyUnderpaymentConfig: {
-            underpayment_config?: components["schemas"]["payments_schLossConfig"];
-        };
-        /** Overpayment config */
-        payments_ptyOverpaymentConfig: {
-            overpayment_config?: components["schemas"]["payments_schLossConfig"];
-        };
-        /** Payment details */
-        payments_schDetails: components["schemas"]["payments_ptyTitle"] & components["schemas"]["payments_ptyDescription"] & components["schemas"]["payments_ptySuccessRedirectUrl"] & components["schemas"]["payments_ptyFailureRedirectUrl"] & components["schemas"]["payments_ptyOrderId"] & components["schemas"]["payments_ptyCustomerId"] & components["schemas"]["payments_ptyCustomerEmail"] & components["schemas"]["payments_ptyCustomerIpAddress"] & components["schemas"]["payments_ptyCustomerReferrerDomain"] & components["schemas"]["payments_ptyOtherData"];
-        /** Project ID */
-        payments_ptyProjectId: {
-            /**
-             * Format: uuid
-             * @description Project ID.
-             * @example 007dd1e5-cc29-41cb-8522-ccfe13c27e7c
-             */
-            project_id?: string;
-        };
-        /**
-         * Payment ID
-         * Format: uuid
-         * @description Payment ID.
-         * @example 1f04d164-73de-4b5d-a2b9-4bf1faa05973
-         */
-        payments_schPaymentId: string;
-        /** Selected payment method */
-        payments_ptySelectedPaymentMethod: {
-            selected_payment_method?: components["schemas"]["payments_resSelectedPaymentMethod"];
-        };
-        /** Recommended amount */
-        payments_ptyRecommendedAmount: {
-            /**
-             * @description Recommended amount.
-             *
-             *     See
-             *     [Recommended Amount](#section/Types-of-Payments/Recommended-Amount).
-             */
-            recommended_amount?: {
-                /**
-                 * @description Recommended sum of payment in nominal currency displayed to the
-                 *     customer.
-                 *
-                 *     ⚠️ The actual payment amount may not correspond to this sum.
-                 *
-                 *     ℹ️ Includes fees before being recalculated in payin currency.
-                 *
-                 *     ℹ️ Amount in payin currency displayed on our checkout page
-                 *     (`payment_url`) or obtained via the
-                 *     `POST /api/v1/payments/payment_methods/calc` call.
-                 */
-                nominal: components["schemas"]["payments_schAmount"];
-            };
-        };
-        /** ID */
-        "payments_ptyId-Payments": {
-            id?: components["schemas"]["payments_schPaymentId"];
-        };
-        /** Details */
-        payments_ptyDetails: {
-            /** @description Additional payment details. */
-            details?: components["schemas"]["payments_schDetails"];
-        };
-        /** Payment URL */
-        payments_ptyPaymentUrl: {
-            /**
-             * Format: uri
-             * @description Link to an individual checkout page hosted by us when the
-             *     customer can choose a payment method.
-             * @example https://dba.com/C1408A
-             */
-            payment_url?: string;
-        };
-        /** Created at */
-        "payments_ptyCreatedAt-Payments": {
-            /** @description Date and time the payment initiated. */
-            created_at?: components["schemas"]["payments_schTimestamp"];
-        };
-        /** Updated at */
-        "payments_ptyUpdatedAt-Payments": {
-            /** @description Date and time the payment state last update. */
-            updated_at?: components["schemas"]["payments_schTimestamp"];
-        };
-        /** Completed at */
-        payments_ptyCompletedAt: {
-            /** @description Date and time of the transition to the `COMPLETED` state. */
-            completed_at?: components["schemas"]["payments_schTimestamp"];
-        };
-        /** Deadline at */
-        payments_ptyDeadlineAt: {
-            /**
-             * @description Our deadline for a payment in the `WAITING` state.
-             *
-             *     ⚠️ If a payment violates the deadline, it will be transferred
-             *     to the `FAILED` state.
-             */
-            deadline_at?: components["schemas"]["payments_schTimestamp"];
-        };
-        /** Deposit */
-        "payments_resPayment-Deposit": components["schemas"]["payments_ptyType"] & components["schemas"]["payments_ptyId-Payments"] & components["schemas"]["payments_ptyState-Payments"] & components["schemas"]["payments_ptyNominalCurrency"] & components["schemas"]["payments_ptyNominalAmount"] & components["schemas"]["payments_ptyRecommendedAmount"] & components["schemas"]["payments_ptySelectedPaymentMethod"] & components["schemas"]["payments_ptyFeesPayer"] & components["schemas"]["payments_ptyPaymentUrl"] & components["schemas"]["payments_ptyProjectId"] & components["schemas"]["payments_ptyDetails"] & components["schemas"]["payments_ptyCreatedAt-Payments"] & components["schemas"]["payments_ptyUpdatedAt-Payments"] & components["schemas"]["payments_ptyCompletedAt"] & components["schemas"]["payments_ptyDeadlineAt"] & components["schemas"]["payments_ptyCustomerIpAddress"] & components["schemas"]["payments_ptyCustomerReferrerDomain"] & components["schemas"]["payments_ptyError"] & components["schemas"]["payments_checkoutTemplateId"] & unknown & {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            type: "DEPOSIT";
-        };
-        /** Invoice */
-        "payments_resPayment-Invoice": components["schemas"]["payments_ptyType"] & components["schemas"]["payments_ptyId-Payments"] & components["schemas"]["payments_ptyState-Payments"] & components["schemas"]["payments_ptyNominalCurrency"] & components["schemas"]["payments_ptyNominalAmount"] & components["schemas"]["payments_ptySelectedPaymentMethod"] & components["schemas"]["payments_ptyFeesPayer"] & components["schemas"]["payments_ptyLossConfig"] & components["schemas"]["payments_ptyPaymentUrl"] & components["schemas"]["payments_ptyProjectId"] & components["schemas"]["payments_ptyDetails"] & components["schemas"]["payments_ptyCreatedAt-Payments"] & components["schemas"]["payments_ptyUpdatedAt-Payments"] & components["schemas"]["payments_ptyCompletedAt"] & components["schemas"]["payments_ptyDeadlineAt"] & components["schemas"]["payments_ptyCustomerIpAddress"] & components["schemas"]["payments_ptyCustomerReferrerDomain"] & components["schemas"]["payments_ptyError"] & components["schemas"]["payments_checkoutTemplateId"] & unknown & {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            type: "INVOICE";
-        };
-        payments_resPayment: {
-            type: "payments_resPayment";
-        } & Omit<components["schemas"]["payments_resPayment-Deposit"] | components["schemas"]["payments_resPayment-Invoice"], "type">;
-        /** Type */
-        payments_ptyType: {
-            type?: components["schemas"]["payments_schType"];
-        };
-        /** State */
-        "payments_ptyState-Payments": {
-            state?: components["schemas"]["payments_schState"];
-        };
-        /**
-         * Type
-         * @description Payment type.
-         *
-         *     Values:
-         *     * `INVOICE`—a payment of the predefined amount that succeeds only after
-         *       the total amount of all detected payins reaches this amount;
-         *     * `DEPOSIT`—a deposit of an arbitrary amount that succeeds after the
-         *       first detected payin.
-         * @enum {string}
-         */
-        payments_schType: "INVOICE" | "DEPOSIT";
-        /**
-         * State
-         * @description Payment state.
-         *
-         *     Values:
-         *     * `CREATED`—the customer initiated a payment and picks a payment method;
-         *     * `CANCELED`—the merchant deadline specified in `pending_deadline_at` is
-         *       exceeded;
-         *     * `FAILED`—the payment expired our deadline or failed during processing;
-         *     * `WAITING`—a transaction corresponding to the payment is detected in
-         *       the blockchain and gains confirmations;
-         *     * `COMPLETED`—the payment successfully completed.
-         * @enum {string}
-         */
-        payments_schState: "CREATED" | "CANCELED" | "WAITING" | "FAILED" | "COMPLETED";
-        /** Selected payment method */
-        payments_resSelectedPaymentMethod: components["schemas"]["payments_ptyHoldingCurrency"] & components["schemas"]["payments_ptyHoldingAmount"] & components["schemas"]["payments_ptyMinimumPayinAmount"] & unknown & {
-            selected_at?: components["schemas"]["payments_schTimestamp"];
-            /**
-             * @description Details of a swap created after the payment initialization which
-             *     is not guaranteed to be executed after successful payins.
-             */
-            nominal_holding_swap?: components["schemas"]["payments_schHoldingSwap"] & unknown;
-            /**
-             * @description Fee charged for the payment.
-             *
-             *     ℹ️ A percent: `0.01` stands for 0.01%.
-             *
-             *     Format: decimal
-             * @example 0.27
-             */
-            payment_fee?: components["schemas"]["payments_schAmount"];
-            /**
-             * Format: uuid
-             * @description UUID of the final transfer to the holding account.
-             * @example 8331c46a-56e4-4748-9dd9-7e5e23732cd6
-             */
-            holding_transfer_txn_id?: string;
-            /**
-             * @description Transaction produced as a result of the actually committed swap
-             *     at the latest stage of the payment.
-             */
-            payin_holding_swap?: components["schemas"]["payments_schHoldingSwap"];
-            /** @description Payin currency code. */
-            payin_currency?: components["schemas"]["payments_schCode-Currency"];
-            payin_network?: components["schemas"]["payments_schCode-Network"];
-            /**
-             * @description Expected payment amount.
-             *
-             *     Format: decimal
-             */
-            expected_payin_amount?: components["schemas"]["payments_schAmount"];
-            payin_address?: components["schemas"]["payments_schAddress"];
-            /**
-             * @description Additional ID of the payment apart from a deposit address.
-             * @example lOqMs91JaKqlwM18Mkqolx
-             */
-            payin_address_tag?: string;
-            /** @description Payins detected for an invoice payment. */
-            payins?: components["schemas"]["payments_schPayins"][];
-            /**
-             * @description Payins amount remaining before we accept the payment.
-             *
-             *     Format: decimal
-             * @example 0.01
-             */
-            remaining_payin_amount?: components["schemas"]["payments_schAmount"];
-        };
-        /**
-         * Swap rate
-         * @description Swap rate.
-         *
-         *     Format: decimal
-         * @example 30250.48
-         */
-        payments_schRate: components["schemas"]["payments_schAmount"];
-        /** Holding swap */
-        payments_schHoldingSwap: {
-            rate: components["schemas"]["payments_schRate"];
-            /**
-             * @description Date and time of the swap from default holding currency to holding
-             *     currency.
-             */
-            time: components["schemas"]["payments_schTimestamp"];
-            /** @description Swap operation UUID. */
-            txn_id?: components["schemas"]["payments_schTxnId"];
-        };
-        /** Amount */
-        payments_ptyAmount: {
-            /**
-             * @description Amount.
-             *
-             *     Format: decimal
-             */
-            amount?: components["schemas"]["payments_schAmount"];
-        };
-        /** Payins */
-        payments_schPayins: components["schemas"]["payments_ptyCurrency"] & components["schemas"]["payments_ptyNetwork"] & components["schemas"]["payments_ptyAmount"] & {
-            /**
-             * @description Deposit fee.
-             *
-             *     Format: decimal
-             * @example 0.01
-             */
-            fee: components["schemas"]["payments_schAmount"];
-            txn_hash: components["schemas"]["payments_schHash"];
-            /**
-             * @description Date and time of submitting the payin transaction to the
-             *     blockchain.
-             * @example 2023-03-22T15:23:56.876Z
-             */
-            declared_at: components["schemas"]["payments_schTimestamp"];
-            /**
-             * @description Date and time of gathering sufficient number of confirmations.
-             * @example 2023-03-22T15:23:56.876Z
-             */
-            confirmed_at?: components["schemas"]["payments_schTimestamp"];
-        };
-        /** Payment method */
-        payments_resPaymentMethod: components["schemas"]["payments_ptyCode-Currency"] & components["schemas"]["payments_ptyName-Currency"] & components["schemas"]["payments_ptyCrypto"] & components["schemas"]["payments_ptyPrecision"] & components["schemas"]["payments_ptyPriority"] & components["schemas"]["payments_ptyAddressTagName"] & components["schemas"]["payments_ptyCryptoExplorer"] & components["schemas"]["payments_ptyNetworks"] & components["schemas"]["payments_ptySwappableTo"] & components["schemas"]["payments_ptyPayinEnabled"] & components["schemas"]["payments_ptyPayoutEnabled"] & components["schemas"]["payments_ptyMinimumSwapAmount"] & components["schemas"]["payments_ptyMinimumPayinAmount"] & unknown;
-        /** Calculate payment method amounts request */
-        payments_reqCalcPaymentMethodAmounts: components["schemas"]["payments_ptyFeesPayer"] & components["schemas"]["payments_ptyNominalCurrency"] & components["schemas"]["payments_ptyPayinCurrency"] & components["schemas"]["payments_ptyPayinNetwork"] & unknown & {
-            amount?: {
-                /** @description Nominal amount. */
-                nominal: components["schemas"]["payments_ptyAmount"];
-            };
-        };
-        /** Set payment method */
-        payments_reqSelectPaymentMethod: components["schemas"]["payments_ptyCurrency"] & components["schemas"]["payments_ptyNetwork"] & unknown;
-        /** Holding currency */
-        payments_ptyHoldingCurrency: {
-            /** @description Holding currency. */
-            holding_currency?: components["schemas"]["payments_schCode-Currency"];
-        };
-        /** Holding amount */
-        payments_ptyHoldingAmount: {
-            /**
-             * @description Amount credited to the holding account as a result of the
-             *     payment minus fees.
-             *
-             *     Format: decimal
-             * @example 14.08
-             */
-            holding_amount?: string;
-        };
-        /** Payin currency */
-        payments_ptyPayinCurrency: {
-            /**
-             * @description Payin currency.
-             *
-             *     ℹ️ Specified in `currency` parameter.
-             */
-            payin_currency?: components["schemas"]["payments_schCode-Currency"];
-        };
-        /** Payin network */
-        payments_ptyPayinNetwork: {
-            /**
-             * @description Payin network.
-             *
-             *     ℹ️ Specified in `network` parameter.
-             */
-            payin_network?: components["schemas"]["payments_schCode-Network"];
-        };
-        /** Expected amount */
-        payments_resAmount: components["schemas"]["payments_ptyNominalCurrency"] & components["schemas"]["payments_ptyNominalAmount"] & components["schemas"]["payments_ptyHoldingCurrency"] & components["schemas"]["payments_ptyHoldingAmount"] & components["schemas"]["payments_ptyPayinCurrency"] & components["schemas"]["payments_ptyPayinNetwork"] & components["schemas"]["payments_ptyMinimumPayinAmount"] & unknown & {
-            /**
-             * @description Estimated exchange rate from the payment currency to the holding
-             *     currency calculated if these do not match.
-             *
-             *     Format: decimal
-             * @example 2.37
-             */
-            nominal_holding_swap_rate?: string;
-            /**
-             * @description Estimated exchange rate from the payin currency to the holding
-             *     currency calculated if these do not match.
-             *
-             *     Format: decimal
-             * @example 1
-             */
-            payin_holding_swap_rate?: string;
-            /**
-             * @description Fixed fee charged for deposits.
-             *
-             *     ℹ️ An absolute value: `0.01` stands for 0.01 USDT.
-             *
-             *     Format: decimal
-             * @example 0.01
-             */
-            deposit_fee?: string;
-            /**
-             * @description The total payment fee.
-             *
-             *     Format: decimal
-             * @example 0.97
-             */
-            payment_fee?: components["schemas"]["payments_schAmount"];
-            /**
-             * @description Expected amount of payin in payin currency.
-             *
-             *     Format: decimal
-             * @example 0.0062534748
-             */
-            expected_payin_amount?: components["schemas"]["payments_schAmount"];
-        };
-        /** Send callback response */
-        payments_resSendCallback: {
-            request: {
-                /**
-                 * Format: uri
-                 * @description Target URL.
-                 * @example https://example.com/api/v1/payment/webhook
-                 */
-                url: string;
-                /**
-                 * @description Callback body.
-                 * @example {"callback_type":"PAYMENT","payment_id":"80036de2-7aef-4aaf-9205-992647ff730a","project_id":"7388421c-06af-11ee-be56-0242ac120002","type":"INVOICE","state":"CANCELED","nominal_currency":"USDT","nominal_amount":"14.08","fees_payer":"MERCHANT","title":"DBA","description":"Loremipsumdolorsitametconsecteturadipiscingelit...","order_id":"34d3149b-8eb0-4898-971a-63464ae73f1e","customer_id":"24fc0740-c6c6-48d8-9735-6b5f42a350d4","customer_email":"johndoe@example.com","other_data":{"sales_manager_id":221163,"customer_phone":"+999999999"},"selected_payment_method":{"holding_currency":"USDT","holding_amount":"14.08","minimum_payin_amount":"14.08","selected_at":"2023-03-22T15:23:56.876Z","nominal_holding_swap":{},"payment_fee":"0.27","holding_transfer_txn_id":"cec43f26-99a7-48dd-a42e-c332833a3c47","payin_holding_swap":{},"payin_currency":"USDT","payin_network":"ETH","expected_payin_amount":"14.08","remaining_payin_amount":"0.01","payin_address":"0xb794f5ea0ba39494ce839613fffba74279579268","payin_address_tag":"lOqMs91JaKqlwM18Mkqolx","payins":[]},"created_at":"2023-03-22T15:23:56.876Z","updated_at":"2023-03-22T15:23:56.876Z","completed_at":"2023-03-22T15:23:56.876Z","deadline_at":"2023-03-22T15:23:56.876Z"}
-                 */
-                body: string;
-                /** @example VzMyYzZDT0h3UVR2RFNwNENNMWh5ZE11S3VhWU42ajVEcDl6RG1GaG1pRDlnV25USHI0ZUovVDE4eHZwZGxLdXJmcnhKYSt5RElMelQ0RmRIZUYzVjZYcnNxdzZ3YzhKNi9lZXFyZzc1WnhJek0yN1ZjckFQVXNrazJ3WTFYUFJrK3BqWnpGcTVMRU5ZbHdESFpIOFRPaGtLUTVtbDBQUFFCaDUvVitYTG5BPToxNzEyMjI5NTM5 */
-                signature: components["schemas"]["payments_schSignature"];
-            };
-            response: {
-                /**
-                 * @description Status code.
-                 * @example 200
-                 */
-                code: number;
-                /**
-                 * @description Request result.
-                 * @example {"ok":true}
-                 */
-                body: string;
-            };
-        };
-        /** Type */
-        "payments_ptyType-Errors": {
-            type?: components["schemas"]["payments_schType-Errors"];
-        };
-        /**
-         * Type
-         * @description Error type.
-         * @enum {string}
-         */
-        "payments_schType-Errors": "BAD_REQUEST" | "API_ERROR";
-        /** Code */
-        "payments_ptyCode-Errors": {
-            code?: components["schemas"]["payments_schCode-Errors"];
-        };
-        /**
-         * Code
-         * @description Error reason.
-         * @enum {string}
-         */
-        "payments_schCode-Errors": "INVALID_REQUEST_PARAMETERS" | "INVALID_REQUEST_BODY" | "INVALID_REQUEST" | "TOO_MANY_REQUESTS" | "ACCOUNT_IS_DISABLED" | "OPERATION_TEMPORARILY_BLOCKED" | "NOMINAL_AMOUNT_INVALID" | "PAYMENT_METHOD_NOT_SELECTED" | "NO_FREE_ADDRESSES" | "ADDRESS_ALREADY_EXISTS" | "INSUFFICIENT_BALANCE" | "MERCHANT_IS_DISABLED";
-        /** Message */
-        "payments_ptyMessage-Errors": {
-            message?: components["schemas"]["payments_schMessage-Errors"];
-        };
-        /** @description Error message. */
-        "payments_schMessage-Errors": string;
-        /** Parameter */
-        "payments_ptyParam-Errors": {
-            param?: components["schemas"]["payments_schParam-Errors"];
-        };
-        /**
-         * Parameter
-         * @description Name of the parameter caused the error.
-         */
-        "payments_schParam-Errors": string;
-        /** Error */
-        payments_default: {
-            errors: (components["schemas"]["payments_ptyType-Errors"] & components["schemas"]["payments_ptyMessage-Errors"] & unknown)[];
-        };
-        /** Error */
-        "payments_default-Code": {
-            errors: (components["schemas"]["payments_ptyType-Errors"] & components["schemas"]["payments_ptyMessage-Errors"] & components["schemas"]["payments_ptyCode-Errors"] & unknown)[];
-        };
-        /** Error */
-        "payments_default-Code-Param": {
-            errors: (components["schemas"]["payments_ptyType-Errors"] & components["schemas"]["payments_ptyMessage-Errors"] & components["schemas"]["payments_ptyCode-Errors"] & components["schemas"]["payments_ptyParam-Errors"] & unknown)[];
-        };
-        /**
-         * Bad request
-         * @description Bad request.
-         * @example {
-         *       "errors": [
-         *         {
-         *           "type": "BAD_REQUEST",
-         *           "message": "bad request"
-         *         }
-         *       ]
-         *     }
-         */
-        payments_errBadRequest: components["schemas"]["payments_default"];
-        /**
-         * Unauthorized
-         * @description Requested address do not march the project or merchant.
-         * @example {
-         *       "errors": [
-         *         {
-         *           "type": "BAD_REQUEST",
-         *           "message": "unauthorized"
-         *         }
-         *       ]
-         *     }
-         */
-        payments_errUnauthorized: components["schemas"]["payments_default"];
-        /**
-         * Forbidden
-         * @description Requested operation is not allowed.
-         * @example {
-         *       "errors": [
-         *         {
-         *           "type": "BAD_REQUEST",
-         *           "message": "forbidden"
-         *         }
-         *       ]
-         *     }
-         */
-        payments_errForbidden: components["schemas"]["payments_default"];
-        /**
-         * Not found
-         * @description Requested resource not found.
-         * @example {
-         *       "errors": [
-         *         {
-         *           "type": "BAD_REQUEST",
-         *           "message": "not found"
-         *         }
-         *       ]
-         *     }
-         */
-        payments_errNotFound: components["schemas"]["payments_default"];
-        /**
-         * Already exists
-         * @description Bad request.
-         * @example {
-         *       "errors": [
-         *         {
-         *           "type": "BAD_REQUEST",
-         *           "message": "already exists"
-         *         }
-         *       ]
-         *     }
-         */
-        payments_errAlreadyExists: components["schemas"]["payments_default"];
-        /**
-         * Resource busy
-         * @description Cannot alter requested resource.
-         * @example {
-         *       "errors": [
-         *         {
-         *           "type": "BAD_REQUEST",
-         *           "message": "resource is busy"
-         *         }
-         *       ]
-         *     }
-         */
-        payments_errResourceBusy: components["schemas"]["payments_default"];
-        /**
-         * Too many requests
-         * @description Too many requests.
-         * @example {
-         *       "errors": [
-         *         {
-         *           "type": "BAD_REQUEST",
-         *           "code": "TOO_MANY_REQUESTS",
-         *           "message": "too many requests"
-         *         }
-         *       ]
-         *     }
-         */
-        payments_errTooManyRequests: components["schemas"]["payments_default-Code"];
-        /**
-         * Unavailable now
-         * @description Service unavailable.
-         * @example {
-         *       "errors": [
-         *         {
-         *           "type": "API_ERROR",
-         *           "message": "service unavailable now"
-         *         }
-         *       ]
-         *     }
-         */
-        payments_errUnavailableNow: components["schemas"]["payments_default"];
-        /**
-         * Unknown
-         * @description Unknown error.
-         * @example {
-         *       "errors": [
-         *         {
-         *           "type": "API_ERROR",
-         *           "message": "unknown error"
-         *         }
-         *       ]
-         *     }
-         */
-        payments_errUnknown: components["schemas"]["payments_default"];
-        /**
-         * Internal
-         * @description Internal server error.
-         * @example {
-         *       "errors": [
-         *         {
-         *           "type": "API_ERROR",
-         *           "message": "internal server error"
-         *         }
-         *       ]
-         *     }
-         */
-        payments_errInternal: components["schemas"]["payments_default"];
-        /**
-         * Invalid request parameters
-         * @example {
-         *       "errors": [
-         *         {
-         *           "type": "BAD_REQUEST",
-         *           "code": "INVALID_REQUEST_PARAMETERS",
-         *           "message": "<message>",
-         *           "param": "<param>"
-         *         }
-         *       ]
-         *     }
-         */
-        payments_errInvalidRequestParameters: components["schemas"]["payments_default-Code-Param"];
-        /**
-         * Invalid request body
-         * @description Invalid request body.
-         * @example {
-         *       "errors": [
-         *         {
-         *           "type": "BAD_REQUEST",
-         *           "code": "INVALID_REQUEST_BODY",
-         *           "message": "<message>"
-         *         }
-         *       ]
-         *     }
-         */
-        payments_errInvalidRequestBody: components["schemas"]["payments_default-Code"];
-        /**
-         * Invalid request
-         * @description Invalid request.
-         * @example {
-         *       "errors": [
-         *         {
-         *           "type": "BAD_REQUEST",
-         *           "code": "INVALID_REQUEST",
-         *           "message": "<message>"
-         *         }
-         *       ]
-         *     }
-         */
-        payments_errInvalidRequest: components["schemas"]["payments_default-Code"];
-        /**
-         * Payment method not selected
-         * @description Missing payment method.
-         * @example {
-         *       "errors": [
-         *         {
-         *           "type": "BAD_REQUEST",
-         *           "code": "PAYMENT_METHOD_NOT_SELECTED",
-         *           "message": "payment_method is required for recommended_amount.payin",
-         *           "param": "payment_method"
-         *         }
-         *       ]
-         *     }
-         */
-        payments_errPaymentMethodNotSelected: components["schemas"]["payments_default-Code-Param"];
-        /**
-         * Nominal amount invalid
-         * @description Invalid nominal amount.
-         * @example {
-         *       "errors": [
-         *         {
-         *           "type": "API_ERROR",
-         *           "code": "NOMINAL_AMOUNT_INVALID",
-         *           "message": "<message>"
-         *         }
-         *       ]
-         *     }
-         */
-        payments_errNominalAmountInvalid: components["schemas"]["payments_default-Code"];
-        /**
-         * No free addresses
-         * @description No free deposit addresses in the pool of addresses.
-         * @example {
-         *       "errors": [
-         *         {
-         *           "type": "API_ERROR",
-         *           "code": "NO_FREE_ADDRESSES",
-         *           "message": "no free addresses in the pool"
-         *         }
-         *       ]
-         *     }
-         */
-        payments_errNoFreeAddresses: components["schemas"]["payments_default-Code"];
-        /**
-         * Address already exists
-         * @description Deposit address generated for provided parameters already exists.
-         * @example {
-         *       "errors": [
-         *         {
-         *           "type": "API_ERROR",
-         *           "code": "ADDRESS_ALREADY_EXISTS",
-         *           "message": "customer static deposit address already exists"
-         *         }
-         *       ]
-         *     }
-         */
-        payments_errAddressAlreadyExists: components["schemas"]["payments_default-Code"];
-        /**
-         * Account is disabled
-         * @description Holding account is disabled.
-         * @example {
-         *       "errors": [
-         *         {
-         *           "type": "API_ERROR",
-         *           "code": "ACCOUNT_IS_DISABLED",
-         *           "message": "the account is disabled"
-         *         }
-         *       ]
-         *     }
-         */
-        payments_errAccountIsDisabled: components["schemas"]["payments_default-Code"];
-        /**
-         * Operation blocked
-         * @description Requested operation is temporary disabled.
-         * @example {
-         *       "errors": [
-         *         {
-         *           "type": "API_ERROR",
-         *           "code": "OPERATION_TEMPORARILY_BLOCKED",
-         *           "message": "requested operation is temporarily blocked"
-         *         }
-         *       ]
-         *     }
-         */
-        payments_errOperationBlocked: components["schemas"]["payments_default-Code"];
-        /**
-         * Merchant is disabled
-         * @description Merchant is disabled.
-         * @example {
-         *       "errors": [
-         *         {
-         *           "type": "API_ERROR",
-         *           "code": "MERCHANT_IS_DISABLED",
-         *           "message": "cannot perform operation; this account is disabled"
-         *         }
-         *       ]
-         *     }
-         */
-        payments_errMerchantIsDisabled: components["schemas"]["payments_default-Code"];
-        /**
-         * Insufficient balance
-         * @description Holding account balance is insufficient for the withdrawal.
-         * @example {
-         *       "errors": [
-         *         {
-         *           "type": "API_ERROR",
-         *           "code": "INSUFFICIENT_BALANCE",
-         *           "message": "balance is insufficient for the requested operation"
-         *         }
-         *       ]
-         *     }
-         */
-        payments_errInsufficientBalance: components["schemas"]["payments_default-Code"];
-        /**
-         * Currency not found
-         * @description Currency not found.
-         * @example {
-         *       "errors": [
-         *         {
-         *           "code": "INVALID_REQUEST_PARAMETERS",
-         *           "message": "not found: currency",
-         *           "type": "API_ERROR",
-         *           "param": "currency"
-         *         }
-         *       ]
-         *     }
-         */
-        payments_errCurrencyNotFound: components["schemas"]["payments_default-Code-Param"];
-        /**
-         * Network not found
-         * @description Network not found.
-         * @example {
-         *       "errors": [
-         *         {
-         *           "code": "INVALID_REQUEST_PARAMETERS",
-         *           "message": "network is not found",
-         *           "type": "API_ERROR",
-         *           "param": "network"
-         *         }
-         *       ]
-         *     }
-         */
-        payments_errNetworkNotFound: components["schemas"]["payments_default-Code-Param"];
-        /**
-         * Network required
-         * @description Network parameter not provided.
-         * @example {
-         *       "errors": [
-         *         {
-         *           "code": "INVALID_REQUEST_PARAMETERS",
-         *           "message": "network is required",
-         *           "type": "API_ERROR",
-         *           "param": "network"
-         *         }
-         *       ]
-         *     }
-         */
-        payments_errNetworkRequired: components["schemas"]["payments_default-Code-Param"];
-        /** Code */
-        callbacks_schCode: string;
-        /**
-         * Address
-         * @description Deposit address.
-         * @example 0xb794f5ea0ba39494ce839613fffba74279579268
-         */
-        callbacks_schAddress: string;
-        /**
-         * Currency code
-         * @description Currency code.
-         * @example USDT
-         */
-        "callbacks_schCode-Currency": components["schemas"]["callbacks_schCode"];
-        /**
-         * Network code
-         * @description Network code.
-         * @example ETH
-         */
-        "callbacks_schCode-Network": components["schemas"]["callbacks_schCode"];
-        /**
-         * Timestamp
-         * Format: date-time
-         * @example 2023-03-22T15:23:56.876Z
-         */
-        callbacks_schTimestamp: string;
-        /**
-         * Payment ID
-         * Format: uuid
-         * @description Payment ID.
-         * @example 2838302c-a433-4a52-912c-91877ca62178
-         */
-        callbacks_schPaymentId: string;
-        /** Currency */
-        callbacks_ptyCurrency: {
-            currency?: components["schemas"]["callbacks_schCode-Currency"];
-        };
-        /** Network */
-        callbacks_ptyNetwork: {
-            network?: components["schemas"]["callbacks_schCode-Network"];
-        };
-        /** Payment ID */
-        callbacks_ptyPaymentId: {
-            payment_id?: components["schemas"]["callbacks_schPaymentId"];
-        };
-        /** Project ID */
-        callbacks_ptyProjectId: {
-            /**
-             * Format: uuid
-             * @description Project ID.
-             * @example a157bba8-1aed-46f8-a91b-d89d8476aab0
-             */
-            project_id?: string;
-        };
-        /**
-         * Payment states
-         * @description Payment state.
-         *
-         *     Values:
-         *     * `CREATED`—the customer initiated a payment and picks a payment method;
-         *     * `CANCELED`—the merchant deadline specified in `pending_deadline_at` is
-         *       exceeded;
-         *     * `FAILED`—the payment expired our deadline or failed during processing;
-         *     * `WAITING`—a transaction corresponding to the payment is detected in
-         *       the blockchain and gains confirmations;
-         *     * `COMPLETED`—the payment successfully completed.
-         * @enum {string}
-         */
-        "callbacks_schState-Payments": "CREATED" | "CANCELED" | "WAITING" | "FAILED" | "COMPLETED";
-        /** State */
-        "callbacks_ptyState-Payments": {
-            state?: components["schemas"]["callbacks_schState-Payments"];
-        };
-        /** Type */
-        callbacks_ptyType: {
-            type?: components["schemas"]["callbacks_schType"];
-        };
-        /**
-         * Type
-         * @description Payment type.
-         *
-         *     Values:
-         *     * `INVOICE`—a payment of the predefined amount that succeeds only after
-         *       the total amount of all detected payins reaches this amount;
-         *     * `DEPOSIT`—a deposit of an arbitrary amount that succeeds after the
-         *       first detected payin.
-         * @enum {string}
-         */
-        callbacks_schType: "INVOICE" | "DEPOSIT";
-        /** Nominal currency */
-        callbacks_ptyNominalCurrency: {
-            /**
-             * @description The desired currency of payment.
-             *
-             *     ℹ️ This currency also denominates the amount specified in
-             *     `nominal_amount`.
-             * @example USDT
-             */
-            nominal_currency?: string;
-        };
-        /**
-         * Amount
-         * @description Amount.
-         *
-         *     Format: decimal
-         * @example 14.08
-         */
-        callbacks_schAmount: string;
-        /** Amount */
-        callbacks_ptyAmount: {
-            amount?: components["schemas"]["callbacks_schAmount"];
-        };
-        /** Nominal amount */
-        callbacks_ptyNominalAmount: {
-            /**
-             * @description The desired amount of a payment.
-             *
-             *     ⚠️ A payment will not complete until this amount is sent by the
-             *     customer.
-             *
-             *     Format: decimal
-             */
-            nominal_amount?: components["schemas"]["callbacks_schAmount"];
-        };
-        /** Fees payer */
-        callbacks_ptyFeesPayer: {
-            /**
-             * @description The party that pays fees.
-             *
-             *     Values:
-             *     * `MERCHANT`—the amount of payment is not affected by fees;
-             *     * `CUSTOMER`—the amount of a payment is reduced by fees.
-             * @enum {string}
-             */
-            fees_payer?: "MERCHANT" | "CUSTOMER";
-        };
-        /**
-         * Title
-         * @description Payment custom name shown to the customer.
-         * @example DBA
-         */
-        callbacks_schTitle: string;
-        /** Title */
-        callbacks_ptyTitle: {
-            title?: components["schemas"]["callbacks_schTitle"];
-        };
-        /**
-         * Description
-         * @description Payment custom description.
-         * @example Lorem ipsum dolor sit amet consectetur adipiscing elit...
-         */
-        callbacks_schDescription: string;
-        /** Description */
-        callbacks_ptyDescription: {
-            description?: components["schemas"]["callbacks_schDescription"];
-        };
-        /** Order ID */
-        callbacks_ptyOrderId: {
-            /**
-             * @description Arbitrary operation ID generated of the merchant side.
-             * @example 34d3149b-8eb0-4898-971a-63464ae73f1e
-             */
-            order_id?: string;
-        };
-        /**
-         * Customer ID
-         * @description Arbitrary customer ID.
-         * @example 24fc0740-c6c6-48d8-9735-6b5f42a350d4
-         */
-        callbacks_schCustomerId: string;
-        /** Customer ID */
-        callbacks_ptyCustomerId: {
-            customer_id?: components["schemas"]["callbacks_schCustomerId"];
-        };
-        /** Customer email */
-        callbacks_ptyCustomerEmail: {
-            /**
-             * Format: email
-             * @description Customer email.
-             * @example johndoe@example.com
-             */
-            customer_email?: string;
-        };
-        /**
-         * @description Arbitrary metadata associated with the payment.
-         * @example {
-         *       "sales_manager_id": 221163,
-         *       "customer_phone": "+999999999"
-         *     }
-         */
-        callbacks_schData: {
-            [key: string]: unknown;
-        };
-        /** Other data */
-        callbacks_ptyOtherData: {
-            other_data?: components["schemas"]["callbacks_schData"];
-        };
-        /** Holding currency */
-        callbacks_ptyHoldingCurrency: {
-            /** @description Holding currency. */
-            holding_currency?: components["schemas"]["callbacks_schCode-Currency"];
-        };
-        /** Holding amount */
-        callbacks_ptyHoldingAmount: {
-            /**
-             * @description Amount credited to the holding account as a result of the payment
-             *     minus fees.
-             *
-             *     Format: decimal
-             * @example 14.08
-             */
-            holding_amount?: components["schemas"]["callbacks_schAmount"];
-        };
-        /** Minimum payin amount */
-        callbacks_ptyMinimumPayinAmount: {
-            /**
-             * @description Minimum payin amount.
-             *
-             *     Format: decimal
-             */
-            minimum_payin_amount?: components["schemas"]["callbacks_schAmount"];
-        };
-        /**
-         * Transaction ID
-         * Format: uuid
-         * @description Transaction UUID.
-         * @example e1dbb8b8-cb76-4dc1-8be9-68d751d6cd1a
-         */
-        callbacks_schTxnId: string;
-        /**
-         * Swap rate
-         * @description Swap rate.
-         *
-         *     Format: decimal
-         * @example 30250.48
-         */
-        callbacks_schRate: components["schemas"]["callbacks_schAmount"];
-        /** Holding swap */
-        callbacks_schHoldingSwap: {
-            rate: components["schemas"]["callbacks_schRate"];
-            /**
-             * @description Date and time of the swap from default holding currency to holding
-             *     currency.
-             */
-            time: components["schemas"]["callbacks_schTimestamp"];
-            /** @description Swap operation UUID. */
-            txn_id?: components["schemas"]["callbacks_schTxnId"];
-        };
-        /** Selected payment method */
-        callbacks_resSelectedPaymentMethod: components["schemas"]["callbacks_ptyHoldingCurrency"] & components["schemas"]["callbacks_ptyHoldingAmount"] & components["schemas"]["callbacks_ptyMinimumPayinAmount"] & unknown & {
-            selected_at?: components["schemas"]["callbacks_schTimestamp"];
-            /**
-             * @description Details of a swap created after the payment initialization which
-             *     is not guaranteed to be executed after successful payins.
-             */
-            nominal_holding_swap?: components["schemas"]["callbacks_schHoldingSwap"] & unknown;
-            /**
-             * @description Fee charged for the payment.
-             *
-             *     ℹ️ A percent: `0.01` stands for 0.01%.
-             *
-             *     Format: decimal
-             * @example 0.27
-             */
-            payment_fee?: string;
-            /**
-             * Format: uuid
-             * @description UUID of the final transfer to the holding account.
-             * @example fe442f6b-4846-4ec6-8199-7859afc9facb
-             */
-            holding_transfer_txn_id?: string;
-            /**
-             * @description Transaction produced as a result of the actually committed swap
-             *     at the latest stage of the payment.
-             */
-            payin_holding_swap?: components["schemas"]["callbacks_schHoldingSwap"];
-            /** @description Payin currency code. */
-            payin_currency?: components["schemas"]["callbacks_schCode-Currency"];
-            payin_network?: components["schemas"]["callbacks_schCode-Network"];
-            /**
-             * @description Expected payment amount.
-             *
-             *     Format: decimal
-             */
-            expected_payin_amount?: components["schemas"]["callbacks_schAmount"];
-            /**
-             * @description Payins amount remaining before we accept the payment.
-             *
-             *     Format: decimal
-             * @example 0.01
-             */
-            remaining_payin_amount?: components["schemas"]["callbacks_schAmount"];
-            payin_address?: components["schemas"]["callbacks_schAddress"];
-            /**
-             * @description Additional ID of the payment apart from a deposit address.
-             * @example lOqMs91JaKqlwM18Mkqolx
-             */
-            payin_address_tag?: string;
-            /** @description Payins detected for a payment. */
-            payins?: components["schemas"]["callbacks_schPayins"][];
-        };
-        /**
-         * Hash
-         * @description Network transaction hash.
-         * @example 0xfb0ba568213d11230cd34d62fddd1cc1fe11fdc173l4f2007b0e47a06ad73d20
-         */
-        callbacks_schHash: string;
-        /** Payins */
-        callbacks_schPayins: components["schemas"]["callbacks_ptyCurrency"] & components["schemas"]["callbacks_ptyNetwork"] & components["schemas"]["callbacks_ptyAmount"] & unknown & {
-            /**
-             * @description Deposit fee.
-             *
-             *     Format: decimal
-             * @example 0.01
-             */
-            fee?: components["schemas"]["callbacks_schAmount"];
-            txn_hash?: components["schemas"]["callbacks_schHash"];
-            /**
-             * @description Date and time of submitting the payin transaction to the
-             *     blockchain.
-             * @example 2023-03-22T15:23:56.876Z
-             */
-            declared_at?: components["schemas"]["callbacks_schTimestamp"];
-            /**
-             * @description Date and time of gathering sufficient number of confirmations.
-             * @example 2023-03-22T15:23:56.876Z
-             */
-            confirmed_at?: components["schemas"]["callbacks_schTimestamp"];
-        };
-        /** Selected payment method */
-        callbacks_ptySelectedPaymentMethod: {
-            selected_payment_method?: components["schemas"]["callbacks_resSelectedPaymentMethod"];
-        };
-        /** Created at */
-        "callbacks_ptyCreatedAt-Payments": {
-            /** @description Date and time the payment initiated. */
-            created_at?: components["schemas"]["callbacks_schTimestamp"];
-        };
-        /** Updated at */
-        "callbacks_ptyUpdatedAt-Payments": {
-            /** @description Date and time the payment state last update. */
-            updated_at?: components["schemas"]["callbacks_schTimestamp"];
-        };
-        /** Completed at */
-        callbacks_ptyCompletedAt: {
-            /** @description Date and time of the transition to the `COMPLETED` state. */
-            completed_at?: components["schemas"]["callbacks_schTimestamp"];
-        };
-        /** Deadline at */
-        callbacks_ptyDeadlineAt: {
-            /**
-             * @description Our deadline for a payment in the `WAITING` state.
-             *
-             *     ⚠️ If a payment violates the deadline, it will be transferred
-             *     to the `FAILED` state.
-             */
-            deadline_at?: components["schemas"]["callbacks_schTimestamp"];
-        };
-        /**
-         * Customer IP address
-         * @description IP address (IPv4 or IPv6) of the request sender.
-         *
-         *     ⚠️ Currently our validator accepts empty values for this field, but
-         *     this is only temporary. In the next release, this field will become
-         *     mandatory. To avoid unexpected integration failures when validation
-         *     is enforced, please populate this field from the beginning of your
-         *     integration implementation.
-         *
-         *     ℹ️ Used for API requests only.
-         * @example 0.0.0.0
-         */
-        callbacks_schCustomerIpAddress: string;
-        /** Customer IP address */
-        callbacks_ptyCustomerIpAddress: {
-            customer_ip_address?: components["schemas"]["callbacks_schCustomerIpAddress"];
-        };
-        /**
-         * Customer referrer domain
-         * @description The URL of the domain where the buyer is located at the moment of the
-         *     request for creating a one-time payment, static address, or initiation
-         *     of withdrawal.
-         *
-         *     ⚠️ Currently our validator accepts empty values for this field, but this
-         *     is only temporary. In the next release, this field will become
-         *     mandatory. To avoid unexpected integration failures when validation is
-         *     enforced, please populate this field from the beginning of your
-         *     integration implementation.
-         *
-         *     ℹ️ Used for API requests only.
-         */
-        callbacks_schCustomerReferrerDomain: string;
-        /** Customer referrer domain */
-        callbacks_ptyCustomerReferrerDomain: {
-            customer_referer_domain?: components["schemas"]["callbacks_schCustomerReferrerDomain"];
-        };
-        /** Payment (success) */
-        callbacks_reqPayment: components["schemas"]["callbacks_ptyCallbackType"] & components["schemas"]["callbacks_ptyPaymentId"] & components["schemas"]["callbacks_ptyType"] & components["schemas"]["callbacks_ptyState-Payments"] & components["schemas"]["callbacks_ptyNominalCurrency"] & components["schemas"]["callbacks_ptyNominalAmount"] & components["schemas"]["callbacks_ptySelectedPaymentMethod"] & components["schemas"]["callbacks_ptyFeesPayer"] & components["schemas"]["callbacks_ptyTitle"] & components["schemas"]["callbacks_ptyDescription"] & components["schemas"]["callbacks_ptyProjectId"] & components["schemas"]["callbacks_ptyOrderId"] & components["schemas"]["callbacks_ptyCustomerId"] & components["schemas"]["callbacks_ptyCustomerEmail"] & components["schemas"]["callbacks_ptyOtherData"] & components["schemas"]["callbacks_ptyCustomerIpAddress"] & components["schemas"]["callbacks_ptyCustomerReferrerDomain"] & components["schemas"]["callbacks_ptyCreatedAt-Payments"] & components["schemas"]["callbacks_ptyUpdatedAt-Payments"] & components["schemas"]["callbacks_ptyCompletedAt"] & components["schemas"]["callbacks_ptyDeadlineAt"] & unknown & unknown & {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            callback_type: "PAYMENT";
-        };
-        /** Payment (error) */
-        callbacks_errPayment: components["schemas"]["callbacks_ptyCallbackType"] & components["schemas"]["callbacks_ptyPaymentId"] & components["schemas"]["callbacks_ptyType"] & components["schemas"]["callbacks_ptyState-Payments"] & components["schemas"]["callbacks_ptyNominalCurrency"] & components["schemas"]["callbacks_ptyNominalAmount"] & components["schemas"]["callbacks_ptySelectedPaymentMethod"] & components["schemas"]["callbacks_ptyFeesPayer"] & components["schemas"]["callbacks_ptyTitle"] & components["schemas"]["callbacks_ptyDescription"] & components["schemas"]["callbacks_ptyProjectId"] & components["schemas"]["callbacks_ptyOrderId"] & components["schemas"]["callbacks_ptyCustomerId"] & components["schemas"]["callbacks_ptyCustomerEmail"] & components["schemas"]["callbacks_ptyOtherData"] & components["schemas"]["callbacks_ptyCustomerIpAddress"] & components["schemas"]["callbacks_ptyCustomerReferrerDomain"] & components["schemas"]["callbacks_ptyCreatedAt-Payments"] & components["schemas"]["callbacks_ptyUpdatedAt-Payments"] & components["schemas"]["callbacks_ptyCompletedAt"] & components["schemas"]["callbacks_ptyDeadlineAt"] & components["schemas"]["callbacks_ptyError"] & unknown & unknown & {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            callback_type: "callbacks_errPayment";
-        };
-        /** Withdrawal ID */
-        "callbacks_ptyId-Withdrawals": {
-            id?: components["schemas"]["callbacks_schTxnId"];
-        };
-        /**
-         * Currency to
-         * @description Target currency.
-         * @example BTC
-         */
-        "callbacks_schCode-Currency-To": components["schemas"]["callbacks_schCode-Currency"];
-        /** Receive currency */
-        callbacks_ptyReceiveCurrency: {
-            /** @description The currency credited to the merchant as the result of a withdrawal. */
-            receive_currency?: components["schemas"]["callbacks_schCode-Currency-To"];
-        };
-        /** Receive network */
-        callbacks_ptyReceiveNetwork: {
-            receive_network?: components["schemas"]["callbacks_schCode-Network"];
-        };
-        /** Credit currency */
-        callbacks_ptyCreditCurrency: {
-            /** @description The holding currency. */
-            credit_currency?: components["schemas"]["callbacks_schCode-Currency"];
-        };
-        /**
-         * Amount to
-         * @description Estimated amount in target currency.
-         *
-         *     Format: decimal
-         * @example 0.00007
-         */
-        callbacks_schAmountTo: components["schemas"]["callbacks_schAmount"];
-        /** Receive amount */
-        callbacks_ptyReceiveAmount: {
-            /**
-             * @description The amount of crypto the merchant must receive as the result of a
-             *     withdrawals (fees not included).
-             *
-             *     Format: decimal
-             */
-            receive_amount?: components["schemas"]["callbacks_schAmountTo"];
-        };
-        /** Credit amount */
-        callbacks_ptyCreditAmount: {
-            /**
-             * @description The amount of crypto the merchant withdraws from the holding account
-             *     (fees included).
-             *
-             *     Format: decimal
-             */
-            credit_amount?: components["schemas"]["callbacks_schAmount"];
-        };
-        /** Fee */
-        callbacks_ptyFee: {
-            /**
-             * @description Withdrawal fee amount.
-             *
-             *     Format: decimal
-             * @example 0.14
-             */
-            fee?: components["schemas"]["callbacks_schAmount"];
-        };
-        /**
-         * State
-         * @description Withdrawal state.
-         *
-         *     Values:
-         *     * `PENDING`—a transaction has been created and either waiting to be sent
-         *       to the blockchain or has been sent to the blockchain and gains
-         *       confirmations;
-         *     * `CANCELED`—the transaction has been rolled back;
-         *     * `FAILED`—transaction has failed before being created or on latest
-         *       stages;
-         *     * `SUCCESS`—transaction has been successfully completed.
-         * @enum {string}
-         */
-        "callbacks_schState-Withdrawals": "PENDING" | "SUCCESS" | "CANCELED" | "FAILED";
-        /** State */
-        "callbacks_ptyState-Withdrawals": {
-            state?: components["schemas"]["callbacks_schState-Withdrawals"];
-        };
-        /** Payout UUID */
-        callbacks_ptyTxnId: {
-            /**
-             * @description UUID of the payout corresponding to this withdrawal.
-             * @example a0cdbe86-f568-4b7d-a696-8c31effe10b1
-             */
-            txn_id?: components["schemas"]["callbacks_schTxnId"];
-        };
-        /** Address */
-        callbacks_ptyAddress: string;
-        /**
-         * Address tag
-         * @description Address tag value.
-         * @example 33672098-c31e-4790-b4ed-27fd48638a3e
-         */
-        callbacks_schAddressTag: string;
-        /** Address tag */
-        callbacks_ptyAddressTag: {
-            address_tag?: components["schemas"]["callbacks_schAddressTag"];
-        };
-        /**
-         * Callback type
-         * @description Callback type.
-         * @enum {string}
-         */
-        callbacks_schCallbackType: "PAYMENT" | "WITHDRAWAL";
-        /** Callback type */
-        callbacks_ptyCallbackType: {
-            callback_type?: components["schemas"]["callbacks_schCallbackType"];
-        };
-        /** Error */
-        callbacks_ptyError: {
-            error?: components["schemas"]["callbacks_schError"];
-        };
-        /** Error */
-        callbacks_schError: {
-            /**
-             * @description Error caused payment failure.
-             * @example The order has been failed because the payin amount is below the minimum amount
-             */
-            message?: string;
-        };
-        /** Canceled by */
-        callbacks_schCanceledBy: {
-            /**
-             * Format: uuid
-             * @description Cabinet user UUID.
-             */
-            id: string;
-            /** @description Cabinet user name */
-            name: string;
-            /**
-             * Format: email
-             * @description Cabinet user email.
-             */
-            email: string;
-        };
-        /** Withdrawal (success) */
-        callbacks_reqWithdrawal: components["schemas"]["callbacks_ptyCallbackType"] & components["schemas"]["callbacks_ptyId-Withdrawals"] & components["schemas"]["callbacks_ptyState-Withdrawals"] & components["schemas"]["callbacks_ptyReceiveCurrency"] & components["schemas"]["callbacks_ptyReceiveNetwork"] & components["schemas"]["callbacks_ptyCreditCurrency"] & components["schemas"]["callbacks_ptyReceiveAmount"] & components["schemas"]["callbacks_ptyCreditAmount"] & components["schemas"]["callbacks_ptyTxnId"] & components["schemas"]["callbacks_ptyFee"] & components["schemas"]["callbacks_ptyAddress"] & components["schemas"]["callbacks_ptyAddressTag"] & components["schemas"]["callbacks_ptyOrderId"] & components["schemas"]["callbacks_ptyCustomerIpAddress"] & components["schemas"]["callbacks_ptyCustomerReferrerDomain"] & unknown & {
-            /** @description Withdrawal created. */
-            created_at?: components["schemas"]["callbacks_schTimestamp"];
-            /** @description Transaction rolled back. */
-            canceled_at?: components["schemas"]["callbacks_schTimestamp"];
-            /** @description Identity of the cabinet user who canceled the withdrawal. */
-            canceled_by?: components["schemas"]["callbacks_schCanceledBy"];
-            /** @description Transaction sent to the blockchain. */
-            sent_at?: components["schemas"]["callbacks_schTimestamp"];
-            /** @description Transaction committed in the blockchain. */
-            committed_at?: components["schemas"]["callbacks_schTimestamp"];
-            /** @description Withdrawal status updated. */
-            updated_at?: components["schemas"]["callbacks_schTimestamp"];
-        } & unknown & {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            callback_type: "WITHDRAWAL";
-        };
-        /** Withdrawal (error) */
-        callbacks_errWithdrawal: components["schemas"]["callbacks_ptyCallbackType"] & components["schemas"]["callbacks_ptyId-Withdrawals"] & components["schemas"]["callbacks_ptyState-Withdrawals"] & components["schemas"]["callbacks_ptyReceiveCurrency"] & components["schemas"]["callbacks_ptyReceiveNetwork"] & components["schemas"]["callbacks_ptyCreditCurrency"] & components["schemas"]["callbacks_ptyReceiveAmount"] & components["schemas"]["callbacks_ptyCreditAmount"] & components["schemas"]["callbacks_ptyTxnId"] & components["schemas"]["callbacks_ptyFee"] & components["schemas"]["callbacks_ptyAddress"] & components["schemas"]["callbacks_ptyAddressTag"] & components["schemas"]["callbacks_ptyOrderId"] & components["schemas"]["callbacks_ptyCustomerIpAddress"] & components["schemas"]["callbacks_ptyCustomerReferrerDomain"] & components["schemas"]["callbacks_ptyError"] & unknown & {
-            /** @description Text comment. */
-            note?: string;
-            /** @description Withdrawal created. */
-            created_at?: components["schemas"]["callbacks_schTimestamp"];
-            /** @description Transaction rolled back. */
-            canceled_at?: components["schemas"]["callbacks_schTimestamp"];
-            /** @description Identity of the cabinet user who canceled the withdrawal. */
-            canceled_by?: components["schemas"]["callbacks_schCanceledBy"];
-            /** @description Transaction sent to the blockchain. */
-            sent_at?: components["schemas"]["callbacks_schTimestamp"];
-            /** @description Transaction committed in the blockchain. */
-            committed_at?: components["schemas"]["callbacks_schTimestamp"];
-            /** @description Withdrawal status updated. */
-            updated_at?: components["schemas"]["callbacks_schTimestamp"];
-        } & unknown & {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            callback_type: "callbacks_errWithdrawal";
-        };
-        callbacks_reqCallback: {
-            callback_type: "callbacks_reqCallback";
-        } & Omit<components["schemas"]["callbacks_reqPayment"] | components["schemas"]["callbacks_errPayment"] | components["schemas"]["callbacks_reqWithdrawal"] | components["schemas"]["callbacks_errWithdrawal"], "callback_type">;
-    };
-    responses: {
-        /** @description No Content */
-        payments_res204: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content?: never;
-        };
-        /** @description Bad Request */
-        payments_err400: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/json": components["schemas"]["payments_errBadRequest"];
-            };
-        };
-        /** @description Unauthorized */
-        payments_err401: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/json": components["schemas"]["payments_errUnauthorized"];
-            };
-        };
-        /** @description Forbidden */
-        payments_err403: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/json": components["schemas"]["payments_errForbidden"];
-            };
-        };
-        /** @description Not Found */
-        payments_err404: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/json": components["schemas"]["payments_errNotFound"];
-            };
-        };
-        /** @description Conflict */
-        payments_err409: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/json": components["schemas"]["payments_errAlreadyExists"] | components["schemas"]["payments_errResourceBusy"];
-            };
-        };
-        /** @description Too Many Requests */
-        payments_err429: {
-            headers: {
-                /**
-                 * @description Time in milliseconds to wait before making a new request.
-                 * @example 3600
-                 */
-                "Retry-After"?: number;
-                [name: string]: unknown;
-            };
-            content: {
-                "application/json": components["schemas"]["payments_errTooManyRequests"];
-            };
-        };
-        /** @description Internal Server Error */
-        payments_err500: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/json": components["schemas"]["payments_errInternal"] | components["schemas"]["payments_errUnknown"];
-            };
-        };
-        /** @description Service Unavailable */
-        payments_err503: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/json": components["schemas"]["payments_errUnavailableNow"];
-            };
-        };
-    };
+  "/currencies": {
     parameters: {
-        payments_xSignature: components["schemas"]["payments_schSignature"];
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get currencies
+     * @description Use it:
+     *     * to get the minimum payin amount
+     *     * to get supported currencies and networks
+     *
+     *     ⚠️ Do not strictly validate response fields to avoid immediate
+     *     failures each time we add a new field.
+     *
+     *     ℹ️ `minimum_payin_amount` pertains to payments that involve an exchange.
+     *     It represents the minimum amount required when a payment involves a
+     *     swap.
+     *
+     *     ℹ️ `minimum_direct_payin_amount` represents the minimum amount required
+     *     for payments that do not involve an exchange.
+     */
+    get: operations["getCurrencies"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/balances": {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get balances
+     * @description Returns balances for all available currencies including zero balances.
+     *
+     *     ⚠️ Do not strictly validate response fields to avoid immediate
+     *     failures each time we add a new field.
+     */
+    get: operations["getBalances"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/balances/{currency}": {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path: {
         /** @description Currency code. */
-        payments_pthCurrency: components["schemas"]["payments_schCode-Currency"];
-        /** @description Currency code. */
-        payments_qryCurrency: components["schemas"]["payments_schCode-Currency"];
-        payments_qryNetwork: components["schemas"]["payments_schCode-Network"];
+        currency: components["parameters"]["payments_pthCurrency"];
+      };
+      cookie?: never;
+    };
+    /**
+     * Get a balance
+     * @description ⚠️ Do not strictly validate response fields to avoid immediate
+     *     failures each time we add a new field.
+     */
+    get: operations["getBalance"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/swaps/rate": {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get the swap rate
+     * @description Returns an estimated or fixed swap rate.
+     *
+     *     Fixed swap rate (the one created with `fixed` equal `true`) is a promise
+     *     to swap on a returned rate within a `fixed_for` time period. To execute
+     *     a swap on a fixed rate, pass the exact amounts, rate and rate's ID
+     *     returned from this operation to the `POST /swaps/fixed` request.
+     *
+     *     ⚠️ This fixed rate can expire due to high price volatility.
+     *
+     *     ⚠️ Do not strictly validate response fields to avoid immediate
+     *     failures each time we add a new field.
+     */
+    get: operations["getSwapRate"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/swaps/now": {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Make a swap now
+     * @description Makes a swap without the fixed price.
+     *
+     *     ⚠️ Do not strictly validate response fields to avoid immediate failures
+     *     each time we add a new field.
+     *
+     *     ⚠️ `amount_from` or `amount_to` is required.
+     *
+     *     ⚠️ `amount_from` and `amount_to` are mutually exclusive.
+     */
+    post: operations["makeSwapNow"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/swaps/fixed": {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Make a fixed swap
+     * @description Makes a swap at fixed price.
+     *
+     *     ⚠️ Do not strictly validate response fields to avoid immediate failures
+     *     each time we add a new field.
+     *
+     *     ⚠️ `amount_from` or `amount_to` is required.
+     *
+     *     ⚠️ `amount_from` and `amount_to` are mutually exclusive.
+     */
+    post: operations["makeSwapFixed"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/swaps/{id}": {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get a swap
+     * @description Returns details of a swap.
+     *
+     *     ⚠️ Do not strictly validate response fields to avoid immediate failures
+     *     each time we add a new field.
+     */
+    get: operations["getSwap"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/addresses": {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get addresses
+     * @description Returns the list of allocated static addresses.
+     *
+     *     ⚠️ Do not strictly validate response fields to avoid immediate
+     *     failures each time we add a new field.
+     */
+    get: operations["getAddresses"];
+    put?: never;
+    /**
+     * Allocate an address
+     * @description Returns a static deposit address for a given combination of currency,
+     *     network, and customer.
+     *
+     *     ⚠️ Before allocating a static address, read
+     *     [Payments to Static Addresses](#section/Types-of-Payments/Payments-to-Static-Addresses).
+     *
+     *     ⚠️ Do not strictly validate response fields to avoid immediate
+     *     failures each time we add a new field.
+     *
+     *     ℹ️ If the existing address was de-allocated, allocates a new one.
+     */
+    post: operations["allocateAddress"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/addresses/{address_id}": {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path: {
+        address_id: components["parameters"]["payments_pthAddressId"];
+      };
+      cookie?: never;
+    };
+    /**
+     * Get an address
+     * @description Returns an allocated static deposit address.
+     *
+     *     ⚠️ Do not strictly validate response fields to avoid immediate
+     *     failures each time we add a new field.
+     */
+    get: operations["getAddress"];
+    put?: never;
+    post?: never;
+    /**
+     * Delete an address
+     * @description De-allocates a static deposit address.
+     *
+     *     ⚠️ Do not strictly validate response fields to avoid immediate
+     *     failures each time we add a new field.
+     */
+    delete: operations["deleteAddress"];
+    options?: never;
+    head?: never;
+    /**
+     * Update an address
+     * @description Updates an allocated static deposit address.
+     *
+     *     ⚠️ Do not strictly validate response fields to avoid immediate
+     *     failures each time we add a new field.
+     */
+    patch: operations["updateAddress"];
+    trace?: never;
+  };
+  "/withdrawals/amounts/calc": {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Estimate the amount
+     * @description Calculates estimated withdrawal amount, fees, and the exchange rate.
+     *
+     *     ⚠️ Do not strictly validate response fields to avoid immediate
+     *     failures each time we add a new field.
+     *
+     *     ⚠️  `receive`, `credit`, and `nominal_receive` parameters are
+     *     mutually exclusive.
+     *
+     *     ℹ️ Provide `receive_currency` and `receive` to calculate the amount
+     *     reduced by fees and denominated in target currency.
+     *
+     *     ℹ️ Provide `credit_currency` and `credit` to calculate the amount that
+     *     includes fees and denominated in holding currency.
+     *
+     *     ℹ️ Provide `nominal_receive_currency` and `nominal_receive` to calculate
+     *     the amount reduced by fees and denominated in fiat.
+     */
+    post: operations["calcAmounts"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/withdrawals": {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Create a withdrawal
+     * @description ⚠️ Do not strictly validate response fields to avoid immediate
+     *     failures each time we add a new field.
+     */
+    post: operations["createWithdrawal"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/withdrawals/{txn_id}": {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path: {
+        txn_id: components["parameters"]["payments_pthTxnId"];
+      };
+      cookie?: never;
+    };
+    /**
+     * Get a withdrawal
+     * @description ⚠️ Do not strictly validate response fields to avoid immediate
+     *     failures each time we add a new field.
+     */
+    get: operations["getWithdrawal"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/withdrawals/{txn_id}/callback": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        txn_id: components["parameters"]["payments_pthTxnId"];
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Send a withdrawal callback
+     * @description Triggers sending a callback notification with the withdrawal status.
+     *
+     *     ⚠️ Do not strictly validate response fields to avoid immediate
+     *     failures each time we add a new field.
+     *
+     *     ℹ️ An owner or a team member with the necessary roles can resend through
+     *     the dashboard.
+     */
+    post: operations["sendWithdrawalCallback"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/payments": {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Create a payment
+     * @description Initiates a new payment.
+     *
+     *     ⚠️ Do not strictly validate response fields to avoid immediate
+     *     failures each time we add a new field.
+     *
+     *     ⚠️ To create an invoice, provide `nominal_amount`, and omit it for
+     *     creating a deposit.
+     *
+     *     ⚠️ To make a payin inside a deposit, the customer must follow the
+     *     `payment_url` and send crypto to a new address each time.
+     *
+     *     ⚠️ To send crypto to the same address several times, allocate a static
+     *     deposit address by calling `POST /api/v1/payment/addresses` instead of
+     *     this call.
+     *
+     *     ℹ️ Provide `payment_method` to determine the payment method right away
+     *     and trigger allocation of a new deposit address.
+     */
+    post: operations["createPayment"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/payments/{payment_id}": {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path: {
         /**
          * @description Payment ID.
          * @example 80036de2-7aef-4aaf-9205-992647ff730a
          */
-        payments_pthPaymentId: string;
-        /** @description The cursor received in the previous response in the `cursor_next` field. */
-        payments_qryCursor: components["schemas"]["payments_schCursor"];
-        /** @description The maximum number of items to return. */
-        payments_qryLimit: number;
-        payments_pthAddressId: components["schemas"]["payments_schAddressId"];
-        payments_pthTxnId: components["schemas"]["payments_schTxnId"];
+        payment_id: components["parameters"]["payments_pthPaymentId"];
+      };
+      cookie?: never;
+    };
+    /**
+     * Get a payment
+     * @description ⚠️ Do not strictly validate response fields to avoid immediate
+     *     failures each time we add a new field.
+     */
+    get: operations["getPayment"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Update a payment
+     * @description ⚠️ Do not strictly validate response fields to avoid immediate
+     *     failures each time we add a new field.
+     */
+    patch: operations["updatePayment"];
+    trace?: never;
+  };
+  "/payments/{payment_id}/payment_methods": {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path: {
+        /**
+         * @description Payment ID.
+         * @example 80036de2-7aef-4aaf-9205-992647ff730a
+         */
+        payment_id: components["parameters"]["payments_pthPaymentId"];
+      };
+      cookie?: never;
+    };
+    /**
+     * Get payment methods
+     * @description Returns a list of payment methods available for a payment.
+     *
+     *     ⚠️ Do not strictly validate response fields to avoid immediate
+     *     failures each time we add a new field.
+     */
+    get: operations["getPaymentMethods"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/payments/payment_methods/calc": {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Calculate payment method amounts
+     * @description Returns needed amount in nominal currency given provided payin currency,
+     *     network, and amount.
+     *
+     *     ⚠️ Do not strictly validate response fields to avoid immediate
+     *     failures each time we add a new field.
+     *
+     *     ℹ️ Provides all data available on `payment_url` to that be handled on
+     *     the merchant frontend.
+     */
+    post: operations["calcPaymentMethodAmounts"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/payments/{payment_id}/payment_methods/{currency}": {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path: {
+        /**
+         * @description Payment ID.
+         * @example 80036de2-7aef-4aaf-9205-992647ff730a
+         */
+        payment_id: components["parameters"]["payments_pthPaymentId"];
+        /** @description Currency code. */
+        currency: components["parameters"]["payments_pthCurrency"];
+      };
+      cookie?: never;
+    };
+    /**
+     * Get expected amount
+     * @description Returns an expected amount of the payment given the fees.
+     *
+     *     ⚠️ Do not strictly validate response fields to avoid immediate failures
+     *     each time we add a new field.
+     */
+    get: operations["getPaymentMethodsAmounts"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/payments/{payment_id}/selected_payment_method": {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path: {
+        /**
+         * @description Payment ID.
+         * @example 80036de2-7aef-4aaf-9205-992647ff730a
+         */
+        payment_id: components["parameters"]["payments_pthPaymentId"];
+      };
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Set payment method
+     * @description Sets the payment method for a payment.
+     *
+     *     ⚠️ Do not strictly validate response fields to avoid immediate
+     *     failures each time we add a new field.
+     */
+    put: operations["updatePaymentMethod"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/payments/{payment_id}/callback": {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path: {
+        /**
+         * @description Payment ID.
+         * @example 80036de2-7aef-4aaf-9205-992647ff730a
+         */
+        payment_id: components["parameters"]["payments_pthPaymentId"];
+      };
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Send a payment callback
+     * @description Triggers sending a callback notification with the payment status.
+     *
+     *     ⚠️ Do not strictly validate response fields to avoid immediate
+     *     failures each time we add a new field.
+     *
+     *     ℹ️ An owner or a team member with the necessary roles can resend through
+     *     the dashboard.
+     */
+    post: operations["sendPaymentCallback"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+}
+export interface webhooks {
+  "/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Callback notification
+     * @description Incoming POST request containing a payment/withdrawal notification.
+     *
+     *     ⚠️ Do not strictly validate request fields to avoid immediate failures
+     *     each time we add a new field.
+     *
+     *     ℹ️ Processing of this incoming request must be implemented on the
+     *     merchant's server side.
+     *
+     *     ℹ️ To receive callbacks, provide the URL in the cabinet.
+     */
+    post: operations["callback"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+}
+export interface components {
+  schemas: {
+    /**
+     * Signature
+     * @description Signature of a call passed to the receiver for verification of the call
+     *     origin.
+     */
+    payments_schSignature: string;
+    /** Code */
+    payments_schCode: string;
+    /**
+     * Network code
+     * @description Network code.
+     * @example ETH
+     */
+    "payments_schCode-Network": components["schemas"]["payments_schCode"];
+    /**
+     * Network name
+     * @description Network name.
+     * @example Ethereum
+     */
+    "payments_schName-Network": string;
+    /**
+     * Currency code
+     * @description Currency code.
+     * @example USDT
+     */
+    "payments_schCode-Currency": components["schemas"]["payments_schCode"];
+    /**
+     * Name
+     * @description Currency name.
+     * @example Tether
+     */
+    "payments_schName-Currency": string;
+    /**
+     * Amount
+     * @description Amount.
+     *
+     *     Format: decimal
+     * @example 14.08
+     */
+    payments_schAmount: string;
+    /** Network code */
+    "payments_ptyCode-Network": {
+      code?: components["schemas"]["payments_schCode-Network"];
+    };
+    /** Network name */
+    "payments_ptyName-Network": {
+      name?: components["schemas"]["payments_schName-Network"];
+    };
+    /** Currency code */
+    "payments_ptyCode-Currency": {
+      code?: components["schemas"]["payments_schCode-Currency"];
+    };
+    /** Currency name */
+    "payments_ptyName-Currency": {
+      name?: components["schemas"]["payments_schName-Currency"];
+    };
+    /**
+     * Precision
+     * Format: uint64
+     * @description The number of digits after the dot.
+     * @example 8
+     */
+    payments_schPrecision: number;
+    /** Precision */
+    payments_ptyPrecision: {
+      precision?: components["schemas"]["payments_schPrecision"];
+    };
+    /**
+     * Currency to
+     * @description Target currency.
+     * @example BTC
+     */
+    "payments_schCode-Currency-To": components["schemas"]["payments_schCode-Currency"];
+    /** Swappable to */
+    payments_ptySwappableTo: {
+      swappable_to?: components["schemas"]["payments_schCode-Currency-To"][];
+    };
+    /**
+     * Protocol
+     * @description The protocol or the standard powering the network.
+     * @example ERC20
+     */
+    payments_schProtocol: string;
+    /** Protocol */
+    payments_ptyProtocol: {
+      protocol?: components["schemas"]["payments_schProtocol"];
+    };
+    /**
+     * Address regex
+     * @description Regular expression for a deposit address.
+     * @example ^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,39}$
+     */
+    payments_schAddressRegex: string;
+    /** Address regex */
+    payments_ptyAddressRegex: {
+      address_regex?: components["schemas"]["payments_schAddressRegex"];
+    };
+    /**
+     * Address tag regex
+     * @description Regular expression for `address_tag`.
+     * @example ^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,39}$
+     */
+    payments_schAddressTagRegex: string;
+    /** Address tag regex */
+    payments_ptyAddressTagRegex: {
+      address_tag_regex?: components["schemas"]["payments_schAddressTagRegex"];
+    };
+    /** Networks */
+    payments_schNetworks: components["schemas"]["payments_ptyCode-Network"] &
+      components["schemas"]["payments_ptyName-Network"] &
+      components["schemas"]["payments_ptyProtocol"] &
+      components["schemas"]["payments_ptyPrecision"] &
+      components["schemas"]["payments_ptyPayinEnabled"] &
+      components["schemas"]["payments_ptyPayoutEnabled"] &
+      components["schemas"]["payments_ptyMinimumDirectPayinAmount"] &
+      components["schemas"]["payments_ptyAddressRegex"] &
+      components["schemas"]["payments_ptyAddressTagName"] &
+      components["schemas"]["payments_ptyAddressTagRegex"] &
+      components["schemas"]["payments_ptyCryptoExplorer"] &
+      unknown & {
+        /**
+         * @description Minimum payin amount.
+         *
+         *     ℹ️ If swaps are needed, equals to the sum of
+         *     `minimum_direct_payin_amount` and `minimum_swap_amount`.
+         *
+         *     Format: decimal
+         */
+        minimum_payin_amount?: components["schemas"]["payments_schMinimumPayinAmount"];
+      };
+    /** Networks */
+    payments_ptyNetworks: {
+      /** @description Networks supporting the currency. */
+      networks?: components["schemas"]["payments_schNetworks"][];
+    };
+    /**
+     * Crypto
+     * @description Flag indicating whether the currency is a cryptocurrency.
+     */
+    payments_schCrypto: boolean;
+    /** Crypto */
+    payments_ptyCrypto: {
+      crypto?: components["schemas"]["payments_schCrypto"];
+    };
+    /** Minimum swap amount */
+    payments_ptyMinimumSwapAmount: {
+      /**
+       * @description Minimum swap amount.
+       *
+       *     ⚠️ Applied if nominal and holding currencies are different.
+       *
+       *     Format: decimal
+       * @example 0.00001494652018679495
+       */
+      minimum_swap_amount?: components["schemas"]["payments_schAmount"];
+    };
+    /**
+     * Minimum payin amount
+     * @description Minimum payin amount.
+     *
+     *     Format: decimal
+     * @example 0.00004244652018679495
+     */
+    payments_schMinimumPayinAmount: components["schemas"]["payments_schAmount"];
+    /** Minimum payin amount */
+    payments_ptyMinimumPayinAmount: {
+      minimum_payin_amount?: components["schemas"]["payments_schMinimumPayinAmount"];
+    };
+    /** Minimum direct payin amount */
+    payments_ptyMinimumDirectPayinAmount: {
+      minimum_direct_payin_amount?: components["schemas"]["payments_schMinimumDirectPayinAmount"];
+    };
+    /**
+     * Minimum direct payin amount
+     * @description Minimum payin amount considering network fees.
+     * @example 0.0000275
+     */
+    payments_schMinimumDirectPayinAmount: string &
+      components["schemas"]["payments_schAmount"];
+    /**
+     * Priority
+     * @description The absolute position of the currency in the currency list.
+     * @example 1
+     */
+    payments_schPriority: number;
+    /** Priority */
+    payments_ptyPriority: {
+      priority?: components["schemas"]["payments_schPriority"];
+    };
+    /**
+     * Crypto explorer
+     * Format: url
+     * @description The link to the currency explorer with `{tx}` placeholder for a hash.
+     * @example http://omniexplorer.info/lookuptx.aspx?txid={tx}
+     */
+    payments_schCryptoExplorer: string;
+    /** Crypto explorer */
+    payments_ptyCryptoExplorer: {
+      crypto_explorer?: components["schemas"]["payments_schCryptoExplorer"];
+    };
+    /**
+     * Payin enabled
+     * @description Flag indicating generating deposit addresses is allowed for the
+     *     currency.
+     */
+    payments_schPayinEnabled: boolean;
+    /** Payin enabled */
+    payments_ptyPayinEnabled: {
+      payin_enabled?: components["schemas"]["payments_schPayinEnabled"];
+    };
+    /** Payout enabled */
+    payments_ptyPayoutEnabled: {
+      /** @description Flag indicating withdrawals are allowed for the currency. */
+      payout_enabled?: boolean;
+    };
+    /**
+     * Address tag name
+     * @description The name of the auxiliary identifier used in the network for
+     *     identification of the receiver.
+     * @example Memo
+     */
+    payments_schAddressTagName: string;
+    /** Address tag name */
+    payments_ptyAddressTagName: {
+      address_tag_name?: components["schemas"]["payments_schAddressTagName"];
+    };
+    /** Currency */
+    payments_resCurrency: components["schemas"]["payments_ptyCode-Currency"] &
+      components["schemas"]["payments_ptyName-Currency"] &
+      components["schemas"]["payments_ptyCrypto"] &
+      components["schemas"]["payments_ptyPrecision"] &
+      components["schemas"]["payments_ptyPriority"] &
+      components["schemas"]["payments_ptyAddressTagName"] &
+      components["schemas"]["payments_ptyCryptoExplorer"] &
+      components["schemas"]["payments_ptyNetworks"] &
+      components["schemas"]["payments_ptySwappableTo"] &
+      components["schemas"]["payments_ptyPayinEnabled"] &
+      components["schemas"]["payments_ptyPayoutEnabled"] &
+      components["schemas"]["payments_ptyMinimumSwapAmount"] &
+      unknown & {
+        /**
+         * @description Minimum payin amount.
+         *
+         *     ℹ️ If swaps are needed, equals to the sum of
+         *     `minimum_direct_payin_amount` and `minimum_swap_amount`.
+         */
+        minimum_payin_amount?: components["schemas"]["payments_schMinimumPayinAmount"];
+        /** @description Maximum `minimum_direct_payin_amount` among all networks. */
+        minimum_direct_payin_amount?: components["schemas"]["payments_schMinimumDirectPayinAmount"];
+      };
+    /** Currency */
+    payments_ptyCurrency: {
+      currency?: components["schemas"]["payments_schCode-Currency"];
+    };
+    /** Network */
+    payments_ptyNetwork: {
+      network?: components["schemas"]["payments_schCode-Network"];
+    };
+    /** Fiat equivalent currency */
+    payments_ptyFiatEquivalentCurrency: {
+      /**
+       * @description Fiat currency code.
+       * @example USD
+       */
+      fiat_equivalent_currency?: components["schemas"]["payments_schCode-Currency"];
+    };
+    /** Fiat equivalent amount */
+    payments_ptyFiatEquivalentAmount: {
+      /** @description Balance expressed in fiat. */
+      fiat_equivalent_amount?: components["schemas"]["payments_schAmount"];
+    };
+    /** Balance response */
+    payments_resBalance: components["schemas"]["payments_ptyCurrency"] &
+      components["schemas"]["payments_ptyFiatEquivalentCurrency"] &
+      components["schemas"]["payments_ptyFiatEquivalentAmount"] &
+      unknown & {
+        /**
+         * @description Balance.
+         *
+         *     Format: decimal
+         */
+        amount?: components["schemas"]["payments_schAmount"];
+      };
+    /**
+     * Currency from
+     * @description Source currency.
+     */
+    payments_schCurrencyFrom: components["schemas"]["payments_schCode-Currency"];
+    /** Currency from */
+    payments_ptyCurrencyFrom: {
+      currency_from?: components["schemas"]["payments_schCurrencyFrom"];
+    };
+    /** Currency to */
+    payments_ptyCurrencyTo: {
+      currency_to?: components["schemas"]["payments_schCode-Currency-To"];
+    };
+    /**
+     * Amount from
+     * @description Amount in source currency.
+     * @example 2.37
+     */
+    payments_schAmountFrom: components["schemas"]["payments_schAmount"];
+    /** Amount from */
+    payments_ptyAmountFrom: {
+      amount_from?: components["schemas"]["payments_schAmountFrom"];
+    };
+    /**
+     * Amount to
+     * @description Estimated amount in target currency.
+     * @example 0.00007
+     */
+    payments_schAmountTo: components["schemas"]["payments_schAmount"];
+    /** Amount to */
+    payments_ptyAmountTo: {
+      amount_to?: components["schemas"]["payments_schAmountTo"];
+    };
+    /** Rate */
+    payments_ptyRate: {
+      rate?: components["schemas"]["payments_schRate"];
+    };
+    /** Fixed for */
+    payments_ptyFixedFor: {
+      /**
+       * @description For how long in seconds the rate is fixed.
+       * @example 120
+       */
+      fixed_for?: number;
+    };
+    /** Swap rate */
+    payments_resSwapRate: components["schemas"]["payments_ptyCurrencyFrom"] &
+      components["schemas"]["payments_ptyCurrencyTo"] &
+      components["schemas"]["payments_ptyAmountFrom"] &
+      components["schemas"]["payments_ptyAmountTo"] &
+      components["schemas"]["payments_ptyRate"] &
+      components["schemas"]["payments_ptyFixedFor"] &
+      unknown & {
+        id?: components["schemas"]["payments_schRateId"];
+      };
+    /** Make swap now request */
+    payments_reqMakeSwapNow: components["schemas"]["payments_ptyCurrencyFrom"] &
+      components["schemas"]["payments_ptyCurrencyTo"] &
+      components["schemas"]["payments_ptyAmountFrom"] &
+      components["schemas"]["payments_ptyAmountTo"] &
+      unknown;
+    /**
+     * Rate ID
+     * Format: uuid
+     * @description Swap rate UUID.
+     * @example 58380c1e-60e7-4d81-85ad-1867151641b2
+     */
+    payments_schRateId: string;
+    /** Rate ID */
+    payments_ptyRateId: {
+      rate_id?: components["schemas"]["payments_schRateId"];
+    };
+    /** Make swap fixed */
+    payments_reqMakeSwapFixed: components["schemas"]["payments_ptyCurrencyFrom"] &
+      components["schemas"]["payments_ptyCurrencyTo"] &
+      components["schemas"]["payments_ptyAmountFrom"] &
+      components["schemas"]["payments_ptyAmountTo"] &
+      components["schemas"]["payments_ptyRate"] &
+      components["schemas"]["payments_ptyRateId"] &
+      unknown;
+    /**
+     * Swap ID
+     * @description Swap ID.
+     * @example 7189236
+     */
+    "payments_schId-Swaps": string;
+    /** Swap ID */
+    "payments_ptyId-Swaps": {
+      id?: components["schemas"]["payments_schId-Swaps"];
+    };
+    /**
+     * Swap status
+     * @description Swap status.
+     * @enum {string}
+     */
+    "payments_schStatus-Swaps":
+      | "PENDING"
+      | "COMPLETED"
+      | "FAILED"
+      | "ROLLED_BACK";
+    /** Swap status */
+    "payments_ptyStatus-Swaps": {
+      status?: components["schemas"]["payments_schStatus-Swaps"];
+    };
+    /** Swap */
+    payments_resSwap: components["schemas"]["payments_ptyId-Swaps"] &
+      components["schemas"]["payments_ptyCurrencyFrom"] &
+      components["schemas"]["payments_ptyCurrencyTo"] &
+      components["schemas"]["payments_ptyAmountFrom"] &
+      components["schemas"]["payments_ptyAmountTo"] &
+      components["schemas"]["payments_ptyRate"] &
+      components["schemas"]["payments_ptyStatus-Swaps"] &
+      unknown;
+    /**
+     * Timestamp
+     * Format: date-time
+     * @example 2023-03-22T15:23:56.876Z
+     */
+    payments_schTimestamp: string;
+    /**
+     * Cursor
+     * @description Pointer to an adjacent result page if any.
+     * @example MjAyMy0xMC0xOFQxMTo1ODowOS41OTRaXzA4MzQ2NDhhLWI5YzktNDIwOC1iMzQ2LWUzNjY3NDcwYzIzN19mYWxzZQ==
+     */
+    payments_schCursor: string;
+    /** Cursors */
+    payments_resCursors: {
+      cursor_next?: components["schemas"]["payments_schCursor"];
+      cursor_prev?: components["schemas"]["payments_schCursor"];
+    };
+    /**
+     * Address
+     * @description Deposit address.
+     * @example 0xb794f5ea0ba39494ce839613fffba74279579268
+     */
+    payments_schAddress: string;
+    /**
+     * Address tag
+     * @description Address tag value.
+     * @example 33672098-c31e-4790-b4ed-27fd48638a3e
+     */
+    payments_schAddressTag: string;
+    /**
+     * Address ID
+     * Format: uuid
+     * @description Static deposit address UUID.
+     * @example 75bca384-cf5e-4afb-b1d8-ba488b03bf1e
+     */
+    payments_schAddressId: string;
+    /** Address */
+    payments_ptyAddress: {
+      address?: components["schemas"]["payments_schAddress"];
+    };
+    /** Address tag */
+    payments_ptyAddressTag: {
+      address_tag?: components["schemas"]["payments_schAddressTag"];
+    };
+    /** Payins enabled */
+    payments_ptyPayinsEnabled: {
+      payins_enabled?: components["schemas"]["payments_schPayinEnabled"];
+    };
+    /**
+     * Origin
+     * @description Flag indicating the way the address was created.
+     * @enum {string}
+     */
+    payments_schOrigin: "API" | "Cabinet";
+    /** Origin */
+    payments_ptyOrigin: {
+      origin?: components["schemas"]["payments_schOrigin"];
+    };
+    /** Address response */
+    payments_resAddress: components["schemas"]["payments_ptyProjectId"] &
+      components["schemas"]["payments_ptyCurrency"] &
+      components["schemas"]["payments_ptyNetwork"] &
+      components["schemas"]["payments_ptyAddress"] &
+      components["schemas"]["payments_ptyAddressTag"] &
+      components["schemas"]["payments_ptyPayinsEnabled"] &
+      components["schemas"]["payments_ptyMinimumPayinAmount"] &
+      components["schemas"]["payments_ptyNominalCurrency"] &
+      components["schemas"]["payments_ptyFeesPayer"] &
+      components["schemas"]["payments_ptyCustomerId"] &
+      components["schemas"]["payments_ptyCustomerEmail"] &
+      components["schemas"]["payments_ptyPaymentData"] &
+      components["schemas"]["payments_ptyOrigin"] &
+      components["schemas"]["payments_ptyNewAddressGenerated"] &
+      components["schemas"]["payments_ptyCustomerIpAddress"] &
+      components["schemas"]["payments_ptyCustomerReferrerDomain"] &
+      unknown & {
+        id?: components["schemas"]["payments_schAddressId"];
+        /** @description Date and time of the creation. */
+        created_at?: components["schemas"]["payments_schTimestamp"];
+        /** @description Date and time of the last update. */
+        updated_at?: components["schemas"]["payments_schTimestamp"];
+      };
+    /**
+     * New address generated
+     * @description Flag indicating if customer deposit address was replaced with a new one.
+     */
+    payments_schNewAddressGenerated: boolean;
+    /** New address generated */
+    payments_ptyNewAddressGenerated: {
+      new_address_generated?: components["schemas"]["payments_schNewAddressGenerated"];
+    };
+    /** Create address request */
+    payments_reqAllocateAddress: components["schemas"]["payments_ptyCurrency"] &
+      components["schemas"]["payments_ptyNetwork"] &
+      components["schemas"]["payments_ptyNominalCurrency"] &
+      components["schemas"]["payments_ptyFeesPayer"] &
+      components["schemas"]["payments_ptyCustomerId"] &
+      components["schemas"]["payments_ptyCustomerEmail"] &
+      components["schemas"]["payments_ptyPaymentData"] &
+      components["schemas"]["payments_ptyCustomerIpAddress"] &
+      components["schemas"]["payments_ptyCustomerReferrerDomain"] &
+      unknown;
+    /** Update address request */
+    payments_reqUpdateAddress: components["schemas"]["payments_ptyCustomerId"] &
+      components["schemas"]["payments_ptyCustomerEmail"] &
+      components["schemas"]["payments_ptyPaymentData"] &
+      components["schemas"]["payments_ptyFeesPayer"] &
+      components["schemas"]["payments_ptyCustomerIpAddress"] &
+      components["schemas"]["payments_ptyCustomerReferrerDomain"] & {
+        payment_data?: components["schemas"]["payments_schData"] | null;
+        nominal_currency?:
+          | components["schemas"]["payments_schNominalCurrency"]
+          | null;
+        fees_payer?: components["schemas"]["payments_schFeesPayer"] | null;
+      } & unknown;
+    /** Receive network */
+    payments_ptyReceiveNetwork: {
+      receive_network?: components["schemas"]["payments_schCode-Network"];
+    };
+    payments_reqCalcAmounts:
+      | components["schemas"]["payments_reqCalcAmounts-Receive"]
+      | components["schemas"]["payments_reqCalcAmounts-Credit"]
+      | components["schemas"]["payments_reqCalcAmounts-Nominal"];
+    /** Receive currency */
+    payments_ptyReceiveCurrency: {
+      /** @description The currency credited to the merchant as the result of a withdrawal. */
+      receive_currency?: components["schemas"]["payments_schCode-Currency-To"];
+    };
+    /** Credit currency */
+    payments_ptyCreditCurrency: {
+      /** @description The holding currency. */
+      credit_currency?: components["schemas"]["payments_schCode-Currency"];
+    };
+    /** Nominal receive currency */
+    payments_ptyNominalReceiveCurrency: {
+      /**
+       * @description A fiat currency that denominates crypto the merchant receives as the
+       *     result of a withdrawal.
+       * @example USD
+       */
+      nominal_receive_currency?: components["schemas"]["payments_schCode-Currency-To"];
+    };
+    /** Receive currency */
+    "payments_reqCalcAmounts-Receive": components["schemas"]["payments_ptyReceiveCurrency"] &
+      components["schemas"]["payments_ptyCreditCurrency"] &
+      components["schemas"]["payments_ptyNominalReceiveCurrency"] &
+      components["schemas"]["payments_ptyReceiveNetwork"] &
+      unknown & {
+        amount?: {
+          /**
+           * @description The amount of crypto the merchant must receive as the result
+           *     of a withdrawals (fees not included).
+           *
+           *     Format: decimal
+           */
+          receive: components["schemas"]["payments_schAmountTo"];
+        };
+      };
+    /** Credit currency */
+    "payments_reqCalcAmounts-Credit": components["schemas"]["payments_ptyReceiveCurrency"] &
+      components["schemas"]["payments_ptyCreditCurrency"] &
+      components["schemas"]["payments_ptyNominalReceiveCurrency"] &
+      components["schemas"]["payments_ptyReceiveNetwork"] &
+      unknown & {
+        amount?: {
+          /**
+           * @description The amount of crypto the merchant withdraws from the holding
+           *     account (fees included).
+           *
+           *     Format: decimal
+           */
+          credit: components["schemas"]["payments_schAmount"];
+        };
+      };
+    /** Nominal receive currency */
+    "payments_reqCalcAmounts-Nominal": components["schemas"]["payments_ptyReceiveCurrency"] &
+      components["schemas"]["payments_ptyCreditCurrency"] &
+      components["schemas"]["payments_ptyNominalReceiveCurrency"] &
+      components["schemas"]["payments_ptyReceiveNetwork"] &
+      unknown & {
+        amount?: {
+          /**
+           * @description The amount of fiat the merchant must receive as the
+           *     result of a withdrawals (fees not included).
+           *
+           *     Format: decimal
+           */
+          nominal_receive: components["schemas"]["payments_schAmount"];
+        };
+      };
+    /** Credit amount */
+    payments_ptyCreditAmount: {
+      /**
+       * @description The amount of crypto the merchant withdraws from the
+       *     holding account (fees included).
+       *
+       *     Format: decimal
+       */
+      credit_amount?: components["schemas"]["payments_schAmount"];
+    };
+    /** Receive amount */
+    payments_ptyReceiveAmount: {
+      /**
+       * @description The amount of crypto the merchant must receive as the result of
+       *     a withdrawals (fees not included).
+       *
+       *     Format: decimal
+       */
+      receive_amount?: components["schemas"]["payments_schAmountTo"];
+    };
+    /** Swap rate */
+    payments_ptySwapRate: {
+      swap_rate?: components["schemas"]["payments_schRate"];
+    };
+    /** Fee */
+    payments_ptyFee: {
+      /**
+       * @description Withdrawal fee amount.
+       *
+       *     Format: decimal
+       * @example 0.14
+       */
+      fee?: string;
+    };
+    /** Amounts */
+    payments_resCalcAmounts: components["schemas"]["payments_ptyCreditAmount"] &
+      components["schemas"]["payments_ptyReceiveAmount"] &
+      components["schemas"]["payments_ptySwapRate"] &
+      components["schemas"]["payments_ptyFee"] &
+      unknown;
+    /** Idempotency key */
+    payments_ptyIdempotencyKey: {
+      /**
+       * @description A unique arbitrary key identifying the request used for avoiding
+       *     repeated operations (maintain idempotency).
+       * @example 3f29dcb7-6b33-4fa6-9e37-b262d4810f31
+       */
+      idempotency_key?: string;
+    };
+    /** Create withdrawal request */
+    payments_reqCreateWithdrawal: components["schemas"]["payments_reqCalcAmounts"] &
+      components["schemas"]["payments_ptyOrderId"] &
+      components["schemas"]["payments_ptyAddress"] &
+      components["schemas"]["payments_ptyAddressTag"] &
+      components["schemas"]["payments_ptyCustomerIpAddress"] &
+      components["schemas"]["payments_ptyCustomerReferrerDomain"] &
+      components["schemas"]["payments_ptyIdempotencyKey"] &
+      components["schemas"]["payments_ptyNote"] &
+      unknown;
+    /**
+     * Transaction ID
+     * Format: uuid
+     * @description Transaction UUID.
+     * @example f4505800-772e-4502-88ed-48b1f9585070
+     */
+    payments_schTxnId: string;
+    /**
+     * State
+     * @description Withdrawal state.
+     *
+     *     Values:
+     *     * `PENDING`—a transaction has been created and either waiting to be sent
+     *       to the blockchain or has been sent to the blockchain and gains
+     *       confirmations;
+     *     * `CANCELED`—the transaction has been rolled back;
+     *     * `FAILED`—transaction has failed before being created or on latest
+     *       stages;
+     *     * `SUCCESS`—transaction has been successfully completed.
+     * @enum {string}
+     */
+    "payments_schState-Withdrawal":
+      | "PENDING"
+      | "SUCCESS"
+      | "CANCELED"
+      | "FAILED";
+    /** State */
+    "payments_ptyState-Withdrawal": {
+      state?: components["schemas"]["payments_schState-Withdrawal"];
+    };
+    /**
+     * Hash
+     * @description Network transaction hash.
+     * @example 0xfb0ba568213d11230cd34d62fddd1cc1fe11fdc173l4f2007b0e47a06ad73d20
+     */
+    payments_schHash: string;
+    /** Hash */
+    payments_ptyHash: {
+      hash?: components["schemas"]["payments_schHash"];
+    };
+    /** Withdrawal ID */
+    "payments_ptyId-Withdrawals": {
+      id?: components["schemas"]["payments_schTxnId"];
+    };
+    /**
+     * Payout UUID
+     * @description UUID of the payout corresponding to this withdrawal.
+     * @example a0cdbe86-f568-4b7d-a696-8c31effe10b1
+     */
+    payments_schPayoutTxnTd: components["schemas"]["payments_schTxnId"];
+    /** Payout UUID */
+    payments_ptyPayoutTxnTd: {
+      payout_txn_id?: components["schemas"]["payments_schPayoutTxnTd"];
+    };
+    /** Canceled by */
+    payments_schCanceledBy: {
+      /**
+       * Format: uuid
+       * @description Cabinet user UUID.
+       */
+      id: string;
+      /** @description Cabinet user name */
+      name: string;
+      /**
+       * Format: email
+       * @description Cabinet user email.
+       */
+      email: string;
+    };
+    /** Note */
+    payments_ptyNote: {
+      /** @description Withdrawal text comment. */
+      note?: string;
+    };
+    /** withdrawal response */
+    payments_resWithdrawal: components["schemas"]["payments_resCalcAmounts"] &
+      components["schemas"]["payments_ptyId-Withdrawals"] &
+      components["schemas"]["payments_ptyAddress"] &
+      components["schemas"]["payments_ptyState-Withdrawal"] &
+      components["schemas"]["payments_ptyAddressTag"] &
+      components["schemas"]["payments_ptyReceiveCurrency"] &
+      components["schemas"]["payments_ptyCreditCurrency"] &
+      components["schemas"]["payments_ptyNominalReceiveCurrency"] &
+      components["schemas"]["payments_ptyReceiveNetwork"] &
+      components["schemas"]["payments_ptyIdempotencyKey"] &
+      components["schemas"]["payments_ptyPayoutTxnTd"] &
+      components["schemas"]["payments_ptyHash"] &
+      components["schemas"]["payments_ptyOrderId"] &
+      components["schemas"]["payments_ptyCustomerIpAddress"] &
+      components["schemas"]["payments_ptyCustomerReferrerDomain"] &
+      components["schemas"]["payments_ptyNote"] &
+      components["schemas"]["payments_ptyError"] &
+      unknown & {
+        /** @description Withdrawal created. */
+        created_at?: components["schemas"]["payments_schTimestamp"];
+        /** @description Transaction rolled back. */
+        canceled_at?: components["schemas"]["payments_schTimestamp"];
+        /** @description Identity of the cabinet user who canceled the withdrawal. */
+        canceled_by?: components["schemas"]["payments_schCanceledBy"];
+        /** @description Transaction sent to the blockchain. */
+        sent_at?: components["schemas"]["payments_schTimestamp"];
+        /** @description Transaction committed in the blockchain. */
+        committed_at?: components["schemas"]["payments_schTimestamp"];
+        /** @description Withdrawal status updated. */
+        updated_at?: components["schemas"]["payments_schTimestamp"];
+      };
+    /**
+     * @description Arbitrary metadata associated with the payment.
+     * @example {
+     *       "order_id": 221163,
+     *       "customer_phone": "+999999999"
+     *     }
+     */
+    payments_schData: {
+      [key: string]: unknown;
+    };
+    /**
+     * Customer ID
+     * @description Arbitrary customer ID.
+     * @example 24fc0740-c6c6-48d8-9735-6b5f42a350d4
+     */
+    payments_schCustomerId: string;
+    /** Customer ID */
+    payments_ptyCustomerId: {
+      customer_id?: components["schemas"]["payments_schCustomerId"];
+    };
+    /**
+     * Format: email
+     * @description Customer email.
+     * @example johndoe@example.com
+     */
+    payments_schCustomerEmail: string;
+    /** Customer email */
+    payments_ptyCustomerEmail: {
+      customer_email?: components["schemas"]["payments_schCustomerEmail"];
+    };
+    /** Order ID */
+    payments_ptyOrderId: {
+      /**
+       * @description Arbitrary operation ID generated of the merchant side.
+       * @example 34d3149b-8eb0-4898-971a-63464ae73f1e
+       */
+      order_id?: string;
+    };
+    /**
+     * Title
+     * @description Payment custom name shown to the customer.
+     * @example DBA
+     */
+    payments_schTitle: string;
+    /** Title */
+    payments_ptyTitle: {
+      title?: components["schemas"]["payments_schTitle"];
+    };
+    /**
+     * Description
+     * @description Payment custom description.
+     * @example Lorem ipsum dolor sit amet consectetur adipiscing elit...
+     */
+    payments_schDescription: string;
+    /** Description */
+    payments_ptyDescription: {
+      description?: components["schemas"]["payments_schDescription"];
+    };
+    /** Success redirect URL */
+    payments_ptySuccessRedirectUrl: {
+      /**
+       * Format: uri
+       * @description Link to the merchant page displayed to the customer in the case
+       *     of success.
+       * @example https://example.com/payment/success
+       */
+      success_redirect_url?: string;
+    };
+    /** Failure redirect URL */
+    payments_ptyFailureRedirectUrl: {
+      /**
+       * Format: uri
+       * @description Link to the merchant page displayed to the customer in the case
+       *     of failure.
+       * @example https://example.com/payment/failure
+       */
+      failure_redirect_url?: string;
+    };
+    /**
+     * Nominal currency
+     * @description The desired currency of payment.
+     *
+     *     ℹ️ This currency also denominates the amount specified in
+     *     `nominal_amount`.
+     * @example USDT
+     */
+    payments_schNominalCurrency: string;
+    /** Nominal currency */
+    payments_ptyNominalCurrency: {
+      nominal_currency?: components["schemas"]["payments_schNominalCurrency"];
+    };
+    /** Nominal amount */
+    payments_ptyNominalAmount: {
+      /**
+       * @description The desired amount of a payment.
+       *
+       *     ⚠️ A payment will not complete until this amount is sent by
+       *     the customer.
+       *
+       *     Format: decimal
+       */
+      nominal_amount?: components["schemas"]["payments_schAmount"];
+    };
+    /**
+     * Fees payer
+     * @description The party that pays fees.
+     *
+     *     Values:
+     *     * `MERCHANT`—the amount of payment is not affected by fees;
+     *     * `CUSTOMER`—the amount of a payment is reduced by fees.
+     * @enum {string}
+     */
+    payments_schFeesPayer: "MERCHANT" | "CUSTOMER";
+    /** Fees payer */
+    payments_ptyFeesPayer: {
+      fees_payer?: components["schemas"]["payments_schFeesPayer"];
+    };
+    /** Payment data */
+    payments_ptyPaymentData: {
+      payment_data?: components["schemas"]["payments_schData"];
+    };
+    /** Loss config */
+    payments_schLossConfig: {
+      /**
+       * @description Maximum allowed underpaid percent of `expected_payin_amount`.
+       *
+       *     Calculated as 1 - 'remaining_payin_amount' / `expected_payin_amount`
+       *     where 'remaining_payin_amount' is the minimal accepted amount.
+       *
+       *     Format: decimal fraction (0.01 stands for 1%)
+       */
+      relative?: number;
+      absolute?: {
+        /**
+         * @description Currency that denominates the absolute underpayment threshold.
+         *
+         *     ℹ️ To propose a new currency, contact our support team.
+         * @enum {unknown}
+         */
+        currency:
+          | "USD"
+          | "EUR"
+          | "GBP"
+          | "AUD"
+          | "BRL"
+          | "CAD"
+          | "INR"
+          | "RUB"
+          | "TRY"
+          | "UAH";
+        /**
+         * @description Maximum allowed underpaid amount.
+         *
+         *     Format: decimal
+         */
+        amount: components["schemas"]["payments_schAmount"];
+      };
+    };
+    /** Loss config */
+    payments_ptyLossConfig: {
+      /**
+       * @description ⚠️ If both `relative` and `absolute` are provided,
+       *     the lowest of two calculated amounts will be chosen.
+       *
+       *     ℹ️ If omitted, we apply underpayment settings from the cabinet; and
+       *     0%—if no settings submitted.
+       */
+      loss_config?: components["schemas"]["payments_schLossConfig"];
+    };
+    /** Error */
+    payments_schError: {
+      /**
+       * @description Error message.
+       * @example The order has been failed because the payin amount is below the minimum amount
+       */
+      message?: string;
+    };
+    /** Error */
+    payments_ptyError: {
+      /** @description Error caused payment failure. */
+      error?: components["schemas"]["payments_schError"];
+    };
+    /** Pending deadline at */
+    payments_ptyPendingDeadlineAt: {
+      /**
+       * @description The deadline for payments in the `PENDING` state.
+       *
+       *     ℹ️ If the provided deadline exceeds the one in `deadline_at`
+       *     for the chosen method, it will not take effect.
+       *
+       *     ⚠️ If a payment violates the deadline, it will be
+       *     transferred to the `CANCELED` state.
+       * @example 2023-03-22T15:23:56.876Z
+       */
+      pending_deadline_at?: components["schemas"]["payments_schTimestamp"];
+    };
+    /** Payment method */
+    payments_ptyPaymentMethod: {
+      payment_method?: components["schemas"]["payments_ptyCurrency"] &
+        components["schemas"]["payments_ptyNetwork"] &
+        unknown &
+        unknown;
+    };
+    /** Checkout template ID */
+    payments_checkoutTemplateId: {
+      /**
+       * Format: uuid
+       * @description UUID of the template that will be displayed on the checkout page.
+       *
+       *     ℹ️ If not set, default template will be applied.
+       *
+       *     ℹ️ See the templates settings in **My Merchant** >
+       *     **Checkout templates** section in the app.
+       * @example c1460010-ed46-49eb-8f02-4f0edd21c933
+       */
+      checkout_template_id?: string;
+    };
+    /** Deposit */
+    "payments_reqCreatePayment-Deposit": components["schemas"]["payments_ptyTitle"] &
+      components["schemas"]["payments_ptyDescription"] &
+      components["schemas"]["payments_ptyOrderId"] &
+      components["schemas"]["payments_ptyCustomerId"] &
+      components["schemas"]["payments_ptyCustomerEmail"] &
+      components["schemas"]["payments_ptyPaymentData"] &
+      components["schemas"]["payments_ptyNominalCurrency"] &
+      components["schemas"]["payments_ptyRecommendedAmount"] &
+      components["schemas"]["payments_ptySuccessRedirectUrl"] &
+      components["schemas"]["payments_ptyFailureRedirectUrl"] &
+      components["schemas"]["payments_ptyPendingDeadlineAt"] &
+      components["schemas"]["payments_ptyPaymentMethod"] &
+      components["schemas"]["payments_ptyFeesPayer"] &
+      components["schemas"]["payments_checkoutTemplateId"] &
+      components["schemas"]["payments_ptyCustomerIpAddress"] &
+      components["schemas"]["payments_ptyCustomerReferrerDomain"] &
+      unknown;
+    /** Invoice */
+    "payments_reqCreatePayment-Invoice": components["schemas"]["payments_ptyTitle"] &
+      components["schemas"]["payments_ptyDescription"] &
+      components["schemas"]["payments_ptyOrderId"] &
+      components["schemas"]["payments_ptyCustomerId"] &
+      components["schemas"]["payments_ptyCustomerEmail"] &
+      components["schemas"]["payments_ptyPaymentData"] &
+      components["schemas"]["payments_ptyNominalCurrency"] &
+      components["schemas"]["payments_ptySuccessRedirectUrl"] &
+      components["schemas"]["payments_ptyFailureRedirectUrl"] &
+      components["schemas"]["payments_ptyPendingDeadlineAt"] &
+      components["schemas"]["payments_ptyPaymentMethod"] &
+      components["schemas"]["payments_ptyFeesPayer"] &
+      components["schemas"]["payments_ptyNominalAmount"] &
+      components["schemas"]["payments_ptyLossConfig"] &
+      components["schemas"]["payments_checkoutTemplateId"] &
+      components["schemas"]["payments_ptyCustomerIpAddress"] &
+      components["schemas"]["payments_ptyCustomerReferrerDomain"] &
+      components["schemas"]["payments_ptyUnderpaymentConfig"] &
+      components["schemas"]["payments_ptyOverpaymentConfig"] &
+      unknown;
+    /** Update payment request */
+    payments_reqUpdatePayment: components["schemas"]["payments_ptyOrderId"] &
+      components["schemas"]["payments_ptyCustomerId"] &
+      components["schemas"]["payments_ptyCustomerEmail"] &
+      components["schemas"]["payments_ptyPaymentData"] & {
+        payment_title?: components["schemas"]["payments_schTitle"];
+        payment_description?: components["schemas"]["payments_schDescription"];
+      };
+    /** Other data */
+    payments_ptyOtherData: {
+      other_data?: components["schemas"]["payments_schData"];
+    };
+    /**
+     * Customer IP address
+     * @description IP address (IPv4 or IPv6) of the request sender.
+     *
+     *     ⚠️ Currently our validator accepts empty values for this field, but this
+     *     is only temporary. In the next release, this field will become
+     *     mandatory. To avoid unexpected integration failures when validation is
+     *     enforced, please populate this field from the beginning of your
+     *     integration implementation.
+     *
+     *     ℹ️ Used for API requests only.
+     * @example 0.0.0.0
+     */
+    payments_schCustomerIpAddress: string;
+    /** Customer IP address */
+    payments_ptyCustomerIpAddress: {
+      customer_ip_address?: components["schemas"]["callbacks_schCustomerIpAddress"];
+    };
+    /**
+     * Customer referrer domain
+     * @description The URL of the domain where the buyer is located at the moment of the
+     *     request for creating a one-time payment, static address, or initiation
+     *     of withdrawal.
+     *
+     *     ⚠️ Currently our validator accepts empty values for this field, but this
+     *     is only temporary. In the next release, this field will become
+     *     mandatory. To avoid unexpected integration failures when validation is
+     *     enforced, please populate this field from the beginning of your
+     *     integration implementation.
+     *
+     *     ℹ️ Used for API requests only.
+     */
+    payments_schCustomerReferrerDomain: string;
+    /** Customer referrer domain */
+    payments_ptyCustomerReferrerDomain: {
+      customer_referer_domain?: components["schemas"]["callbacks_schCustomerReferrerDomain"];
+    };
+    /** Underpayment config */
+    payments_ptyUnderpaymentConfig: {
+      underpayment_config?: components["schemas"]["payments_schLossConfig"];
+    };
+    /** Overpayment config */
+    payments_ptyOverpaymentConfig: {
+      overpayment_config?: components["schemas"]["payments_schLossConfig"];
+    };
+    /** Payment details */
+    payments_schDetails: components["schemas"]["payments_ptyTitle"] &
+      components["schemas"]["payments_ptyDescription"] &
+      components["schemas"]["payments_ptySuccessRedirectUrl"] &
+      components["schemas"]["payments_ptyFailureRedirectUrl"] &
+      components["schemas"]["payments_ptyOrderId"] &
+      components["schemas"]["payments_ptyCustomerId"] &
+      components["schemas"]["payments_ptyCustomerEmail"] &
+      components["schemas"]["payments_ptyCustomerIpAddress"] &
+      components["schemas"]["payments_ptyCustomerReferrerDomain"] &
+      components["schemas"]["payments_ptyOtherData"];
+    /** Project ID */
+    payments_ptyProjectId: {
+      /**
+       * Format: uuid
+       * @description Project ID.
+       * @example 007dd1e5-cc29-41cb-8522-ccfe13c27e7c
+       */
+      project_id?: string;
+    };
+    /**
+     * Payment ID
+     * Format: uuid
+     * @description Payment ID.
+     * @example 1f04d164-73de-4b5d-a2b9-4bf1faa05973
+     */
+    payments_schPaymentId: string;
+    /** Selected payment method */
+    payments_ptySelectedPaymentMethod: {
+      selected_payment_method?: components["schemas"]["payments_resSelectedPaymentMethod"];
+    };
+    /** Recommended amount */
+    payments_ptyRecommendedAmount: {
+      /**
+       * @description Recommended amount.
+       *
+       *     See
+       *     [Recommended Amount](#section/Types-of-Payments/Recommended-Amount).
+       */
+      recommended_amount?: {
+        /**
+         * @description Recommended sum of payment in nominal currency displayed to the
+         *     customer.
+         *
+         *     ⚠️ The actual payment amount may not correspond to this sum.
+         *
+         *     ℹ️ Includes fees before being recalculated in payin currency.
+         *
+         *     ℹ️ Amount in payin currency displayed on our checkout page
+         *     (`payment_url`) or obtained via the
+         *     `POST /api/v1/payments/payment_methods/calc` call.
+         */
+        nominal: components["schemas"]["payments_schAmount"];
+      };
+    };
+    /** ID */
+    "payments_ptyId-Payments": {
+      id?: components["schemas"]["payments_schPaymentId"];
+    };
+    /** Details */
+    payments_ptyDetails: {
+      /** @description Additional payment details. */
+      details?: components["schemas"]["payments_schDetails"];
+    };
+    /** Payment URL */
+    payments_ptyPaymentUrl: {
+      /**
+       * Format: uri
+       * @description Link to an individual checkout page hosted by us when the
+       *     customer can choose a payment method.
+       * @example https://dba.com/C1408A
+       */
+      payment_url?: string;
+    };
+    /** Created at */
+    "payments_ptyCreatedAt-Payments": {
+      /** @description Date and time the payment initiated. */
+      created_at?: components["schemas"]["payments_schTimestamp"];
+    };
+    /** Updated at */
+    "payments_ptyUpdatedAt-Payments": {
+      /** @description Date and time the payment state last update. */
+      updated_at?: components["schemas"]["payments_schTimestamp"];
+    };
+    /** Completed at */
+    payments_ptyCompletedAt: {
+      /** @description Date and time of the transition to the `COMPLETED` state. */
+      completed_at?: components["schemas"]["payments_schTimestamp"];
+    };
+    /** Deadline at */
+    payments_ptyDeadlineAt: {
+      /**
+       * @description Our deadline for a payment in the `WAITING` state.
+       *
+       *     ⚠️ If a payment violates the deadline, it will be transferred
+       *     to the `FAILED` state.
+       */
+      deadline_at?: components["schemas"]["payments_schTimestamp"];
+    };
+    /** Deposit */
+    "payments_resPayment-Deposit": components["schemas"]["payments_ptyType"] &
+      components["schemas"]["payments_ptyId-Payments"] &
+      components["schemas"]["payments_ptyState-Payments"] &
+      components["schemas"]["payments_ptyNominalCurrency"] &
+      components["schemas"]["payments_ptyNominalAmount"] &
+      components["schemas"]["payments_ptyRecommendedAmount"] &
+      components["schemas"]["payments_ptySelectedPaymentMethod"] &
+      components["schemas"]["payments_ptyFeesPayer"] &
+      components["schemas"]["payments_ptyPaymentUrl"] &
+      components["schemas"]["payments_ptyProjectId"] &
+      components["schemas"]["payments_ptyDetails"] &
+      components["schemas"]["payments_ptyCreatedAt-Payments"] &
+      components["schemas"]["payments_ptyUpdatedAt-Payments"] &
+      components["schemas"]["payments_ptyCompletedAt"] &
+      components["schemas"]["payments_ptyDeadlineAt"] &
+      components["schemas"]["payments_ptyCustomerIpAddress"] &
+      components["schemas"]["payments_ptyCustomerReferrerDomain"] &
+      components["schemas"]["payments_ptyError"] &
+      components["schemas"]["payments_checkoutTemplateId"] &
+      unknown & {
+        /**
+         * @description discriminator enum property added by openapi-typescript
+         * @enum {string}
+         */
+        type: "DEPOSIT";
+      };
+    /** Invoice */
+    "payments_resPayment-Invoice": components["schemas"]["payments_ptyType"] &
+      components["schemas"]["payments_ptyId-Payments"] &
+      components["schemas"]["payments_ptyState-Payments"] &
+      components["schemas"]["payments_ptyNominalCurrency"] &
+      components["schemas"]["payments_ptyNominalAmount"] &
+      components["schemas"]["payments_ptySelectedPaymentMethod"] &
+      components["schemas"]["payments_ptyFeesPayer"] &
+      components["schemas"]["payments_ptyLossConfig"] &
+      components["schemas"]["payments_ptyPaymentUrl"] &
+      components["schemas"]["payments_ptyProjectId"] &
+      components["schemas"]["payments_ptyDetails"] &
+      components["schemas"]["payments_ptyCreatedAt-Payments"] &
+      components["schemas"]["payments_ptyUpdatedAt-Payments"] &
+      components["schemas"]["payments_ptyCompletedAt"] &
+      components["schemas"]["payments_ptyDeadlineAt"] &
+      components["schemas"]["payments_ptyCustomerIpAddress"] &
+      components["schemas"]["payments_ptyCustomerReferrerDomain"] &
+      components["schemas"]["payments_ptyError"] &
+      components["schemas"]["payments_checkoutTemplateId"] &
+      unknown & {
+        /**
+         * @description discriminator enum property added by openapi-typescript
+         * @enum {string}
+         */
+        type: "INVOICE";
+      };
+    payments_resPayment: {
+      type: "payments_resPayment";
+    } & Omit<
+      | components["schemas"]["payments_resPayment-Deposit"]
+      | components["schemas"]["payments_resPayment-Invoice"],
+      "type"
+    >;
+    /** Type */
+    payments_ptyType: {
+      type?: components["schemas"]["payments_schType"];
+    };
+    /** State */
+    "payments_ptyState-Payments": {
+      state?: components["schemas"]["payments_schState"];
+    };
+    /**
+     * Type
+     * @description Payment type.
+     *
+     *     Values:
+     *     * `INVOICE`—a payment of the predefined amount that succeeds only after
+     *       the total amount of all detected payins reaches this amount;
+     *     * `DEPOSIT`—a deposit of an arbitrary amount that succeeds after the
+     *       first detected payin.
+     * @enum {string}
+     */
+    payments_schType: "INVOICE" | "DEPOSIT";
+    /**
+     * State
+     * @description Payment state.
+     *
+     *     Values:
+     *     * `CREATED`—the customer initiated a payment and picks a payment method;
+     *     * `CANCELED`—the merchant deadline specified in `pending_deadline_at` is
+     *       exceeded;
+     *     * `FAILED`—the payment expired our deadline or failed during processing;
+     *     * `WAITING`—a transaction corresponding to the payment is detected in
+     *       the blockchain and gains confirmations;
+     *     * `COMPLETED`—the payment successfully completed.
+     * @enum {string}
+     */
+    payments_schState:
+      | "CREATED"
+      | "CANCELED"
+      | "WAITING"
+      | "FAILED"
+      | "COMPLETED";
+    /** Selected payment method */
+    payments_resSelectedPaymentMethod: components["schemas"]["payments_ptyHoldingCurrency"] &
+      components["schemas"]["payments_ptyHoldingAmount"] &
+      components["schemas"]["payments_ptyMinimumPayinAmount"] &
+      unknown & {
+        selected_at?: components["schemas"]["payments_schTimestamp"];
+        /**
+         * @description Details of a swap created after the payment initialization which
+         *     is not guaranteed to be executed after successful payins.
+         */
+        nominal_holding_swap?: components["schemas"]["payments_schHoldingSwap"] &
+          unknown;
+        /**
+         * @description Fee charged for the payment.
+         *
+         *     ℹ️ A percent: `0.01` stands for 0.01%.
+         *
+         *     Format: decimal
+         * @example 0.27
+         */
+        payment_fee?: components["schemas"]["payments_schAmount"];
+        /**
+         * Format: uuid
+         * @description UUID of the final transfer to the holding account.
+         * @example 8331c46a-56e4-4748-9dd9-7e5e23732cd6
+         */
+        holding_transfer_txn_id?: string;
+        /**
+         * @description Transaction produced as a result of the actually committed swap
+         *     at the latest stage of the payment.
+         */
+        payin_holding_swap?: components["schemas"]["payments_schHoldingSwap"];
+        /** @description Payin currency code. */
+        payin_currency?: components["schemas"]["payments_schCode-Currency"];
+        payin_network?: components["schemas"]["payments_schCode-Network"];
+        /**
+         * @description Expected payment amount.
+         *
+         *     Format: decimal
+         */
+        expected_payin_amount?: components["schemas"]["payments_schAmount"];
+        payin_address?: components["schemas"]["payments_schAddress"];
+        /**
+         * @description Additional ID of the payment apart from a deposit address.
+         * @example lOqMs91JaKqlwM18Mkqolx
+         */
+        payin_address_tag?: string;
+        /** @description Payins detected for an invoice payment. */
+        payins?: components["schemas"]["payments_schPayins"][];
+        /**
+         * @description Payins amount remaining before we accept the payment.
+         *
+         *     Format: decimal
+         * @example 0.01
+         */
+        remaining_payin_amount?: components["schemas"]["payments_schAmount"];
+      };
+    /**
+     * Swap rate
+     * @description Swap rate.
+     *
+     *     Format: decimal
+     * @example 30250.48
+     */
+    payments_schRate: components["schemas"]["payments_schAmount"];
+    /** Holding swap */
+    payments_schHoldingSwap: {
+      rate: components["schemas"]["payments_schRate"];
+      /**
+       * @description Date and time of the swap from default holding currency to holding
+       *     currency.
+       */
+      time: components["schemas"]["payments_schTimestamp"];
+      /** @description Swap operation UUID. */
+      txn_id?: components["schemas"]["payments_schTxnId"];
+    };
+    /** Amount */
+    payments_ptyAmount: {
+      /**
+       * @description Amount.
+       *
+       *     Format: decimal
+       */
+      amount?: components["schemas"]["payments_schAmount"];
+    };
+    /** Payins */
+    payments_schPayins: components["schemas"]["payments_ptyCurrency"] &
+      components["schemas"]["payments_ptyNetwork"] &
+      components["schemas"]["payments_ptyAmount"] & {
+        /**
+         * @description Deposit fee.
+         *
+         *     Format: decimal
+         * @example 0.01
+         */
+        fee: components["schemas"]["payments_schAmount"];
+        txn_hash: components["schemas"]["payments_schHash"];
+        /**
+         * @description Date and time of submitting the payin transaction to the
+         *     blockchain.
+         * @example 2023-03-22T15:23:56.876Z
+         */
+        declared_at: components["schemas"]["payments_schTimestamp"];
+        /**
+         * @description Date and time of gathering sufficient number of confirmations.
+         * @example 2023-03-22T15:23:56.876Z
+         */
+        confirmed_at?: components["schemas"]["payments_schTimestamp"];
+      };
+    /** Payment method */
+    payments_resPaymentMethod: components["schemas"]["payments_ptyCode-Currency"] &
+      components["schemas"]["payments_ptyName-Currency"] &
+      components["schemas"]["payments_ptyCrypto"] &
+      components["schemas"]["payments_ptyPrecision"] &
+      components["schemas"]["payments_ptyPriority"] &
+      components["schemas"]["payments_ptyAddressTagName"] &
+      components["schemas"]["payments_ptyCryptoExplorer"] &
+      components["schemas"]["payments_ptyNetworks"] &
+      components["schemas"]["payments_ptySwappableTo"] &
+      components["schemas"]["payments_ptyPayinEnabled"] &
+      components["schemas"]["payments_ptyPayoutEnabled"] &
+      components["schemas"]["payments_ptyMinimumSwapAmount"] &
+      components["schemas"]["payments_ptyMinimumPayinAmount"] &
+      unknown;
+    /** Calculate payment method amounts request */
+    payments_reqCalcPaymentMethodAmounts: components["schemas"]["payments_ptyFeesPayer"] &
+      components["schemas"]["payments_ptyNominalCurrency"] &
+      components["schemas"]["payments_ptyPayinCurrency"] &
+      components["schemas"]["payments_ptyPayinNetwork"] &
+      unknown & {
+        amount?: {
+          /** @description Nominal amount. */
+          nominal: components["schemas"]["payments_ptyAmount"];
+        };
+      };
+    /** Set payment method */
+    payments_reqSelectPaymentMethod: components["schemas"]["payments_ptyCurrency"] &
+      components["schemas"]["payments_ptyNetwork"] &
+      unknown;
+    /** Holding currency */
+    payments_ptyHoldingCurrency: {
+      /** @description Holding currency. */
+      holding_currency?: components["schemas"]["payments_schCode-Currency"];
+    };
+    /** Holding amount */
+    payments_ptyHoldingAmount: {
+      /**
+       * @description Amount credited to the holding account as a result of the
+       *     payment minus fees.
+       *
+       *     Format: decimal
+       * @example 14.08
+       */
+      holding_amount?: string;
+    };
+    /** Payin currency */
+    payments_ptyPayinCurrency: {
+      /**
+       * @description Payin currency.
+       *
+       *     ℹ️ Specified in `currency` parameter.
+       */
+      payin_currency?: components["schemas"]["payments_schCode-Currency"];
+    };
+    /** Payin network */
+    payments_ptyPayinNetwork: {
+      /**
+       * @description Payin network.
+       *
+       *     ℹ️ Specified in `network` parameter.
+       */
+      payin_network?: components["schemas"]["payments_schCode-Network"];
+    };
+    /** Expected amount */
+    payments_resAmount: components["schemas"]["payments_ptyNominalCurrency"] &
+      components["schemas"]["payments_ptyNominalAmount"] &
+      components["schemas"]["payments_ptyHoldingCurrency"] &
+      components["schemas"]["payments_ptyHoldingAmount"] &
+      components["schemas"]["payments_ptyPayinCurrency"] &
+      components["schemas"]["payments_ptyPayinNetwork"] &
+      components["schemas"]["payments_ptyMinimumPayinAmount"] &
+      unknown & {
+        /**
+         * @description Estimated exchange rate from the payment currency to the holding
+         *     currency calculated if these do not match.
+         *
+         *     Format: decimal
+         * @example 2.37
+         */
+        nominal_holding_swap_rate?: string;
+        /**
+         * @description Estimated exchange rate from the payin currency to the holding
+         *     currency calculated if these do not match.
+         *
+         *     Format: decimal
+         * @example 1
+         */
+        payin_holding_swap_rate?: string;
+        /**
+         * @description Fixed fee charged for deposits.
+         *
+         *     ℹ️ An absolute value: `0.01` stands for 0.01 USDT.
+         *
+         *     Format: decimal
+         * @example 0.01
+         */
+        deposit_fee?: string;
+        /**
+         * @description The total payment fee.
+         *
+         *     Format: decimal
+         * @example 0.97
+         */
+        payment_fee?: components["schemas"]["payments_schAmount"];
+        /**
+         * @description Expected amount of payin in payin currency.
+         *
+         *     Format: decimal
+         * @example 0.0062534748
+         */
+        expected_payin_amount?: components["schemas"]["payments_schAmount"];
+      };
+    /** Send callback response */
+    payments_resSendCallback: {
+      request: {
+        /**
+         * Format: uri
+         * @description Target URL.
+         * @example https://example.com/api/v1/payment/webhook
+         */
+        url: string;
+        /**
+         * @description Callback body.
+         * @example {"callback_type":"PAYMENT","payment_id":"80036de2-7aef-4aaf-9205-992647ff730a","project_id":"7388421c-06af-11ee-be56-0242ac120002","type":"INVOICE","state":"CANCELED","nominal_currency":"USDT","nominal_amount":"14.08","fees_payer":"MERCHANT","title":"DBA","description":"Loremipsumdolorsitametconsecteturadipiscingelit...","order_id":"34d3149b-8eb0-4898-971a-63464ae73f1e","customer_id":"24fc0740-c6c6-48d8-9735-6b5f42a350d4","customer_email":"johndoe@example.com","other_data":{"sales_manager_id":221163,"customer_phone":"+999999999"},"selected_payment_method":{"holding_currency":"USDT","holding_amount":"14.08","minimum_payin_amount":"14.08","selected_at":"2023-03-22T15:23:56.876Z","nominal_holding_swap":{},"payment_fee":"0.27","holding_transfer_txn_id":"cec43f26-99a7-48dd-a42e-c332833a3c47","payin_holding_swap":{},"payin_currency":"USDT","payin_network":"ETH","expected_payin_amount":"14.08","remaining_payin_amount":"0.01","payin_address":"0xb794f5ea0ba39494ce839613fffba74279579268","payin_address_tag":"lOqMs91JaKqlwM18Mkqolx","payins":[]},"created_at":"2023-03-22T15:23:56.876Z","updated_at":"2023-03-22T15:23:56.876Z","completed_at":"2023-03-22T15:23:56.876Z","deadline_at":"2023-03-22T15:23:56.876Z"}
+         */
+        body: string;
+        /** @example VzMyYzZDT0h3UVR2RFNwNENNMWh5ZE11S3VhWU42ajVEcDl6RG1GaG1pRDlnV25USHI0ZUovVDE4eHZwZGxLdXJmcnhKYSt5RElMelQ0RmRIZUYzVjZYcnNxdzZ3YzhKNi9lZXFyZzc1WnhJek0yN1ZjckFQVXNrazJ3WTFYUFJrK3BqWnpGcTVMRU5ZbHdESFpIOFRPaGtLUTVtbDBQUFFCaDUvVitYTG5BPToxNzEyMjI5NTM5 */
+        signature: components["schemas"]["payments_schSignature"];
+      };
+      response: {
+        /**
+         * @description Status code.
+         * @example 200
+         */
+        code: number;
+        /**
+         * @description Request result.
+         * @example {"ok":true}
+         */
+        body: string;
+      };
+    };
+    /** Type */
+    "payments_ptyType-Errors": {
+      type?: components["schemas"]["payments_schType-Errors"];
+    };
+    /**
+     * Type
+     * @description Error type.
+     * @enum {string}
+     */
+    "payments_schType-Errors": "BAD_REQUEST" | "API_ERROR";
+    /** Code */
+    "payments_ptyCode-Errors": {
+      code?: components["schemas"]["payments_schCode-Errors"];
+    };
+    /**
+     * Code
+     * @description Error reason.
+     * @enum {string}
+     */
+    "payments_schCode-Errors":
+      | "INVALID_REQUEST_PARAMETERS"
+      | "INVALID_REQUEST_BODY"
+      | "INVALID_REQUEST"
+      | "TOO_MANY_REQUESTS"
+      | "ACCOUNT_IS_DISABLED"
+      | "OPERATION_TEMPORARILY_BLOCKED"
+      | "NOMINAL_AMOUNT_INVALID"
+      | "PAYMENT_METHOD_NOT_SELECTED"
+      | "NO_FREE_ADDRESSES"
+      | "ADDRESS_ALREADY_EXISTS"
+      | "INSUFFICIENT_BALANCE"
+      | "MERCHANT_IS_DISABLED";
+    /** Message */
+    "payments_ptyMessage-Errors": {
+      message?: components["schemas"]["payments_schMessage-Errors"];
+    };
+    /** @description Error message. */
+    "payments_schMessage-Errors": string;
+    /** Parameter */
+    "payments_ptyParam-Errors": {
+      param?: components["schemas"]["payments_schParam-Errors"];
+    };
+    /**
+     * Parameter
+     * @description Name of the parameter caused the error.
+     */
+    "payments_schParam-Errors": string;
+    /** Error */
+    payments_default: {
+      errors: (components["schemas"]["payments_ptyType-Errors"] &
+        components["schemas"]["payments_ptyMessage-Errors"] &
+        unknown)[];
+    };
+    /** Error */
+    "payments_default-Code": {
+      errors: (components["schemas"]["payments_ptyType-Errors"] &
+        components["schemas"]["payments_ptyMessage-Errors"] &
+        components["schemas"]["payments_ptyCode-Errors"] &
+        unknown)[];
+    };
+    /** Error */
+    "payments_default-Code-Param": {
+      errors: (components["schemas"]["payments_ptyType-Errors"] &
+        components["schemas"]["payments_ptyMessage-Errors"] &
+        components["schemas"]["payments_ptyCode-Errors"] &
+        components["schemas"]["payments_ptyParam-Errors"] &
+        unknown)[];
+    };
+    /**
+     * Bad request
+     * @description Bad request.
+     * @example {
+     *       "errors": [
+     *         {
+     *           "type": "BAD_REQUEST",
+     *           "message": "bad request"
+     *         }
+     *       ]
+     *     }
+     */
+    payments_errBadRequest: components["schemas"]["payments_default"];
+    /**
+     * Unauthorized
+     * @description Requested address do not march the project or merchant.
+     * @example {
+     *       "errors": [
+     *         {
+     *           "type": "BAD_REQUEST",
+     *           "message": "unauthorized"
+     *         }
+     *       ]
+     *     }
+     */
+    payments_errUnauthorized: components["schemas"]["payments_default"];
+    /**
+     * Forbidden
+     * @description Requested operation is not allowed.
+     * @example {
+     *       "errors": [
+     *         {
+     *           "type": "BAD_REQUEST",
+     *           "message": "forbidden"
+     *         }
+     *       ]
+     *     }
+     */
+    payments_errForbidden: components["schemas"]["payments_default"];
+    /**
+     * Not found
+     * @description Requested resource not found.
+     * @example {
+     *       "errors": [
+     *         {
+     *           "type": "BAD_REQUEST",
+     *           "message": "not found"
+     *         }
+     *       ]
+     *     }
+     */
+    payments_errNotFound: components["schemas"]["payments_default"];
+    /**
+     * Already exists
+     * @description Bad request.
+     * @example {
+     *       "errors": [
+     *         {
+     *           "type": "BAD_REQUEST",
+     *           "message": "already exists"
+     *         }
+     *       ]
+     *     }
+     */
+    payments_errAlreadyExists: components["schemas"]["payments_default"];
+    /**
+     * Resource busy
+     * @description Cannot alter requested resource.
+     * @example {
+     *       "errors": [
+     *         {
+     *           "type": "BAD_REQUEST",
+     *           "message": "resource is busy"
+     *         }
+     *       ]
+     *     }
+     */
+    payments_errResourceBusy: components["schemas"]["payments_default"];
+    /**
+     * Too many requests
+     * @description Too many requests.
+     * @example {
+     *       "errors": [
+     *         {
+     *           "type": "BAD_REQUEST",
+     *           "code": "TOO_MANY_REQUESTS",
+     *           "message": "too many requests"
+     *         }
+     *       ]
+     *     }
+     */
+    payments_errTooManyRequests: components["schemas"]["payments_default-Code"];
+    /**
+     * Unavailable now
+     * @description Service unavailable.
+     * @example {
+     *       "errors": [
+     *         {
+     *           "type": "API_ERROR",
+     *           "message": "service unavailable now"
+     *         }
+     *       ]
+     *     }
+     */
+    payments_errUnavailableNow: components["schemas"]["payments_default"];
+    /**
+     * Unknown
+     * @description Unknown error.
+     * @example {
+     *       "errors": [
+     *         {
+     *           "type": "API_ERROR",
+     *           "message": "unknown error"
+     *         }
+     *       ]
+     *     }
+     */
+    payments_errUnknown: components["schemas"]["payments_default"];
+    /**
+     * Internal
+     * @description Internal server error.
+     * @example {
+     *       "errors": [
+     *         {
+     *           "type": "API_ERROR",
+     *           "message": "internal server error"
+     *         }
+     *       ]
+     *     }
+     */
+    payments_errInternal: components["schemas"]["payments_default"];
+    /**
+     * Invalid request parameters
+     * @example {
+     *       "errors": [
+     *         {
+     *           "type": "BAD_REQUEST",
+     *           "code": "INVALID_REQUEST_PARAMETERS",
+     *           "message": "<message>",
+     *           "param": "<param>"
+     *         }
+     *       ]
+     *     }
+     */
+    payments_errInvalidRequestParameters: components["schemas"]["payments_default-Code-Param"];
+    /**
+     * Invalid request body
+     * @description Invalid request body.
+     * @example {
+     *       "errors": [
+     *         {
+     *           "type": "BAD_REQUEST",
+     *           "code": "INVALID_REQUEST_BODY",
+     *           "message": "<message>"
+     *         }
+     *       ]
+     *     }
+     */
+    payments_errInvalidRequestBody: components["schemas"]["payments_default-Code"];
+    /**
+     * Invalid request
+     * @description Invalid request.
+     * @example {
+     *       "errors": [
+     *         {
+     *           "type": "BAD_REQUEST",
+     *           "code": "INVALID_REQUEST",
+     *           "message": "<message>"
+     *         }
+     *       ]
+     *     }
+     */
+    payments_errInvalidRequest: components["schemas"]["payments_default-Code"];
+    /**
+     * Payment method not selected
+     * @description Missing payment method.
+     * @example {
+     *       "errors": [
+     *         {
+     *           "type": "BAD_REQUEST",
+     *           "code": "PAYMENT_METHOD_NOT_SELECTED",
+     *           "message": "payment_method is required for recommended_amount.payin",
+     *           "param": "payment_method"
+     *         }
+     *       ]
+     *     }
+     */
+    payments_errPaymentMethodNotSelected: components["schemas"]["payments_default-Code-Param"];
+    /**
+     * Nominal amount invalid
+     * @description Invalid nominal amount.
+     * @example {
+     *       "errors": [
+     *         {
+     *           "type": "API_ERROR",
+     *           "code": "NOMINAL_AMOUNT_INVALID",
+     *           "message": "<message>"
+     *         }
+     *       ]
+     *     }
+     */
+    payments_errNominalAmountInvalid: components["schemas"]["payments_default-Code"];
+    /**
+     * No free addresses
+     * @description No free deposit addresses in the pool of addresses.
+     * @example {
+     *       "errors": [
+     *         {
+     *           "type": "API_ERROR",
+     *           "code": "NO_FREE_ADDRESSES",
+     *           "message": "no free addresses in the pool"
+     *         }
+     *       ]
+     *     }
+     */
+    payments_errNoFreeAddresses: components["schemas"]["payments_default-Code"];
+    /**
+     * Address already exists
+     * @description Deposit address generated for provided parameters already exists.
+     * @example {
+     *       "errors": [
+     *         {
+     *           "type": "API_ERROR",
+     *           "code": "ADDRESS_ALREADY_EXISTS",
+     *           "message": "customer static deposit address already exists"
+     *         }
+     *       ]
+     *     }
+     */
+    payments_errAddressAlreadyExists: components["schemas"]["payments_default-Code"];
+    /**
+     * Account is disabled
+     * @description Holding account is disabled.
+     * @example {
+     *       "errors": [
+     *         {
+     *           "type": "API_ERROR",
+     *           "code": "ACCOUNT_IS_DISABLED",
+     *           "message": "the account is disabled"
+     *         }
+     *       ]
+     *     }
+     */
+    payments_errAccountIsDisabled: components["schemas"]["payments_default-Code"];
+    /**
+     * Operation blocked
+     * @description Requested operation is temporary disabled.
+     * @example {
+     *       "errors": [
+     *         {
+     *           "type": "API_ERROR",
+     *           "code": "OPERATION_TEMPORARILY_BLOCKED",
+     *           "message": "requested operation is temporarily blocked"
+     *         }
+     *       ]
+     *     }
+     */
+    payments_errOperationBlocked: components["schemas"]["payments_default-Code"];
+    /**
+     * Merchant is disabled
+     * @description Merchant is disabled.
+     * @example {
+     *       "errors": [
+     *         {
+     *           "type": "API_ERROR",
+     *           "code": "MERCHANT_IS_DISABLED",
+     *           "message": "cannot perform operation; this account is disabled"
+     *         }
+     *       ]
+     *     }
+     */
+    payments_errMerchantIsDisabled: components["schemas"]["payments_default-Code"];
+    /**
+     * Insufficient balance
+     * @description Holding account balance is insufficient for the withdrawal.
+     * @example {
+     *       "errors": [
+     *         {
+     *           "type": "API_ERROR",
+     *           "code": "INSUFFICIENT_BALANCE",
+     *           "message": "balance is insufficient for the requested operation"
+     *         }
+     *       ]
+     *     }
+     */
+    payments_errInsufficientBalance: components["schemas"]["payments_default-Code"];
+    /**
+     * Currency not found
+     * @description Currency not found.
+     * @example {
+     *       "errors": [
+     *         {
+     *           "code": "INVALID_REQUEST_PARAMETERS",
+     *           "message": "not found: currency",
+     *           "type": "API_ERROR",
+     *           "param": "currency"
+     *         }
+     *       ]
+     *     }
+     */
+    payments_errCurrencyNotFound: components["schemas"]["payments_default-Code-Param"];
+    /**
+     * Network not found
+     * @description Network not found.
+     * @example {
+     *       "errors": [
+     *         {
+     *           "code": "INVALID_REQUEST_PARAMETERS",
+     *           "message": "network is not found",
+     *           "type": "API_ERROR",
+     *           "param": "network"
+     *         }
+     *       ]
+     *     }
+     */
+    payments_errNetworkNotFound: components["schemas"]["payments_default-Code-Param"];
+    /**
+     * Network required
+     * @description Network parameter not provided.
+     * @example {
+     *       "errors": [
+     *         {
+     *           "code": "INVALID_REQUEST_PARAMETERS",
+     *           "message": "network is required",
+     *           "type": "API_ERROR",
+     *           "param": "network"
+     *         }
+     *       ]
+     *     }
+     */
+    payments_errNetworkRequired: components["schemas"]["payments_default-Code-Param"];
+    /** Code */
+    callbacks_schCode: string;
+    /**
+     * Address
+     * @description Deposit address.
+     * @example 0xb794f5ea0ba39494ce839613fffba74279579268
+     */
+    callbacks_schAddress: string;
+    /**
+     * Currency code
+     * @description Currency code.
+     * @example USDT
+     */
+    "callbacks_schCode-Currency": components["schemas"]["callbacks_schCode"];
+    /**
+     * Network code
+     * @description Network code.
+     * @example ETH
+     */
+    "callbacks_schCode-Network": components["schemas"]["callbacks_schCode"];
+    /**
+     * Timestamp
+     * Format: date-time
+     * @example 2023-03-22T15:23:56.876Z
+     */
+    callbacks_schTimestamp: string;
+    /**
+     * Payment ID
+     * Format: uuid
+     * @description Payment ID.
+     * @example 2838302c-a433-4a52-912c-91877ca62178
+     */
+    callbacks_schPaymentId: string;
+    /** Currency */
+    callbacks_ptyCurrency: {
+      currency?: components["schemas"]["callbacks_schCode-Currency"];
+    };
+    /** Network */
+    callbacks_ptyNetwork: {
+      network?: components["schemas"]["callbacks_schCode-Network"];
+    };
+    /** Payment ID */
+    callbacks_ptyPaymentId: {
+      payment_id?: components["schemas"]["callbacks_schPaymentId"];
+    };
+    /** Project ID */
+    callbacks_ptyProjectId: {
+      /**
+       * Format: uuid
+       * @description Project ID.
+       * @example a157bba8-1aed-46f8-a91b-d89d8476aab0
+       */
+      project_id?: string;
+    };
+    /**
+     * Payment states
+     * @description Payment state.
+     *
+     *     Values:
+     *     * `CREATED`—the customer initiated a payment and picks a payment method;
+     *     * `CANCELED`—the merchant deadline specified in `pending_deadline_at` is
+     *       exceeded;
+     *     * `FAILED`—the payment expired our deadline or failed during processing;
+     *     * `WAITING`—a transaction corresponding to the payment is detected in
+     *       the blockchain and gains confirmations;
+     *     * `COMPLETED`—the payment successfully completed.
+     * @enum {string}
+     */
+    "callbacks_schState-Payments":
+      | "CREATED"
+      | "CANCELED"
+      | "WAITING"
+      | "FAILED"
+      | "COMPLETED";
+    /** State */
+    "callbacks_ptyState-Payments": {
+      state?: components["schemas"]["callbacks_schState-Payments"];
+    };
+    /** Type */
+    callbacks_ptyType: {
+      type?: components["schemas"]["callbacks_schType"];
+    };
+    /**
+     * Type
+     * @description Payment type.
+     *
+     *     Values:
+     *     * `INVOICE`—a payment of the predefined amount that succeeds only after
+     *       the total amount of all detected payins reaches this amount;
+     *     * `DEPOSIT`—a deposit of an arbitrary amount that succeeds after the
+     *       first detected payin.
+     * @enum {string}
+     */
+    callbacks_schType: "INVOICE" | "DEPOSIT";
+    /** Nominal currency */
+    callbacks_ptyNominalCurrency: {
+      /**
+       * @description The desired currency of payment.
+       *
+       *     ℹ️ This currency also denominates the amount specified in
+       *     `nominal_amount`.
+       * @example USDT
+       */
+      nominal_currency?: string;
+    };
+    /**
+     * Amount
+     * @description Amount.
+     *
+     *     Format: decimal
+     * @example 14.08
+     */
+    callbacks_schAmount: string;
+    /** Amount */
+    callbacks_ptyAmount: {
+      amount?: components["schemas"]["callbacks_schAmount"];
+    };
+    /** Nominal amount */
+    callbacks_ptyNominalAmount: {
+      /**
+       * @description The desired amount of a payment.
+       *
+       *     ⚠️ A payment will not complete until this amount is sent by the
+       *     customer.
+       *
+       *     Format: decimal
+       */
+      nominal_amount?: components["schemas"]["callbacks_schAmount"];
+    };
+    /** Fees payer */
+    callbacks_ptyFeesPayer: {
+      /**
+       * @description The party that pays fees.
+       *
+       *     Values:
+       *     * `MERCHANT`—the amount of payment is not affected by fees;
+       *     * `CUSTOMER`—the amount of a payment is reduced by fees.
+       * @enum {string}
+       */
+      fees_payer?: "MERCHANT" | "CUSTOMER";
+    };
+    /**
+     * Title
+     * @description Payment custom name shown to the customer.
+     * @example DBA
+     */
+    callbacks_schTitle: string;
+    /** Title */
+    callbacks_ptyTitle: {
+      title?: components["schemas"]["callbacks_schTitle"];
+    };
+    /**
+     * Description
+     * @description Payment custom description.
+     * @example Lorem ipsum dolor sit amet consectetur adipiscing elit...
+     */
+    callbacks_schDescription: string;
+    /** Description */
+    callbacks_ptyDescription: {
+      description?: components["schemas"]["callbacks_schDescription"];
+    };
+    /** Order ID */
+    callbacks_ptyOrderId: {
+      /**
+       * @description Arbitrary operation ID generated of the merchant side.
+       * @example 34d3149b-8eb0-4898-971a-63464ae73f1e
+       */
+      order_id?: string;
+    };
+    /**
+     * Customer ID
+     * @description Arbitrary customer ID.
+     * @example 24fc0740-c6c6-48d8-9735-6b5f42a350d4
+     */
+    callbacks_schCustomerId: string;
+    /** Customer ID */
+    callbacks_ptyCustomerId: {
+      customer_id?: components["schemas"]["callbacks_schCustomerId"];
+    };
+    /** Customer email */
+    callbacks_ptyCustomerEmail: {
+      /**
+       * Format: email
+       * @description Customer email.
+       * @example johndoe@example.com
+       */
+      customer_email?: string;
+    };
+    /**
+     * @description Arbitrary metadata associated with the payment.
+     * @example {
+     *       "sales_manager_id": 221163,
+     *       "customer_phone": "+999999999"
+     *     }
+     */
+    callbacks_schData: {
+      [key: string]: unknown;
+    };
+    /** Other data */
+    callbacks_ptyOtherData: {
+      other_data?: components["schemas"]["callbacks_schData"];
+    };
+    /** Holding currency */
+    callbacks_ptyHoldingCurrency: {
+      /** @description Holding currency. */
+      holding_currency?: components["schemas"]["callbacks_schCode-Currency"];
+    };
+    /** Holding amount */
+    callbacks_ptyHoldingAmount: {
+      /**
+       * @description Amount credited to the holding account as a result of the payment
+       *     minus fees.
+       *
+       *     Format: decimal
+       * @example 14.08
+       */
+      holding_amount?: components["schemas"]["callbacks_schAmount"];
+    };
+    /** Minimum payin amount */
+    callbacks_ptyMinimumPayinAmount: {
+      /**
+       * @description Minimum payin amount.
+       *
+       *     Format: decimal
+       */
+      minimum_payin_amount?: components["schemas"]["callbacks_schAmount"];
+    };
+    /**
+     * Transaction ID
+     * Format: uuid
+     * @description Transaction UUID.
+     * @example e1dbb8b8-cb76-4dc1-8be9-68d751d6cd1a
+     */
+    callbacks_schTxnId: string;
+    /**
+     * Swap rate
+     * @description Swap rate.
+     *
+     *     Format: decimal
+     * @example 30250.48
+     */
+    callbacks_schRate: components["schemas"]["callbacks_schAmount"];
+    /** Holding swap */
+    callbacks_schHoldingSwap: {
+      rate: components["schemas"]["callbacks_schRate"];
+      /**
+       * @description Date and time of the swap from default holding currency to holding
+       *     currency.
+       */
+      time: components["schemas"]["callbacks_schTimestamp"];
+      /** @description Swap operation UUID. */
+      txn_id?: components["schemas"]["callbacks_schTxnId"];
+    };
+    /** Selected payment method */
+    callbacks_resSelectedPaymentMethod: components["schemas"]["callbacks_ptyHoldingCurrency"] &
+      components["schemas"]["callbacks_ptyHoldingAmount"] &
+      components["schemas"]["callbacks_ptyMinimumPayinAmount"] &
+      unknown & {
+        selected_at?: components["schemas"]["callbacks_schTimestamp"];
+        /**
+         * @description Details of a swap created after the payment initialization which
+         *     is not guaranteed to be executed after successful payins.
+         */
+        nominal_holding_swap?: components["schemas"]["callbacks_schHoldingSwap"] &
+          unknown;
+        /**
+         * @description Fee charged for the payment.
+         *
+         *     ℹ️ A percent: `0.01` stands for 0.01%.
+         *
+         *     Format: decimal
+         * @example 0.27
+         */
+        payment_fee?: string;
+        /**
+         * Format: uuid
+         * @description UUID of the final transfer to the holding account.
+         * @example fe442f6b-4846-4ec6-8199-7859afc9facb
+         */
+        holding_transfer_txn_id?: string;
+        /**
+         * @description Transaction produced as a result of the actually committed swap
+         *     at the latest stage of the payment.
+         */
+        payin_holding_swap?: components["schemas"]["callbacks_schHoldingSwap"];
+        /** @description Payin currency code. */
+        payin_currency?: components["schemas"]["callbacks_schCode-Currency"];
+        payin_network?: components["schemas"]["callbacks_schCode-Network"];
+        /**
+         * @description Expected payment amount.
+         *
+         *     Format: decimal
+         */
+        expected_payin_amount?: components["schemas"]["callbacks_schAmount"];
+        /**
+         * @description Payins amount remaining before we accept the payment.
+         *
+         *     Format: decimal
+         * @example 0.01
+         */
+        remaining_payin_amount?: components["schemas"]["callbacks_schAmount"];
+        payin_address?: components["schemas"]["callbacks_schAddress"];
+        /**
+         * @description Additional ID of the payment apart from a deposit address.
+         * @example lOqMs91JaKqlwM18Mkqolx
+         */
+        payin_address_tag?: string;
+        /** @description Payins detected for a payment. */
+        payins?: components["schemas"]["callbacks_schPayins"][];
+      };
+    /**
+     * Hash
+     * @description Network transaction hash.
+     * @example 0xfb0ba568213d11230cd34d62fddd1cc1fe11fdc173l4f2007b0e47a06ad73d20
+     */
+    callbacks_schHash: string;
+    /** Payins */
+    callbacks_schPayins: components["schemas"]["callbacks_ptyCurrency"] &
+      components["schemas"]["callbacks_ptyNetwork"] &
+      components["schemas"]["callbacks_ptyAmount"] &
+      unknown & {
+        /**
+         * @description Deposit fee.
+         *
+         *     Format: decimal
+         * @example 0.01
+         */
+        fee?: components["schemas"]["callbacks_schAmount"];
+        txn_hash?: components["schemas"]["callbacks_schHash"];
+        /**
+         * @description Date and time of submitting the payin transaction to the
+         *     blockchain.
+         * @example 2023-03-22T15:23:56.876Z
+         */
+        declared_at?: components["schemas"]["callbacks_schTimestamp"];
+        /**
+         * @description Date and time of gathering sufficient number of confirmations.
+         * @example 2023-03-22T15:23:56.876Z
+         */
+        confirmed_at?: components["schemas"]["callbacks_schTimestamp"];
+      };
+    /** Selected payment method */
+    callbacks_ptySelectedPaymentMethod: {
+      selected_payment_method?: components["schemas"]["callbacks_resSelectedPaymentMethod"];
+    };
+    /** Created at */
+    "callbacks_ptyCreatedAt-Payments": {
+      /** @description Date and time the payment initiated. */
+      created_at?: components["schemas"]["callbacks_schTimestamp"];
+    };
+    /** Updated at */
+    "callbacks_ptyUpdatedAt-Payments": {
+      /** @description Date and time the payment state last update. */
+      updated_at?: components["schemas"]["callbacks_schTimestamp"];
+    };
+    /** Completed at */
+    callbacks_ptyCompletedAt: {
+      /** @description Date and time of the transition to the `COMPLETED` state. */
+      completed_at?: components["schemas"]["callbacks_schTimestamp"];
+    };
+    /** Deadline at */
+    callbacks_ptyDeadlineAt: {
+      /**
+       * @description Our deadline for a payment in the `WAITING` state.
+       *
+       *     ⚠️ If a payment violates the deadline, it will be transferred
+       *     to the `FAILED` state.
+       */
+      deadline_at?: components["schemas"]["callbacks_schTimestamp"];
+    };
+    /**
+     * Customer IP address
+     * @description IP address (IPv4 or IPv6) of the request sender.
+     *
+     *     ⚠️ Currently our validator accepts empty values for this field, but
+     *     this is only temporary. In the next release, this field will become
+     *     mandatory. To avoid unexpected integration failures when validation
+     *     is enforced, please populate this field from the beginning of your
+     *     integration implementation.
+     *
+     *     ℹ️ Used for API requests only.
+     * @example 0.0.0.0
+     */
+    callbacks_schCustomerIpAddress: string;
+    /** Customer IP address */
+    callbacks_ptyCustomerIpAddress: {
+      customer_ip_address?: components["schemas"]["callbacks_schCustomerIpAddress"];
+    };
+    /**
+     * Customer referrer domain
+     * @description The URL of the domain where the buyer is located at the moment of the
+     *     request for creating a one-time payment, static address, or initiation
+     *     of withdrawal.
+     *
+     *     ⚠️ Currently our validator accepts empty values for this field, but this
+     *     is only temporary. In the next release, this field will become
+     *     mandatory. To avoid unexpected integration failures when validation is
+     *     enforced, please populate this field from the beginning of your
+     *     integration implementation.
+     *
+     *     ℹ️ Used for API requests only.
+     */
+    callbacks_schCustomerReferrerDomain: string;
+    /** Customer referrer domain */
+    callbacks_ptyCustomerReferrerDomain: {
+      customer_referer_domain?: components["schemas"]["callbacks_schCustomerReferrerDomain"];
+    };
+    /** Payment (success) */
+    callbacks_reqPayment: components["schemas"]["callbacks_ptyCallbackType"] &
+      components["schemas"]["callbacks_ptyPaymentId"] &
+      components["schemas"]["callbacks_ptyType"] &
+      components["schemas"]["callbacks_ptyState-Payments"] &
+      components["schemas"]["callbacks_ptyNominalCurrency"] &
+      components["schemas"]["callbacks_ptyNominalAmount"] &
+      components["schemas"]["callbacks_ptySelectedPaymentMethod"] &
+      components["schemas"]["callbacks_ptyFeesPayer"] &
+      components["schemas"]["callbacks_ptyTitle"] &
+      components["schemas"]["callbacks_ptyDescription"] &
+      components["schemas"]["callbacks_ptyProjectId"] &
+      components["schemas"]["callbacks_ptyOrderId"] &
+      components["schemas"]["callbacks_ptyCustomerId"] &
+      components["schemas"]["callbacks_ptyCustomerEmail"] &
+      components["schemas"]["callbacks_ptyOtherData"] &
+      components["schemas"]["callbacks_ptyCustomerIpAddress"] &
+      components["schemas"]["callbacks_ptyCustomerReferrerDomain"] &
+      components["schemas"]["callbacks_ptyCreatedAt-Payments"] &
+      components["schemas"]["callbacks_ptyUpdatedAt-Payments"] &
+      components["schemas"]["callbacks_ptyCompletedAt"] &
+      components["schemas"]["callbacks_ptyDeadlineAt"] &
+      unknown &
+      unknown & {
+        /**
+         * @description discriminator enum property added by openapi-typescript
+         * @enum {string}
+         */
+        callback_type: "PAYMENT";
+      };
+    /** Payment (error) */
+    callbacks_errPayment: components["schemas"]["callbacks_ptyCallbackType"] &
+      components["schemas"]["callbacks_ptyPaymentId"] &
+      components["schemas"]["callbacks_ptyType"] &
+      components["schemas"]["callbacks_ptyState-Payments"] &
+      components["schemas"]["callbacks_ptyNominalCurrency"] &
+      components["schemas"]["callbacks_ptyNominalAmount"] &
+      components["schemas"]["callbacks_ptySelectedPaymentMethod"] &
+      components["schemas"]["callbacks_ptyFeesPayer"] &
+      components["schemas"]["callbacks_ptyTitle"] &
+      components["schemas"]["callbacks_ptyDescription"] &
+      components["schemas"]["callbacks_ptyProjectId"] &
+      components["schemas"]["callbacks_ptyOrderId"] &
+      components["schemas"]["callbacks_ptyCustomerId"] &
+      components["schemas"]["callbacks_ptyCustomerEmail"] &
+      components["schemas"]["callbacks_ptyOtherData"] &
+      components["schemas"]["callbacks_ptyCustomerIpAddress"] &
+      components["schemas"]["callbacks_ptyCustomerReferrerDomain"] &
+      components["schemas"]["callbacks_ptyCreatedAt-Payments"] &
+      components["schemas"]["callbacks_ptyUpdatedAt-Payments"] &
+      components["schemas"]["callbacks_ptyCompletedAt"] &
+      components["schemas"]["callbacks_ptyDeadlineAt"] &
+      components["schemas"]["callbacks_ptyError"] &
+      unknown &
+      unknown & {
+        /**
+         * @description discriminator enum property added by openapi-typescript
+         * @enum {string}
+         */
+        callback_type: "callbacks_errPayment";
+      };
+    /** Withdrawal ID */
+    "callbacks_ptyId-Withdrawals": {
+      id?: components["schemas"]["callbacks_schTxnId"];
+    };
+    /**
+     * Currency to
+     * @description Target currency.
+     * @example BTC
+     */
+    "callbacks_schCode-Currency-To": components["schemas"]["callbacks_schCode-Currency"];
+    /** Receive currency */
+    callbacks_ptyReceiveCurrency: {
+      /** @description The currency credited to the merchant as the result of a withdrawal. */
+      receive_currency?: components["schemas"]["callbacks_schCode-Currency-To"];
+    };
+    /** Receive network */
+    callbacks_ptyReceiveNetwork: {
+      receive_network?: components["schemas"]["callbacks_schCode-Network"];
+    };
+    /** Credit currency */
+    callbacks_ptyCreditCurrency: {
+      /** @description The holding currency. */
+      credit_currency?: components["schemas"]["callbacks_schCode-Currency"];
+    };
+    /**
+     * Amount to
+     * @description Estimated amount in target currency.
+     *
+     *     Format: decimal
+     * @example 0.00007
+     */
+    callbacks_schAmountTo: components["schemas"]["callbacks_schAmount"];
+    /** Receive amount */
+    callbacks_ptyReceiveAmount: {
+      /**
+       * @description The amount of crypto the merchant must receive as the result of a
+       *     withdrawals (fees not included).
+       *
+       *     Format: decimal
+       */
+      receive_amount?: components["schemas"]["callbacks_schAmountTo"];
+    };
+    /** Credit amount */
+    callbacks_ptyCreditAmount: {
+      /**
+       * @description The amount of crypto the merchant withdraws from the holding account
+       *     (fees included).
+       *
+       *     Format: decimal
+       */
+      credit_amount?: components["schemas"]["callbacks_schAmount"];
+    };
+    /** Fee */
+    callbacks_ptyFee: {
+      /**
+       * @description Withdrawal fee amount.
+       *
+       *     Format: decimal
+       * @example 0.14
+       */
+      fee?: components["schemas"]["callbacks_schAmount"];
+    };
+    /**
+     * State
+     * @description Withdrawal state.
+     *
+     *     Values:
+     *     * `PENDING`—a transaction has been created and either waiting to be sent
+     *       to the blockchain or has been sent to the blockchain and gains
+     *       confirmations;
+     *     * `CANCELED`—the transaction has been rolled back;
+     *     * `FAILED`—transaction has failed before being created or on latest
+     *       stages;
+     *     * `SUCCESS`—transaction has been successfully completed.
+     * @enum {string}
+     */
+    "callbacks_schState-Withdrawals":
+      | "PENDING"
+      | "SUCCESS"
+      | "CANCELED"
+      | "FAILED";
+    /** State */
+    "callbacks_ptyState-Withdrawals": {
+      state?: components["schemas"]["callbacks_schState-Withdrawals"];
+    };
+    /** Payout UUID */
+    callbacks_ptyTxnId: {
+      /**
+       * @description UUID of the payout corresponding to this withdrawal.
+       * @example a0cdbe86-f568-4b7d-a696-8c31effe10b1
+       */
+      txn_id?: components["schemas"]["callbacks_schTxnId"];
+    };
+    /** Address */
+    callbacks_ptyAddress: string;
+    /**
+     * Address tag
+     * @description Address tag value.
+     * @example 33672098-c31e-4790-b4ed-27fd48638a3e
+     */
+    callbacks_schAddressTag: string;
+    /** Address tag */
+    callbacks_ptyAddressTag: {
+      address_tag?: components["schemas"]["callbacks_schAddressTag"];
+    };
+    /**
+     * Callback type
+     * @description Callback type.
+     * @enum {string}
+     */
+    callbacks_schCallbackType: "PAYMENT" | "WITHDRAWAL";
+    /** Callback type */
+    callbacks_ptyCallbackType: {
+      callback_type?: components["schemas"]["callbacks_schCallbackType"];
+    };
+    /** Error */
+    callbacks_ptyError: {
+      error?: components["schemas"]["callbacks_schError"];
+    };
+    /** Error */
+    callbacks_schError: {
+      /**
+       * @description Error caused payment failure.
+       * @example The order has been failed because the payin amount is below the minimum amount
+       */
+      message?: string;
+    };
+    /** Canceled by */
+    callbacks_schCanceledBy: {
+      /**
+       * Format: uuid
+       * @description Cabinet user UUID.
+       */
+      id: string;
+      /** @description Cabinet user name */
+      name: string;
+      /**
+       * Format: email
+       * @description Cabinet user email.
+       */
+      email: string;
+    };
+    /** Withdrawal (success) */
+    callbacks_reqWithdrawal: components["schemas"]["callbacks_ptyCallbackType"] &
+      components["schemas"]["callbacks_ptyId-Withdrawals"] &
+      components["schemas"]["callbacks_ptyState-Withdrawals"] &
+      components["schemas"]["callbacks_ptyReceiveCurrency"] &
+      components["schemas"]["callbacks_ptyReceiveNetwork"] &
+      components["schemas"]["callbacks_ptyCreditCurrency"] &
+      components["schemas"]["callbacks_ptyReceiveAmount"] &
+      components["schemas"]["callbacks_ptyCreditAmount"] &
+      components["schemas"]["callbacks_ptyTxnId"] &
+      components["schemas"]["callbacks_ptyFee"] &
+      components["schemas"]["callbacks_ptyAddress"] &
+      components["schemas"]["callbacks_ptyAddressTag"] &
+      components["schemas"]["callbacks_ptyOrderId"] &
+      components["schemas"]["callbacks_ptyCustomerIpAddress"] &
+      components["schemas"]["callbacks_ptyCustomerReferrerDomain"] &
+      unknown & {
+        /** @description Withdrawal created. */
+        created_at?: components["schemas"]["callbacks_schTimestamp"];
+        /** @description Transaction rolled back. */
+        canceled_at?: components["schemas"]["callbacks_schTimestamp"];
+        /** @description Identity of the cabinet user who canceled the withdrawal. */
+        canceled_by?: components["schemas"]["callbacks_schCanceledBy"];
+        /** @description Transaction sent to the blockchain. */
+        sent_at?: components["schemas"]["callbacks_schTimestamp"];
+        /** @description Transaction committed in the blockchain. */
+        committed_at?: components["schemas"]["callbacks_schTimestamp"];
+        /** @description Withdrawal status updated. */
+        updated_at?: components["schemas"]["callbacks_schTimestamp"];
+      } & unknown & {
+        /**
+         * @description discriminator enum property added by openapi-typescript
+         * @enum {string}
+         */
+        callback_type: "WITHDRAWAL";
+      };
+    /** Withdrawal (error) */
+    callbacks_errWithdrawal: components["schemas"]["callbacks_ptyCallbackType"] &
+      components["schemas"]["callbacks_ptyId-Withdrawals"] &
+      components["schemas"]["callbacks_ptyState-Withdrawals"] &
+      components["schemas"]["callbacks_ptyReceiveCurrency"] &
+      components["schemas"]["callbacks_ptyReceiveNetwork"] &
+      components["schemas"]["callbacks_ptyCreditCurrency"] &
+      components["schemas"]["callbacks_ptyReceiveAmount"] &
+      components["schemas"]["callbacks_ptyCreditAmount"] &
+      components["schemas"]["callbacks_ptyTxnId"] &
+      components["schemas"]["callbacks_ptyFee"] &
+      components["schemas"]["callbacks_ptyAddress"] &
+      components["schemas"]["callbacks_ptyAddressTag"] &
+      components["schemas"]["callbacks_ptyOrderId"] &
+      components["schemas"]["callbacks_ptyCustomerIpAddress"] &
+      components["schemas"]["callbacks_ptyCustomerReferrerDomain"] &
+      components["schemas"]["callbacks_ptyError"] &
+      unknown & {
+        /** @description Text comment. */
+        note?: string;
+        /** @description Withdrawal created. */
+        created_at?: components["schemas"]["callbacks_schTimestamp"];
+        /** @description Transaction rolled back. */
+        canceled_at?: components["schemas"]["callbacks_schTimestamp"];
+        /** @description Identity of the cabinet user who canceled the withdrawal. */
+        canceled_by?: components["schemas"]["callbacks_schCanceledBy"];
+        /** @description Transaction sent to the blockchain. */
+        sent_at?: components["schemas"]["callbacks_schTimestamp"];
+        /** @description Transaction committed in the blockchain. */
+        committed_at?: components["schemas"]["callbacks_schTimestamp"];
+        /** @description Withdrawal status updated. */
+        updated_at?: components["schemas"]["callbacks_schTimestamp"];
+      } & unknown & {
+        /**
+         * @description discriminator enum property added by openapi-typescript
+         * @enum {string}
+         */
+        callback_type: "callbacks_errWithdrawal";
+      };
+    callbacks_reqCallback: {
+      callback_type: "callbacks_reqCallback";
+    } & Omit<
+      | components["schemas"]["callbacks_reqPayment"]
+      | components["schemas"]["callbacks_errPayment"]
+      | components["schemas"]["callbacks_reqWithdrawal"]
+      | components["schemas"]["callbacks_errWithdrawal"],
+      "callback_type"
+    >;
+  };
+  responses: {
+    /** @description No Content */
+    payments_res204: {
+      headers: {
+        [name: string]: unknown;
+      };
+      content?: never;
+    };
+    /** @description Bad Request */
+    payments_err400: {
+      headers: {
+        [name: string]: unknown;
+      };
+      content: {
+        "application/json": components["schemas"]["payments_errBadRequest"];
+      };
+    };
+    /** @description Unauthorized */
+    payments_err401: {
+      headers: {
+        [name: string]: unknown;
+      };
+      content: {
+        "application/json": components["schemas"]["payments_errUnauthorized"];
+      };
+    };
+    /** @description Forbidden */
+    payments_err403: {
+      headers: {
+        [name: string]: unknown;
+      };
+      content: {
+        "application/json": components["schemas"]["payments_errForbidden"];
+      };
+    };
+    /** @description Not Found */
+    payments_err404: {
+      headers: {
+        [name: string]: unknown;
+      };
+      content: {
+        "application/json": components["schemas"]["payments_errNotFound"];
+      };
+    };
+    /** @description Conflict */
+    payments_err409: {
+      headers: {
+        [name: string]: unknown;
+      };
+      content: {
+        "application/json":
+          | components["schemas"]["payments_errAlreadyExists"]
+          | components["schemas"]["payments_errResourceBusy"];
+      };
+    };
+    /** @description Too Many Requests */
+    payments_err429: {
+      headers: {
+        /**
+         * @description Time in milliseconds to wait before making a new request.
+         * @example 3600
+         */
+        "Retry-After"?: number;
+        [name: string]: unknown;
+      };
+      content: {
+        "application/json": components["schemas"]["payments_errTooManyRequests"];
+      };
+    };
+    /** @description Internal Server Error */
+    payments_err500: {
+      headers: {
+        [name: string]: unknown;
+      };
+      content: {
+        "application/json":
+          | components["schemas"]["payments_errInternal"]
+          | components["schemas"]["payments_errUnknown"];
+      };
+    };
+    /** @description Service Unavailable */
+    payments_err503: {
+      headers: {
+        [name: string]: unknown;
+      };
+      content: {
+        "application/json": components["schemas"]["payments_errUnavailableNow"];
+      };
+    };
+  };
+  parameters: {
+    payments_xSignature: components["schemas"]["payments_schSignature"];
+    /** @description Currency code. */
+    payments_pthCurrency: components["schemas"]["payments_schCode-Currency"];
+    /** @description Currency code. */
+    payments_qryCurrency: components["schemas"]["payments_schCode-Currency"];
+    payments_qryNetwork: components["schemas"]["payments_schCode-Network"];
+    /**
+     * @description Payment ID.
+     * @example 80036de2-7aef-4aaf-9205-992647ff730a
+     */
+    payments_pthPaymentId: string;
+    /** @description The cursor received in the previous response in the `cursor_next` field. */
+    payments_qryCursor: components["schemas"]["payments_schCursor"];
+    /** @description The maximum number of items to return. */
+    payments_qryLimit: number;
+    payments_pthAddressId: components["schemas"]["payments_schAddressId"];
+    payments_pthTxnId: components["schemas"]["payments_schTxnId"];
+    /** @description Source currency. */
+    payments_qryCurrencyFrom: components["schemas"]["payments_schCode-Currency"];
+    payments_qryCurrencyTo: components["schemas"]["payments_schCode-Currency-To"];
+    /** @description Flag indicating if the swap has a fixed price. */
+    payments_qryFixed: boolean;
+    "payments_pthId-Swaps": components["schemas"]["payments_schId-Swaps"];
+    payments_qryAmountFrom: components["schemas"]["payments_schAmountFrom"];
+    payments_qryAmountTo: components["schemas"]["payments_schAmountTo"];
+    payments_qryAddress: components["schemas"]["payments_schAddress"];
+    payments_qryAddressTag: components["schemas"]["payments_schAddressTag"];
+    payments_qryCustomerId: components["schemas"]["payments_schCustomerId"];
+    /** @description Start timestamp for `created_at`. */
+    payments_qryCreatedAtFrom: components["schemas"]["payments_schTimestamp"];
+    /** @description End timestamp for `created_at`. */
+    payments_qryCreatedAtTo: components["schemas"]["payments_schTimestamp"];
+    /**
+     * @description Payin amount.
+     *
+     *     Format: decimal
+     */
+    payments_qryPayinAmount: components["schemas"]["payments_schAmount"];
+    /**
+     * @description Signature of a call passed to the receiver for verification of the call
+     *     origin.
+     */
+    callbacks_xSignature: string;
+  };
+  requestBodies: never;
+  headers: never;
+  pathItems: never;
+}
+export type $defs = Record<string, never>;
+export interface operations {
+  getCurrencies: {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: components["schemas"]["payments_resCurrency"];
+          };
+        };
+      };
+      401: components["responses"]["payments_err401"];
+      403: components["responses"]["payments_err403"];
+      429: components["responses"]["payments_err429"];
+      500: components["responses"]["payments_err500"];
+      503: components["responses"]["payments_err503"];
+    };
+  };
+  getBalances: {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["payments_resBalance"][];
+        };
+      };
+      401: components["responses"]["payments_err401"];
+      403: components["responses"]["payments_err403"];
+      429: components["responses"]["payments_err429"];
+      500: components["responses"]["payments_err500"];
+      503: components["responses"]["payments_err503"];
+    };
+  };
+  getBalance: {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path: {
+        /** @description Currency code. */
+        currency: components["parameters"]["payments_pthCurrency"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["payments_resBalance"];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["payments_errInvalidRequestParameters"]
+            | components["schemas"]["payments_errBadRequest"];
+        };
+      };
+      401: components["responses"]["payments_err401"];
+      403: components["responses"]["payments_err403"];
+      404: components["responses"]["payments_err404"];
+      429: components["responses"]["payments_err429"];
+      500: components["responses"]["payments_err500"];
+      503: components["responses"]["payments_err503"];
+    };
+  };
+  getSwapRate: {
+    parameters: {
+      query: {
         /** @description Source currency. */
-        payments_qryCurrencyFrom: components["schemas"]["payments_schCode-Currency"];
-        payments_qryCurrencyTo: components["schemas"]["payments_schCode-Currency-To"];
+        currency_from: components["parameters"]["payments_qryCurrencyFrom"];
+        currency_to: components["parameters"]["payments_qryCurrencyTo"];
+        amount_from?: components["parameters"]["payments_qryAmountFrom"];
+        amount_to?: components["parameters"]["payments_qryAmountTo"];
         /** @description Flag indicating if the swap has a fixed price. */
-        payments_qryFixed: boolean;
-        "payments_pthId-Swaps": components["schemas"]["payments_schId-Swaps"];
-        payments_qryAmountFrom: components["schemas"]["payments_schAmountFrom"];
-        payments_qryAmountTo: components["schemas"]["payments_schAmountTo"];
-        payments_qryAddress: components["schemas"]["payments_schAddress"];
-        payments_qryAddressTag: components["schemas"]["payments_schAddressTag"];
-        payments_qryCustomerId: components["schemas"]["payments_schCustomerId"];
+        fixed?: components["parameters"]["payments_qryFixed"];
+      };
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["payments_resSwapRate"];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["payments_errInvalidRequestParameters"]
+            | components["schemas"]["payments_errBadRequest"];
+        };
+      };
+      401: components["responses"]["payments_err401"];
+      403: components["responses"]["payments_err403"];
+      429: components["responses"]["payments_err429"];
+      500: components["responses"]["payments_err500"];
+      503: components["responses"]["payments_err503"];
+    };
+  };
+  makeSwapNow: {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        /**
+         * @example {
+         *       "currency_from": "USDT",
+         *       "currency_to": "BTC",
+         *       "amount_from": "2.37"
+         *     }
+         */
+        "application/json": components["schemas"]["payments_reqMakeSwapNow"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["payments_resSwap"];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["payments_errInvalidRequestParameters"]
+            | components["schemas"]["payments_errBadRequest"];
+        };
+      };
+      401: components["responses"]["payments_err401"];
+      403: components["responses"]["payments_err403"];
+      429: components["responses"]["payments_err429"];
+      500: components["responses"]["payments_err500"];
+      503: components["responses"]["payments_err503"];
+    };
+  };
+  makeSwapFixed: {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        /**
+         * @example {
+         *       "currency_from": "USDT",
+         *       "currency_to": "BTC",
+         *       "amount_from": "2.37",
+         *       "rate": "30250.48",
+         *       "rate_id": "ac76f165-b96b-4a85-8ab2-0a878db73388"
+         *     }
+         */
+        "application/json": components["schemas"]["payments_reqMakeSwapFixed"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["payments_resSwap"];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["payments_errInvalidRequestParameters"]
+            | components["schemas"]["payments_errBadRequest"];
+        };
+      };
+      401: components["responses"]["payments_err401"];
+      403: components["responses"]["payments_err403"];
+      429: components["responses"]["payments_err429"];
+      500: components["responses"]["payments_err500"];
+      503: components["responses"]["payments_err503"];
+    };
+  };
+  getSwap: {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path: {
+        id: components["parameters"]["payments_pthId-Swaps"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["payments_resSwap"];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["payments_errInvalidRequestParameters"]
+            | components["schemas"]["payments_errBadRequest"];
+        };
+      };
+      401: components["responses"]["payments_err401"];
+      403: components["responses"]["payments_err403"];
+      429: components["responses"]["payments_err429"];
+      500: components["responses"]["payments_err500"];
+      503: components["responses"]["payments_err503"];
+    };
+  };
+  getAddresses: {
+    parameters: {
+      query?: {
+        /** @description Currency code. */
+        currency?: components["parameters"]["payments_qryCurrency"];
+        network?: components["parameters"]["payments_qryNetwork"];
+        address?: components["parameters"]["payments_qryAddress"];
+        address_tag?: components["parameters"]["payments_qryAddressTag"];
+        customer_id?: components["parameters"]["payments_qryCustomerId"];
         /** @description Start timestamp for `created_at`. */
-        payments_qryCreatedAtFrom: components["schemas"]["payments_schTimestamp"];
+        created_at_from?: components["parameters"]["payments_qryCreatedAtFrom"];
         /** @description End timestamp for `created_at`. */
-        payments_qryCreatedAtTo: components["schemas"]["payments_schTimestamp"];
+        created_at_to?: components["parameters"]["payments_qryCreatedAtTo"];
+        /** @description The cursor received in the previous response in the `cursor_next` field. */
+        cursor?: components["parameters"]["payments_qryCursor"];
+        /** @description The maximum number of items to return. */
+        limit?: components["parameters"]["payments_qryLimit"];
+      };
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["payments_resCursors"] &
+            unknown & {
+              addresses?: components["schemas"]["payments_resAddress"][];
+            };
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["payments_errCurrencyNotFound"]
+            | components["schemas"]["payments_errBadRequest"];
+        };
+      };
+      401: components["responses"]["payments_err401"];
+      403: components["responses"]["payments_err403"];
+      429: components["responses"]["payments_err429"];
+      500: components["responses"]["payments_err500"];
+      503: components["responses"]["payments_err503"];
+    };
+  };
+  allocateAddress: {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["payments_reqAllocateAddress"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["payments_resAddress"];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["payments_errInvalidRequestParameters"]
+            | components["schemas"]["payments_errAddressAlreadyExists"]
+            | components["schemas"]["payments_errBadRequest"];
+        };
+      };
+      401: components["responses"]["payments_err401"];
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["payments_errMerchantIsDisabled"]
+            | components["schemas"]["payments_errAccountIsDisabled"]
+            | components["schemas"]["payments_errForbidden"];
+        };
+      };
+      429: components["responses"]["payments_err429"];
+      500: components["responses"]["payments_err500"];
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["payments_errNoFreeAddresses"]
+            | components["schemas"]["payments_errUnavailableNow"];
+        };
+      };
+    };
+  };
+  getAddress: {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path: {
+        address_id: components["parameters"]["payments_pthAddressId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["payments_resAddress"];
+        };
+      };
+      400: components["responses"]["payments_err400"];
+      401: components["responses"]["payments_err401"];
+      403: components["responses"]["payments_err403"];
+      404: components["responses"]["payments_err404"];
+      429: components["responses"]["payments_err429"];
+      500: components["responses"]["payments_err500"];
+      503: components["responses"]["payments_err503"];
+    };
+  };
+  deleteAddress: {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path: {
+        address_id: components["parameters"]["payments_pthAddressId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      204: components["responses"]["payments_res204"];
+      400: components["responses"]["payments_err400"];
+      401: components["responses"]["payments_err401"];
+      403: components["responses"]["payments_err403"];
+      404: components["responses"]["payments_err404"];
+      429: components["responses"]["payments_err429"];
+      500: components["responses"]["payments_err500"];
+      503: components["responses"]["payments_err503"];
+    };
+  };
+  updateAddress: {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path: {
+        address_id: components["parameters"]["payments_pthAddressId"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["payments_reqUpdateAddress"];
+      };
+    };
+    responses: {
+      204: components["responses"]["payments_res204"];
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["payments_errInvalidRequestParameters"]
+            | components["schemas"]["payments_errBadRequest"];
+        };
+      };
+      401: components["responses"]["payments_err401"];
+      403: components["responses"]["payments_err403"];
+      404: components["responses"]["payments_err404"];
+      409: components["responses"]["payments_err409"];
+      429: components["responses"]["payments_err429"];
+      500: components["responses"]["payments_err500"];
+      503: components["responses"]["payments_err503"];
+    };
+  };
+  calcAmounts: {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["payments_reqCalcAmounts"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["payments_resCalcAmounts"];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["payments_errInvalidRequestParameters"]
+            | components["schemas"]["payments_errBadRequest"];
+        };
+      };
+      401: components["responses"]["payments_err401"];
+      403: components["responses"]["payments_err403"];
+      429: components["responses"]["payments_err429"];
+      500: components["responses"]["payments_err500"];
+      503: components["responses"]["payments_err503"];
+    };
+  };
+  createWithdrawal: {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["payments_reqCreateWithdrawal"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["payments_resWithdrawal"];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["payments_errInvalidRequestParameters"]
+            | components["schemas"]["payments_errInsufficientBalance"]
+            | components["schemas"]["payments_errBadRequest"];
+        };
+      };
+      401: components["responses"]["payments_err401"];
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["payments_errAccountIsDisabled"]
+            | components["schemas"]["payments_errOperationBlocked"]
+            | components["schemas"]["payments_errForbidden"];
+        };
+      };
+      429: components["responses"]["payments_err429"];
+      500: components["responses"]["payments_err500"];
+      503: components["responses"]["payments_err503"];
+    };
+  };
+  getWithdrawal: {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path: {
+        txn_id: components["parameters"]["payments_pthTxnId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["payments_resWithdrawal"];
+        };
+      };
+      400: components["responses"]["payments_err400"];
+      401: components["responses"]["payments_err401"];
+      403: components["responses"]["payments_err403"];
+      404: components["responses"]["payments_err404"];
+      429: components["responses"]["payments_err429"];
+      500: components["responses"]["payments_err500"];
+      503: components["responses"]["payments_err503"];
+    };
+  };
+  sendWithdrawalCallback: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        txn_id: components["parameters"]["payments_pthTxnId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["payments_resSendCallback"] &
+            unknown;
+        };
+      };
+      400: components["responses"]["payments_err400"];
+      401: components["responses"]["payments_err401"];
+      403: components["responses"]["payments_err403"];
+      404: components["responses"]["payments_err404"];
+      429: components["responses"]["payments_err429"];
+      500: components["responses"]["payments_err500"];
+      503: components["responses"]["payments_err503"];
+    };
+  };
+  createPayment: {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json":
+          | components["schemas"]["payments_reqCreatePayment-Deposit"]
+          | components["schemas"]["payments_reqCreatePayment-Invoice"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["payments_resPayment"];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["payments_errInvalidRequestParameters"]
+            | components["schemas"]["payments_errNominalAmountInvalid"]
+            | components["schemas"]["payments_errPaymentMethodNotSelected"]
+            | components["schemas"]["payments_errBadRequest"];
+        };
+      };
+      401: components["responses"]["payments_err401"];
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["payments_errForbidden"]
+            | components["schemas"]["payments_errAccountIsDisabled"];
+        };
+      };
+      429: components["responses"]["payments_err429"];
+      500: components["responses"]["payments_err500"];
+      503: components["responses"]["payments_err503"];
+    };
+  };
+  getPayment: {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path: {
+        /**
+         * @description Payment ID.
+         * @example 80036de2-7aef-4aaf-9205-992647ff730a
+         */
+        payment_id: components["parameters"]["payments_pthPaymentId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["payments_resPayment"];
+        };
+      };
+      400: components["responses"]["payments_err400"];
+      401: components["responses"]["payments_err401"];
+      403: components["responses"]["payments_err403"];
+      404: components["responses"]["payments_err404"];
+      429: components["responses"]["payments_err429"];
+      500: components["responses"]["payments_err500"];
+      503: components["responses"]["payments_err503"];
+    };
+  };
+  updatePayment: {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path: {
+        /**
+         * @description Payment ID.
+         * @example 80036de2-7aef-4aaf-9205-992647ff730a
+         */
+        payment_id: components["parameters"]["payments_pthPaymentId"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["payments_reqUpdatePayment"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      400: components["responses"]["payments_err400"];
+      401: components["responses"]["payments_err401"];
+      403: components["responses"]["payments_err403"];
+      404: components["responses"]["payments_err404"];
+      409: components["responses"]["payments_err409"];
+      429: components["responses"]["payments_err429"];
+      500: components["responses"]["payments_err500"];
+      503: components["responses"]["payments_err503"];
+    };
+  };
+  getPaymentMethods: {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path: {
+        /**
+         * @description Payment ID.
+         * @example 80036de2-7aef-4aaf-9205-992647ff730a
+         */
+        payment_id: components["parameters"]["payments_pthPaymentId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["payments_resPaymentMethod"][];
+        };
+      };
+      400: components["responses"]["payments_err400"];
+      401: components["responses"]["payments_err401"];
+      403: components["responses"]["payments_err403"];
+      404: components["responses"]["payments_err404"];
+      429: components["responses"]["payments_err429"];
+      500: components["responses"]["payments_err500"];
+      503: components["responses"]["payments_err503"];
+    };
+  };
+  calcPaymentMethodAmounts: {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["payments_reqCalcPaymentMethodAmounts"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["payments_resAmount"];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["payments_errInvalidRequestParameters"]
+            | components["schemas"]["payments_errBadRequest"];
+        };
+      };
+      401: components["responses"]["payments_err401"];
+      403: components["responses"]["payments_err403"];
+      404: components["responses"]["payments_err404"];
+      409: components["responses"]["payments_err409"];
+      429: components["responses"]["payments_err429"];
+      500: components["responses"]["payments_err500"];
+      503: components["responses"]["payments_err503"];
+    };
+  };
+  getPaymentMethodsAmounts: {
+    parameters: {
+      query?: {
+        network?: components["parameters"]["payments_qryNetwork"];
         /**
          * @description Payin amount.
          *
          *     Format: decimal
          */
-        payments_qryPayinAmount: components["schemas"]["payments_schAmount"];
+        payin_amount?: components["parameters"]["payments_qryPayinAmount"];
+      };
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path: {
+        /**
+         * @description Payment ID.
+         * @example 80036de2-7aef-4aaf-9205-992647ff730a
+         */
+        payment_id: components["parameters"]["payments_pthPaymentId"];
+        /** @description Currency code. */
+        currency: components["parameters"]["payments_pthCurrency"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["payments_resAmount"];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["payments_errInvalidRequestParameters"]
+            | components["schemas"]["payments_errBadRequest"];
+        };
+      };
+      401: components["responses"]["payments_err401"];
+      403: components["responses"]["payments_err403"];
+      404: components["responses"]["payments_err404"];
+      429: components["responses"]["payments_err429"];
+      500: components["responses"]["payments_err500"];
+      503: components["responses"]["payments_err503"];
+    };
+  };
+  updatePaymentMethod: {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path: {
+        /**
+         * @description Payment ID.
+         * @example 80036de2-7aef-4aaf-9205-992647ff730a
+         */
+        payment_id: components["parameters"]["payments_pthPaymentId"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["payments_reqSelectPaymentMethod"];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["payments_resSelectedPaymentMethod"];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["payments_errInvalidRequestParameters"]
+            | components["schemas"]["payments_errInvalidRequest"];
+        };
+      };
+      401: components["responses"]["payments_err401"];
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["payments_errMerchantIsDisabled"]
+            | components["schemas"]["payments_errAccountIsDisabled"]
+            | components["schemas"]["payments_errForbidden"];
+        };
+      };
+      404: components["responses"]["payments_err404"];
+      429: components["responses"]["payments_err429"];
+      500: components["responses"]["payments_err500"];
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json":
+            | components["schemas"]["payments_errNoFreeAddresses"]
+            | components["schemas"]["payments_errUnavailableNow"];
+        };
+      };
+    };
+  };
+  sendPaymentCallback: {
+    parameters: {
+      query?: never;
+      header: {
+        "X-Signature": components["parameters"]["payments_xSignature"];
+      };
+      path: {
+        /**
+         * @description Payment ID.
+         * @example 80036de2-7aef-4aaf-9205-992647ff730a
+         */
+        payment_id: components["parameters"]["payments_pthPaymentId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["payments_resSendCallback"];
+        };
+      };
+      400: components["responses"]["payments_err400"];
+      401: components["responses"]["payments_err401"];
+      403: components["responses"]["payments_err403"];
+      404: components["responses"]["payments_err404"];
+      429: components["responses"]["payments_err429"];
+      500: components["responses"]["payments_err500"];
+      503: components["responses"]["payments_err503"];
+    };
+  };
+  callback: {
+    parameters: {
+      query?: never;
+      header: {
         /**
          * @description Signature of a call passed to the receiver for verification of the call
          *     origin.
          */
-        callbacks_xSignature: string;
+        "X-Signature": components["parameters"]["callbacks_xSignature"];
+      };
+      path?: never;
+      cookie?: never;
     };
-    requestBodies: never;
-    headers: never;
-    pathItems: never;
-}
-export type $defs = Record<string, never>;
-export interface operations {
-    getCurrencies: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: components["schemas"]["payments_resCurrency"];
-                    };
-                };
-            };
-            401: components["responses"]["payments_err401"];
-            403: components["responses"]["payments_err403"];
-            429: components["responses"]["payments_err429"];
-            500: components["responses"]["payments_err500"];
-            503: components["responses"]["payments_err503"];
-        };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["callbacks_reqCallback"];
+      };
     };
-    getBalances: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path?: never;
-            cookie?: never;
+    responses: {
+      /** @description Successful */
+      "2XX": {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_resBalance"][];
-                };
-            };
-            401: components["responses"]["payments_err401"];
-            403: components["responses"]["payments_err403"];
-            429: components["responses"]["payments_err429"];
-            500: components["responses"]["payments_err500"];
-            503: components["responses"]["payments_err503"];
+        content?: never;
+      };
+      /** @description Client Error */
+      "4XX": {
+        headers: {
+          [name: string]: unknown;
         };
+        content?: never;
+      };
+      /** @description Server Error */
+      "5XX": {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
     };
-    getBalance: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path: {
-                /** @description Currency code. */
-                currency: components["parameters"]["payments_pthCurrency"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_resBalance"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_errInvalidRequestParameters"] | components["schemas"]["payments_errBadRequest"];
-                };
-            };
-            401: components["responses"]["payments_err401"];
-            403: components["responses"]["payments_err403"];
-            404: components["responses"]["payments_err404"];
-            429: components["responses"]["payments_err429"];
-            500: components["responses"]["payments_err500"];
-            503: components["responses"]["payments_err503"];
-        };
-    };
-    getSwapRate: {
-        parameters: {
-            query: {
-                /** @description Source currency. */
-                currency_from: components["parameters"]["payments_qryCurrencyFrom"];
-                currency_to: components["parameters"]["payments_qryCurrencyTo"];
-                amount_from?: components["parameters"]["payments_qryAmountFrom"];
-                amount_to?: components["parameters"]["payments_qryAmountTo"];
-                /** @description Flag indicating if the swap has a fixed price. */
-                fixed?: components["parameters"]["payments_qryFixed"];
-            };
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_resSwapRate"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_errInvalidRequestParameters"] | components["schemas"]["payments_errBadRequest"];
-                };
-            };
-            401: components["responses"]["payments_err401"];
-            403: components["responses"]["payments_err403"];
-            429: components["responses"]["payments_err429"];
-            500: components["responses"]["payments_err500"];
-            503: components["responses"]["payments_err503"];
-        };
-    };
-    makeSwapNow: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                /**
-                 * @example {
-                 *       "currency_from": "USDT",
-                 *       "currency_to": "BTC",
-                 *       "amount_from": "2.37"
-                 *     }
-                 */
-                "application/json": components["schemas"]["payments_reqMakeSwapNow"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_resSwap"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_errInvalidRequestParameters"] | components["schemas"]["payments_errBadRequest"];
-                };
-            };
-            401: components["responses"]["payments_err401"];
-            403: components["responses"]["payments_err403"];
-            429: components["responses"]["payments_err429"];
-            500: components["responses"]["payments_err500"];
-            503: components["responses"]["payments_err503"];
-        };
-    };
-    makeSwapFixed: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                /**
-                 * @example {
-                 *       "currency_from": "USDT",
-                 *       "currency_to": "BTC",
-                 *       "amount_from": "2.37",
-                 *       "rate": "30250.48",
-                 *       "rate_id": "ac76f165-b96b-4a85-8ab2-0a878db73388"
-                 *     }
-                 */
-                "application/json": components["schemas"]["payments_reqMakeSwapFixed"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_resSwap"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_errInvalidRequestParameters"] | components["schemas"]["payments_errBadRequest"];
-                };
-            };
-            401: components["responses"]["payments_err401"];
-            403: components["responses"]["payments_err403"];
-            429: components["responses"]["payments_err429"];
-            500: components["responses"]["payments_err500"];
-            503: components["responses"]["payments_err503"];
-        };
-    };
-    getSwap: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path: {
-                id: components["parameters"]["payments_pthId-Swaps"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_resSwap"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_errInvalidRequestParameters"] | components["schemas"]["payments_errBadRequest"];
-                };
-            };
-            401: components["responses"]["payments_err401"];
-            403: components["responses"]["payments_err403"];
-            429: components["responses"]["payments_err429"];
-            500: components["responses"]["payments_err500"];
-            503: components["responses"]["payments_err503"];
-        };
-    };
-    getAddresses: {
-        parameters: {
-            query?: {
-                /** @description Currency code. */
-                currency?: components["parameters"]["payments_qryCurrency"];
-                network?: components["parameters"]["payments_qryNetwork"];
-                address?: components["parameters"]["payments_qryAddress"];
-                address_tag?: components["parameters"]["payments_qryAddressTag"];
-                customer_id?: components["parameters"]["payments_qryCustomerId"];
-                /** @description Start timestamp for `created_at`. */
-                created_at_from?: components["parameters"]["payments_qryCreatedAtFrom"];
-                /** @description End timestamp for `created_at`. */
-                created_at_to?: components["parameters"]["payments_qryCreatedAtTo"];
-                /** @description The cursor received in the previous response in the `cursor_next` field. */
-                cursor?: components["parameters"]["payments_qryCursor"];
-                /** @description The maximum number of items to return. */
-                limit?: components["parameters"]["payments_qryLimit"];
-            };
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_resCursors"] & unknown & {
-                        addresses?: components["schemas"]["payments_resAddress"][];
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_errCurrencyNotFound"] | components["schemas"]["payments_errBadRequest"];
-                };
-            };
-            401: components["responses"]["payments_err401"];
-            403: components["responses"]["payments_err403"];
-            429: components["responses"]["payments_err429"];
-            500: components["responses"]["payments_err500"];
-            503: components["responses"]["payments_err503"];
-        };
-    };
-    allocateAddress: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["payments_reqAllocateAddress"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_resAddress"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_errInvalidRequestParameters"] | components["schemas"]["payments_errAddressAlreadyExists"] | components["schemas"]["payments_errBadRequest"];
-                };
-            };
-            401: components["responses"]["payments_err401"];
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_errMerchantIsDisabled"] | components["schemas"]["payments_errAccountIsDisabled"] | components["schemas"]["payments_errForbidden"];
-                };
-            };
-            429: components["responses"]["payments_err429"];
-            500: components["responses"]["payments_err500"];
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_errNoFreeAddresses"] | components["schemas"]["payments_errUnavailableNow"];
-                };
-            };
-        };
-    };
-    getAddress: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path: {
-                address_id: components["parameters"]["payments_pthAddressId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_resAddress"];
-                };
-            };
-            400: components["responses"]["payments_err400"];
-            401: components["responses"]["payments_err401"];
-            403: components["responses"]["payments_err403"];
-            404: components["responses"]["payments_err404"];
-            429: components["responses"]["payments_err429"];
-            500: components["responses"]["payments_err500"];
-            503: components["responses"]["payments_err503"];
-        };
-    };
-    deleteAddress: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path: {
-                address_id: components["parameters"]["payments_pthAddressId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            204: components["responses"]["payments_res204"];
-            400: components["responses"]["payments_err400"];
-            401: components["responses"]["payments_err401"];
-            403: components["responses"]["payments_err403"];
-            404: components["responses"]["payments_err404"];
-            429: components["responses"]["payments_err429"];
-            500: components["responses"]["payments_err500"];
-            503: components["responses"]["payments_err503"];
-        };
-    };
-    updateAddress: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path: {
-                address_id: components["parameters"]["payments_pthAddressId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["payments_reqUpdateAddress"];
-            };
-        };
-        responses: {
-            204: components["responses"]["payments_res204"];
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_errInvalidRequestParameters"] | components["schemas"]["payments_errBadRequest"];
-                };
-            };
-            401: components["responses"]["payments_err401"];
-            403: components["responses"]["payments_err403"];
-            404: components["responses"]["payments_err404"];
-            409: components["responses"]["payments_err409"];
-            429: components["responses"]["payments_err429"];
-            500: components["responses"]["payments_err500"];
-            503: components["responses"]["payments_err503"];
-        };
-    };
-    calcAmounts: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["payments_reqCalcAmounts"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_resCalcAmounts"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_errInvalidRequestParameters"] | components["schemas"]["payments_errBadRequest"];
-                };
-            };
-            401: components["responses"]["payments_err401"];
-            403: components["responses"]["payments_err403"];
-            429: components["responses"]["payments_err429"];
-            500: components["responses"]["payments_err500"];
-            503: components["responses"]["payments_err503"];
-        };
-    };
-    createWithdrawal: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["payments_reqCreateWithdrawal"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_resWithdrawal"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_errInvalidRequestParameters"] | components["schemas"]["payments_errInsufficientBalance"] | components["schemas"]["payments_errBadRequest"];
-                };
-            };
-            401: components["responses"]["payments_err401"];
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_errAccountIsDisabled"] | components["schemas"]["payments_errOperationBlocked"] | components["schemas"]["payments_errForbidden"];
-                };
-            };
-            429: components["responses"]["payments_err429"];
-            500: components["responses"]["payments_err500"];
-            503: components["responses"]["payments_err503"];
-        };
-    };
-    getWithdrawal: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path: {
-                txn_id: components["parameters"]["payments_pthTxnId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_resWithdrawal"];
-                };
-            };
-            400: components["responses"]["payments_err400"];
-            401: components["responses"]["payments_err401"];
-            403: components["responses"]["payments_err403"];
-            404: components["responses"]["payments_err404"];
-            429: components["responses"]["payments_err429"];
-            500: components["responses"]["payments_err500"];
-            503: components["responses"]["payments_err503"];
-        };
-    };
-    sendWithdrawalCallback: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                txn_id: components["parameters"]["payments_pthTxnId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_resSendCallback"] & unknown;
-                };
-            };
-            400: components["responses"]["payments_err400"];
-            401: components["responses"]["payments_err401"];
-            403: components["responses"]["payments_err403"];
-            404: components["responses"]["payments_err404"];
-            429: components["responses"]["payments_err429"];
-            500: components["responses"]["payments_err500"];
-            503: components["responses"]["payments_err503"];
-        };
-    };
-    createPayment: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["payments_reqCreatePayment-Deposit"] | components["schemas"]["payments_reqCreatePayment-Invoice"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_resPayment"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_errInvalidRequestParameters"] | components["schemas"]["payments_errNominalAmountInvalid"] | components["schemas"]["payments_errPaymentMethodNotSelected"] | components["schemas"]["payments_errBadRequest"];
-                };
-            };
-            401: components["responses"]["payments_err401"];
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_errForbidden"] | components["schemas"]["payments_errAccountIsDisabled"];
-                };
-            };
-            429: components["responses"]["payments_err429"];
-            500: components["responses"]["payments_err500"];
-            503: components["responses"]["payments_err503"];
-        };
-    };
-    getPayment: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path: {
-                /**
-                 * @description Payment ID.
-                 * @example 80036de2-7aef-4aaf-9205-992647ff730a
-                 */
-                payment_id: components["parameters"]["payments_pthPaymentId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_resPayment"];
-                };
-            };
-            400: components["responses"]["payments_err400"];
-            401: components["responses"]["payments_err401"];
-            403: components["responses"]["payments_err403"];
-            404: components["responses"]["payments_err404"];
-            429: components["responses"]["payments_err429"];
-            500: components["responses"]["payments_err500"];
-            503: components["responses"]["payments_err503"];
-        };
-    };
-    updatePayment: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path: {
-                /**
-                 * @description Payment ID.
-                 * @example 80036de2-7aef-4aaf-9205-992647ff730a
-                 */
-                payment_id: components["parameters"]["payments_pthPaymentId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["payments_reqUpdatePayment"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            400: components["responses"]["payments_err400"];
-            401: components["responses"]["payments_err401"];
-            403: components["responses"]["payments_err403"];
-            404: components["responses"]["payments_err404"];
-            409: components["responses"]["payments_err409"];
-            429: components["responses"]["payments_err429"];
-            500: components["responses"]["payments_err500"];
-            503: components["responses"]["payments_err503"];
-        };
-    };
-    getPaymentMethods: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path: {
-                /**
-                 * @description Payment ID.
-                 * @example 80036de2-7aef-4aaf-9205-992647ff730a
-                 */
-                payment_id: components["parameters"]["payments_pthPaymentId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_resPaymentMethod"][];
-                };
-            };
-            400: components["responses"]["payments_err400"];
-            401: components["responses"]["payments_err401"];
-            403: components["responses"]["payments_err403"];
-            404: components["responses"]["payments_err404"];
-            429: components["responses"]["payments_err429"];
-            500: components["responses"]["payments_err500"];
-            503: components["responses"]["payments_err503"];
-        };
-    };
-    calcPaymentMethodAmounts: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["payments_reqCalcPaymentMethodAmounts"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_resAmount"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_errInvalidRequestParameters"] | components["schemas"]["payments_errBadRequest"];
-                };
-            };
-            401: components["responses"]["payments_err401"];
-            403: components["responses"]["payments_err403"];
-            404: components["responses"]["payments_err404"];
-            409: components["responses"]["payments_err409"];
-            429: components["responses"]["payments_err429"];
-            500: components["responses"]["payments_err500"];
-            503: components["responses"]["payments_err503"];
-        };
-    };
-    getPaymentMethodsAmounts: {
-        parameters: {
-            query?: {
-                network?: components["parameters"]["payments_qryNetwork"];
-                /**
-                 * @description Payin amount.
-                 *
-                 *     Format: decimal
-                 */
-                payin_amount?: components["parameters"]["payments_qryPayinAmount"];
-            };
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path: {
-                /**
-                 * @description Payment ID.
-                 * @example 80036de2-7aef-4aaf-9205-992647ff730a
-                 */
-                payment_id: components["parameters"]["payments_pthPaymentId"];
-                /** @description Currency code. */
-                currency: components["parameters"]["payments_pthCurrency"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_resAmount"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_errInvalidRequestParameters"] | components["schemas"]["payments_errBadRequest"];
-                };
-            };
-            401: components["responses"]["payments_err401"];
-            403: components["responses"]["payments_err403"];
-            404: components["responses"]["payments_err404"];
-            429: components["responses"]["payments_err429"];
-            500: components["responses"]["payments_err500"];
-            503: components["responses"]["payments_err503"];
-        };
-    };
-    updatePaymentMethod: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path: {
-                /**
-                 * @description Payment ID.
-                 * @example 80036de2-7aef-4aaf-9205-992647ff730a
-                 */
-                payment_id: components["parameters"]["payments_pthPaymentId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["payments_reqSelectPaymentMethod"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_resSelectedPaymentMethod"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_errInvalidRequestParameters"] | components["schemas"]["payments_errInvalidRequest"];
-                };
-            };
-            401: components["responses"]["payments_err401"];
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_errMerchantIsDisabled"] | components["schemas"]["payments_errAccountIsDisabled"] | components["schemas"]["payments_errForbidden"];
-                };
-            };
-            404: components["responses"]["payments_err404"];
-            429: components["responses"]["payments_err429"];
-            500: components["responses"]["payments_err500"];
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_errNoFreeAddresses"] | components["schemas"]["payments_errUnavailableNow"];
-                };
-            };
-        };
-    };
-    sendPaymentCallback: {
-        parameters: {
-            query?: never;
-            header: {
-                "X-Signature": components["parameters"]["payments_xSignature"];
-            };
-            path: {
-                /**
-                 * @description Payment ID.
-                 * @example 80036de2-7aef-4aaf-9205-992647ff730a
-                 */
-                payment_id: components["parameters"]["payments_pthPaymentId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["payments_resSendCallback"];
-                };
-            };
-            400: components["responses"]["payments_err400"];
-            401: components["responses"]["payments_err401"];
-            403: components["responses"]["payments_err403"];
-            404: components["responses"]["payments_err404"];
-            429: components["responses"]["payments_err429"];
-            500: components["responses"]["payments_err500"];
-            503: components["responses"]["payments_err503"];
-        };
-    };
-    callback: {
-        parameters: {
-            query?: never;
-            header: {
-                /**
-                 * @description Signature of a call passed to the receiver for verification of the call
-                 *     origin.
-                 */
-                "X-Signature": components["parameters"]["callbacks_xSignature"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["callbacks_reqCallback"];
-            };
-        };
-        responses: {
-            /** @description Successful */
-            "2XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Client Error */
-            "4XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Server Error */
-            "5XX": {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
+  };
 }

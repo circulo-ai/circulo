@@ -1,5 +1,5 @@
 import { agentRepo } from "@/db/repositories/agent-repo";
-import { api, notFound, noContent, success } from "@/lib/server";
+import { api, noContent, notFound, success } from "@/lib/server";
 import { z } from "zod";
 
 export const GET = api(
@@ -11,7 +11,7 @@ export const GET = api(
       return notFound("Agent not found");
     }
     return success({ agent: item });
-  }
+  },
 );
 
 export const PATCH = api(
@@ -49,7 +49,7 @@ export const PATCH = api(
       updatedAt: new Date(),
     } as any);
     return success({ agent: updated });
-  }
+  },
 );
 
 export const DELETE = api(
@@ -62,5 +62,5 @@ export const DELETE = api(
     }
     await agentRepo.delete(agentId);
     return noContent();
-  }
+  },
 );

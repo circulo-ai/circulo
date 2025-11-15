@@ -1,6 +1,11 @@
 "use client";
 
-import { type ReactNode, useMemo, useState } from "react";
+import {
+  CheckCircleFillIcon,
+  ChevronDownIcon,
+  GlobeIcon,
+  LockIcon,
+} from "@/components/icons/icons";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -10,12 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useChatVisibility } from "@/hooks/chats/use-chat-visibility";
 import { cn } from "@/lib/utils";
-import {
-  CheckCircleFillIcon,
-  ChevronDownIcon,
-  GlobeIcon,
-  LockIcon,
-} from "@/components/icons/icons";
+import { type ReactNode, useMemo, useState } from "react";
 
 export type VisibilityType = "private" | "public";
 
@@ -56,7 +56,7 @@ export function VisibilitySelector({
 
   const selectedVisibility = useMemo(
     () => visibilities.find((visibility) => visibility.id === visibilityType),
-    [visibilityType]
+    [visibilityType],
   );
 
   return (
@@ -64,8 +64,8 @@ export function VisibilitySelector({
       <DropdownMenuTrigger
         asChild
         className={cn(
-          "w-fit data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
-          className
+          "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground w-fit",
+          className,
         )}
       >
         <Button
@@ -99,7 +99,7 @@ export function VisibilitySelector({
                 </div>
               )}
             </div>
-            <div className="text-foreground opacity-0 group-data-[active=true]/item:opacity-100 dark:text-foreground">
+            <div className="text-foreground dark:text-foreground opacity-0 group-data-[active=true]/item:opacity-100">
               <CheckCircleFillIcon />
             </div>
           </DropdownMenuItem>

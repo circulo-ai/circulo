@@ -1,3 +1,8 @@
+import { CrossSmallIcon, TerminalWindowIcon } from "@/components/icons/icons";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import { useArtifactSelector } from "@/hooks/chats/use-artifact";
+import { cn } from "@/lib/utils";
 import {
   type Dispatch,
   type SetStateAction,
@@ -6,11 +11,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { useArtifactSelector } from "@/hooks/chats/use-artifact";
-import { cn } from "@/lib/utils";
-import { CrossSmallIcon, TerminalWindowIcon } from "@/components/icons/icons";
-import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
 
 export type ConsoleOutputContent = {
   type: "text" | "image";
@@ -55,7 +55,7 @@ export function Console({ consoleOutputs, setConsoleOutputs }: ConsoleProps) {
         }
       }
     },
-    [isResizing]
+    [isResizing],
   );
 
   useEffect(() => {
@@ -101,14 +101,14 @@ export function Console({ consoleOutputs, setConsoleOutputs }: ConsoleProps) {
 
       <div
         className={cn(
-          "fixed bottom-0 z-40 flex w-full flex-col overflow-x-hidden overflow-y-scroll border-zinc-200 border-t bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900",
+          "fixed bottom-0 z-40 flex w-full flex-col overflow-x-hidden overflow-y-scroll border-t border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900",
           {
             "select-none": isResizing,
-          }
+          },
         )}
         style={{ height }}
       >
-        <div className="sticky top-0 z-50 flex h-fit w-full flex-row items-center justify-between border-zinc-200 border-b bg-muted px-2 py-1 dark:border-zinc-700">
+        <div className="bg-muted sticky top-0 z-50 flex h-fit w-full flex-row items-center justify-between border-b border-zinc-200 px-2 py-1 dark:border-zinc-700">
           <div className="flex flex-row items-center gap-3 pl-2 text-sm text-zinc-800 dark:text-zinc-50">
             <div className="text-muted-foreground">
               <TerminalWindowIcon />
@@ -128,7 +128,7 @@ export function Console({ consoleOutputs, setConsoleOutputs }: ConsoleProps) {
         <div>
           {consoleOutputs.map((consoleOutput, index) => (
             <div
-              className="flex flex-row border-zinc-200 border-b bg-zinc-50 px-4 py-2 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              className="flex flex-row border-b border-zinc-200 bg-zinc-50 px-4 py-2 font-mono text-sm dark:border-zinc-700 dark:bg-zinc-900"
               key={consoleOutput.id}
             >
               <div
@@ -144,18 +144,18 @@ export function Console({ consoleOutputs, setConsoleOutputs }: ConsoleProps) {
                 [{index + 1}]
               </div>
               {["in_progress", "loading_packages"].includes(
-                consoleOutput.status
+                consoleOutput.status,
               ) ? (
                 <div className="flex flex-row gap-2">
                   <div className="mt-0.5 mb-auto size-fit self-center">
-                    <Spinner className={'size-4'} />
+                    <Spinner className={"size-4"} />
                   </div>
                   <div className="text-muted-foreground">
                     {consoleOutput.status === "in_progress"
                       ? "Initializing..."
                       : consoleOutput.status === "loading_packages"
                         ? consoleOutput.contents.map((content) =>
-                            content.type === "text" ? content.value : null
+                            content.type === "text" ? content.value : null,
                           )
                         : null}
                   </div>
@@ -174,12 +174,12 @@ export function Console({ consoleOutputs, setConsoleOutputs }: ConsoleProps) {
                       </picture>
                     ) : (
                       <div
-                        className="w-full whitespace-pre-line break-words"
+                        className="w-full break-words whitespace-pre-line"
                         key={`${consoleOutput.id}-${contentIndex}`}
                       >
                         {content.value}
                       </div>
-                    )
+                    ),
                   )}
                 </div>
               )}

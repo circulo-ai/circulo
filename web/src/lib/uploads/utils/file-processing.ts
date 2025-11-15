@@ -1,7 +1,7 @@
 import type { Logger } from "@/lib/logs/console/logger";
 import { type StorageContext, StorageService } from "@/lib/uploads";
-import { extractStorageKey } from "@/lib/uploads/utils/file-utils";
 import { UserFile } from "@/lib/uploads/types";
+import { extractStorageKey } from "@/lib/uploads/utils/file-utils";
 
 /**
  * Converts a single raw file object to UserFile format
@@ -14,7 +14,7 @@ import { UserFile } from "@/lib/uploads/types";
 export function processSingleFileToUserFile(
   file: any,
   requestId: string,
-  logger: Logger
+  logger: Logger,
 ): UserFile {
   // Already a UserFile (from variable reference)
   if (file.id && file.key && file.uploadedAt) {
@@ -22,10 +22,13 @@ export function processSingleFileToUserFile(
   }
 
   // Extract storage key from path or key property
-  const storageKey = file.key || (file.path ? extractStorageKey(file.path) : null);
+  const storageKey =
+    file.key || (file.path ? extractStorageKey(file.path) : null);
 
   if (!storageKey) {
-    logger.warn(`[${requestId}] File has no storage key: ${file.name || "unknown"}`);
+    logger.warn(
+      `[${requestId}] File has no storage key: ${file.name || "unknown"}`,
+    );
     throw new Error(`File has no storage key: ${file.name || "unknown"}`);
   }
 
@@ -37,10 +40,14 @@ export function processSingleFileToUserFile(
     type: file.type || "application/octet-stream",
     key: storageKey,
     uploadedAt: file.uploadedAt || new Date().toISOString(),
-    expiresAt: file.expiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    expiresAt:
+      file.expiresAt ||
+      new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
   };
 
-  logger.info(`[${requestId}] Converted file to UserFile: ${userFile.name} (key: ${userFile.key})`);
+  logger.info(
+    `[${requestId}] Converted file to UserFile: ${userFile.name} (key: ${userFile.key})`,
+  );
   return userFile;
 }
 
@@ -54,7 +61,7 @@ export function processSingleFileToUserFile(
 export function processFilesToUserFiles(
   files: any[],
   requestId: string,
-  logger: Logger
+  logger: Logger,
 ): UserFile[] {
   const userFiles: UserFile[] = [];
 
@@ -65,7 +72,7 @@ export function processFilesToUserFiles(
     } catch (error) {
       // Log and skip files that can't be processed
       logger.warn(
-        `[${requestId}] Skipping file: ${error instanceof Error ? error.message : "Unknown error"}`
+        `[${requestId}] Skipping file: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
     }
   }
@@ -111,20 +118,21 @@ function inferContextFromKey(key: string): StorageContext {
 export async function downloadFileFromStorage(
   userFile: UserFile,
   requestId: string,
-  logger: Logger
+  logger: Logger,
 ): Promise<Buffer> {
   let buffer: Buffer;
 
   if (userFile.key) {
     // Use explicit context from file if available, otherwise infer from key pattern (fallback)
-    const context = (userFile.context as StorageContext) || inferContextFromKey(userFile.key);
+    const context =
+      (userFile.context as StorageContext) || inferContextFromKey(userFile.key);
     logger.info(
-      `[${requestId}] Downloading from ${context} storage (${userFile.context ? "explicit" : "inferred"}): ${userFile.key}`
+      `[${requestId}] Downloading from ${context} storage (${userFile.context ? "explicit" : "inferred"}): ${userFile.key}`,
     );
 
     buffer = await StorageService.downloadFile({
       key: userFile.key,
-      context
+      context,
     });
   } else {
     throw new Error("File has no key - cannot download");

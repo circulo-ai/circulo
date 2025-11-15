@@ -18,12 +18,10 @@ export const isDev = env.NODE_ENV === "development";
  */
 export const isTest = env.NODE_ENV === "test";
 
-
 /**
  * Is billing enforcement enabled
  */
-export const isBillingEnabled = isTruthy(env.BILLING_ENABLED)
-
+export const isBillingEnabled = isTruthy(env.BILLING_ENABLED);
 
 /**
  * Is this the hosted version of the application

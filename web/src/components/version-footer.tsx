@@ -1,14 +1,14 @@
 "use client";
 
+import { LoaderIcon } from "@/components/icons/icons";
+import type { Document } from "@/db/schema";
+import { useArtifact } from "@/hooks/chats/use-artifact";
+import { getDocumentTimestampByIndex } from "@/lib/utils";
 import { isAfter } from "date-fns";
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { useSWRConfig } from "swr";
 import { useWindowSize } from "usehooks-ts";
-import { useArtifact } from "@/hooks/chats/use-artifact";
-import type { Document } from "@/db/schema";
-import { getDocumentTimestampByIndex } from "@/lib/utils";
-import { LoaderIcon } from "@/components/icons/icons";
 import { Button } from "./ui/button";
 
 type VersionFooterProps = {
@@ -37,7 +37,7 @@ export const VersionFooter = ({
   return (
     <motion.div
       animate={{ y: 0 }}
-      className="absolute bottom-0 z-50 flex w-full flex-col justify-between gap-4 border-t bg-background p-4 lg:flex-row"
+      className="bg-background absolute bottom-0 z-50 flex w-full flex-col justify-between gap-4 border-t p-4 lg:flex-row"
       exit={{ y: isMobile ? 200 : 77 }}
       initial={{ y: isMobile ? 200 : 77 }}
       transition={{ type: "spring", stiffness: 140, damping: 20 }}
@@ -60,11 +60,11 @@ export const VersionFooter = ({
               await fetch(
                 `/api/document?id=${artifact.documentId}&timestamp=${getDocumentTimestampByIndex(
                   documents,
-                  currentVersionIndex
+                  currentVersionIndex,
                 )}`,
                 {
                   method: "DELETE",
-                }
+                },
               ),
               {
                 optimisticData: documents
@@ -75,14 +75,14 @@ export const VersionFooter = ({
                           new Date(
                             getDocumentTimestampByIndex(
                               documents,
-                              currentVersionIndex
-                            )
-                          )
-                        )
+                              currentVersionIndex,
+                            ),
+                          ),
+                        ),
                       ),
                     ]
                   : [],
-              }
+              },
             );
           }}
         >

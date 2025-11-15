@@ -1,15 +1,23 @@
 "use client";
 
-import { Agent } from "@/db/schema/agent";
-import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import {
-  DndContext,
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Label } from "@/components/ui/label";
+import { Agent } from "@/db/schema/agent";
+import {
   closestCenter,
+  DndContext,
+  DragEndEvent,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
-  DragEndEvent,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -19,32 +27,26 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, X, Settings2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { GripVertical, Settings2, X } from "lucide-react";
+import { useState } from "react";
 
 interface ChatAgentManagerProps {
   chatAgents: Agent[];
   allAgents: Agent[];
-  onReorder: (agents: Array<{ agentId: string; speakOrder: number }>) => Promise<void>;
+  onReorder: (
+    agents: Array<{ agentId: string; speakOrder: number }>,
+  ) => Promise<void>;
   onRemove: (agentId: string) => Promise<void>;
   onClose: () => void;
 }
 
 function SortableChatAgent({
-                             agent,
-                             index,
-                             isExpanded,
-                             onToggle,
-                             onRemove,
-                           }: {
+  agent,
+  index,
+  isExpanded,
+  onToggle,
+  onRemove,
+}: {
   agent: Agent;
   index: number;
   isExpanded: boolean;
@@ -74,15 +76,15 @@ function SortableChatAgent({
             <div
               {...attributes}
               {...listeners}
-              className="cursor-grab active:cursor-grabbing touch-none"
+              className="cursor-grab touch-none active:cursor-grabbing"
             >
-              <GripVertical className="h-5 w-5 text-muted-foreground" />
+              <GripVertical className="text-muted-foreground h-5 w-5" />
             </div>
             <Badge variant="outline" className="shrink-0">
               #{index + 1}
             </Badge>
             <div
-              className="h-10 w-10 rounded-full flex items-center justify-center text-white font-semibold"
+              className="flex h-10 w-10 items-center justify-center rounded-full font-semibold text-white"
               style={{ backgroundColor: agent.color || "#3B82F6" }}
             >
               {agent.avatar ? (
@@ -95,10 +97,10 @@ function SortableChatAgent({
                 agent.name.charAt(0).toUpperCase()
               )}
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-medium truncate">{agent.name}</p>
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-medium">{agent.name}</p>
               {agent.description && (
-                <p className="text-xs text-muted-foreground truncate">
+                <p className="text-muted-foreground truncate text-xs">
                   {agent.description}
                 </p>
               )}
@@ -115,10 +117,10 @@ function SortableChatAgent({
         </div>
 
         <CollapsibleContent>
-          <div className="px-3 pb-3 pt-0 space-y-4 border-t mt-3 pt-3">
+          <div className="mt-3 space-y-4 border-t px-3 pt-0 pt-3 pb-3">
             <div className="space-y-2">
               <Label className="text-xs">Model</Label>
-              <p className="text-sm font-mono">{agent.model}</p>
+              <p className="font-mono text-sm">{agent.model}</p>
             </div>
             <div className="space-y-2">
               <Label className="text-xs">Temperature</Label>
@@ -126,7 +128,7 @@ function SortableChatAgent({
             </div>
             <div className="space-y-2">
               <Label className="text-xs">System Prompt</Label>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 {agent.systemPrompt.substring(0, 200)}
                 {agent.systemPrompt.length > 200 ? "..." : ""}
               </p>
@@ -139,12 +141,12 @@ function SortableChatAgent({
 }
 
 export function ChatAgentManager({
-                                   chatAgents,
-                                   allAgents,
-                                   onReorder,
-                                   onRemove,
-                                   onClose,
-                                 }: ChatAgentManagerProps) {
+  chatAgents,
+  allAgents,
+  onReorder,
+  onRemove,
+  onClose,
+}: ChatAgentManagerProps) {
   const [expandedAgentId, setExpandedAgentId] = useState<string | null>(null);
   const [localAgents, setLocalAgents] = useState(chatAgents);
 
@@ -152,7 +154,7 @@ export function ChatAgentManager({
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
-    })
+    }),
   );
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -175,11 +177,11 @@ export function ChatAgentManager({
   };
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="space-y-4 p-4">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold">Manage Chat Agents</h3>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Reorder agents to control speaking sequence
           </p>
         </div>
@@ -189,8 +191,8 @@ export function ChatAgentManager({
       </div>
 
       {localAgents.length === 0 ? (
-        <Card className="p-8 text-center border-dashed">
-          <p className="text-sm text-muted-foreground">
+        <Card className="border-dashed p-8 text-center">
+          <p className="text-muted-foreground text-sm">
             No agents in this chat. Add agents to start collaborating.
           </p>
         </Card>
@@ -213,7 +215,7 @@ export function ChatAgentManager({
                   isExpanded={expandedAgentId === agent.id}
                   onToggle={() =>
                     setExpandedAgentId(
-                      expandedAgentId === agent.id ? null : agent.id
+                      expandedAgentId === agent.id ? null : agent.id,
                     )
                   }
                   onRemove={() => onRemove(agent.id)}

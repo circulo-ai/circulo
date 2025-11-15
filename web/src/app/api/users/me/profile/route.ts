@@ -1,73 +1,78 @@
-import { db } from '@/db'
-import { user } from '@/db/schema'
-import { eq } from 'drizzle-orm'
-import { type NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
-import { getSession } from '@/lib/auth'
-import { createLogger } from '@/lib/logs/console/logger'
-import { generateRequestId } from '@/lib/server-utils'
+import { db } from "@/db";
+import { user } from "@/db/schema";
+import { getSession } from "@/lib/auth";
+import { createLogger } from "@/lib/logs/console/logger";
+import { generateRequestId } from "@/lib/server-utils";
+import { eq } from "drizzle-orm";
+import { type NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
-const logger = createLogger('UpdateUserProfileAPI')
+const logger = createLogger("UpdateUserProfileAPI");
 
 const UpdateProfileSchema = z
   .object({
-    name: z.string().min(1, 'Name is required').optional(),
+    name: z.string().min(1, "Name is required").optional(),
     image: z
       .string()
       .refine(
         (val) => {
-          return val.startsWith('http://') || val.startsWith('https://') || val.startsWith('/api/')
+          return (
+            val.startsWith("http://") ||
+            val.startsWith("https://") ||
+            val.startsWith("/api/")
+          );
         },
-        { message: 'Invalid image URL' }
+        { message: "Invalid image URL" },
       )
       .optional(),
   })
   .refine((data) => data.name !== undefined || data.image !== undefined, {
-    message: 'At least one field (name or image) must be provided',
-  })
+    message: "At least one field (name or image) must be provided",
+  });
 
 interface UpdateData {
-  updatedAt: Date
-  name?: string
-  image?: string | null
+  updatedAt: Date;
+  name?: string;
+  image?: string | null;
 }
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
 export async function PATCH(request: NextRequest) {
-  const requestId = generateRequestId()
+  const requestId = generateRequestId();
 
   try {
-    const session = await getSession()
+    const session = await getSession();
 
     if (!session?.user?.id) {
-      logger.warn(`[${requestId}] Unauthorized profile update attempt`)
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      logger.warn(`[${requestId}] Unauthorized profile update attempt`);
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userId = session.user.id
-    const body = await request.json()
+    const userId = session.user.id;
+    const body = await request.json();
 
-    const validatedData = UpdateProfileSchema.parse(body)
+    const validatedData = UpdateProfileSchema.parse(body);
 
-    const updateData: UpdateData = { updatedAt: new Date() }
-    if (validatedData.name !== undefined) updateData.name = validatedData.name
-    if (validatedData.image !== undefined) updateData.image = validatedData.image
+    const updateData: UpdateData = { updatedAt: new Date() };
+    if (validatedData.name !== undefined) updateData.name = validatedData.name;
+    if (validatedData.image !== undefined)
+      updateData.image = validatedData.image;
 
     const [updatedUser] = await db
       .update(user)
       .set(updateData)
       .where(eq(user.id, userId))
-      .returning()
+      .returning();
 
     if (!updatedUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     logger.info(`[${requestId}] User profile updated`, {
       userId,
       updatedFields: Object.keys(validatedData),
-    })
+    });
 
     return NextResponse.json({
       success: true,
@@ -77,36 +82,39 @@ export async function PATCH(request: NextRequest) {
         email: updatedUser.email,
         image: updatedUser.image,
       },
-    })
+    });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
       logger.warn(`[${requestId}] Invalid profile data`, {
         errors: error.issues,
-      })
+      });
       return NextResponse.json(
-        { error: 'Invalid profile data', details: error.issues },
-        { status: 400 }
-      )
+        { error: "Invalid profile data", details: error.issues },
+        { status: 400 },
+      );
     }
 
-    logger.error(`[${requestId}] Profile update error`, error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error(`[${requestId}] Profile update error`, error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
 
 // GET endpoint to fetch current user profile
 export async function GET() {
-  const requestId = generateRequestId()
+  const requestId = generateRequestId();
 
   try {
-    const session = await getSession()
+    const session = await getSession();
 
     if (!session?.user?.id) {
-      logger.warn(`[${requestId}] Unauthorized profile fetch attempt`)
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      logger.warn(`[${requestId}] Unauthorized profile fetch attempt`);
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userId = session.user.id
+    const userId = session.user.id;
 
     const [userRecord] = await db
       .select({
@@ -118,17 +126,20 @@ export async function GET() {
       })
       .from(user)
       .where(eq(user.id, userId))
-      .limit(1)
+      .limit(1);
 
     if (!userRecord) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     return NextResponse.json({
       user: userRecord,
-    })
+    });
   } catch (error: any) {
-    logger.error(`[${requestId}] Profile fetch error`, error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error(`[${requestId}] Profile fetch error`, error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

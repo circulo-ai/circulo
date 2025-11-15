@@ -1,15 +1,14 @@
-import { and, eq, isNull, lte } from 'drizzle-orm';
-import { db } from '@/db';
+import { db } from "@/db";
 import {
-  invoices,
   invoiceLineItems,
-  subscriptions,
+  invoices,
   subscriptionHistory,
   subscriptionPlans,
-} from '@/db/schema/billing';
-import { getProvider } from '.';
-import { PaymentProvider } from './abstraction/payment-provider';
-import { CreateInvoiceParams, InvoiceStatus } from './abstraction/types';
+  subscriptions,
+} from "@/db/schema/billing";
+import { and, eq, lte } from "drizzle-orm";
+import { PaymentProvider } from "./abstraction/payment-provider";
+import { CreateInvoiceParams, InvoiceStatus } from "./abstraction/types";
 
 export class BillingManager {
   constructor(private readonly provider: PaymentProvider) {}
@@ -40,7 +39,7 @@ export class BillingManager {
         provider: this.provider.name,
         providerInvoiceId: providerInvoice.invoiceId,
         usdAmount: totalAmount,
-        status: 'pending',
+        status: "pending",
         description: params.description,
         metadata: params.metadata,
         dueDate: params.dueDate,
@@ -77,7 +76,7 @@ export class BillingManager {
   async updateInvoiceStatus(
     providerInvoiceId: string,
     newStatus: InvoiceStatus,
-    paidAt?: Date
+    paidAt?: Date,
   ): Promise<void> {
     const now = new Date();
 
@@ -86,8 +85,8 @@ export class BillingManager {
       .update(invoices)
       .set({
         status: newStatus,
-        paidAt: newStatus === 'paid' ? paidAt || now : undefined,
-        failedAt: newStatus === 'failed' ? now : undefined,
+        paidAt: newStatus === "paid" ? paidAt || now : undefined,
+        failedAt: newStatus === "failed" ? now : undefined,
       })
       .where(eq(invoices.providerInvoiceId, providerInvoiceId))
       .returning();
@@ -98,15 +97,15 @@ export class BillingManager {
 
     // Handle subscription activation/renewal if applicable
     if (
-      newStatus === 'paid' &&
-      updatedInvoice.type === 'subscription' &&
+      newStatus === "paid" &&
+      updatedInvoice.type === "subscription" &&
       updatedInvoice.subscriptionId
     ) {
       await this.activateSubscription(updatedInvoice.subscriptionId);
     }
 
     // Handle failed payment
-    if (newStatus === 'failed' && updatedInvoice.subscriptionId) {
+    if (newStatus === "failed" && updatedInvoice.subscriptionId) {
       await this.handleFailedPayment(updatedInvoice.subscriptionId);
     }
   }
@@ -126,7 +125,9 @@ export class BillingManager {
 
     const now = new Date();
     const billingDays = subscription.plan.billingIntervalDays;
-    const newEndDate = new Date(now.getTime() + billingDays * 24 * 60 * 60 * 1000);
+    const newEndDate = new Date(
+      now.getTime() + billingDays * 24 * 60 * 60 * 1000,
+    );
 
     const oldStatus = subscription.status;
 
@@ -134,8 +135,9 @@ export class BillingManager {
     await db
       .update(subscriptions)
       .set({
-        status: 'active',
-        startDate: subscription.status === 'inactive' ? now : subscription.startDate,
+        status: "active",
+        startDate:
+          subscription.status === "inactive" ? now : subscription.startDate,
         endDate: newEndDate,
       })
       .where(eq(subscriptions.id, subscriptionId));
@@ -145,8 +147,8 @@ export class BillingManager {
       subscriptionId,
       planId: subscription.planId,
       oldStatus,
-      newStatus: 'active',
-      reason: oldStatus === 'inactive' ? 'activated' : 'renewed',
+      newStatus: "active",
+      reason: oldStatus === "inactive" ? "activated" : "renewed",
       changedAt: now,
     });
   }
@@ -165,15 +167,15 @@ export class BillingManager {
     // (You could track retry count in metadata)
     await db
       .update(subscriptions)
-      .set({ status: 'inactive' })
+      .set({ status: "inactive" })
       .where(eq(subscriptions.id, subscriptionId));
 
     await db.insert(subscriptionHistory).values({
       subscriptionId,
       planId: subscription.planId,
       oldStatus: subscription.status,
-      newStatus: 'inactive',
-      reason: 'payment_failed',
+      newStatus: "inactive",
+      reason: "payment_failed",
       changedAt: new Date(),
     });
   }
@@ -184,7 +186,7 @@ export class BillingManager {
   async createSubscriptionInvoice(
     userId: string,
     subscriptionId: number,
-    planId: number
+    planId: number,
   ) {
     const plan = await db.query.subscriptionPlans.findFirst({
       where: eq(subscriptionPlans.id, planId),
@@ -197,7 +199,7 @@ export class BillingManager {
     return this.createInvoice({
       userId,
       subscriptionId,
-      type: 'subscription',
+      type: "subscription",
       usdAmount: plan.usdPrice,
       description: `${plan.name} - Subscription`,
       lineItems: [
@@ -205,7 +207,7 @@ export class BillingManager {
           description: `${plan.name} Plan`,
           quantity: 1,
           unitPrice: plan.usdPrice,
-          referenceType: 'plan',
+          referenceType: "plan",
           referenceId: planId,
         },
       ],
@@ -218,18 +220,14 @@ export class BillingManager {
   async processWebhook(payload: unknown, signature: string): Promise<void> {
     // Verify webhook signature
     if (!this.provider.verifyWebhook(payload, signature)) {
-      throw new Error('Invalid webhook signature');
+      throw new Error("Invalid webhook signature");
     }
 
     // Parse webhook event
     const event = this.provider.parseWebhook(payload);
 
     // Update invoice status
-    await this.updateInvoiceStatus(
-      event.invoiceId,
-      event.status,
-      event.paidAt
-    );
+    await this.updateInvoiceStatus(event.invoiceId, event.status, event.paidAt);
 
     // Call provider-specific webhook handler if exists
     if (this.provider.handleWebhook) {
@@ -245,8 +243,8 @@ export class BillingManager {
 
     const expired = await db.query.subscriptions.findMany({
       where: and(
-        eq(subscriptions.status, 'active'),
-        lte(subscriptions.endDate, now)
+        eq(subscriptions.status, "active"),
+        lte(subscriptions.endDate, now),
       ),
     });
 
@@ -264,15 +262,15 @@ export class BillingManager {
         // Mark as expired
         await db
           .update(subscriptions)
-          .set({ status: 'expired' })
+          .set({ status: "expired" })
           .where(eq(subscriptions.id, sub.id));
 
         await db.insert(subscriptionHistory).values({
           subscriptionId: sub.id,
           planId: sub.planId,
-          oldStatus: 'active',
-          newStatus: 'expired',
-          reason: 'subscription_ended',
+          oldStatus: "active",
+          newStatus: "expired",
+          reason: "subscription_ended",
           changedAt: now,
         });
       }

@@ -1,5 +1,8 @@
+import { user } from "@/db/schema/auth";
+import { sql } from "drizzle-orm";
 import {
-  boolean, check,
+  boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -7,10 +10,8 @@ import {
   pgEnum,
   pgTable,
   text,
-  timestamp
+  timestamp,
 } from "drizzle-orm/pg-core";
-import { user } from "@/db/schema/auth";
-import { sql } from "drizzle-orm";
 
 export const agentVisibilityEnum = pgEnum("agent_visibility", [
   "private",
@@ -29,8 +30,9 @@ export const agentTemplate = pgTable(
   "agent_template",
   {
     id: text("id").primaryKey(),
-    creatorId: text("creator_id")
-      .references(() => user.id, { onDelete: "set null" }), // Can be null for system templates
+    creatorId: text("creator_id").references(() => user.id, {
+      onDelete: "set null",
+    }), // Can be null for system templates
 
     name: text("name").notNull(),
     description: text("description"),
@@ -85,9 +87,9 @@ export const agentTemplate = pgTable(
     isSystemIdx: index("agent_template_is_system_idx").on(table.isSystem),
     countsNonNegative: check(
       "agent_template_counts_non_negative",
-      sql`instance_count >= 0 AND usage_count >= 0`
+      sql`instance_count >= 0 AND usage_count >= 0`,
     ),
-  })
+  }),
 );
 
 // User-created agent instances
@@ -139,14 +141,14 @@ export const agent = pgTable(
     templateIdIdx: index("agent_template_id_idx").on(table.templateId),
     userTemplateIdx: index("agent_user_template_idx").on(
       table.userId,
-      table.templateId
+      table.templateId,
     ),
     lastUsedIdx: index("agent_last_used_idx").on(table.lastUsedAt),
     usageCountNonNegative: check(
       "agent_usage_count_non_negative",
-      sql`usage_count >= 0`
+      sql`usage_count >= 0`,
     ),
-  })
+  }),
 );
 
 // Tool definitions for agents
@@ -161,7 +163,9 @@ export const tool = pgTable(
 
     // Tool configuration
     type: text("type").notNull(), // 'function', 'mcp_server', 'api', etc.
-    configuration: jsonb("configuration").$type<Record<string, any>>().notNull(),
+    configuration: jsonb("configuration")
+      .$type<Record<string, any>>()
+      .notNull(),
 
     // For MCP servers
     mcpServerId: text("mcp_server_id").references(() => mcpServer.id, {
@@ -182,7 +186,7 @@ export const tool = pgTable(
     mcpServerIdx: index("tool_mcp_server_idx").on(table.mcpServerId),
     typeIdx: index("tool_type_idx").on(table.type),
     isSystemIdx: index("tool_is_system_idx").on(table.isSystem),
-  })
+  }),
 );
 
 // MCP (Model Context Protocol) Server definitions
@@ -217,7 +221,7 @@ export const mcpServer = pgTable(
     userIdIdx: index("mcp_server_user_id_idx").on(table.userId),
     isSystemIdx: index("mcp_server_is_system_idx").on(table.isSystem),
     endpointIdx: index("mcp_server_endpoint_idx").on(table.endpoint),
-  })
+  }),
 );
 
 // Types

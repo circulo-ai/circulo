@@ -4,9 +4,7 @@ import { MentionEntity } from "@/lib/chat/mentions/types";
 import { useCallback, useState } from "react";
 
 export function useMentionInput(entities: MentionEntity[]) {
-  const [selectedMentions, setSelectedMentions] = useState<MentionEntity[]>(
-    [],
-  );
+  const [selectedMentions, setSelectedMentions] = useState<MentionEntity[]>([]);
 
   const addMention = useCallback((mention: MentionEntity) => {
     setSelectedMentions((prev) => {

@@ -4,15 +4,17 @@ import {
   InferSelectModel,
   SQL,
   sql,
+  TablesRelationalConfig,
 } from "drizzle-orm";
 import { AnyPgTable } from "drizzle-orm/pg-core";
 import {
   PostgresJsDatabase,
   PostgresJsTransaction,
 } from "drizzle-orm/postgres-js";
-import { TablesRelationalConfig } from "drizzle-orm";
 
-type DrizzleExecutor<TFullSchema extends Record<string, unknown> = Record<string, unknown>> =
+type DrizzleExecutor<
+  TFullSchema extends Record<string, unknown> = Record<string, unknown>,
+> =
   | PostgresJsDatabase<TFullSchema>
   | PostgresJsTransaction<TFullSchema, TablesRelationalConfig>;
 
@@ -22,11 +24,11 @@ type DrizzleExecutor<TFullSchema extends Record<string, unknown> = Record<string
  */
 export function createRepository<
   TTable extends AnyPgTable,
-  TFullSchema extends Record<string, unknown> = Record<string, unknown>
+  TFullSchema extends Record<string, unknown> = Record<string, unknown>,
 >(
   db: DrizzleExecutor<TFullSchema>,
   table: TTable,
-  options?: { primaryKey?: keyof InferSelectModel<TTable> }
+  options?: { primaryKey?: keyof InferSelectModel<TTable> },
 ) {
   type TModel = InferSelectModel<TTable>;
   type TInsert = InferInsertModel<TTable>;
@@ -38,7 +40,10 @@ export function createRepository<
   const getPrimaryKey = (): PK => {
     if (cachedPk) return cachedPk;
     const pk = Object.keys(table).find((k) => (table as any)[k]?.primaryKey);
-    if (!pk) throw new Error("No primary key found for table. Provide options.primaryKey.");
+    if (!pk)
+      throw new Error(
+        "No primary key found for table. Provide options.primaryKey.",
+      );
     cachedPk = pk as PK;
     return cachedPk;
   };
@@ -75,7 +80,10 @@ export function createRepository<
     },
 
     /** Update one row by id and return it (or undefined if not found) */
-    async update(id: TModel[PK], data: Partial<TInsert>): Promise<TModel | undefined> {
+    async update(
+      id: TModel[PK],
+      data: Partial<TInsert>,
+    ): Promise<TModel | undefined> {
       const pk = getPrimaryKey();
       const rows = await db
         .update(table)
@@ -123,7 +131,9 @@ export function createRepository<
 
     /** Count rows matching an optional condition */
     async count(where?: SQL): Promise<number> {
-      const q = db.select({ value: sql<number>`count(*)` }).from(table as AnyPgTable);
+      const q = db
+        .select({ value: sql<number>`count(*)` })
+        .from(table as AnyPgTable);
       if (where) (q as any).where(where);
       const [{ value }] = await (q as any);
       return Number(value ?? 0);
@@ -164,7 +174,6 @@ export function createRepository<
   };
 }
 
-
 /**
  * Generic factory to build a repository for a table, with optional extensions.
  * Avoids repeating db/transaction wiring across entity repositories.
@@ -172,17 +181,22 @@ export function createRepository<
 export function makeRepo<
   TTable extends AnyPgTable,
   TSchema extends Record<string, unknown>,
-  TExtra extends Record<string, any> = {}
+  TExtra extends Record<string, any> = {},
 >(
   table: TTable,
-  extend: (base: ReturnType<typeof createRepository<TTable, TSchema>>) => TExtra,
-  options?: { primaryKey?: keyof InferSelectModel<TTable> }
+  extend: (
+    base: ReturnType<typeof createRepository<TTable, TSchema>>,
+  ) => TExtra,
+  options?: { primaryKey?: keyof InferSelectModel<TTable> },
 ) {
   return {
     with(executor: DrizzleExecutor<TSchema>) {
       const base = createRepository<TTable, TSchema>(executor, table, options);
       const extra = extend(base);
-      return { ...base, ...extra } as ReturnType<typeof createRepository<TTable, TSchema>> & TExtra;
+      return { ...base, ...extra } as ReturnType<
+        typeof createRepository<TTable, TSchema>
+      > &
+        TExtra;
     },
   };
 }

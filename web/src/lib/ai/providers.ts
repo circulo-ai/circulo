@@ -1,9 +1,9 @@
+import { google } from "@ai-sdk/google";
 import {
   customProvider,
   extractReasoningMiddleware,
-  wrapLanguageModel
+  wrapLanguageModel,
 } from "ai";
-import { google } from "@ai-sdk/google";
 
 export const myProvider = customProvider({
   languageModels: {

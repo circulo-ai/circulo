@@ -1,4 +1,4 @@
-import { db, chatAgent } from "@/db";
+import { chatAgent, db } from "@/db";
 import { and, eq } from "drizzle-orm";
 import { makeRepo } from "../helpers/repo";
 
@@ -18,14 +18,17 @@ const chatAgentRepoFactory = makeRepo(
         .update(chatAgent)
         .set({ speakOrder: newOrder })
         .where(
-          and(eq(chatAgent.chatId, chatId), eq(chatAgent.agentId, agentId))
+          and(eq(chatAgent.chatId, chatId), eq(chatAgent.agentId, agentId)),
         )
         .returning();
     },
 
     async toggleEnabled(chatId: string, agentId: string) {
       const current = await db.query.chatAgent.findFirst({
-        where: and(eq(chatAgent.chatId, chatId), eq(chatAgent.agentId, agentId)),
+        where: and(
+          eq(chatAgent.chatId, chatId),
+          eq(chatAgent.agentId, agentId),
+        ),
       });
 
       if (!current) return null;
@@ -34,12 +37,12 @@ const chatAgentRepoFactory = makeRepo(
         .update(chatAgent)
         .set({ enabled: !current.enabled })
         .where(
-          and(eq(chatAgent.chatId, chatId), eq(chatAgent.agentId, agentId))
+          and(eq(chatAgent.chatId, chatId), eq(chatAgent.agentId, agentId)),
         )
         .returning();
     },
   }),
-  { primaryKey: "id" }
+  { primaryKey: "id" },
 );
 
 export const chatAgentRepo = chatAgentRepoFactory.with(db);

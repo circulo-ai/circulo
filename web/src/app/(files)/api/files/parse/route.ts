@@ -1,111 +1,123 @@
-import { Buffer } from 'buffer'
-import { createHash } from 'crypto'
-import fsPromises, { readFile } from 'fs/promises'
-import path from 'path'
-import binaryExtensionsList from 'binary-extensions'
-import { type NextRequest, NextResponse } from 'next/server'
-import { isSupportedFileType, parseFile } from '@/lib/file-parsers'
-import { createLogger } from '@/lib/logs/console/logger'
-import { validateExternalUrl } from '@/lib/security/input-validation'
-import { isUsingCloudStorage, type StorageContext, StorageService } from '@/lib/uploads'
-import { UPLOAD_DIR_SERVER } from '@/lib/uploads/core/setup.server'
-import { extractStorageKey } from '@/lib/uploads/utils/file-utils'
-import '@/lib/uploads/core/setup.server'
+import { isSupportedFileType, parseFile } from "@/lib/file-parsers";
+import { createLogger } from "@/lib/logs/console/logger";
+import { validateExternalUrl } from "@/lib/security/input-validation";
+import {
+  isUsingCloudStorage,
+  type StorageContext,
+  StorageService,
+} from "@/lib/uploads";
+import "@/lib/uploads/core/setup.server";
+import { UPLOAD_DIR_SERVER } from "@/lib/uploads/core/setup.server";
+import { extractStorageKey } from "@/lib/uploads/utils/file-utils";
+import binaryExtensionsList from "binary-extensions";
+import { Buffer } from "buffer";
+import { createHash } from "crypto";
+import fsPromises, { readFile } from "fs/promises";
+import { type NextRequest, NextResponse } from "next/server";
+import path from "path";
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
-const logger = createLogger('FilesParseAPI')
+const logger = createLogger("FilesParseAPI");
 
 /**
  * Infer storage context from file key pattern
  */
 function inferContextFromKey(key: string): StorageContext {
-  if (key.startsWith('kb/')) return 'knowledge-base'
+  if (key.startsWith("kb/")) return "knowledge-base";
 
-  const segments = key.split('/')
-  if (segments.length >= 4 && segments[0].match(/^[a-f0-9-]{36}$/)) return 'execution'
-  if (key.match(/^[a-f0-9-]{36}\/\d+-[a-z0-9]+-/)) return 'workspace'
+  const segments = key.split("/");
+  if (segments.length >= 4 && segments[0].match(/^[a-f0-9-]{36}$/))
+    return "execution";
+  if (key.match(/^[a-f0-9-]{36}\/\d+-[a-z0-9]+-/)) return "workspace";
 
-  return 'general'
+  return "general";
 }
 
-const MAX_DOWNLOAD_SIZE_BYTES = 100 * 1024 * 1024 // 100 MB
-const DOWNLOAD_TIMEOUT_MS = 30000 // 30 seconds
+const MAX_DOWNLOAD_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB
+const DOWNLOAD_TIMEOUT_MS = 30000; // 30 seconds
 
 interface ParseResult {
-  success: boolean
-  content?: string
-  error?: string
-  filePath: string
+  success: boolean;
+  content?: string;
+  error?: string;
+  filePath: string;
   metadata?: {
-    fileType: string
-    size: number
-    hash: string
-    processingTime: number
-  }
+    fileType: string;
+    size: number;
+    hash: string;
+    processingTime: number;
+  };
 }
 
 const fileTypeMap: Record<string, string> = {
   // Text formats
-  txt: 'text/plain',
-  csv: 'text/csv',
-  json: 'application/json',
-  xml: 'application/xml',
-  md: 'text/markdown',
-  html: 'text/html',
-  css: 'text/css',
-  js: 'application/javascript',
-  ts: 'application/typescript',
+  txt: "text/plain",
+  csv: "text/csv",
+  json: "application/json",
+  xml: "application/xml",
+  md: "text/markdown",
+  html: "text/html",
+  css: "text/css",
+  js: "application/javascript",
+  ts: "application/typescript",
   // Document formats
-  pdf: 'application/pdf',
-  doc: 'application/msword',
-  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  pdf: "application/pdf",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   // Spreadsheet formats
-  xls: 'application/vnd.ms-excel',
-  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   // Presentation formats
-  ppt: 'application/vnd.ms-powerpoint',
-  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   // Image formats
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  gif: 'image/gif',
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
   // Archive formats
-  zip: 'application/zip',
-}
+  zip: "application/zip",
+};
 
 /**
  * Main API route handler
  */
 export async function POST(request: NextRequest) {
-  const startTime = Date.now()
+  const startTime = Date.now();
 
   try {
-    const requestData = await request.json()
-    const { filePath, fileType, workspaceId } = requestData
+    const requestData = await request.json();
+    const { filePath, fileType, workspaceId } = requestData;
 
-    if (!filePath || (typeof filePath === 'string' && filePath.trim() === '')) {
-      return NextResponse.json({ success: false, error: 'No file path provided' }, { status: 400 })
+    if (!filePath || (typeof filePath === "string" && filePath.trim() === "")) {
+      return NextResponse.json(
+        { success: false, error: "No file path provided" },
+        { status: 400 },
+      );
     }
 
-    logger.info('File parse request received:', { filePath, fileType, workspaceId })
+    logger.info("File parse request received:", {
+      filePath,
+      fileType,
+      workspaceId,
+    });
 
     if (Array.isArray(filePath)) {
-      const results = []
+      const results = [];
       for (const path of filePath) {
-        if (!path || (typeof path === 'string' && path.trim() === '')) {
+        if (!path || (typeof path === "string" && path.trim() === "")) {
           results.push({
             success: false,
-            error: 'Empty file path in array',
-            filePath: path || '',
-          })
-          continue
+            error: "Empty file path in array",
+            filePath: path || "",
+          });
+          continue;
         }
 
-        const result = await parseFileSingle(path, fileType)
+        const result = await parseFileSingle(path, fileType);
         if (result.metadata) {
-          result.metadata.processingTime = Date.now() - startTime
+          result.metadata.processingTime = Date.now() - startTime;
         }
 
         if (result.success) {
@@ -113,28 +125,28 @@ export async function POST(request: NextRequest) {
             success: true,
             output: {
               content: result.content,
-              name: result.filePath.split('/').pop() || 'unknown',
-              fileType: result.metadata?.fileType || 'application/octet-stream',
+              name: result.filePath.split("/").pop() || "unknown",
+              fileType: result.metadata?.fileType || "application/octet-stream",
               size: result.metadata?.size || 0,
               binary: false,
             },
             filePath: result.filePath,
-          })
+          });
         } else {
-          results.push(result)
+          results.push(result);
         }
       }
 
       return NextResponse.json({
         success: true,
         results,
-      })
+      });
     }
 
-    const result = await parseFileSingle(filePath, fileType)
+    const result = await parseFileSingle(filePath, fileType);
 
     if (result.metadata) {
-      result.metadata.processingTime = Date.now() - startTime
+      result.metadata.processingTime = Date.now() - startTime;
     }
 
     if (result.success) {
@@ -142,25 +154,26 @@ export async function POST(request: NextRequest) {
         success: true,
         output: {
           content: result.content,
-          name: result.filePath.split('/').pop() || 'unknown',
-          fileType: result.metadata?.fileType || 'application/octet-stream',
+          name: result.filePath.split("/").pop() || "unknown",
+          fileType: result.metadata?.fileType || "application/octet-stream",
           size: result.metadata?.size || 0,
           binary: false, // We only return text content
         },
-      })
+      });
     }
 
-    return NextResponse.json(result)
+    return NextResponse.json(result);
   } catch (error) {
-    logger.error('Error in file parse API:', error)
+    logger.error("Error in file parse API:", error);
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
-        filePath: '',
+        error:
+          error instanceof Error ? error.message : "Unknown error occurred",
+        filePath: "",
       },
-      { status: 500 }
-    )
+      { status: 500 },
+    );
   }
 }
 
@@ -171,65 +184,71 @@ async function parseFileSingle(
   filePath: string,
   fileType?: string,
 ): Promise<ParseResult> {
-  logger.info('Parsing file:', filePath)
+  logger.info("Parsing file:", filePath);
 
-  if (!filePath || filePath.trim() === '') {
+  if (!filePath || filePath.trim() === "") {
     return {
       success: false,
-      error: 'Empty file path provided',
-      filePath: filePath || '',
-    }
+      error: "Empty file path provided",
+      filePath: filePath || "",
+    };
   }
 
-  const pathValidation = validateFilePath(filePath)
+  const pathValidation = validateFilePath(filePath);
   if (!pathValidation.isValid) {
     return {
       success: false,
-      error: pathValidation.error || 'Invalid path',
+      error: pathValidation.error || "Invalid path",
       filePath,
-    }
+    };
   }
 
-  if (filePath.includes('/api/files/serve/')) {
-    return handleCloudFile(filePath, fileType)
+  if (filePath.includes("/api/files/serve/")) {
+    return handleCloudFile(filePath, fileType);
   }
 
-  if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
-    return handleExternalUrl(filePath, fileType)
+  if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
+    return handleExternalUrl(filePath, fileType);
   }
 
   if (isUsingCloudStorage()) {
-    return handleCloudFile(filePath, fileType)
+    return handleCloudFile(filePath, fileType);
   }
 
-  return handleLocalFile(filePath, fileType)
+  return handleLocalFile(filePath, fileType);
 }
 
 /**
  * Validate file path for security - prevents null byte injection and path traversal attacks
  */
-function validateFilePath(filePath: string): { isValid: boolean; error?: string } {
-  if (filePath.includes('\0')) {
-    return { isValid: false, error: 'Invalid path: null byte detected' }
+function validateFilePath(filePath: string): {
+  isValid: boolean;
+  error?: string;
+} {
+  if (filePath.includes("\0")) {
+    return { isValid: false, error: "Invalid path: null byte detected" };
   }
 
-  if (filePath.includes('..')) {
-    return { isValid: false, error: 'Access denied: path traversal detected' }
+  if (filePath.includes("..")) {
+    return { isValid: false, error: "Access denied: path traversal detected" };
   }
 
-  if (filePath.includes('~')) {
-    return { isValid: false, error: 'Invalid path: tilde character not allowed' }
+  if (filePath.includes("~")) {
+    return {
+      isValid: false,
+      error: "Invalid path: tilde character not allowed",
+    };
   }
 
-  if (filePath.startsWith('/') && !filePath.startsWith('/api/files/serve/')) {
-    return { isValid: false, error: 'Path outside allowed directory' }
+  if (filePath.startsWith("/") && !filePath.startsWith("/api/files/serve/")) {
+    return { isValid: false, error: "Path outside allowed directory" };
   }
 
   if (/^[A-Za-z]:\\/.test(filePath)) {
-    return { isValid: false, error: 'Path outside allowed directory' }
+    return { isValid: false, error: "Path outside allowed directory" };
   }
 
-  return { isValid: true }
+  return { isValid: true };
 }
 
 /**
@@ -241,62 +260,79 @@ async function handleExternalUrl(
   fileType?: string,
 ): Promise<ParseResult> {
   try {
-    logger.info('Fetching external URL:', url)
+    logger.info("Fetching external URL:", url);
 
-    const urlValidation = validateExternalUrl(url, 'fileUrl')
+    const urlValidation = validateExternalUrl(url, "fileUrl");
     if (!urlValidation.isValid) {
-      logger.warn(`Blocked external URL request: ${urlValidation.error}`)
+      logger.warn(`Blocked external URL request: ${urlValidation.error}`);
       return {
         success: false,
-        error: urlValidation.error || 'Invalid external URL',
+        error: urlValidation.error || "Invalid external URL",
         filePath: url,
-      }
+      };
     }
 
-    const urlPath = new URL(url).pathname
-    const filename = urlPath.split('/').pop() || 'download'
-    const extension = path.extname(filename).toLowerCase().substring(1)
+    const urlPath = new URL(url).pathname;
+    const filename = urlPath.split("/").pop() || "download";
+    const extension = path.extname(filename).toLowerCase().substring(1);
 
-    logger.info(`Extracted filename: ${filename}`)
+    logger.info(`Extracted filename: ${filename}`);
 
     const response = await fetch(url, {
       signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
-    })
+    });
     if (!response.ok) {
-      throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`)
+      throw new Error(
+        `Failed to fetch URL: ${response.status} ${response.statusText}`,
+      );
     }
 
-    const contentLength = response.headers.get('content-length')
-    if (contentLength && Number.parseInt(contentLength) > MAX_DOWNLOAD_SIZE_BYTES) {
-      throw new Error(`File too large: ${contentLength} bytes (max: ${MAX_DOWNLOAD_SIZE_BYTES})`)
+    const contentLength = response.headers.get("content-length");
+    if (
+      contentLength &&
+      Number.parseInt(contentLength) > MAX_DOWNLOAD_SIZE_BYTES
+    ) {
+      throw new Error(
+        `File too large: ${contentLength} bytes (max: ${MAX_DOWNLOAD_SIZE_BYTES})`,
+      );
     }
 
-    const buffer = Buffer.from(await response.arrayBuffer())
+    const buffer = Buffer.from(await response.arrayBuffer());
 
     if (buffer.length > MAX_DOWNLOAD_SIZE_BYTES) {
-      throw new Error(`File too large: ${buffer.length} bytes (max: ${MAX_DOWNLOAD_SIZE_BYTES})`)
+      throw new Error(
+        `File too large: ${buffer.length} bytes (max: ${MAX_DOWNLOAD_SIZE_BYTES})`,
+      );
     }
 
-    logger.info(`Downloaded file from URL: ${url}, size: ${buffer.length} bytes`)
+    logger.info(
+      `Downloaded file from URL: ${url}, size: ${buffer.length} bytes`,
+    );
 
-    if (extension === 'pdf') {
-      return await handlePdfBuffer(buffer, filename, fileType, url)
+    if (extension === "pdf") {
+      return await handlePdfBuffer(buffer, filename, fileType, url);
     }
-    if (extension === 'csv') {
-      return await handleCsvBuffer(buffer, filename, fileType, url)
+    if (extension === "csv") {
+      return await handleCsvBuffer(buffer, filename, fileType, url);
     }
     if (isSupportedFileType(extension)) {
-      return await handleGenericTextBuffer(buffer, filename, extension, fileType, url)
+      return await handleGenericTextBuffer(
+        buffer,
+        filename,
+        extension,
+        fileType,
+        url,
+      );
     }
 
-    return handleGenericBuffer(buffer, filename, extension, fileType)
+    return handleGenericBuffer(buffer, filename, extension, fileType);
   } catch (error) {
-    logger.error(`Error handling external URL ${url}:`, error)
+    logger.error(`Error handling external URL ${url}:`, error);
     return {
       success: false,
       error: `Error fetching URL: ${(error as Error).message}`,
       filePath: url,
-    }
+    };
   }
 }
 
@@ -306,71 +342,89 @@ async function handleExternalUrl(
 async function handleCloudFile(
   filePath: string,
   fileType?: string,
-  explicitContext?: string
+  explicitContext?: string,
 ): Promise<ParseResult> {
   try {
-    const cloudKey = extractStorageKey(filePath)
+    const cloudKey = extractStorageKey(filePath);
 
-    logger.info('Extracted cloud key:', cloudKey)
+    logger.info("Extracted cloud key:", cloudKey);
 
-    const context = (explicitContext as StorageContext) || inferContextFromKey(cloudKey)
-    const fileBuffer = await StorageService.downloadFile({ key: cloudKey, context })
+    const context =
+      (explicitContext as StorageContext) || inferContextFromKey(cloudKey);
+    const fileBuffer = await StorageService.downloadFile({
+      key: cloudKey,
+      context,
+    });
     logger.info(
-      `Downloaded file from ${context} storage (${explicitContext ? 'explicit' : 'inferred'}): ${cloudKey}, size: ${fileBuffer.length} bytes`
-    )
+      `Downloaded file from ${context} storage (${explicitContext ? "explicit" : "inferred"}): ${cloudKey}, size: ${fileBuffer.length} bytes`,
+    );
 
-    const filename = cloudKey.split('/').pop() || cloudKey
-    const extension = path.extname(filename).toLowerCase().substring(1)
+    const filename = cloudKey.split("/").pop() || cloudKey;
+    const extension = path.extname(filename).toLowerCase().substring(1);
 
-    if (extension === 'pdf') {
-      return await handlePdfBuffer(fileBuffer, filename, fileType, filePath)
+    if (extension === "pdf") {
+      return await handlePdfBuffer(fileBuffer, filename, fileType, filePath);
     }
-    if (extension === 'csv') {
-      return await handleCsvBuffer(fileBuffer, filename, fileType, filePath)
+    if (extension === "csv") {
+      return await handleCsvBuffer(fileBuffer, filename, fileType, filePath);
     }
     if (isSupportedFileType(extension)) {
-      return await handleGenericTextBuffer(fileBuffer, filename, extension, fileType, filePath)
+      return await handleGenericTextBuffer(
+        fileBuffer,
+        filename,
+        extension,
+        fileType,
+        filePath,
+      );
     }
-    return handleGenericBuffer(fileBuffer, filename, extension, fileType)
+    return handleGenericBuffer(fileBuffer, filename, extension, fileType);
   } catch (error) {
-    logger.error(`Error handling cloud file ${filePath}:`, error)
+    logger.error(`Error handling cloud file ${filePath}:`, error);
 
-    const errorMessage = (error as Error).message
-    if (errorMessage.includes('Access denied') || errorMessage.includes('Forbidden')) {
-      throw new Error(`Error accessing file from cloud storage: ${errorMessage}`)
+    const errorMessage = (error as Error).message;
+    if (
+      errorMessage.includes("Access denied") ||
+      errorMessage.includes("Forbidden")
+    ) {
+      throw new Error(
+        `Error accessing file from cloud storage: ${errorMessage}`,
+      );
     }
 
     return {
       success: false,
       error: `Error accessing file from cloud storage: ${errorMessage}`,
       filePath,
-    }
+    };
   }
 }
 
 /**
  * Handle local file
  */
-async function handleLocalFile(filePath: string, fileType?: string): Promise<ParseResult> {
+async function handleLocalFile(
+  filePath: string,
+  fileType?: string,
+): Promise<ParseResult> {
   try {
-    const filename = filePath.split('/').pop() || filePath
-    const fullPath = path.join(UPLOAD_DIR_SERVER, filename)
+    const filename = filePath.split("/").pop() || filePath;
+    const fullPath = path.join(UPLOAD_DIR_SERVER, filename);
 
-    logger.info('Processing local file:', fullPath)
+    logger.info("Processing local file:", fullPath);
 
     try {
-      await fsPromises.access(fullPath)
+      await fsPromises.access(fullPath);
     } catch {
-      throw new Error(`File not found: ${filename}`)
+      throw new Error(`File not found: ${filename}`);
     }
 
-    const result = await parseFile(fullPath)
+    const result = await parseFile(fullPath);
 
-    const stats = await fsPromises.stat(fullPath)
-    const fileBuffer = await readFile(fullPath)
-    const hash = createHash('md5').update(fileBuffer).digest('hex')
+    const stats = await fsPromises.stat(fullPath);
+    const fileBuffer = await readFile(fullPath);
+    const hash = createHash("md5").update(fileBuffer).digest("hex");
 
-    const extension = path.extname(filename).toLowerCase().substring(1)
+    const extension = path.extname(filename).toLowerCase().substring(1);
 
     return {
       success: true,
@@ -382,14 +436,14 @@ async function handleLocalFile(filePath: string, fileType?: string): Promise<Par
         hash,
         processingTime: 0,
       },
-    }
+    };
   } catch (error) {
-    logger.error(`Error handling local file ${filePath}:`, error)
+    logger.error(`Error handling local file ${filePath}:`, error);
     return {
       success: false,
       error: `Error processing local file: ${(error as Error).message}`,
       filePath,
-    }
+    };
   }
 }
 
@@ -400,49 +454,53 @@ async function handlePdfBuffer(
   fileBuffer: Buffer,
   filename: string,
   fileType?: string,
-  originalPath?: string
+  originalPath?: string,
 ): Promise<ParseResult> {
   try {
-    logger.info(`Parsing PDF in memory: ${filename}`)
+    logger.info(`Parsing PDF in memory: ${filename}`);
 
-    const result = await parseBufferAsPdf(fileBuffer)
+    const result = await parseBufferAsPdf(fileBuffer);
 
     const content =
       result.content ||
-      createPdfFallbackMessage(result.metadata?.pageCount || 0, fileBuffer.length, originalPath)
+      createPdfFallbackMessage(
+        result.metadata?.pageCount || 0,
+        fileBuffer.length,
+        originalPath,
+      );
 
     return {
       success: true,
       content,
       filePath: originalPath || filename,
       metadata: {
-        fileType: fileType || 'application/pdf',
+        fileType: fileType || "application/pdf",
         size: fileBuffer.length,
-        hash: createHash('md5').update(fileBuffer).digest('hex'),
+        hash: createHash("md5").update(fileBuffer).digest("hex"),
         processingTime: 0,
       },
-    }
+    };
   } catch (error) {
-    logger.error('Failed to parse PDF in memory:', error)
+    logger.error("Failed to parse PDF in memory:", error);
 
     const content = createPdfFailureMessage(
       0,
       fileBuffer.length,
       originalPath || filename,
-      (error as Error).message
-    )
+      (error as Error).message,
+    );
 
     return {
       success: true,
       content,
       filePath: originalPath || filename,
       metadata: {
-        fileType: fileType || 'application/pdf',
+        fileType: fileType || "application/pdf",
         size: fileBuffer.length,
-        hash: createHash('md5').update(fileBuffer).digest('hex'),
+        hash: createHash("md5").update(fileBuffer).digest("hex"),
         processingTime: 0,
       },
-    }
+    };
   }
 }
 
@@ -453,38 +511,38 @@ async function handleCsvBuffer(
   fileBuffer: Buffer,
   filename: string,
   fileType?: string,
-  originalPath?: string
+  originalPath?: string,
 ): Promise<ParseResult> {
   try {
-    logger.info(`Parsing CSV in memory: ${filename}`)
+    logger.info(`Parsing CSV in memory: ${filename}`);
 
-    const { parseBuffer } = await import('@/lib/file-parsers')
-    const result = await parseBuffer(fileBuffer, 'csv')
+    const { parseBuffer } = await import("@/lib/file-parsers");
+    const result = await parseBuffer(fileBuffer, "csv");
 
     return {
       success: true,
       content: result.content,
       filePath: originalPath || filename,
       metadata: {
-        fileType: fileType || 'text/csv',
+        fileType: fileType || "text/csv",
         size: fileBuffer.length,
-        hash: createHash('md5').update(fileBuffer).digest('hex'),
+        hash: createHash("md5").update(fileBuffer).digest("hex"),
         processingTime: 0,
       },
-    }
+    };
   } catch (error) {
-    logger.error('Failed to parse CSV in memory:', error)
+    logger.error("Failed to parse CSV in memory:", error);
     return {
       success: false,
       error: `Failed to parse CSV: ${(error as Error).message}`,
       filePath: originalPath || filename,
       metadata: {
-        fileType: 'text/csv',
+        fileType: "text/csv",
         size: 0,
-        hash: '',
+        hash: "",
         processingTime: 0,
       },
-    }
+    };
   }
 }
 
@@ -496,16 +554,18 @@ async function handleGenericTextBuffer(
   filename: string,
   extension: string,
   fileType?: string,
-  originalPath?: string
+  originalPath?: string,
 ): Promise<ParseResult> {
   try {
-    logger.info(`Parsing text file in memory: ${filename}`)
+    logger.info(`Parsing text file in memory: ${filename}`);
 
     try {
-      const { parseBuffer, isSupportedFileType } = await import('@/lib/file-parsers')
+      const { parseBuffer, isSupportedFileType } = await import(
+        "@/lib/file-parsers"
+      );
 
       if (isSupportedFileType(extension)) {
-        const result = await parseBuffer(fileBuffer, extension)
+        const result = await parseBuffer(fileBuffer, extension);
 
         return {
           success: true,
@@ -514,16 +574,19 @@ async function handleGenericTextBuffer(
           metadata: {
             fileType: fileType || getMimeType(extension),
             size: fileBuffer.length,
-            hash: createHash('md5').update(fileBuffer).digest('hex'),
+            hash: createHash("md5").update(fileBuffer).digest("hex"),
             processingTime: 0,
           },
-        }
+        };
       }
     } catch (parserError) {
-      logger.warn('Specialized parser failed, falling back to generic parsing:', parserError)
+      logger.warn(
+        "Specialized parser failed, falling back to generic parsing:",
+        parserError,
+      );
     }
 
-    const content = fileBuffer.toString('utf-8')
+    const content = fileBuffer.toString("utf-8");
 
     return {
       success: true,
@@ -532,23 +595,23 @@ async function handleGenericTextBuffer(
       metadata: {
         fileType: fileType || getMimeType(extension),
         size: fileBuffer.length,
-        hash: createHash('md5').update(fileBuffer).digest('hex'),
+        hash: createHash("md5").update(fileBuffer).digest("hex"),
         processingTime: 0,
       },
-    }
+    };
   } catch (error) {
-    logger.error('Failed to parse text file in memory:', error)
+    logger.error("Failed to parse text file in memory:", error);
     return {
       success: false,
       error: `Failed to parse file: ${(error as Error).message}`,
       filePath: originalPath || filename,
       metadata: {
-        fileType: 'text/plain',
+        fileType: "text/plain",
         size: 0,
-        hash: '',
+        hash: "",
         processingTime: 0,
       },
-    }
+    };
   }
 }
 
@@ -559,12 +622,12 @@ function handleGenericBuffer(
   fileBuffer: Buffer,
   filename: string,
   extension: string,
-  fileType?: string
+  fileType?: string,
 ): ParseResult {
-  const isBinary = binaryExtensionsList.includes(extension)
+  const isBinary = binaryExtensionsList.includes(extension);
   const content = isBinary
     ? `[Binary ${extension.toUpperCase()} file - ${fileBuffer.length} bytes]`
-    : fileBuffer.toString('utf-8')
+    : fileBuffer.toString("utf-8");
 
   return {
     success: true,
@@ -573,10 +636,10 @@ function handleGenericBuffer(
     metadata: {
       fileType: fileType || getMimeType(extension),
       size: fileBuffer.length,
-      hash: createHash('md5').update(fileBuffer).digest('hex'),
+      hash: createHash("md5").update(fileBuffer).digest("hex"),
       processingTime: 0,
     },
-  }
+  };
 }
 
 /**
@@ -584,13 +647,13 @@ function handleGenericBuffer(
  */
 async function parseBufferAsPdf(buffer: Buffer) {
   try {
-    const { PdfParser } = await import('@/lib/file-parsers/pdf-parser')
-    const parser = new PdfParser()
-    logger.info('Using main PDF parser for buffer')
+    const { PdfParser } = await import("@/lib/file-parsers/pdf-parser");
+    const parser = new PdfParser();
+    logger.info("Using main PDF parser for buffer");
 
-    return await parser.parseBuffer(buffer)
+    return await parser.parseBuffer(buffer);
   } catch (error) {
-    throw new Error(`PDF parsing failed: ${(error as Error).message}`)
+    throw new Error(`PDF parsing failed: ${(error as Error).message}`);
   }
 }
 
@@ -598,36 +661,40 @@ async function parseBufferAsPdf(buffer: Buffer) {
  * Get MIME type from file extension
  */
 function getMimeType(extension: string): string {
-  return fileTypeMap[extension] || 'application/octet-stream'
+  return fileTypeMap[extension] || "application/octet-stream";
 }
 
 /**
  * Format bytes to human readable size
  */
 function prettySize(bytes: number): string {
-  if (bytes === 0) return '0 Bytes'
+  if (bytes === 0) return "0 Bytes";
 
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(1024))
+  const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
 
-  return `${Number.parseFloat((bytes / 1024 ** i).toFixed(2))} ${sizes[i]}`
+  return `${Number.parseFloat((bytes / 1024 ** i).toFixed(2))} ${sizes[i]}`;
 }
 
 /**
  * Create a formatted message for PDF content
  */
-function createPdfFallbackMessage(pageCount: number, size: number, path?: string): string {
+function createPdfFallbackMessage(
+  pageCount: number,
+  size: number,
+  path?: string,
+): string {
   const formattedPath = path
-    ? path.includes('/api/files/serve/s3/')
-      ? `S3 path: ${decodeURIComponent(path.split('/api/files/serve/s3/')[1])}`
+    ? path.includes("/api/files/serve/s3/")
+      ? `S3 path: ${decodeURIComponent(path.split("/api/files/serve/s3/")[1])}`
       : `Local path: ${path}`
-    : 'Unknown path'
+    : "Unknown path";
 
   return `PDF document - ${pageCount} page(s), ${prettySize(size)}
 Path: ${formattedPath}
 
 This file appears to be a PDF document that could not be fully processed as text.
-Please use a PDF viewer for best results.`
+Please use a PDF viewer for best results.`;
 }
 
 /**
@@ -637,16 +704,16 @@ function createPdfFailureMessage(
   pageCount: number,
   size: number,
   path: string,
-  error: string
+  error: string,
 ): string {
-  const formattedPath = path.includes('/api/files/serve/s3/')
-    ? `S3 path: ${decodeURIComponent(path.split('/api/files/serve/s3/')[1])}`
-    : `Local path: ${path}`
+  const formattedPath = path.includes("/api/files/serve/s3/")
+    ? `S3 path: ${decodeURIComponent(path.split("/api/files/serve/s3/")[1])}`
+    : `Local path: ${path}`;
 
   return `PDF document - Processing failed, ${prettySize(size)}
 Path: ${formattedPath}
 Error: ${error}
 
 This file appears to be a PDF document that could not be processed.
-Please use a PDF viewer for best results.`
+Please use a PDF viewer for best results.`;
 }

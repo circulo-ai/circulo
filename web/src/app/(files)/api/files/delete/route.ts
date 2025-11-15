@@ -1,7 +1,3 @@
-import type { NextRequest } from 'next/server'
-import { createLogger } from '@/lib/logs/console/logger'
-import type { StorageContext } from '@/lib/uploads/core/config-resolver'
-import { deleteFile } from '@/lib/uploads/core/storage-service'
 import {
   createErrorResponse,
   createOptionsResponse,
@@ -13,53 +9,60 @@ import {
   isBlobPath,
   isCloudPath,
   isS3Path,
-} from '@/app/(files)/api/files/utils'
+} from "@/app/(files)/api/files/utils";
+import { createLogger } from "@/lib/logs/console/logger";
+import type { StorageContext } from "@/lib/uploads/core/config-resolver";
+import { deleteFile } from "@/lib/uploads/core/storage-service";
+import type { NextRequest } from "next/server";
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
-const logger = createLogger('FilesDeleteAPI')
+const logger = createLogger("FilesDeleteAPI");
 
 /**
  * Main API route handler for file deletion
  */
 export async function POST(request: NextRequest) {
   try {
-    const requestData = await request.json()
-    const { filePath, context } = requestData
+    const requestData = await request.json();
+    const { filePath, context } = requestData;
 
-    logger.info('File delete request received:', { filePath, context })
+    logger.info("File delete request received:", { filePath, context });
 
     if (!filePath) {
-      throw new InvalidRequestError('No file path provided')
+      throw new InvalidRequestError("No file path provided");
     }
 
     try {
-      const key = extractStorageKey(filePath)
+      const key = extractStorageKey(filePath);
 
-      const storageContext: StorageContext = context || inferContextFromKey(key)
+      const storageContext: StorageContext =
+        context || inferContextFromKey(key);
 
-      logger.info(`Deleting file with key: ${key}, context: ${storageContext}`)
+      logger.info(`Deleting file with key: ${key}, context: ${storageContext}`);
 
       await deleteFile({
         key,
         context: storageContext,
-      })
+      });
 
-      logger.info(`File successfully deleted: ${key}`)
+      logger.info(`File successfully deleted: ${key}`);
 
       return createSuccessResponse({
         success: true,
-        message: 'File deleted successfully',
-      })
+        message: "File deleted successfully",
+      });
     } catch (error) {
-      logger.error('Error deleting file:', error)
+      logger.error("Error deleting file:", error);
       return createErrorResponse(
-        error instanceof Error ? error : new Error('Failed to delete file')
-      )
+        error instanceof Error ? error : new Error("Failed to delete file"),
+      );
     }
   } catch (error) {
-    logger.error('Error parsing request:', error)
-    return createErrorResponse(error instanceof Error ? error : new Error('Invalid request'))
+    logger.error("Error parsing request:", error);
+    return createErrorResponse(
+      error instanceof Error ? error : new Error("Invalid request"),
+    );
   }
 }
 
@@ -68,26 +71,28 @@ export async function POST(request: NextRequest) {
  */
 function extractStorageKey(filePath: string): string {
   if (isS3Path(filePath)) {
-    return extractS3Key(filePath)
+    return extractS3Key(filePath);
   }
 
   if (isBlobPath(filePath)) {
-    return extractBlobKey(filePath)
+    return extractBlobKey(filePath);
   }
 
   // Handle "/api/files/serve/<key>" paths
-  if (filePath.startsWith('/api/files/serve/')) {
-    const pathWithoutQuery = filePath.split('?')[0]
-    return decodeURIComponent(pathWithoutQuery.substring('/api/files/serve/'.length))
+  if (filePath.startsWith("/api/files/serve/")) {
+    const pathWithoutQuery = filePath.split("?")[0];
+    return decodeURIComponent(
+      pathWithoutQuery.substring("/api/files/serve/".length),
+    );
   }
 
   // For local files, extract filename
   if (!isCloudPath(filePath)) {
-    return extractFilename(filePath)
+    return extractFilename(filePath);
   }
 
   // As a last resort, assume the incoming string is already a raw key
-  return filePath
+  return filePath;
 }
 
 /**
@@ -100,22 +105,22 @@ function extractStorageKey(filePath: string): string {
  */
 function inferContextFromKey(key: string): StorageContext {
   // KB files always start with 'kb/' prefix
-  if (key.startsWith('kb/')) {
-    return 'knowledge-base'
+  if (key.startsWith("kb/")) {
+    return "knowledge-base";
   }
 
   // Copilot/General files: timestamp-random-filename (no path segments)
   // Pattern: {timestamp}-{random}-{filename}
   if (key.match(/^\d+-[a-z0-9]+-/)) {
-    return 'general'
+    return "general";
   }
 
-  return 'general'
+  return "general";
 }
 
 /**
  * Handle CORS preflight requests
  */
 export async function OPTIONS() {
-  return createOptionsResponse()
+  return createOptionsResponse();
 }

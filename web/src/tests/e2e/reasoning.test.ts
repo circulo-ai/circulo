@@ -17,7 +17,7 @@ test.describe("chat activity with reasoning", () => {
     expect(assistantMessage!.content).toBe("It's just blue duh!");
 
     expect(assistantMessage!.reasoning).toBe(
-      "The sky is blue because of rayleigh scattering!"
+      "The sky is blue because of rayleigh scattering!",
     );
   });
 
@@ -57,7 +57,7 @@ test.describe("chat activity with reasoning", () => {
     expect(updatedAssistantMessage!.content).toBe("It's just green duh!");
 
     expect(updatedAssistantMessage!.reasoning).toBe(
-      "Grass is green because of chlorophyll absorption!"
+      "Grass is green because of chlorophyll absorption!",
     );
   });
 });

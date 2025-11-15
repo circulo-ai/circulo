@@ -1,3 +1,6 @@
+import { user } from "@/db/schema/auth";
+import { tsvector } from "@/db/schema/types";
+import { SQL, sql } from "drizzle-orm";
 import {
   boolean,
   check,
@@ -10,9 +13,6 @@ import {
   uniqueIndex,
   vector,
 } from "drizzle-orm/pg-core";
-import { SQL, sql } from "drizzle-orm";
-import { tsvector } from "@/db/schema/types";
-import { user } from "@/db/schema/auth";
 
 export const processingStatusEnum = pgEnum("processing_status", [
   "pending",
@@ -57,13 +57,13 @@ export const knowledgeBase = pgTable(
     isPublicIdx: index("kb_is_public_idx").on(table.isPublic),
     countsNonNegative: check(
       "kb_counts_non_negative",
-      sql`document_count >= 0 AND total_tokens >= 0 AND total_size >= 0`
+      sql`document_count >= 0 AND total_tokens >= 0 AND total_size >= 0`,
     ),
     embeddingDimPositive: check(
       "kb_embedding_dimension_positive",
-      sql`embedding_dimension > 0`
+      sql`embedding_dimension > 0`,
     ),
-  })
+  }),
 );
 
 // Documents within knowledge bases
@@ -108,14 +108,14 @@ export const knowledgeDocument = pgTable(
     statusIdx: index("document_status_idx").on(table.processingStatus),
     kbStatusIdx: index("document_kb_status_idx").on(
       table.knowledgeBaseId,
-      table.processingStatus
+      table.processingStatus,
     ),
     fileSizePositive: check("document_file_size_positive", sql`file_size > 0`),
     countsNonNegative: check(
       "document_counts_non_negative",
-      sql`chunk_count >= 0 AND token_count >= 0`
+      sql`chunk_count >= 0 AND token_count >= 0`,
     ),
-  })
+  }),
 );
 
 // Embeddings for document chunks
@@ -143,7 +143,7 @@ export const embedding = pgTable(
 
     // Full-text search vector
     contentTsv: tsvector("content_tsv").generatedAlwaysAs(
-      (): SQL => sql`to_tsvector('english', ${embedding.content})`
+      (): SQL => sql`to_tsvector('english', ${embedding.content})`,
     ),
 
     createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -153,7 +153,7 @@ export const embedding = pgTable(
     docIdIdx: index("embedding_doc_id_idx").on(table.documentId),
     docChunkIdx: uniqueIndex("embedding_doc_chunk_idx").on(
       table.documentId,
-      table.chunkIndex
+      table.chunkIndex,
     ),
 
     // HNSW index for vector similarity search
@@ -164,22 +164,22 @@ export const embedding = pgTable(
     // Full-text search index
     contentFtsIdx: index("embedding_content_fts_idx").using(
       "gin",
-      table.contentTsv
+      table.contentTsv,
     ),
 
     chunkIndexNonNegative: check(
       "embedding_chunk_index_non_negative",
-      sql`chunk_index >= 0`
+      sql`chunk_index >= 0`,
     ),
     tokenCountNonNegative: check(
       "embedding_token_count_non_negative",
-      sql`token_count >= 0`
+      sql`token_count >= 0`,
     ),
     pagesNonNegative: check(
       "embedding_pages_non_negative",
-      sql`(start_page IS NULL OR start_page >= 0) AND (end_page IS NULL OR end_page >= 0)`
+      sql`(start_page IS NULL OR start_page >= 0) AND (end_page IS NULL OR end_page >= 0)`,
     ),
-  })
+  }),
 );
 
 // Document processing queue for async processing
@@ -205,18 +205,18 @@ export const documentProcessingQueue = pgTable(
   },
   (table) => ({
     documentIdIdx: uniqueIndex("doc_processing_queue_document_id_idx").on(
-      table.documentId
+      table.documentId,
     ),
     statusIdx: index("doc_processing_queue_status_idx").on(table.status),
     priorityStatusIdx: index("doc_processing_queue_priority_status_idx").on(
       table.priority,
-      table.status
+      table.status,
     ),
     attemptsNonNegative: check(
       "doc_processing_queue_attempts_non_negative",
-      sql`attempts >= 0 AND max_attempts > 0`
+      sql`attempts >= 0 AND max_attempts > 0`,
     ),
-  })
+  }),
 );
 
 // Types
@@ -230,6 +230,7 @@ export type ProcessingStatus = (typeof processingStatusEnum.enumValues)[number];
 export type Embedding = typeof embedding.$inferSelect;
 export type NewEmbedding = typeof embedding.$inferInsert;
 
-export type DocumentProcessingQueue = typeof documentProcessingQueue.$inferSelect;
+export type DocumentProcessingQueue =
+  typeof documentProcessingQueue.$inferSelect;
 export type NewDocumentProcessingQueue =
   typeof documentProcessingQueue.$inferInsert;

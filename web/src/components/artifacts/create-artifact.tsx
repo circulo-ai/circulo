@@ -1,8 +1,8 @@
+import type { Suggestion } from "@/db/schema";
+import type { ChatMessage, CustomUIDataTypes } from "@/lib/types";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import type { DataUIPart } from "ai";
 import type { ComponentType, Dispatch, ReactNode, SetStateAction } from "react";
-import type { Suggestion } from "@/db/schema";
-import type { ChatMessage, CustomUIDataTypes } from "@/lib/types";
 import type { UIArtifact } from "./artifact";
 
 export type ArtifactActionContext<M = any> = {

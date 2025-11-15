@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
 import { signOut } from "@/lib/auth-client";
 import { useSession } from "@/providers/session-provider";
+import { UserAvatar } from "@daveyplate/better-auth-ui";
 import { ArrowRight, LogOut } from "lucide-react";
 import Link from "next/link";
-import { UserAvatar } from "@daveyplate/better-auth-ui"
 
 export const AlreadyLoggedInCard = () => {
   const { data: session, isPending } = useSession();
@@ -23,10 +23,7 @@ export const AlreadyLoggedInCard = () => {
       <CardContent className="px-8 pt-8 pb-4">
         <div className="flex flex-col items-center space-y-6 text-center">
           {/* Avatar */}
-          <UserAvatar
-          className="size-20"
-          user={user}
-           size={"xl"}/>
+          <UserAvatar className="size-20" user={user} size={"xl"} />
 
           {/* Welcome Message */}
           <div className="space-y-2">

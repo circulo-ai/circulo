@@ -1,8 +1,7 @@
-import { agentRepo } from "@/db/repositories/agent-repo";
 import { db } from "@/db";
+import { agentRepo } from "@/db/repositories/agent-repo";
 import { agentTemplate } from "@/db/schema";
 import { UsageRateLimiter } from "@/lib/billing/rate-limiter";
-import { createLogger } from "@/lib/logs/console/logger";
 import { api, created, error, success } from "@/lib/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -28,13 +27,21 @@ export const POST = api(
           .regex(/^0(\.\d+)?$|^1(\.0+)?$|^2(\.0+)?$/)
           .optional(),
         maxTokens: z.number().min(1).max(32000).optional(),
-        color: z.string().regex(/^#[0-9A-F]{6}$/i).optional(),
+        color: z
+          .string()
+          .regex(/^#[0-9A-F]{6}$/i)
+          .optional(),
         tools: z.array(z.any()).optional(),
       })
       .refine(
         (b) =>
           !!b.templateId ||
-          (b.name && b.systemPrompt && b.model && b.temperature && b.maxTokens && b.color),
+          (b.name &&
+            b.systemPrompt &&
+            b.model &&
+            b.temperature &&
+            b.maxTokens &&
+            b.color),
         {
           message:
             "Provide either templateId or all required agent fields (name, systemPrompt, model, temperature, maxTokens, color).",
@@ -76,10 +83,13 @@ export const POST = api(
       userId: ctx.user.id,
       templateId: template?.id ?? null,
       name: ctx.body.name ?? template?.name!,
-      description: (ctx.body.description ?? template?.description) ?? null,
+      description: ctx.body.description ?? template?.description ?? null,
       systemPrompt: ctx.body.systemPrompt ?? template?.systemPrompt!,
       model: ctx.body.model ?? template?.model!,
-      temperature: ctx.body.temperature ?? (template?.temperature as unknown as string) ?? "0.7",
+      temperature:
+        ctx.body.temperature ??
+        (template?.temperature as unknown as string) ??
+        "0.7",
       maxTokens: ctx.body.maxTokens ?? template?.maxTokens ?? 2000,
       color: ctx.body.color ?? template?.color ?? "#3B82F6",
       usageCount: 0,

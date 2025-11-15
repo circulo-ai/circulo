@@ -1,14 +1,14 @@
-import { createLogger } from '@/lib/logs/console/logger'
+import { createLogger } from "@/lib/logs/console/logger";
 
-const logger = createLogger('InputValidation')
+const logger = createLogger("InputValidation");
 
 /**
  * Result type for validation functions
  */
 export interface ValidationResult {
-  isValid: boolean
-  error?: string
-  sanitized?: string
+  isValid: boolean;
+  error?: string;
+  sanitized?: string;
 }
 
 /**
@@ -16,17 +16,17 @@ export interface ValidationResult {
  */
 export interface PathSegmentOptions {
   /** Name of the parameter for error messages */
-  paramName?: string
+  paramName?: string;
   /** Maximum length allowed (default: 255) */
-  maxLength?: number
+  maxLength?: number;
   /** Allow hyphens (default: true) */
-  allowHyphens?: boolean
+  allowHyphens?: boolean;
   /** Allow underscores (default: true) */
-  allowUnderscores?: boolean
+  allowUnderscores?: boolean;
   /** Allow dots (default: false, to prevent directory traversal) */
-  allowDots?: boolean
+  allowDots?: boolean;
   /** Custom regex pattern to match */
-  customPattern?: RegExp
+  customPattern?: RegExp;
 }
 
 /**
@@ -53,121 +53,121 @@ export interface PathSegmentOptions {
  */
 export function validatePathSegment(
   value: string | null | undefined,
-  options: PathSegmentOptions = {}
+  options: PathSegmentOptions = {},
 ): ValidationResult {
   const {
-    paramName = 'path segment',
+    paramName = "path segment",
     maxLength = 255,
     allowHyphens = true,
     allowUnderscores = true,
     allowDots = false,
     customPattern,
-  } = options
+  } = options;
 
   // Check for null/undefined
-  if (value === null || value === undefined || value === '') {
+  if (value === null || value === undefined || value === "") {
     return {
       isValid: false,
       error: `${paramName} is required`,
-    }
+    };
   }
 
   // Check length
   if (value.length > maxLength) {
-    logger.warn('Path segment exceeds maximum length', {
+    logger.warn("Path segment exceeds maximum length", {
       paramName,
       length: value.length,
       maxLength,
-    })
+    });
     return {
       isValid: false,
       error: `${paramName} exceeds maximum length of ${maxLength} characters`,
-    }
+    };
   }
 
   // Check for null bytes (potential for bypass attacks)
-  if (value.includes('\0') || value.includes('%00')) {
-    logger.warn('Path segment contains null bytes', { paramName })
+  if (value.includes("\0") || value.includes("%00")) {
+    logger.warn("Path segment contains null bytes", { paramName });
     return {
       isValid: false,
       error: `${paramName} contains invalid characters`,
-    }
+    };
   }
 
   // Check for path traversal patterns
   const pathTraversalPatterns = [
-    '..',
-    './',
-    '.\\.', // Windows path traversal
-    '%2e%2e', // URL encoded ..
-    '%252e%252e', // Double URL encoded ..
-    '..%2f',
-    '..%5c',
-    '%2e%2e%2f',
-    '%2e%2e/',
-    '..%252f',
-  ]
+    "..",
+    "./",
+    ".\\.", // Windows path traversal
+    "%2e%2e", // URL encoded ..
+    "%252e%252e", // Double URL encoded ..
+    "..%2f",
+    "..%5c",
+    "%2e%2e%2f",
+    "%2e%2e/",
+    "..%252f",
+  ];
 
-  const lowerValue = value.toLowerCase()
+  const lowerValue = value.toLowerCase();
   for (const pattern of pathTraversalPatterns) {
     if (lowerValue.includes(pattern.toLowerCase())) {
-      logger.warn('Path traversal attempt detected', {
+      logger.warn("Path traversal attempt detected", {
         paramName,
         pattern,
         value: value.substring(0, 100),
-      })
+      });
       return {
         isValid: false,
         error: `${paramName} contains invalid path traversal sequences`,
-      }
+      };
     }
   }
 
   // Check for directory separators
-  if (value.includes('/') || value.includes('\\')) {
-    logger.warn('Path segment contains directory separators', { paramName })
+  if (value.includes("/") || value.includes("\\")) {
+    logger.warn("Path segment contains directory separators", { paramName });
     return {
       isValid: false,
       error: `${paramName} cannot contain directory separators`,
-    }
+    };
   }
 
   // Use custom pattern if provided
   if (customPattern) {
     if (!customPattern.test(value)) {
-      logger.warn('Path segment failed custom pattern validation', {
+      logger.warn("Path segment failed custom pattern validation", {
         paramName,
         pattern: customPattern.toString(),
-      })
+      });
       return {
         isValid: false,
         error: `${paramName} format is invalid`,
-      }
+      };
     }
-    return { isValid: true, sanitized: value }
+    return { isValid: true, sanitized: value };
   }
 
   // Build allowed character pattern
-  let pattern = '^[a-zA-Z0-9'
-  if (allowHyphens) pattern += '\\-'
-  if (allowUnderscores) pattern += '_'
-  if (allowDots) pattern += '\\.'
-  pattern += ']+$'
+  let pattern = "^[a-zA-Z0-9";
+  if (allowHyphens) pattern += "\\-";
+  if (allowUnderscores) pattern += "_";
+  if (allowDots) pattern += "\\.";
+  pattern += "]+$";
 
-  const regex = new RegExp(pattern)
+  const regex = new RegExp(pattern);
 
   if (!regex.test(value)) {
-    logger.warn('Path segment contains disallowed characters', {
+    logger.warn("Path segment contains disallowed characters", {
       paramName,
       value: value.substring(0, 100),
-    })
+    });
     return {
       isValid: false,
-      error: `${paramName} can only contain alphanumeric characters${allowHyphens ? ', hyphens' : ''}${allowUnderscores ? ', underscores' : ''}${allowDots ? ', dots' : ''}`,
-    }
+      error: `${paramName} can only contain alphanumeric characters${allowHyphens ? ", hyphens" : ""}${allowUnderscores ? ", underscores" : ""}${allowDots ? ", dots" : ""}`,
+    };
   }
 
-  return { isValid: true, sanitized: value }
+  return { isValid: true, sanitized: value };
 }
 
 /**
@@ -187,27 +187,31 @@ export function validatePathSegment(
  */
 export function validateUUID(
   value: string | null | undefined,
-  paramName = 'UUID'
+  paramName = "UUID",
 ): ValidationResult {
-  if (value === null || value === undefined || value === '') {
+  if (value === null || value === undefined || value === "") {
     return {
       isValid: false,
       error: `${paramName} is required`,
-    }
+    };
   }
 
   // UUID v4 pattern
-  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+  const uuidPattern =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
   if (!uuidPattern.test(value)) {
-    logger.warn('Invalid UUID format', { paramName, value: value.substring(0, 50) })
+    logger.warn("Invalid UUID format", {
+      paramName,
+      value: value.substring(0, 50),
+    });
     return {
       isValid: false,
       error: `${paramName} must be a valid UUID`,
-    }
+    };
   }
 
-  return { isValid: true, sanitized: value.toLowerCase() }
+  return { isValid: true, sanitized: value.toLowerCase() };
 }
 
 /**
@@ -228,8 +232,8 @@ export function validateUUID(
  */
 export function validateAlphanumericId(
   value: string | null | undefined,
-  paramName = 'ID',
-  maxLength = 100
+  paramName = "ID",
+  maxLength = 100,
 ): ValidationResult {
   return validatePathSegment(value, {
     paramName,
@@ -237,7 +241,7 @@ export function validateAlphanumericId(
     allowHyphens: true,
     allowUnderscores: true,
     allowDots: false,
-  })
+  });
 }
 
 /**
@@ -258,41 +262,41 @@ export function validateAlphanumericId(
  */
 export function validateNumericId(
   value: string | number | null | undefined,
-  paramName = 'ID',
-  options: { min?: number; max?: number } = {}
+  paramName = "ID",
+  options: { min?: number; max?: number } = {},
 ): ValidationResult {
-  if (value === null || value === undefined || value === '') {
+  if (value === null || value === undefined || value === "") {
     return {
       isValid: false,
       error: `${paramName} is required`,
-    }
+    };
   }
 
-  const num = typeof value === 'number' ? value : Number(value)
+  const num = typeof value === "number" ? value : Number(value);
 
   if (Number.isNaN(num) || !Number.isFinite(num)) {
-    logger.warn('Invalid numeric ID', { paramName, value })
+    logger.warn("Invalid numeric ID", { paramName, value });
     return {
       isValid: false,
       error: `${paramName} must be a valid number`,
-    }
+    };
   }
 
   if (options.min !== undefined && num < options.min) {
     return {
       isValid: false,
       error: `${paramName} must be at least ${options.min}`,
-    }
+    };
   }
 
   if (options.max !== undefined && num > options.max) {
     return {
       isValid: false,
       error: `${paramName} must be at most ${options.max}`,
-    }
+    };
   }
 
-  return { isValid: true, sanitized: num.toString() }
+  return { isValid: true, sanitized: num.toString() };
 }
 
 /**
@@ -314,28 +318,28 @@ export function validateNumericId(
 export function validateEnum<T extends string>(
   value: string | null | undefined,
   allowedValues: readonly T[],
-  paramName = 'value'
+  paramName = "value",
 ): ValidationResult {
-  if (value === null || value === undefined || value === '') {
+  if (value === null || value === undefined || value === "") {
     return {
       isValid: false,
       error: `${paramName} is required`,
-    }
+    };
   }
 
   if (!allowedValues.includes(value as T)) {
-    logger.warn('Value not in allowed list', {
+    logger.warn("Value not in allowed list", {
       paramName,
       value,
       allowedValues,
-    })
+    });
     return {
       isValid: false,
-      error: `${paramName} must be one of: ${allowedValues.join(', ')}`,
-    }
+      error: `${paramName} must be one of: ${allowedValues.join(", ")}`,
+    };
   }
 
-  return { isValid: true, sanitized: value }
+  return { isValid: true, sanitized: value };
 }
 
 /**
@@ -358,13 +362,13 @@ export function validateEnum<T extends string>(
  */
 export function validateHostname(
   hostname: string | null | undefined,
-  paramName = 'hostname'
+  paramName = "hostname",
 ): ValidationResult {
-  if (hostname === null || hostname === undefined || hostname === '') {
+  if (hostname === null || hostname === undefined || hostname === "") {
     return {
       isValid: false,
       error: `${paramName} is required`,
-    }
+    };
   }
 
   // Import the blocked IP ranges from url-validation
@@ -397,39 +401,39 @@ export function validateHostname(
     /^::ffff:10\./i,
     /^::ffff:172\.(1[6-9]|2[0-9]|3[01])\./i,
     /^::ffff:192\.168\./i,
-  ]
+  ];
 
-  const lowerHostname = hostname.toLowerCase()
+  const lowerHostname = hostname.toLowerCase();
 
   for (const pattern of BLOCKED_IP_RANGES) {
     if (pattern.test(lowerHostname)) {
-      logger.warn('Hostname matches blocked IP range', {
+      logger.warn("Hostname matches blocked IP range", {
         paramName,
         hostname: hostname.substring(0, 100),
-      })
+      });
       return {
         isValid: false,
         error: `${paramName} cannot be a private IP address or localhost`,
-      }
+      };
     }
   }
 
   // Basic hostname format validation
   const hostnamePattern =
-    /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/i
+    /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/i;
 
   if (!hostnamePattern.test(hostname)) {
-    logger.warn('Invalid hostname format', {
+    logger.warn("Invalid hostname format", {
       paramName,
       hostname: hostname.substring(0, 100),
-    })
+    });
     return {
       isValid: false,
       error: `${paramName} is not a valid hostname`,
-    }
+    };
   }
 
-  return { isValid: true, sanitized: hostname }
+  return { isValid: true, sanitized: hostname };
 }
 
 /**
@@ -451,34 +455,34 @@ export function validateHostname(
 export function validateFileExtension(
   extension: string | null | undefined,
   allowedExtensions: readonly string[],
-  paramName = 'file extension'
+  paramName = "file extension",
 ): ValidationResult {
-  if (extension === null || extension === undefined || extension === '') {
+  if (extension === null || extension === undefined || extension === "") {
     return {
       isValid: false,
       error: `${paramName} is required`,
-    }
+    };
   }
 
   // Remove leading dot if present
-  const ext = extension.startsWith('.') ? extension.slice(1) : extension
+  const ext = extension.startsWith(".") ? extension.slice(1) : extension;
 
   // Normalize to lowercase
-  const normalizedExt = ext.toLowerCase()
+  const normalizedExt = ext.toLowerCase();
 
   if (!allowedExtensions.map((e) => e.toLowerCase()).includes(normalizedExt)) {
-    logger.warn('File extension not in allowed list', {
+    logger.warn("File extension not in allowed list", {
       paramName,
       extension: ext,
       allowedExtensions,
-    })
+    });
     return {
       isValid: false,
-      error: `${paramName} must be one of: ${allowedExtensions.join(', ')}`,
-    }
+      error: `${paramName} must be one of: ${allowedExtensions.join(", ")}`,
+    };
   }
 
-  return { isValid: true, sanitized: normalizedExt }
+  return { isValid: true, sanitized: normalizedExt };
 }
 
 /**
@@ -489,19 +493,19 @@ export function validateFileExtension(
  * @returns Sanitized string safe for logging
  */
 export function sanitizeForLogging(value: string, maxLength = 100): string {
-  if (!value) return ''
+  if (!value) return "";
 
   // Truncate long values
-  let sanitized = value.substring(0, maxLength)
+  let sanitized = value.substring(0, maxLength);
 
   // Mask common sensitive patterns
   sanitized = sanitized
-    .replace(/Bearer\s+[A-Za-z0-9\-._~+/]+=*/gi, 'Bearer [REDACTED]')
+    .replace(/Bearer\s+[A-Za-z0-9\-._~+/]+=*/gi, "Bearer [REDACTED]")
     .replace(/password['":\s]*['"]\w+['"]/gi, 'password: "[REDACTED]"')
     .replace(/token['":\s]*['"]\w+['"]/gi, 'token: "[REDACTED]"')
-    .replace(/api[_-]?key['":\s]*['"]\w+['"]/gi, 'api_key: "[REDACTED]"')
+    .replace(/api[_-]?key['":\s]*['"]\w+['"]/gi, 'api_key: "[REDACTED]"');
 
-  return sanitized
+  return sanitized;
 }
 
 /**
@@ -529,62 +533,62 @@ export function sanitizeForLogging(value: string, maxLength = 100): string {
  */
 export function validateMicrosoftGraphId(
   value: string | null | undefined,
-  paramName = 'ID'
+  paramName = "ID",
 ): ValidationResult {
-  if (value === null || value === undefined || value === '') {
+  if (value === null || value === undefined || value === "") {
     return {
       isValid: false,
       error: `${paramName} is required`,
-    }
+    };
   }
 
   // Check for path traversal patterns (../)
   const pathTraversalPatterns = [
-    '../',
-    '..\\',
-    '%2e%2e%2f',
-    '%2e%2e/',
-    '..%2f',
-    '%2e%2e%5c',
-    '%2e%2e\\',
-    '..%5c',
-    '%252e%252e%252f', // double encoded
-  ]
+    "../",
+    "..\\",
+    "%2e%2e%2f",
+    "%2e%2e/",
+    "..%2f",
+    "%2e%2e%5c",
+    "%2e%2e\\",
+    "..%5c",
+    "%252e%252e%252f", // double encoded
+  ];
 
-  const lowerValue = value.toLowerCase()
+  const lowerValue = value.toLowerCase();
   for (const pattern of pathTraversalPatterns) {
     if (lowerValue.includes(pattern)) {
-      logger.warn('Path traversal attempt in Microsoft Graph ID', {
+      logger.warn("Path traversal attempt in Microsoft Graph ID", {
         paramName,
         value: value.substring(0, 100),
-      })
+      });
       return {
         isValid: false,
         error: `${paramName} contains invalid path traversal sequence`,
-      }
+      };
     }
   }
 
   // Check for control characters and null bytes
-  if (/[\x00-\x1f\x7f]/.test(value) || value.includes('%00')) {
-    logger.warn('Control characters in Microsoft Graph ID', { paramName })
+  if (/[\x00-\x1f\x7f]/.test(value) || value.includes("%00")) {
+    logger.warn("Control characters in Microsoft Graph ID", { paramName });
     return {
       isValid: false,
       error: `${paramName} contains invalid control characters`,
-    }
+    };
   }
 
   // Check for newlines (which could be used for header injection)
-  if (value.includes('\n') || value.includes('\r')) {
+  if (value.includes("\n") || value.includes("\r")) {
     return {
       isValid: false,
       error: `${paramName} contains invalid newline characters`,
-    }
+    };
   }
 
   // Microsoft Graph IDs can contain many characters, but not suspicious patterns
   // We've blocked path traversal, so allow the rest
-  return { isValid: true, sanitized: value }
+  return { isValid: true, sanitized: value };
 }
 
 /**
@@ -604,7 +608,7 @@ export function validateMicrosoftGraphId(
  */
 export function validateJiraCloudId(
   value: string | null | undefined,
-  paramName = 'cloudId'
+  paramName = "cloudId",
 ): ValidationResult {
   // Jira cloud IDs are alphanumeric with hyphens (UUID-like)
   return validatePathSegment(value, {
@@ -613,7 +617,7 @@ export function validateJiraCloudId(
     allowUnderscores: false,
     allowDots: false,
     maxLength: 100,
-  })
+  });
 }
 
 /**
@@ -633,7 +637,7 @@ export function validateJiraCloudId(
  */
 export function validateJiraIssueKey(
   value: string | null | undefined,
-  paramName = 'issueKey'
+  paramName = "issueKey",
 ): ValidationResult {
   // Jira issue keys: letters, numbers, hyphens (PROJECT-123 format)
   return validatePathSegment(value, {
@@ -642,7 +646,7 @@ export function validateJiraIssueKey(
     allowUnderscores: false,
     allowDots: false,
     maxLength: 255,
-  })
+  });
 }
 
 /**
@@ -667,49 +671,49 @@ export function validateJiraIssueKey(
  */
 export function validateExternalUrl(
   url: string | null | undefined,
-  paramName = 'url'
+  paramName = "url",
 ): ValidationResult {
-  if (!url || typeof url !== 'string') {
+  if (!url || typeof url !== "string") {
     return {
       isValid: false,
       error: `${paramName} is required and must be a string`,
-    }
+    };
   }
 
   // Must be a valid URL
-  let parsedUrl: URL
+  let parsedUrl: URL;
   try {
-    parsedUrl = new URL(url)
+    parsedUrl = new URL(url);
   } catch {
     return {
       isValid: false,
       error: `${paramName} must be a valid URL`,
-    }
+    };
   }
 
   // Only allow https protocol
-  if (parsedUrl.protocol !== 'https:') {
+  if (parsedUrl.protocol !== "https:") {
     return {
       isValid: false,
       error: `${paramName} must use https:// protocol`,
-    }
+    };
   }
 
   // Block private IP ranges and localhost
-  const hostname = parsedUrl.hostname.toLowerCase()
+  const hostname = parsedUrl.hostname.toLowerCase();
 
   // Block localhost variations
   if (
-    hostname === 'localhost' ||
-    hostname === '127.0.0.1' ||
-    hostname === '::1' ||
-    hostname.startsWith('127.') ||
-    hostname === '0.0.0.0'
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "::1" ||
+    hostname.startsWith("127.") ||
+    hostname === "0.0.0.0"
   ) {
     return {
       isValid: false,
       error: `${paramName} cannot point to localhost`,
-    }
+    };
   }
 
   // Block private IP ranges
@@ -721,38 +725,38 @@ export function validateExternalUrl(
     /^fe80:/i, // IPv6 link-local
     /^fc00:/i, // IPv6 unique local
     /^fd00:/i, // IPv6 unique local
-  ]
+  ];
 
   for (const pattern of privateIpPatterns) {
     if (pattern.test(hostname)) {
       return {
         isValid: false,
         error: `${paramName} cannot point to private IP addresses`,
-      }
+      };
     }
   }
 
   // Block suspicious ports commonly used for internal services
-  const port = parsedUrl.port
+  const port = parsedUrl.port;
   const blockedPorts = [
-    '22', // SSH
-    '23', // Telnet
-    '25', // SMTP
-    '3306', // MySQL
-    '5432', // PostgreSQL
-    '6379', // Redis
-    '27017', // MongoDB
-    '9200', // Elasticsearch
-  ]
+    "22", // SSH
+    "23", // Telnet
+    "25", // SMTP
+    "3306", // MySQL
+    "5432", // PostgreSQL
+    "6379", // Redis
+    "27017", // MongoDB
+    "9200", // Elasticsearch
+  ];
 
   if (port && blockedPorts.includes(port)) {
     return {
       isValid: false,
       error: `${paramName} uses a blocked port`,
-    }
+    };
   }
 
-  return { isValid: true }
+  return { isValid: true };
 }
 
 /**
@@ -761,9 +765,9 @@ export function validateExternalUrl(
  */
 export function validateImageUrl(
   url: string | null | undefined,
-  paramName = 'imageUrl'
+  paramName = "imageUrl",
 ): ValidationResult {
-  return validateExternalUrl(url, paramName)
+  return validateExternalUrl(url, paramName);
 }
 
 /**
@@ -772,7 +776,7 @@ export function validateImageUrl(
  */
 export function validateProxyUrl(
   url: string | null | undefined,
-  paramName = 'proxyUrl'
+  paramName = "proxyUrl",
 ): ValidationResult {
-  return validateExternalUrl(url, paramName)
+  return validateExternalUrl(url, paramName);
 }

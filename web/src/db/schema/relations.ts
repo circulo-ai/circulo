@@ -1,28 +1,23 @@
-import { relations } from "drizzle-orm";
-import {
-  agent,
-  agentTemplate,
-  tool,
-  mcpServer,
-} from "@/db/schema/agent";
+import { agent, agentTemplate, mcpServer, tool } from "@/db/schema/agent";
 import { account, session, user } from "@/db/schema/auth";
-import {
-  knowledgeDocument,
-  embedding,
-  knowledgeBase,
-  documentProcessingQueue,
-} from "@/db/schema/knowledge";
 import {
   chat,
   chatAgent,
+  chatInvitation,
   chatKnowledgeBase,
   chatMember,
-  chatInvitation,
+  document,
   message,
   messageReaction,
-  document,
   suggestion,
 } from "@/db/schema/chat";
+import {
+  documentProcessingQueue,
+  embedding,
+  knowledgeBase,
+  knowledgeDocument,
+} from "@/db/schema/knowledge";
+import { relations } from "drizzle-orm";
 
 // ==================== USER RELATIONS ====================
 
@@ -43,7 +38,9 @@ export const userRelations = relations(user, ({ many }) => ({
   createdChats: many(chat),
   chatMemberships: many(chatMember),
   sentInvitations: many(chatInvitation, { relationName: "sentInvitations" }),
-  receivedInvitations: many(chatInvitation, { relationName: "receivedInvitations" }),
+  receivedInvitations: many(chatInvitation, {
+    relationName: "receivedInvitations",
+  }),
   messages: many(message),
   messageReactions: many(messageReaction),
   documents: many(document),
@@ -74,7 +71,7 @@ export const agentTemplateRelations = relations(
       references: [user.id],
     }),
     instances: many(agent),
-  })
+  }),
 );
 
 export const agentRelations = relations(agent, ({ one, many }) => ({
@@ -121,7 +118,7 @@ export const knowledgeBaseRelations = relations(
     documents: many(knowledgeDocument),
     embeddings: many(embedding),
     chatKnowledgeBases: many(chatKnowledgeBase),
-  })
+  }),
 );
 
 export const knowledgeDocumentRelations = relations(
@@ -136,7 +133,7 @@ export const knowledgeDocumentRelations = relations(
       fields: [knowledgeDocument.id],
       references: [documentProcessingQueue.documentId],
     }),
-  })
+  }),
 );
 
 export const embeddingRelations = relations(embedding, ({ one }) => ({
@@ -157,7 +154,7 @@ export const documentProcessingQueueRelations = relations(
       fields: [documentProcessingQueue.documentId],
       references: [knowledgeDocument.id],
     }),
-  })
+  }),
 );
 
 // ==================== CHAT RELATIONS ====================
@@ -186,25 +183,22 @@ export const chatMemberRelations = relations(chatMember, ({ one }) => ({
   }),
 }));
 
-export const chatInvitationRelations = relations(
-  chatInvitation,
-  ({ one }) => ({
-    chat: one(chat, {
-      fields: [chatInvitation.chatId],
-      references: [chat.id],
-    }),
-    inviter: one(user, {
-      fields: [chatInvitation.inviterId],
-      references: [user.id],
-      relationName: "sentInvitations",
-    }),
-    invitee: one(user, {
-      fields: [chatInvitation.inviteeId],
-      references: [user.id],
-      relationName: "receivedInvitations",
-    }),
-  })
-);
+export const chatInvitationRelations = relations(chatInvitation, ({ one }) => ({
+  chat: one(chat, {
+    fields: [chatInvitation.chatId],
+    references: [chat.id],
+  }),
+  inviter: one(user, {
+    fields: [chatInvitation.inviterId],
+    references: [user.id],
+    relationName: "sentInvitations",
+  }),
+  invitee: one(user, {
+    fields: [chatInvitation.inviteeId],
+    references: [user.id],
+    relationName: "receivedInvitations",
+  }),
+}));
 
 export const chatAgentRelations = relations(chatAgent, ({ one }) => ({
   chat: one(chat, {
@@ -236,7 +230,7 @@ export const chatKnowledgeBaseRelations = relations(
       fields: [chatKnowledgeBase.addedBy],
       references: [user.id],
     }),
-  })
+  }),
 );
 
 export const messageRelations = relations(message, ({ one, many }) => ({
@@ -274,7 +268,7 @@ export const messageReactionRelations = relations(
       fields: [messageReaction.userId],
       references: [user.id],
     }),
-  })
+  }),
 );
 
 export const documentRelations = relations(document, ({ one, many }) => ({

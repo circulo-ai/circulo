@@ -1,3 +1,6 @@
+import EmailFooter from "@/components/emails/footer";
+import { getBrandConfig } from "@/lib/branding/branding";
+import { getBaseUrl } from "@/lib/urls/utils";
 import {
   Body,
   Column,
@@ -11,35 +14,32 @@ import {
   Row,
   Section,
   Text,
-} from '@react-email/components'
-import EmailFooter from '@/components/emails/footer'
-import { getBrandConfig } from '@/lib/branding/branding'
-import { getBaseUrl } from '@/lib/urls/utils'
-import { baseStyles } from './base-styles'
+} from "@react-email/components";
+import { baseStyles } from "./base-styles";
 
 interface UsageThresholdEmailProps {
-  userName?: string
-  planName: string
-  percentUsed: number
-  currentUsage: number
-  limit: number
-  ctaLink: string
-  updatedDate?: Date
+  userName?: string;
+  planName: string;
+  percentUsed: number;
+  currentUsage: number;
+  limit: number;
+  ctaLink: string;
+  updatedDate?: Date;
 }
 
 export function UsageThresholdEmail({
-                                      userName,
-                                      planName,
-                                      percentUsed,
-                                      currentUsage,
-                                      limit,
-                                      ctaLink,
-                                      updatedDate = new Date(),
-                                    }: UsageThresholdEmailProps) {
-  const brand = getBrandConfig()
-  const baseUrl = getBaseUrl()
+  userName,
+  planName,
+  percentUsed,
+  currentUsage,
+  limit,
+  ctaLink,
+  updatedDate = new Date(),
+}: UsageThresholdEmailProps) {
+  const brand = getBrandConfig();
+  const baseUrl = getBaseUrl();
 
-  const previewText = `${brand.name}: You're at ${percentUsed}% of your ${planName} monthly budget`
+  const previewText = `${brand.name}: You're at ${percentUsed}% of your ${planName} monthly budget`;
 
   return (
     <Html>
@@ -47,15 +47,17 @@ export function UsageThresholdEmail({
       <Preview>{previewText}</Preview>
       <Body style={baseStyles.main}>
         <Container style={baseStyles.container}>
-          <Section style={{ padding: '30px 0', textAlign: 'center' }}>
+          <Section style={{ padding: "30px 0", textAlign: "center" }}>
             <Row>
-              <Column style={{ textAlign: 'center' }}>
+              <Column style={{ textAlign: "center" }}>
                 <Img
-                  src={brand.logoUrl || `${baseUrl}/logo/reverse/text/medium.png`}
-                  width='114'
+                  src={
+                    brand.logoUrl || `${baseUrl}/logo/reverse/text/medium.png`
+                  }
+                  width="114"
                   alt={brand.name}
                   style={{
-                    margin: '0 auto',
+                    margin: "0 auto",
                   }}
                 />
               </Column>
@@ -72,7 +74,7 @@ export function UsageThresholdEmail({
 
           <Section style={baseStyles.content}>
             <Text style={{ ...baseStyles.paragraph, marginTop: 0 }}>
-              {userName ? `Hi ${userName},` : 'Hi,'}
+              {userName ? `Hi ${userName},` : "Hi,"}
             </Text>
 
             <Text style={baseStyles.paragraph}>
@@ -86,7 +88,8 @@ export function UsageThresholdEmail({
                     <strong>Usage</strong>
                   </Text>
                   <Text style={{ ...baseStyles.paragraph, marginTop: 0 }}>
-                    ${currentUsage.toFixed(2)} of ${limit.toFixed(2)} used ({percentUsed}%)
+                    ${currentUsage.toFixed(2)} of ${limit.toFixed(2)} used (
+                    {percentUsed}%)
                   </Text>
                 </Column>
               </Row>
@@ -98,7 +101,7 @@ export function UsageThresholdEmail({
               To avoid interruptions, consider increasing your monthly limit.
             </Text>
 
-            <Link href={ctaLink} style={{ textDecoration: 'none' }}>
+            <Link href={ctaLink} style={{ textDecoration: "none" }}>
               <Text style={baseStyles.button}>Review limits</Text>
             </Link>
 
@@ -108,8 +111,15 @@ export function UsageThresholdEmail({
               The Circulo Team
             </Text>
 
-            <Text style={{ ...baseStyles.paragraph, fontSize: '12px', color: '#666' }}>
-              Sent on {updatedDate.toLocaleDateString()} • This is a one-time notification at 80%.
+            <Text
+              style={{
+                ...baseStyles.paragraph,
+                fontSize: "12px",
+                color: "#666",
+              }}
+            >
+              Sent on {updatedDate.toLocaleDateString()} • This is a one-time
+              notification at 80%.
             </Text>
           </Section>
         </Container>
@@ -117,7 +127,7 @@ export function UsageThresholdEmail({
         <EmailFooter baseUrl={baseUrl} />
       </Body>
     </Html>
-  )
+  );
 }
 
-export default UsageThresholdEmail
+export default UsageThresholdEmail;

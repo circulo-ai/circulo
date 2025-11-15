@@ -1,26 +1,26 @@
-import type { NextRequest } from "next/server"
-import { getSession } from "@/lib/auth"
-import { ChatSDKError } from "@/lib/errors"
-import { getConversationSummariesByUserId } from "@/db/queries"
+import { getConversationSummariesByUserId } from "@/db/queries";
+import { getSession } from "@/lib/auth";
+import { ChatSDKError } from "@/lib/errors";
+import type { NextRequest } from "next/server";
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = request.nextUrl
+  const { searchParams } = request.nextUrl;
 
-  const limit = Number.parseInt(searchParams.get("limit") || "10", 10)
-  const startingAfter = searchParams.get("starting_after")
-  const endingBefore = searchParams.get("ending_before")
+  const limit = Number.parseInt(searchParams.get("limit") || "10", 10);
+  const startingAfter = searchParams.get("starting_after");
+  const endingBefore = searchParams.get("ending_before");
 
   if (startingAfter && endingBefore) {
     return new ChatSDKError(
       "bad_request:api",
-      "Only one of starting_after or ending_before can be provided."
-    ).toResponse()
+      "Only one of starting_after or ending_before can be provided.",
+    ).toResponse();
   }
 
-  const session = await getSession()
+  const session = await getSession();
 
   if (!session?.user) {
-    return new ChatSDKError("unauthorized:chat").toResponse()
+    return new ChatSDKError("unauthorized:chat").toResponse();
   }
 
   const result = await getConversationSummariesByUserId({
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     limit,
     startingAfter,
     endingBefore,
-  })
+  });
 
-  return Response.json(result)
+  return Response.json(result);
 }

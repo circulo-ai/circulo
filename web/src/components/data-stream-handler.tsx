@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { initialArtifactData, useArtifact } from "@/hooks/chats/use-artifact";
 import { artifactDefinitions } from "@/components/artifacts/artifact";
+import { initialArtifactData, useArtifact } from "@/hooks/chats/use-artifact";
+import { useEffect } from "react";
 import { useDataStream } from "./data-stream-provider";
 
 export function DataStreamHandler() {
-  const { dataStream,setDataStream } = useDataStream();
+  const { dataStream, setDataStream } = useDataStream();
 
   const { artifact, setArtifact, setMetadata } = useArtifact();
 
@@ -21,7 +21,7 @@ export function DataStreamHandler() {
     for (const delta of newDeltas) {
       const artifactDefinition = artifactDefinitions.find(
         (currentArtifactDefinition) =>
-          currentArtifactDefinition.kind === artifact.kind
+          currentArtifactDefinition.kind === artifact.kind,
       );
 
       if (artifactDefinition?.onStreamPart) {

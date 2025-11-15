@@ -1,29 +1,28 @@
 "use client";
 
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
-import { useSWRConfig } from "swr";
-import { unstable_serialize } from "swr/infinite";
-import useSWRInfinite from "swr/infinite";
-import { Conversation } from "@/components/sidebar/telegram/types";
-import { ConversationItem } from "@/components/sidebar/telegram/conversation-item";
 import { CollapsedConversationItem } from "@/components/sidebar/telegram/collapsed-conversation-item";
+import { ConversationItem } from "@/components/sidebar/telegram/conversation-item";
 import { SidebarHeader as TelegramSidebarHeader } from "@/components/sidebar/telegram/sidebar-header";
-import { fetcher } from "@/lib/swr";
-import { Button } from "@/components/ui/button";
+import { Conversation } from "@/components/sidebar/telegram/types";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarHeader,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { fetcher } from "@/lib/swr";
+import { User } from "@/providers/session-provider";
+import { UserButton } from "@daveyplate/better-auth-ui";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import { useSWRConfig } from "swr";
+import useSWRInfinite, { unstable_serialize } from "swr/infinite";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,10 +33,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "./ui/alert-dialog";
-import { UserButton } from "@daveyplate/better-auth-ui";
-import { User } from "@/providers/session-provider";
 
-export function AppSidebar({user}: {user: User}) {
+export function AppSidebar({ user }: { user: User }) {
   const router = useRouter();
   const { state, setOpenMobile } = useSidebar();
   const { mutate } = useSWRConfig();
@@ -52,7 +49,7 @@ export function AppSidebar({user}: {user: User}) {
 
   const getConversationsPaginationKey = (
     pageIndex: number,
-    previousPageData: ConversationPage | undefined
+    previousPageData: ConversationPage | undefined,
   ) => {
     if (previousPageData && previousPageData.hasMore === false) {
       return null;
@@ -86,8 +83,14 @@ export function AppSidebar({user}: {user: User}) {
     const now = new Date();
     const sameDay = d.toDateString() === now.toDateString();
     return sameDay
-      ? new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(d)
-      : new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(d);
+      ? new Intl.DateTimeFormat(undefined, {
+          hour: "2-digit",
+          minute: "2-digit",
+        }).format(d)
+      : new Intl.DateTimeFormat(undefined, {
+          month: "short",
+          day: "numeric",
+        }).format(d);
   };
 
   const { id } = useParams();
@@ -106,12 +109,15 @@ export function AppSidebar({user}: {user: User}) {
 
   const sentinelRef = (node: HTMLDivElement | null) => {
     if (!node) return;
-    const observer = new IntersectionObserver((entries) => {
-      const entry = entries[0];
-      if (entry.isIntersecting && !isValidating && !hasReachedEnd) {
-        setSize((s) => s + 1);
-      }
-    }, { root: null, rootMargin: "0px", threshold: 0.1 });
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry.isIntersecting && !isValidating && !hasReachedEnd) {
+          setSize((s) => s + 1);
+        }
+      },
+      { root: null, rootMargin: "0px", threshold: 0.1 },
+    );
     observer.observe(node);
   };
 
@@ -147,86 +153,123 @@ export function AppSidebar({user}: {user: User}) {
           />
         </SidebarHeader>
         <SidebarContent>
-          {user && (() => {
-            if (isLoading) {
-              return (
-                <div className="flex flex-col gap-2 p-2">
-                  {[44, 32, 28, 64, 52].map((w, i) => (
-                    <div key={i} className="h-8 rounded-md bg-sidebar-accent-foreground/10" />
-                  ))}
-                </div>
-              );
-            }
-            const conversations = (paginatedConversations?.flatMap((p) => p.conversations) ?? []).map((c) => ({
-              ...c,
-              timestamp: formatTimestamp(c.timestamp),
-            }));
-            const viewport = scrollRef.current?.clientHeight ?? 0;
-            const total = conversations.length;
-            const startIndex = Math.max(Math.floor(scrollTop / itemHeight) - 5, 0);
-            const visibleCount = Math.ceil(viewport / itemHeight) + 10;
-            const endIndex = Math.min(startIndex + visibleCount, total);
-            const visibleConversations = conversations.slice(startIndex, endIndex);
-            const topSpacer = startIndex * itemHeight;
-            const bottomSpacer = (total - endIndex) * itemHeight;
-            return (
-              <SidebarGroup>
-                <SidebarGroupContent>
-                  <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto" style={{ scrollbarGutter: "stable", overscrollBehavior: "contain" }}>
-                    <SidebarMenu>
-                      {visibleConversations.map((conversation) =>
-                      collapsed ? (
-                        <SidebarMenuItem key={conversation.id}>
-                          <CollapsedConversationItem conversation={conversation} onClick={() => {
-                            setOpenMobile(false);
-                            router.push(`/chat/${conversation.id}`);
-                          }} />
-                        </SidebarMenuItem>
-                      ) : (
-                        <SidebarMenuItem key={conversation.id}>
-                          <ConversationItem conversation={conversation} isActive={conversation.id === id} onClick={() => {
-                            setOpenMobile(false);
-                            router.push(`/chat/${conversation.id}`);
-                          }} onDelete={async (id) => {
-                            const deletePromise = fetch(`/api/chat?id=${id}`, { method: "DELETE" });
-                            toast.promise(deletePromise, {
-                              loading: "Deleting chat...",
-                              success: () => {
-                                mutateConversations((pages) => {
-                                  if (!pages) return pages;
-                                  return pages.map((p) => ({
-                                    ...p,
-                                    conversations: p.conversations.filter((c) => c.id !== id),
-                                  }));
-                                });
-                                return "Chat deleted successfully";
-                              },
-                              error: "Failed to delete chat",
-                            });
-                          }} />
-                        </SidebarMenuItem>
-                      )
-                      )}
-                      <div style={{ height: topSpacer }} />
-                      <div style={{ height: bottomSpacer }} />
-                    </SidebarMenu>
-                    <div className="py-2" ref={sentinelRef} />
+          {user &&
+            (() => {
+              if (isLoading) {
+                return (
+                  <div className="flex flex-col gap-2 p-2">
+                    {[44, 32, 28, 64, 52].map((w, i) => (
+                      <div
+                        key={i}
+                        className="bg-sidebar-accent-foreground/10 h-8 rounded-md"
+                      />
+                    ))}
                   </div>
-                </SidebarGroupContent>
-              </SidebarGroup>
-            );
-          })()}
+                );
+              }
+              const conversations = (
+                paginatedConversations?.flatMap((p) => p.conversations) ?? []
+              ).map((c) => ({
+                ...c,
+                timestamp: formatTimestamp(c.timestamp),
+              }));
+              const viewport = scrollRef.current?.clientHeight ?? 0;
+              const total = conversations.length;
+              const startIndex = Math.max(
+                Math.floor(scrollTop / itemHeight) - 5,
+                0,
+              );
+              const visibleCount = Math.ceil(viewport / itemHeight) + 10;
+              const endIndex = Math.min(startIndex + visibleCount, total);
+              const visibleConversations = conversations.slice(
+                startIndex,
+                endIndex,
+              );
+              const topSpacer = startIndex * itemHeight;
+              const bottomSpacer = (total - endIndex) * itemHeight;
+              return (
+                <SidebarGroup>
+                  <SidebarGroupContent>
+                    <div
+                      ref={scrollRef}
+                      className="min-h-0 flex-1 overflow-y-auto"
+                      style={{
+                        scrollbarGutter: "stable",
+                        overscrollBehavior: "contain",
+                      }}
+                    >
+                      <SidebarMenu>
+                        {visibleConversations.map((conversation) =>
+                          collapsed ? (
+                            <SidebarMenuItem key={conversation.id}>
+                              <CollapsedConversationItem
+                                conversation={conversation}
+                                onClick={() => {
+                                  setOpenMobile(false);
+                                  router.push(`/chat/${conversation.id}`);
+                                }}
+                              />
+                            </SidebarMenuItem>
+                          ) : (
+                            <SidebarMenuItem key={conversation.id}>
+                              <ConversationItem
+                                conversation={conversation}
+                                isActive={conversation.id === id}
+                                onClick={() => {
+                                  setOpenMobile(false);
+                                  router.push(`/chat/${conversation.id}`);
+                                }}
+                                onDelete={async (id) => {
+                                  const deletePromise = fetch(
+                                    `/api/chat?id=${id}`,
+                                    { method: "DELETE" },
+                                  );
+                                  toast.promise(deletePromise, {
+                                    loading: "Deleting chat...",
+                                    success: () => {
+                                      mutateConversations((pages) => {
+                                        if (!pages) return pages;
+                                        return pages.map((p) => ({
+                                          ...p,
+                                          conversations: p.conversations.filter(
+                                            (c) => c.id !== id,
+                                          ),
+                                        }));
+                                      });
+                                      return "Chat deleted successfully";
+                                    },
+                                    error: "Failed to delete chat",
+                                  });
+                                }}
+                              />
+                            </SidebarMenuItem>
+                          ),
+                        )}
+                        <div style={{ height: topSpacer }} />
+                        <div style={{ height: bottomSpacer }} />
+                      </SidebarMenu>
+                      <div className="py-2" ref={sentinelRef} />
+                    </div>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+              );
+            })()}
         </SidebarContent>
-        <SidebarFooter>{user && <UserButton variant={"ghost"}/>}</SidebarFooter>
+        <SidebarFooter>
+          {user && <UserButton variant={"ghost"} />}
+        </SidebarFooter>
       </Sidebar>
 
-      <AlertDialog onOpenChange={setShowDeleteAllDialog} open={showDeleteAllDialog}>
+      <AlertDialog
+        onOpenChange={setShowDeleteAllDialog}
+        open={showDeleteAllDialog}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete all chats?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete all your
-              chats and remove them from our servers.
+              This action cannot be undone. This will permanently delete all
+              your chats and remove them from our servers.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

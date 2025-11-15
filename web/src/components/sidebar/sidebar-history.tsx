@@ -1,11 +1,6 @@
 "use client";
 
-import { isToday, isYesterday, subMonths, subWeeks } from "date-fns";
-import { motion } from "framer-motion";
-import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
-import { toast } from "sonner";
-import useSWRInfinite from "swr/infinite";
+import { LoaderIcon } from "@/components/icons/icons";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,10 +18,15 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import type { Chat } from "@/db/schema";
-import { LoaderIcon } from "@/components/icons/icons";
-import { ChatItem } from "./sidebar-history-item";
 import { fetcher } from "@/lib/swr";
 import { User } from "@/providers/session-provider";
+import { isToday, isYesterday, subMonths, subWeeks } from "date-fns";
+import { motion } from "framer-motion";
+import { useParams, useRouter } from "next/navigation";
+import { useState } from "react";
+import { toast } from "sonner";
+import useSWRInfinite from "swr/infinite";
+import { ChatItem } from "./sidebar-history-item";
 
 type GroupedChats = {
   today: Chat[];
@@ -72,13 +72,13 @@ const groupChatsByDate = (chats: Chat[]): GroupedChats => {
       lastWeek: [],
       lastMonth: [],
       older: [],
-    } as GroupedChats
+    } as GroupedChats,
   );
 };
 
 export function getChatHistoryPaginationKey(
   pageIndex: number,
-  previousPageData: ChatHistory
+  previousPageData: ChatHistory,
 ) {
   if (previousPageData && previousPageData.hasMore === false) {
     return null;
@@ -167,7 +167,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
   if (isLoading) {
     return (
       <SidebarGroup>
-        <div className="px-2 py-1 text-sidebar-foreground/50 text-xs">
+        <div className="text-sidebar-foreground/50 px-2 py-1 text-xs">
           Today
         </div>
         <SidebarGroupContent>
@@ -178,7 +178,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
                 key={item}
               >
                 <div
-                  className="h-4 max-w-(--skeleton-width) flex-1 rounded-md bg-sidebar-accent-foreground/10"
+                  className="bg-sidebar-accent-foreground/10 h-4 max-w-(--skeleton-width) flex-1 rounded-md"
                   style={
                     {
                       "--skeleton-width": `${item}%`,
@@ -213,7 +213,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
             {paginatedChatHistories &&
               (() => {
                 const chatsFromHistory = paginatedChatHistories.flatMap(
-                  (paginatedChatHistory) => paginatedChatHistory.chats
+                  (paginatedChatHistory) => paginatedChatHistory.chats,
                 );
 
                 const groupedChats = groupChatsByDate(chatsFromHistory);
@@ -222,7 +222,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
                   <div className="flex flex-col gap-6">
                     {groupedChats.today.length > 0 && (
                       <div>
-                        <div className="px-2 py-1 text-sidebar-foreground/50 text-xs">
+                        <div className="text-sidebar-foreground/50 px-2 py-1 text-xs">
                           Today
                         </div>
                         {groupedChats.today.map((chat) => (
@@ -242,7 +242,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
 
                     {groupedChats.yesterday.length > 0 && (
                       <div>
-                        <div className="px-2 py-1 text-sidebar-foreground/50 text-xs">
+                        <div className="text-sidebar-foreground/50 px-2 py-1 text-xs">
                           Yesterday
                         </div>
                         {groupedChats.yesterday.map((chat) => (
@@ -262,7 +262,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
 
                     {groupedChats.lastWeek.length > 0 && (
                       <div>
-                        <div className="px-2 py-1 text-sidebar-foreground/50 text-xs">
+                        <div className="text-sidebar-foreground/50 px-2 py-1 text-xs">
                           Last 7 days
                         </div>
                         {groupedChats.lastWeek.map((chat) => (
@@ -282,7 +282,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
 
                     {groupedChats.lastMonth.length > 0 && (
                       <div>
-                        <div className="px-2 py-1 text-sidebar-foreground/50 text-xs">
+                        <div className="text-sidebar-foreground/50 px-2 py-1 text-xs">
                           Last 30 days
                         </div>
                         {groupedChats.lastMonth.map((chat) => (
@@ -302,7 +302,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
 
                     {groupedChats.older.length > 0 && (
                       <div>
-                        <div className="px-2 py-1 text-sidebar-foreground/50 text-xs">
+                        <div className="text-sidebar-foreground/50 px-2 py-1 text-xs">
                           Older than last month
                         </div>
                         {groupedChats.older.map((chat) => (

@@ -1,15 +1,18 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Agent } from "@/db/schema/agent";
-import { useState } from "react";
 import {
-  DndContext,
   closestCenter,
+  DndContext,
+  DragEndEvent,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
-  DragEndEvent,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -19,11 +22,8 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, X, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { GripVertical, Plus, X } from "lucide-react";
+import { useState } from "react";
 
 interface AgentSelectorProps {
   availableAgents: Agent[];
@@ -32,7 +32,11 @@ interface AgentSelectorProps {
   isLoading?: boolean;
 }
 
-function SortableAgentItem({ agent, index, onRemove }: {
+function SortableAgentItem({
+  agent,
+  index,
+  onRemove,
+}: {
   agent: Agent;
   index: number;
   onRemove: () => void;
@@ -58,27 +62,31 @@ function SortableAgentItem({ agent, index, onRemove }: {
         <div
           {...attributes}
           {...listeners}
-          className="cursor-grab active:cursor-grabbing touch-none"
+          className="cursor-grab touch-none active:cursor-grabbing"
         >
-          <GripVertical className="h-5 w-5 text-muted-foreground" />
+          <GripVertical className="text-muted-foreground h-5 w-5" />
         </div>
         <Badge variant="outline" className="shrink-0">
           #{index + 1}
         </Badge>
         <div
-          className="h-10 w-10 rounded-full flex items-center justify-center text-white font-semibold"
+          className="flex h-10 w-10 items-center justify-center rounded-full font-semibold text-white"
           style={{ backgroundColor: agent.color || "#3B82F6" }}
         >
           {agent.avatar ? (
-            <img src={agent.avatar} alt={agent.name} className="h-full w-full rounded-full" />
+            <img
+              src={agent.avatar}
+              alt={agent.name}
+              className="h-full w-full rounded-full"
+            />
           ) : (
             agent.name.charAt(0).toUpperCase()
           )}
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-medium truncate">{agent.name}</p>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium">{agent.name}</p>
           {agent.description && (
-            <p className="text-xs text-muted-foreground truncate">
+            <p className="text-muted-foreground truncate text-xs">
               {agent.description}
             </p>
           )}
@@ -92,18 +100,18 @@ function SortableAgentItem({ agent, index, onRemove }: {
 }
 
 export function AgentSelector({
-                                availableAgents,
-                                selectedAgentIds,
-                                onSelectionChange,
-                                isLoading,
-                              }: AgentSelectorProps) {
+  availableAgents,
+  selectedAgentIds,
+  onSelectionChange,
+  isLoading,
+}: AgentSelectorProps) {
   const [showAvailable, setShowAvailable] = useState(true);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
-    })
+    }),
   );
 
   const selectedAgents = selectedAgentIds
@@ -111,7 +119,7 @@ export function AgentSelector({
     .filter(Boolean) as Agent[];
 
   const unselectedAgents = availableAgents.filter(
-    (a) => !selectedAgentIds.includes(a.id)
+    (a) => !selectedAgentIds.includes(a.id),
   );
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -136,7 +144,7 @@ export function AgentSelector({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="text-sm text-muted-foreground">Loading agents...</div>
+        <div className="text-muted-foreground text-sm">Loading agents...</div>
       </div>
     );
   }
@@ -147,16 +155,19 @@ export function AgentSelector({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold">
-            Selected Agents {selectedAgents.length > 0 && `(${selectedAgents.length})`}
+            Selected Agents{" "}
+            {selectedAgents.length > 0 && `(${selectedAgents.length})`}
           </h3>
           {selectedAgents.length > 1 && (
-            <span className="text-xs text-muted-foreground">Drag to reorder speaking sequence</span>
+            <span className="text-muted-foreground text-xs">
+              Drag to reorder speaking sequence
+            </span>
           )}
         </div>
 
         {selectedAgents.length === 0 ? (
-          <Card className="p-8 text-center border-dashed">
-            <p className="text-sm text-muted-foreground">
+          <Card className="border-dashed p-8 text-center">
+            <p className="text-muted-foreground text-sm">
               No agents selected yet. Choose from available agents below.
             </p>
           </Card>
@@ -194,17 +205,18 @@ export function AgentSelector({
           className="w-full justify-between"
         >
           <span className="text-sm font-semibold">
-            Available Agents {unselectedAgents.length > 0 && `(${unselectedAgents.length})`}
+            Available Agents{" "}
+            {unselectedAgents.length > 0 && `(${unselectedAgents.length})`}
           </span>
           <span className="text-xs">{showAvailable ? "Hide" : "Show"}</span>
         </Button>
 
         {showAvailable && (
           <ScrollArea className="h-[300px] rounded-md border">
-            <div className="p-2 space-y-2">
+            <div className="space-y-2 p-2">
               {unselectedAgents.length === 0 ? (
                 <div className="p-8 text-center">
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-muted-foreground text-sm">
                     {availableAgents.length === 0
                       ? "No agents available. Create an agent first."
                       : "All available agents have been selected."}
@@ -214,24 +226,28 @@ export function AgentSelector({
                 unselectedAgents.map((agent) => (
                   <Card
                     key={agent.id}
-                    className="p-3 hover:bg-muted/50 cursor-pointer transition-colors"
+                    className="hover:bg-muted/50 cursor-pointer p-3 transition-colors"
                     onClick={() => handleAddAgent(agent.id)}
                   >
                     <div className="flex items-center gap-3">
                       <div
-                        className="h-10 w-10 rounded-full flex items-center justify-center text-white font-semibold"
+                        className="flex h-10 w-10 items-center justify-center rounded-full font-semibold text-white"
                         style={{ backgroundColor: agent.color || "#3B82F6" }}
                       >
                         {agent.avatar ? (
-                          <img src={agent.avatar} alt={agent.name} className="h-full w-full rounded-full" />
+                          <img
+                            src={agent.avatar}
+                            alt={agent.name}
+                            className="h-full w-full rounded-full"
+                          />
                         ) : (
                           agent.name.charAt(0).toUpperCase()
                         )}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{agent.name}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium">{agent.name}</p>
                         {agent.description && (
-                          <p className="text-xs text-muted-foreground truncate">
+                          <p className="text-muted-foreground truncate text-xs">
                             {agent.description}
                           </p>
                         )}

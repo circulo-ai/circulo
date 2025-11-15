@@ -1,8 +1,8 @@
-'use client'
+"use client";
 
-import { useEffect, useRef } from 'react'
-import { useGeneralStore } from '@/stores/settings/general/store'
-import { useSession } from './session-provider'
+import { useGeneralStore } from "@/stores/settings/general/store";
+import { useEffect, useRef } from "react";
+import { useSession } from "./session-provider";
 
 /**
  * Loads user settings from database once per workspace session.
@@ -10,18 +10,18 @@ import { useSession } from './session-provider'
  * localStorage cache for subsequent navigation within the app.
  */
 export function SettingsLoader() {
-  const { data: session, isPending: isSessionPending } = useSession()
-  const loadSettings = useGeneralStore((state) => state.loadSettings)
-  const hasLoadedRef = useRef(false)
+  const { data: session, isPending: isSessionPending } = useSession();
+  const loadSettings = useGeneralStore((state) => state.loadSettings);
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
     // Only load settings once per session for authenticated users
     if (!isSessionPending && session?.user && !hasLoadedRef.current) {
-      hasLoadedRef.current = true
+      hasLoadedRef.current = true;
       // Force load from DB on initial workspace entry
-      loadSettings(true)
+      loadSettings(true);
     }
-  }, [isSessionPending, session?.user, loadSettings])
+  }, [isSessionPending, session?.user, loadSettings]);
 
-  return null
+  return null;
 }

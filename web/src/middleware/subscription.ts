@@ -1,7 +1,7 @@
 import { UsageRateLimiter } from "@/lib/billing/rate-limiter";
 import { SubscriptionManager } from "@/lib/billing/subscription-manager";
 import { Metric } from "@/lib/billing/types";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 /**
  * Middleware to check if user has active subscription
