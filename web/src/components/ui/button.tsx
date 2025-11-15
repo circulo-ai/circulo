@@ -5,16 +5,16 @@ import { VariantProps } from "class-variance-authority";
 import { ComponentProps } from "react";
 
 export function Button({
-                         className,
-                         variant,
-                         size,
-                         rounded,
-                         asChild = false,
-                         ...props
-                       }: ComponentProps<"button"> &
+  className,
+  variant,
+  size,
+  rounded,
+  asChild = false,
+  ...props
+}: ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
-  asChild?: boolean;
-}) {
+    asChild?: boolean;
+  }) {
   const Comp = asChild ? Slot : "button";
 
   return (
