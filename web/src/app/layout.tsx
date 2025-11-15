@@ -1,18 +1,19 @@
-import { isDev } from "@/lib/environment";
 import { AuthClientProvider } from "@/providers/auth-client-provider";
 import { PointerProvider } from "@/providers/pointer-provider";
 import { SessionProvider } from "@/providers/session-provider";
 import { ThemeProvider } from "@/providers/theme-provider";
 import type { Metadata } from "next";
-import { Montserrat as Sans } from "next/font/google";
 import { ReactNode } from "react";
 import { Toaster } from "sonner";
 import "./globals.css";
 import { SWRProvider } from "@/providers/swr-provider";
+import { cn } from "@/lib/utils";
 
-const fontSans = Sans({
-  variable: "--font-sans",
-});
+export const viewport = {
+  maximumScale: 1, // Disable auto-zoom on mobile Safari
+};
+
+// Use system font stack to avoid build-time font fetching
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -26,7 +27,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       suppressHydrationWarning
       className="snap-y snap-mandatory scroll-smooth"
     >
-      <body className={fontSans.variable}>
+      <body className={cn('font-sans', 'antialiased')}>
         <ThemeProvider>
           <SessionProvider>
             <SWRProvider>

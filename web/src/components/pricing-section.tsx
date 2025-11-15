@@ -8,6 +8,7 @@ import {
   Headphones,
   LibraryBig,
   MessageSquare,
+  MessageSquareText,
   ReceiptText,
   Users,
   UsersRound,
@@ -61,6 +62,7 @@ async function Plans() {
     teamMembers: "Team members",
     maxAgentsInChat: "Max agents in chat",
     rateLimitPerMinute: "Rate limit per minute",
+    maxMessagesPerDay: "Max messages per day",
   };
 
   const featureIcons: Record<keyof PlanFeatures, Icon> = {
@@ -72,6 +74,7 @@ async function Plans() {
     teamMembers: Users,
     maxAgentsInChat: UsersRound,
     rateLimitPerMinute: Gauge,
+    maxMessagesPerDay: MessageSquareText,
   };
 
   return (

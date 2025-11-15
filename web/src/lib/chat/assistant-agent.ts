@@ -43,7 +43,7 @@ export async function getAssistantAgentId(chatId: string, userId: unknown): Prom
       agentId: newAgent.id,
       speakOrder: 0,
       enabled: true,
-      createdAt: new Date(),
+      addedBy: userIdStr,
     })
     // Avoid duplicate links if concurrent calls happen
     .onConflictDoNothing({ target: [chatAgent.chatId, chatAgent.agentId] });

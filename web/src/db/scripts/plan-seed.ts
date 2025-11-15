@@ -14,6 +14,7 @@ const plans: PlanSeed[] = [
     billingIntervalDays: 30,
     isActive: true,
     features: {
+      maxMessagesPerDay: 20,
       rateLimitPerMinute: 30,
       maxAgents: 5,
       maxChats: 10,
@@ -29,6 +30,7 @@ const plans: PlanSeed[] = [
     billingIntervalDays: 30,
     isActive: true,
     features: {
+      maxMessagesPerDay: 1000,
       rateLimitPerMinute: 100,
       maxAgents: 10,
       maxChats: 1000,
@@ -44,6 +46,7 @@ const plans: PlanSeed[] = [
     billingIntervalDays: 30,
     isActive: true,
     features: {
+      maxMessagesPerDay: 2000,
       rateLimitPerMinute: 300,
       maxAgents: 50,
       maxChats: 2000,
@@ -60,6 +63,7 @@ const plans: PlanSeed[] = [
     billingIntervalDays: 30,
     isActive: true,
     features: {
+      maxMessagesPerDay: 5000,
       rateLimitPerMinute: 10000,
       maxAgents: null, // unlimited
       maxChats: null,  // unlimited

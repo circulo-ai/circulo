@@ -165,7 +165,7 @@ export class UsageRateLimiter {
           .where(eq(chat.id, ctx.chatId))
           .limit(1);
 
-        if (!chatRecord || chatRecord.userId !== userId) {
+        if (!chatRecord || chatRecord.creatorId !== userId) {
           return {
             allowed: false,
             reason: "Chat not found or unauthorized",
