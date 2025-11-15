@@ -189,14 +189,14 @@ export function makeRepo<
   ) => TExtra,
   options?: { primaryKey?: keyof InferSelectModel<TTable> },
 ) {
+  type BaseRepo = ReturnType<typeof createRepository<TTable, TSchema>>;
+  type FullRepo = BaseRepo & TExtra;
+
   return {
-    with(executor: DrizzleExecutor<TSchema>) {
+    with(executor: DrizzleExecutor<TSchema>): FullRepo {
       const base = createRepository<TTable, TSchema>(executor, table, options);
       const extra = extend(base);
-      return { ...base, ...extra } as ReturnType<
-        typeof createRepository<TTable, TSchema>
-      > &
-        TExtra;
+      return { ...base, ...extra };
     },
   };
 }

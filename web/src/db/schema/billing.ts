@@ -12,6 +12,7 @@ import {
   serial,
   text,
   timestamp,
+  uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
 
@@ -244,7 +245,7 @@ export const usageMetrics = pgTable(
     periodEnd: timestamp("period_end").notNull(),
   },
   (table) => ({
-    userMetricPeriodIdx: index("usage_user_metric_period_idx").on(
+    userMetricPeriodIdx: uniqueIndex("usage_user_metric_period_idx").on(
       table.userId,
       table.metric,
       table.periodStart,

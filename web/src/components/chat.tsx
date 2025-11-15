@@ -38,6 +38,7 @@ import { useDataStream } from "./data-stream-provider";
 import { MultimodalInput } from "./multimodal-input";
 import { toast } from "./toast";
 import type { VisibilityType } from "./visibility-selector";
+// Response shape: chatAgent rows with nested agent
 
 export function Chat({
   id,
@@ -74,6 +75,11 @@ export function Chat({
     currentModelIdRef.current = currentModelId;
   }, [currentModelId]);
 
+  const { data: agentsResponse } = useSWR<any>(
+    `/api/chat/${id}/agents`,
+    fetcher,
+  );
+
   const {
     messages,
     setMessages,
@@ -97,6 +103,11 @@ export function Chat({
             message: request.messages.at(-1),
             selectedChatModel: currentModelIdRef.current,
             selectedVisibilityType: visibilityType,
+            agentIds: Array.isArray(agentsResponse?.data?.agents)
+              ? agentsResponse.data.agents
+                  .map((a: any) => a?.agent?.id)
+                  .filter((v: any) => typeof v === "string" && v.length > 0)
+              : [],
             ...request.body,
           },
         };
@@ -165,6 +176,25 @@ export function Chat({
     setMessages,
   });
 
+  // Use original sendMessage; server enforces agent requirement
+
+  const sendMessageWithPrechecks = (
+    msg?: Parameters<typeof sendMessage>[0],
+    options?: Parameters<typeof sendMessage>[1],
+  ): ReturnType<typeof sendMessage> => {
+    const enabledAgentCount = Array.isArray(agentsResponse?.data?.agents)
+      ? agentsResponse.data.agents.length
+      : 0;
+    if (messages.length === 0 && enabledAgentCount === 0) {
+      toast({
+        type: "error",
+        description: "Add at least one agent to start this chat",
+      });
+      return Promise.resolve();
+    }
+    return sendMessage(msg, options);
+  };
+
   return (
     <>
       <div className="overscroll-behavior-contain bg-background flex h-dvh min-w-0 touch-pan-y flex-col">
@@ -196,7 +226,7 @@ export function Chat({
               onModelChange={setCurrentModelId}
               selectedModelId={currentModelId}
               selectedVisibilityType={visibilityType}
-              sendMessage={sendMessage}
+              sendMessage={sendMessageWithPrechecks}
               setAttachments={setAttachments}
               setInput={setInput}
               setMessages={setMessages}
@@ -217,7 +247,7 @@ export function Chat({
         regenerate={regenerate}
         selectedModelId={currentModelId}
         selectedVisibilityType={visibilityType}
-        sendMessage={sendMessage}
+        sendMessage={sendMessageWithPrechecks}
         setAttachments={setAttachments}
         setInput={setInput}
         setMessages={setMessages}

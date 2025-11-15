@@ -37,10 +37,11 @@ export default async function Page() {
 
   return (
     <>
+      {/* Show a telegram style empty chat page with a beautiful bacjground pattern */}
       <Chat
         autoResume={false}
         id={id}
-        initialChatModel={modelIdFromCookie.value}
+        initialChatModel={DEFAULT_CHAT_MODEL}
         initialMessages={[]}
         initialVisibilityType="private"
         isReadonly={false}

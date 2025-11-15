@@ -199,6 +199,7 @@ export function AppSidebar({ user }: { user: User }) {
                       }}
                     >
                       <SidebarMenu>
+                        <div style={{ height: topSpacer }} />
                         {visibleConversations.map((conversation) =>
                           collapsed ? (
                             <SidebarMenuItem key={conversation.id}>
@@ -245,7 +246,6 @@ export function AppSidebar({ user }: { user: User }) {
                             </SidebarMenuItem>
                           ),
                         )}
-                        <div style={{ height: topSpacer }} />
                         <div style={{ height: bottomSpacer }} />
                       </SidebarMenu>
                       <div className="py-2" ref={sentinelRef} />
@@ -256,7 +256,18 @@ export function AppSidebar({ user }: { user: User }) {
             })()}
         </SidebarContent>
         <SidebarFooter>
-          {user && <UserButton variant={"ghost"} />}
+          {user && (
+            <UserButton
+              className="mb-1"
+              classNames={{
+                trigger: {
+                  base: "mx-auto",
+                },
+              }}
+              size={state == "collapsed" ? "icon" : "default"}
+              variant={"ghost"}
+            />
+          )}
         </SidebarFooter>
       </Sidebar>
 

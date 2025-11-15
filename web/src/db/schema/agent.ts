@@ -3,15 +3,21 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  foreignKey,
   index,
   integer,
+  json,
   jsonb,
   numeric,
   pgEnum,
   pgTable,
   text,
   timestamp,
+  uuid,
 } from "drizzle-orm/pg-core";
+import { createInsertSchema, createSelectSchema } from "drizzle-zod";
+import z from "zod";
+import { chat } from "./chat";
 
 export const agentVisibilityEnum = pgEnum("agent_visibility", [
   "private",
@@ -29,7 +35,7 @@ export const agentTemplateStatusEnum = pgEnum("agent_template_status", [
 export const agentTemplate = pgTable(
   "agent_template",
   {
-    id: text("id").primaryKey(),
+    id: uuid("id").primaryKey().defaultRandom(),
     creatorId: text("creator_id").references(() => user.id, {
       onDelete: "set null",
     }), // Can be null for system templates
@@ -78,31 +84,31 @@ export const agentTemplate = pgTable(
       .$onUpdate(() => new Date()),
     publishedAt: timestamp("published_at"),
   },
-  (table) => ({
-    creatorIdIdx: index("agent_template_creator_id_idx").on(table.creatorId),
-    statusIdx: index("agent_template_status_idx").on(table.status),
-    visibilityIdx: index("agent_template_visibility_idx").on(table.visibility),
-    featuredIdx: index("agent_template_featured_idx").on(table.featured),
-    slugIdx: index("agent_template_slug_idx").on(table.slug),
-    isSystemIdx: index("agent_template_is_system_idx").on(table.isSystem),
-    countsNonNegative: check(
+  (table) => [
+    index("agent_template_creator_id_idx").on(table.creatorId),
+    index("agent_template_status_idx").on(table.status),
+    index("agent_template_visibility_idx").on(table.visibility),
+    index("agent_template_featured_idx").on(table.featured),
+    index("agent_template_slug_idx").on(table.slug),
+    index("agent_template_is_system_idx").on(table.isSystem),
+    check(
       "agent_template_counts_non_negative",
       sql`instance_count >= 0 AND usage_count >= 0`,
     ),
-  }),
+  ],
 );
 
 // User-created agent instances
 export const agent = pgTable(
   "agent",
   {
-    id: text("id").primaryKey(),
+    id: uuid("id").primaryKey().defaultRandom(),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
 
     // Link to template (nullable for custom agents)
-    templateId: text("template_id").references(() => agentTemplate.id, {
+    templateId: uuid("template_id").references(() => agentTemplate.id, {
       onDelete: "set null",
     }),
 
@@ -136,26 +142,20 @@ export const agent = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
-  (table) => ({
-    userIdIdx: index("agent_user_id_idx").on(table.userId),
-    templateIdIdx: index("agent_template_id_idx").on(table.templateId),
-    userTemplateIdx: index("agent_user_template_idx").on(
-      table.userId,
-      table.templateId,
-    ),
-    lastUsedIdx: index("agent_last_used_idx").on(table.lastUsedAt),
-    usageCountNonNegative: check(
-      "agent_usage_count_non_negative",
-      sql`usage_count >= 0`,
-    ),
-  }),
+  (table) => [
+    index("agent_user_id_idx").on(table.userId),
+    index("agent_template_id_idx").on(table.templateId),
+    index("agent_user_template_idx").on(table.userId, table.templateId),
+    index("agent_last_used_idx").on(table.lastUsedAt),
+    check("agent_usage_count_non_negative", sql`usage_count >= 0`),
+  ],
 );
 
 // Tool definitions for agents
 export const tool = pgTable(
   "tool",
   {
-    id: text("id").primaryKey(),
+    id: uuid("id").primaryKey().defaultRandom(),
     userId: text("user_id").references(() => user.id, { onDelete: "cascade" }), // null for system tools
 
     name: text("name").notNull(),
@@ -168,9 +168,7 @@ export const tool = pgTable(
       .notNull(),
 
     // For MCP servers
-    mcpServerId: text("mcp_server_id").references(() => mcpServer.id, {
-      onDelete: "set null",
-    }),
+    mcpServerId: text("mcp_server_id"),
 
     isSystem: boolean("is_system").notNull().default(false), // System-provided tools
     isActive: boolean("is_active").notNull().default(true),
@@ -181,46 +179,70 @@ export const tool = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
-  (table) => ({
-    userIdIdx: index("tool_user_id_idx").on(table.userId),
-    mcpServerIdx: index("tool_mcp_server_idx").on(table.mcpServerId),
-    typeIdx: index("tool_type_idx").on(table.type),
-    isSystemIdx: index("tool_is_system_idx").on(table.isSystem),
-  }),
+  (table) => [
+    index("tool_user_id_idx").on(table.userId),
+    index("tool_mcp_server_idx").on(table.mcpServerId),
+    index("tool_type_idx").on(table.type),
+    index("tool_is_system_idx").on(table.isSystem),
+    foreignKey({
+      columns: [table.mcpServerId],
+      foreignColumns: [mcpServer.id],
+      name: "tool_mcp_server_id_mcp_servers_id_fk",
+    }).onDelete("set null"),
+  ],
 );
 
 // MCP (Model Context Protocol) Server definitions
 export const mcpServer = pgTable(
-  "mcp_server",
+  "mcp_servers",
   {
     id: text("id").primaryKey(),
-    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }), // null for system MCP servers
+    chatId: text("chat_id")
+      .notNull()
+      .references(() => chat.id, { onDelete: "cascade" }),
+
+    // Track who created the server, but chat owns it
+    createdBy: text("created_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
 
     name: text("name").notNull(),
     description: text("description"),
 
-    // Server connection details
-    endpoint: text("endpoint").notNull(),
-    authType: text("auth_type").notNull().default("none"), // 'none', 'api_key', 'oauth', etc.
-    authConfig: jsonb("auth_config").$type<Record<string, any>>(),
+    transport: text("transport").notNull(),
+    url: text("url"),
 
-    // Server metadata
-    version: text("version"),
-    capabilities: jsonb("capabilities").$type<string[]>().default([]),
+    headers: json("headers").default("{}"),
+    timeout: integer("timeout").default(30000),
+    retries: integer("retries").default(3),
 
-    isSystem: boolean("is_system").notNull().default(false),
-    isActive: boolean("is_active").notNull().default(true),
+    enabled: boolean("enabled").notNull().default(true),
+    lastConnected: timestamp("last_connected"),
+    connectionStatus: text("connection_status").default("disconnected"),
+    lastError: text("last_error"),
+
+    toolCount: integer("tool_count").default(0),
+    lastToolsRefresh: timestamp("last_tools_refresh"),
+    totalRequests: integer("total_requests").default(0),
+    lastUsed: timestamp("last_used"),
+
+    deletedAt: timestamp("deleted_at"),
 
     createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at")
-      .notNull()
-      .defaultNow()
-      .$onUpdate(() => new Date()),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (table) => ({
-    userIdIdx: index("mcp_server_user_id_idx").on(table.userId),
-    isSystemIdx: index("mcp_server_is_system_idx").on(table.isSystem),
-    endpointIdx: index("mcp_server_endpoint_idx").on(table.endpoint),
+    // Primary access pattern - active servers by chat
+    chatEnabledIdx: index("mcp_servers_chat_enabled_idx").on(
+      table.chatId,
+      table.enabled,
+    ),
+
+    // Soft delete pattern - chat + not deleted
+    chatDeletedIdx: index("mcp_servers_chat_deleted_idx").on(
+      table.chatId,
+      table.deletedAt,
+    ),
   }),
 );
 
@@ -239,3 +261,69 @@ export type NewTool = typeof tool.$inferInsert;
 
 export type McpServer = typeof mcpServer.$inferSelect;
 export type NewMcpServer = typeof mcpServer.$inferInsert;
+
+// Generate base Zod schemas from Drizzle tables
+// Override numeric fields to work with numbers in API, convert to strings for DB
+export const insertAgentSchema = createInsertSchema(agent, {
+  temperature: z
+    .number()
+    .min(0)
+    .max(2)
+    .transform((val) => val.toString()),
+});
+
+export const selectAgentSchema = createSelectSchema(agent, {
+  temperature: z.string().transform((val) => parseFloat(val)),
+});
+
+export const insertAgentTemplateSchema = createInsertSchema(agentTemplate, {
+  temperature: z
+    .number()
+    .min(0)
+    .max(2)
+    .transform((val) => val.toString()),
+});
+
+export const selectAgentTemplateSchema = createSelectSchema(agentTemplate, {
+  temperature: z.string().transform((val) => parseFloat(val)),
+});
+
+// API input schema - accepts numbers, validates, then transforms to strings for DB
+export const createAgentSchema = insertAgentSchema
+  .omit({
+    id: true, // Exclude auto-generated fields
+    createdAt: true,
+    updatedAt: true,
+    usageCount: true,
+    lastUsedAt: true,
+    deleted: true,
+  })
+  .extend({
+    // Add custom validations
+    name: z.string().min(1).max(100),
+    systemPrompt: z.string().min(10).max(5000),
+    temperature: z.number().min(0).max(2).default(0.7),
+    toolIds: z.array(z.uuid()).optional().default([]),
+  })
+  .transform((data) => ({
+    ...data,
+    temperature: data.temperature.toString(), // Convert to string for DB
+  }));
+
+export const updateAgentSchema = insertAgentSchema
+  .omit({
+    id: true,
+    userId: true, // Can't change ownership
+    createdAt: true,
+    updatedAt: true,
+    deleted: true,
+  })
+  .partial() // Make all fields optional for updates
+  .extend({
+    temperature: z.number().min(0).max(2).optional(),
+  })
+  .transform((data) => ({
+    ...data,
+    temperature:
+      data.temperature !== undefined ? data.temperature.toString() : undefined,
+  }));

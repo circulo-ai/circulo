@@ -99,9 +99,9 @@ export const toolRelations = relations(tool, ({ one }) => ({
 }));
 
 export const mcpServerRelations = relations(mcpServer, ({ one, many }) => ({
-  user: one(user, {
-    fields: [mcpServer.userId],
-    references: [user.id],
+  chat: one(chat, {
+    fields: [mcpServer.chatId],
+    references: [chat.id],
   }),
   tools: many(tool),
 }));

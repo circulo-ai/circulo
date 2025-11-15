@@ -15,11 +15,14 @@ import {
   pgEnum,
   pgTable,
   primaryKey,
+  serial,
   text,
   timestamp,
   unique,
   uniqueIndex,
+  uuid,
   varchar,
+  vector,
 } from "drizzle-orm/pg-core";
 
 export const chatVisibilityEnum = pgEnum("chat_visibility", [
@@ -201,7 +204,7 @@ export const chatAgent = pgTable(
     chatId: text("chat_id")
       .notNull()
       .references(() => chat.id, { onDelete: "cascade" }),
-    agentId: text("agent_id")
+    agentId: uuid("agent_id")
       .notNull()
       .references(() => agent.id, { onDelete: "cascade" }),
 
@@ -284,7 +287,7 @@ export const message = pgTable(
 
     // Sender (either user or agent)
     userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
-    agentId: text("agent_id").references(() => agent.id, {
+    agentId: uuid("agent_id").references(() => agent.id, {
       onDelete: "set null",
     }),
 
@@ -298,15 +301,6 @@ export const message = pgTable(
     attachments: jsonb("attachments").notNull(),
 
     quotedMessageId: text("quoted_message_id"),
-
-    // Mentions
-    mentionedUserIds: jsonb("mentioned_user_ids").$type<string[]>().default([]),
-    mentionedAgentIds: jsonb("mentioned_agent_ids")
-      .$type<string[]>()
-      .default([]),
-    mentionedKnowledgeBaseIds: jsonb("mentioned_knowledge_base_ids")
-      .$type<string[]>()
-      .default([]),
 
     // Message metadata
     isEdited: boolean("is_edited").notNull().default(false),
@@ -333,18 +327,6 @@ export const message = pgTable(
     countsNonNegative: check(
       "message_counts_non_negative",
       sql`token_count >= 0 AND cost >= 0`,
-    ),
-    mentionedUsersIdx: index("message_mentioned_users_idx").using(
-      "gin",
-      table.mentionedUserIds,
-    ),
-    mentionedAgentsIdx: index("message_mentioned_agents_idx").using(
-      "gin",
-      table.mentionedAgentIds,
-    ),
-    mentionedKbsIdx: index("message_mentioned_kbs_idx").using(
-      "gin",
-      table.mentionedKnowledgeBaseIds,
     ),
   }),
 );
@@ -463,6 +445,84 @@ export const suggestion = pgTable(
     ),
     userIdx: index("suggestion_user_idx").on(table.userId),
   }),
+);
+
+export const chatMemories = pgTable(
+  "chat_memories",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    // Memory belongs to a chat
+    chatId: text("chat_id")
+      .notNull()
+      .references(() => chat.id, { onDelete: "cascade" }),
+
+    // Memory belongs to a user (owner)
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+
+    // Optional: which agent created this memory
+    agentId: uuid("agent_id").references(() => agent.id, {
+      onDelete: "set null",
+    }),
+
+    // Short type: "fact", "preference", "conversation", etc.
+    type: text("type").notNull(),
+
+    // Main memory content
+    content: text("content").notNull(),
+
+    // Structured metadata
+    metadata: jsonb("metadata").$type<Record<string, any>>().default({}),
+
+    // Optional expiration to allow memory decay
+    expiresAt: timestamp("expires_at"),
+
+    // Soft delete
+    deleted: boolean("deleted").notNull().default(false),
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at")
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("chat_memory_chat_id_idx").on(table.chatId),
+    index("chat_memory_owner_id_idx").on(table.ownerId),
+    index("chat_memory_agent_id_idx").on(table.agentId),
+    index("chat_memory_type_idx").on(table.type),
+    index("chat_memory_expires_at_idx").on(table.expiresAt),
+    index("chat_memory_metadata_gin_idx").using("gin", table.metadata),
+
+    check("chat_memory_content_non_empty", sql`length(content) > 0`),
+  ],
+);
+
+export const chatMemoryEmbeddings = pgTable(
+  "chat_memory_embeddings",
+  {
+    id: serial("id").primaryKey(),
+
+    memoryId: uuid("memory_id")
+      .notNull()
+      .references(() => chatMemories.id, { onDelete: "cascade" }),
+
+    // Adjust this dimension to your embedding model (OpenAI = 1536)
+    embedding: vector("embedding", { dimensions: 1536 }).notNull(),
+  },
+  (table) => [
+    index("chat_memory_embedding_memory_id_idx").on(table.memoryId),
+
+    // Vector index (IVFFLAT or HNSW depending on pgvector version)
+    // drizzle-kit will generate:
+    // CREATE INDEX ... USING ivfflat (embedding vector_cosine_ops)
+    index("chat_memory_embedding_vector_idx").using(
+      "ivfflat",
+      table.embedding.op("vector_cosine_ops"),
+    ),
+  ],
 );
 
 // Types

@@ -26,11 +26,10 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
-const SIDEBAR_WIDTH_COOKIE_NAME = "sidebar_width";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
-const SIDEBAR_WIDTH_DEFAULT_PX = 256;
+const SIDEBAR_WIDTH = "18rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
-const SIDEBAR_WIDTH_ICON = "3rem";
+const SIDEBAR_WIDTH_ICON = "4rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
 
 type SidebarContextProps = {
@@ -41,8 +40,6 @@ type SidebarContextProps = {
   setOpenMobile: (open: boolean) => void;
   isMobile: boolean;
   toggleSidebar: () => void;
-  sidebarWidth: number;
-  setSidebarWidth: (width: number) => void;
 };
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null);
@@ -71,15 +68,6 @@ function SidebarProvider({
 }) {
   const isMobile = useIsMobile();
   const [openMobile, setOpenMobile] = React.useState(false);
-  const [sidebarWidth, _setSidebarWidth] = React.useState<number>(() => {
-    if (typeof document === "undefined") return SIDEBAR_WIDTH_DEFAULT_PX;
-    const m = document.cookie.match(
-      new RegExp(`${SIDEBAR_WIDTH_COOKIE_NAME}=([^;]+)`),
-    );
-    const v = m?.[1];
-    const n = v ? Number.parseInt(v, 10) : SIDEBAR_WIDTH_DEFAULT_PX;
-    return Number.isFinite(n) ? n : SIDEBAR_WIDTH_DEFAULT_PX;
-  });
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
@@ -99,14 +87,6 @@ function SidebarProvider({
     },
     [setOpenProp, open],
   );
-
-  const setSidebarWidth = React.useCallback((width: number) => {
-    const min = 200;
-    const max = 480;
-    const clamped = Math.min(Math.max(width, min), max);
-    _setSidebarWidth(clamped);
-    document.cookie = `${SIDEBAR_WIDTH_COOKIE_NAME}=${clamped}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
-  }, []);
 
   // Helper to toggle the sidebar.
   const toggleSidebar = React.useCallback(() => {
@@ -142,20 +122,8 @@ function SidebarProvider({
       openMobile,
       setOpenMobile,
       toggleSidebar,
-      sidebarWidth,
-      setSidebarWidth,
     }),
-    [
-      state,
-      open,
-      setOpen,
-      isMobile,
-      openMobile,
-      setOpenMobile,
-      toggleSidebar,
-      sidebarWidth,
-      setSidebarWidth,
-    ],
+    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar],
   );
 
   return (
@@ -165,7 +133,7 @@ function SidebarProvider({
           data-slot="sidebar-wrapper"
           style={
             {
-              "--sidebar-width": `${sidebarWidth}px`,
+              "--sidebar-width": SIDEBAR_WIDTH,
               "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
               ...style,
             } as React.CSSProperties
@@ -312,15 +280,16 @@ function SidebarTrigger({
 }
 
 function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
-  const { setSidebarWidth, sidebarWidth } = useSidebar();
+  const { toggleSidebar } = useSidebar();
 
   return (
     <button
       data-sidebar="rail"
       data-slot="sidebar-rail"
-      aria-label="Resize Sidebar"
+      aria-label="Toggle Sidebar"
       tabIndex={-1}
-      title="Resize Sidebar"
+      onClick={toggleSidebar}
+      title="Toggle Sidebar"
       className={cn(
         "hover:after:bg-sidebar-border absolute inset-y-0 z-20 hidden w-4 -translate-x-1/2 transition-all ease-linear group-data-[side=left]:-right-4 group-data-[side=right]:left-0 after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] sm:flex",
         "in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize",
@@ -330,40 +299,6 @@ function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
         "[[data-side=right][data-collapsible=offcanvas]_&]:-left-2",
         className,
       )}
-      onMouseDown={(e) => {
-        if (e.buttons !== 1) return;
-        const startX = e.clientX;
-        const startWidth = sidebarWidth;
-        const onMove = (ev: MouseEvent) => {
-          const delta = ev.clientX - startX;
-          setSidebarWidth(startWidth + delta);
-        };
-        const onUp = () => {
-          window.removeEventListener("mousemove", onMove);
-          window.removeEventListener("mouseup", onUp);
-          const snaps = [280, 320];
-          const current = sidebarWidth;
-          const nearest = snaps.reduce((a, b) =>
-            Math.abs(b - current) < Math.abs(a - current) ? b : a,
-          );
-          if (Math.abs(nearest - current) <= 24) {
-            setSidebarWidth(nearest);
-          }
-        };
-        window.addEventListener("mousemove", onMove);
-        window.addEventListener("mouseup", onUp);
-      }}
-      onDoubleClick={() => {
-        const iconWidth = parseInt(
-          String(
-            getComputedStyle(document.documentElement).getPropertyValue(
-              "--sidebar-width-icon",
-            ),
-          ).replace("rem", ""),
-        );
-        const target = 64;
-        setSidebarWidth(target);
-      }}
       {...props}
     />
   );
@@ -402,7 +337,7 @@ function SidebarHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="sidebar-header"
       data-sidebar="header"
-      className={cn("flex flex-col gap-2", className)}
+      className={cn("flex flex-col gap-2 p-0", className)}
       {...props}
     />
   );
