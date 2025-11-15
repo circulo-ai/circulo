@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  foreignKey,
   index,
   integer,
   json,
@@ -167,9 +168,7 @@ export const tool = pgTable(
       .notNull(),
 
     // For MCP servers
-    mcpServerId: uuid("mcp_server_id").references(() => mcpServer.id, {
-      onDelete: "set null",
-    }),
+    mcpServerId: text("mcp_server_id"),
 
     isSystem: boolean("is_system").notNull().default(false), // System-provided tools
     isActive: boolean("is_active").notNull().default(true),
@@ -185,6 +184,11 @@ export const tool = pgTable(
     index("tool_mcp_server_idx").on(table.mcpServerId),
     index("tool_type_idx").on(table.type),
     index("tool_is_system_idx").on(table.isSystem),
+    foreignKey({
+      columns: [table.mcpServerId],
+      foreignColumns: [mcpServer.id],
+      name: "tool_mcp_server_id_mcp_servers_id_fk",
+    }).onDelete("set null"),
   ],
 );
 

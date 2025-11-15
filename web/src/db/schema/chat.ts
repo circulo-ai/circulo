@@ -448,7 +448,7 @@ export const suggestion = pgTable(
 );
 
 export const chatMemories = pgTable(
-  "memories",
+  "chat_memories",
   {
     id: uuid("id").primaryKey().defaultRandom(),
 
@@ -489,19 +489,19 @@ export const chatMemories = pgTable(
       .$onUpdate(() => new Date()),
   },
   (table) => [
-    index("memory_chat_id_idx").on(table.chatId),
-    index("memory_owner_id_idx").on(table.ownerId),
-    index("memory_agent_id_idx").on(table.agentId),
-    index("memory_type_idx").on(table.type),
-    index("memory_expires_at_idx").on(table.expiresAt),
-    index("memory_metadata_gin_idx").using("gin", table.metadata),
+    index("chat_memory_chat_id_idx").on(table.chatId),
+    index("chat_memory_owner_id_idx").on(table.ownerId),
+    index("chat_memory_agent_id_idx").on(table.agentId),
+    index("chat_memory_type_idx").on(table.type),
+    index("chat_memory_expires_at_idx").on(table.expiresAt),
+    index("chat_memory_metadata_gin_idx").using("gin", table.metadata),
 
-    check("memory_content_non_empty", sql`length(content) > 0`),
+    check("chat_memory_content_non_empty", sql`length(content) > 0`),
   ],
 );
 
 export const chatMemoryEmbeddings = pgTable(
-  "memory_embeddings",
+  "chat_memory_embeddings",
   {
     id: serial("id").primaryKey(),
 
@@ -513,12 +513,15 @@ export const chatMemoryEmbeddings = pgTable(
     embedding: vector("embedding", { dimensions: 1536 }).notNull(),
   },
   (table) => [
-    index("memory_embedding_memory_id_idx").on(table.memoryId),
+    index("chat_memory_embedding_memory_id_idx").on(table.memoryId),
 
     // Vector index (IVFFLAT or HNSW depending on pgvector version)
     // drizzle-kit will generate:
     // CREATE INDEX ... USING ivfflat (embedding vector_cosine_ops)
-    index("memory_embedding_vector_idx").using("ivfflat", table.embedding),
+    index("chat_memory_embedding_vector_idx").using(
+      "ivfflat",
+      table.embedding.op("vector_cosine_ops")
+    ),
   ],
 );
 

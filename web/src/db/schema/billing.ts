@@ -3,6 +3,7 @@ import { relations } from "drizzle-orm";
 import {
   boolean,
   index,
+  uniqueIndex,
   integer,
   jsonb,
   numeric,
@@ -231,7 +232,7 @@ export const usageMetrics = pgTable(
     periodEnd: timestamp("period_end").notNull(),
   },
   (table) => ({
-    userMetricPeriodIdx: index("usage_user_metric_period_idx").on(
+    userMetricPeriodIdx: uniqueIndex("usage_user_metric_period_idx").on(
       table.userId,
       table.metric,
       table.periodStart

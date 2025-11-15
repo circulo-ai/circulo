@@ -1,11 +1,12 @@
 import { streamText, Tool as CoreTool } from "ai";
 import { myProvider } from "@/lib/ai/providers";
 import { toolRegistry } from "@/lib/ai/tools/registry";
-import type { UIMessageStreamWriter } from "ai";
+import type { ModelMessage, UIMessageStreamWriter } from "ai";
 import type { ChatMessage } from "@/lib/types";
 import { createLogger } from "@/lib/logs/console/logger";
 import { z } from "zod";
 import { agentFactory } from "@/lib/ai/tools/factory";
+import { google } from "@ai-sdk/google";
 
 const logger = createLogger("AgentExecutor");
 
@@ -13,7 +14,7 @@ export interface ExecutorContext {
   userId: string;
   chatId: string;
   agentId: string;
-  messages: any[];
+  messages: ModelMessage[];
   dataStream: UIMessageStreamWriter<ChatMessage>;
 }
 
@@ -108,26 +109,27 @@ export async function executeAgentWithDynamicTools(context: ExecutorContext) {
     };
   }
 
-  // Stream text with dynamic tools
-  const result = streamText({
-    model: myProvider.languageModel(agent.config.model || "chat-model"),
-    system: agent.config.systemPrompt,
-    messages,
-    temperature: agent.config.temperature,
-    maxOutputTokens: agent.config.maxTokens,
-    tools: aiSdkTools,
-    onFinish: async ({ usage }) => {
-      logger.info(`Agent ${agentId} execution finished`, { usage });
+  return {
+    result: streamText({
+      // TODO: handle models
+      model: agent.config.model ? google(agent.config.model) : myProvider.languageModel("chat-model"),
+      system: agent.config.systemPrompt,
+      messages,
+      temperature: agent.config.temperature,
+      maxOutputTokens: agent.config.maxTokens,
+      tools: aiSdkTools,
+      onFinish: async ({ usage }) => {
+        logger.info(`Agent ${agentId} execution finished`, { usage });
 
-      dataStream.write({
-        type: "data-usage",
-        data: usage as any,
-        transient: true,
-      });
-    },
-  });
-
-  return result;
+        dataStream.write({
+          type: "data-usage",
+          data: usage as any,
+          transient: true,
+        });
+      },
+    }),
+    agent,
+  };
 }
 
 /**

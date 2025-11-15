@@ -1,0 +1,920 @@
+enum agent_template_status {
+  draft
+  published
+  archived
+}
+
+enum agent_visibility {
+  private
+  public
+  marketplace
+}
+
+enum invoice_status {
+  pending
+  paid
+  failed
+  expired
+  canceled
+}
+
+enum invoice_type {
+  subscription
+  one_time
+  usage_based
+  addon
+  credit
+  refund
+  custom
+}
+
+enum payment_provider {
+  changelly
+}
+
+enum subscription_status {
+  active
+  inactive
+  canceled
+  expired
+  trialing
+}
+
+enum chat_style {
+  brainstorm
+  debate
+  analyze
+  custom
+}
+
+enum chat_type {
+  direct
+  group
+}
+
+enum chat_visibility {
+  private
+  public
+}
+
+enum invitation_status {
+  pending
+  accepted
+  declined
+  expired
+}
+
+enum processing_status {
+  pending
+  processing
+  completed
+  failed
+}
+
+table agent {
+  id uuid [pk, not null, default: `gen_random_uuid()`]
+  user_id text [not null]
+  template_id uuid
+  name text [not null]
+  description text
+  system_prompt text [not null]
+  model text [not null, default: 'gpt-4']
+  temperature "numeric(3, 2)" [not null, default: '0.7']
+  max_tokens integer [default: 2000]
+  avatar text
+  color text [default: '#3B82F6']
+  tool_ids jsonb [default: `[]`]
+  usage_count integer [not null, default: 0]
+  last_used_at timestamp
+  deleted boolean [not null, default: false]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+
+  indexes {
+    user_id [name: 'agent_user_id_idx']
+    template_id [name: 'agent_template_id_idx']
+    (user_id, template_id) [name: 'agent_user_template_idx']
+    last_used_at [name: 'agent_last_used_idx']
+    
+  }
+}
+
+table agent_template {
+  id uuid [pk, not null, default: `gen_random_uuid()`]
+  creator_id text
+  name text [not null]
+  description text
+  long_description text
+  system_prompt text [not null]
+  category text
+  model text [not null, default: 'gpt-4']
+  temperature "numeric(3, 2)" [not null, default: '0.7']
+  max_tokens integer [default: 2000]
+  avatar text
+  color text [default: '#3B82F6']
+  tags jsonb [default: `[]`]
+  tool_ids jsonb [default: `[]`]
+  status agent_template_status [not null, default: 'draft']
+  visibility agent_visibility [not null, default: 'private']
+  instance_count integer [not null, default: 0]
+  usage_count integer [not null, default: 0]
+  slug text [unique]
+  featured boolean [not null, default: false]
+  is_system boolean [not null, default: false]
+  deleted boolean [not null, default: false]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+  published_at timestamp
+
+  indexes {
+    creator_id [name: 'agent_template_creator_id_idx']
+    status [name: 'agent_template_status_idx']
+    visibility [name: 'agent_template_visibility_idx']
+    featured [name: 'agent_template_featured_idx']
+    slug [name: 'agent_template_slug_idx']
+    is_system [name: 'agent_template_is_system_idx']
+    
+  }
+}
+
+table mcp_servers {
+  id text [pk, not null]
+  chat_id text [not null]
+  created_by text
+  name text [not null]
+  description text
+  transport text [not null]
+  url text
+  headers json [default: '{}']
+  timeout integer [default: 30000]
+  retries integer [default: 3]
+  enabled boolean [not null, default: true]
+  last_connected timestamp
+  connection_status text [default: 'disconnected']
+  last_error text
+  tool_count integer [default: 0]
+  last_tools_refresh timestamp
+  total_requests integer [default: 0]
+  last_used timestamp
+  deleted_at timestamp
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+
+  indexes {
+    (chat_id, enabled) [name: 'mcp_servers_chat_enabled_idx']
+    (chat_id, deleted_at) [name: 'mcp_servers_chat_deleted_idx']
+  }
+}
+
+table tool {
+  id uuid [pk, not null, default: `gen_random_uuid()`]
+  user_id text
+  name text [not null]
+  description text [not null]
+  type text [not null]
+  configuration jsonb [not null]
+  mcp_server_id uuid
+  is_system boolean [not null, default: false]
+  is_active boolean [not null, default: true]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+
+  indexes {
+    user_id [name: 'tool_user_id_idx']
+    mcp_server_id [name: 'tool_mcp_server_idx']
+    type [name: 'tool_type_idx']
+    is_system [name: 'tool_is_system_idx']
+  }
+}
+
+table audit_logs {
+  id text [pk, not null]
+  entity_type text [not null]
+  entity_id text [not null]
+  action text [not null]
+  actor_id text
+  actor_type text
+  changes jsonb
+  metadata jsonb
+  ip_address text
+  user_agent text
+  created_at "timestamp with time zone" [not null, default: `now()`]
+
+  indexes {
+    (entity_type, entity_id) [name: 'audit_logs_entity_idx']
+    actor_id [name: 'audit_logs_actor_idx']
+    created_at [name: 'audit_logs_created_at_idx']
+  }
+}
+
+table account {
+  id text [pk, not null]
+  account_id text [not null]
+  provider_id text [not null]
+  user_id text [not null]
+  access_token text
+  refresh_token text
+  id_token text
+  access_token_expires_at timestamp
+  refresh_token_expires_at timestamp
+  scope text
+  password text
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+
+  indexes {
+    user_id [name: 'account_user_id_idx']
+  }
+}
+
+table chat_environment {
+  id text [pk, not null]
+  chat_id text [not null]
+  variables json [not null, default: '{}']
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+
+  indexes {
+    chat_id [name: 'chat_environment_chat_unique', unique]
+  }
+}
+
+table environment {
+  id text [pk, not null]
+  user_id text [not null, unique]
+  variables json [not null]
+  updated_at timestamp [not null, default: `now()`]
+}
+
+table invitation {
+  id text [pk, not null]
+  email text [not null]
+  inviter_id text [not null]
+  organization_id text [not null]
+  role text [not null]
+  status text [not null]
+  expires_at timestamp [not null]
+  created_at timestamp [not null, default: `now()`]
+
+  indexes {
+    email [name: 'invitation_email_idx']
+    organization_id [name: 'invitation_organization_id_idx']
+  }
+}
+
+table member {
+  id text [pk, not null]
+  user_id text [not null]
+  organization_id text [not null]
+  role text [not null]
+  created_at timestamp [not null, default: `now()`]
+
+  indexes {
+    user_id [name: 'member_user_id_idx']
+    organization_id [name: 'member_organization_id_idx']
+  }
+}
+
+table organization {
+  id text [pk, not null]
+  name text [not null]
+  slug text [not null]
+  logo text
+  metadata json
+  org_usage_limit numeric
+  storage_used_bytes bigint [not null, default: 0]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+}
+
+table session {
+  id text [pk, not null]
+  expires_at timestamp [not null]
+  token text [not null, unique]
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  ip_address text
+  user_agent text
+  user_id text [not null]
+  active_organization_id text
+
+  indexes {
+    user_id [name: 'session_user_id_idx']
+    token [name: 'session_token_idx']
+  }
+}
+
+table settings {
+  id text [pk, not null]
+  user_id text [not null, unique]
+  theme text [not null, default: 'system']
+  telemetry_enabled boolean [not null, default: true]
+  email_preferences json [not null, default: '{}']
+  billing_usage_notifications_enabled boolean [not null, default: true]
+  updated_at timestamp [not null, default: `now()`]
+}
+
+table user {
+  id text [pk, not null]
+  name text [not null]
+  email text [not null, unique]
+  email_verified boolean [not null]
+  image text
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  stripe_customer_id text
+}
+
+table user_stats {
+  id text [pk, not null]
+  user_id text [not null, unique]
+  total_chat_executions integer [not null, default: 0]
+  total_tokens_used integer [not null, default: 0]
+  total_cost numeric [not null, default: '0']
+  current_usage_limit numeric [default: '10']
+  usage_limit_updated_at timestamp [default: `now()`]
+  current_period_cost numeric [not null, default: '0']
+  last_period_cost numeric [default: '0']
+  billed_overage_this_period numeric [not null, default: '0']
+  pro_period_cost_snapshot numeric [default: '0']
+  storage_used_bytes bigint [not null, default: 0]
+  last_active timestamp [not null, default: `now()`]
+  billing_blocked boolean [not null, default: false]
+}
+
+table verification {
+  id text [pk, not null]
+  identifier text [not null]
+  value text [not null]
+  expires_at timestamp [not null]
+  created_at timestamp
+  updated_at timestamp
+
+  indexes {
+    identifier [name: 'verification_identifier_idx']
+  }
+}
+
+table invoice_line_items {
+  id serial [pk, not null, increment]
+  invoice_id integer [not null]
+  description varchar(500) [not null]
+  quantity integer [not null, default: 1]
+  unit_price "numeric(10, 2)" [not null]
+  total_price "numeric(10, 2)" [not null]
+  reference_type varchar(100)
+  reference_id integer
+  metadata jsonb
+  created_at timestamp [not null, default: `now()`]
+
+  indexes {
+    invoice_id [name: 'line_items_invoice_idx']
+    (reference_type, reference_id) [name: 'line_items_reference_idx']
+  }
+}
+
+table invoices {
+  id serial [pk, not null, increment]
+  user_id text [not null]
+  subscription_id integer
+  type invoice_type [not null, default: 'one_time']
+  provider payment_provider [not null]
+  provider_invoice_id varchar(255) [not null]
+  usd_amount "numeric(10, 2)" [not null]
+  status invoice_status [not null, default: 'pending']
+  description varchar(500)
+  metadata jsonb
+  created_at timestamp [not null, default: `now()`]
+  paid_at timestamp
+  failed_at timestamp
+  due_date timestamp
+
+  indexes {
+    (provider, provider_invoice_id) [name: 'invoices_provider_invoice_idx']
+    user_id [name: 'invoices_user_idx']
+    subscription_id [name: 'invoices_subscription_idx']
+    type [name: 'invoices_type_idx']
+    status [name: 'invoices_status_idx']
+  }
+}
+
+table subscription_history {
+  id serial [pk, not null, increment]
+  subscription_id integer [not null]
+  plan_id integer [not null]
+  old_status subscription_status
+  new_status subscription_status [not null]
+  reason varchar(255)
+  metadata jsonb
+  changed_at timestamp [not null, default: `now()`]
+
+  indexes {
+    subscription_id [name: 'history_subscription_idx']
+    changed_at [name: 'history_changed_at_idx']
+  }
+}
+
+table subscription_plans {
+  id serial [pk, not null, increment]
+  name varchar(100) [not null]
+  slug varchar(100) [not null, unique]
+  description varchar(500)
+  usd_price "numeric(10, 2)" [not null]
+  billing_interval_days integer [not null, default: 30]
+  features jsonb
+  is_active boolean [not null, default: true]
+  created_at timestamp [not null, default: `now()`]
+
+  indexes {
+    slug [name: 'plans_slug_idx']
+  }
+}
+
+table subscriptions {
+  id serial [pk, not null, increment]
+  user_id text [not null]
+  plan_id integer [not null]
+  status subscription_status [not null, default: 'inactive']
+  start_date timestamp [not null, default: `now()`]
+  end_date timestamp
+  auto_renew boolean [not null, default: true]
+  created_at timestamp [not null, default: `now()`]
+
+  indexes {
+    user_id [name: 'subscriptions_user_idx']
+    status [name: 'subscriptions_status_idx']
+    end_date [name: 'subscriptions_end_date_idx']
+  }
+}
+
+table usage_metrics {
+  id serial [pk, not null, increment]
+  user_id text [not null]
+  subscription_id integer
+  metric varchar(100) [not null]
+  count integer [not null, default: 1]
+  recorded_at timestamp [not null, default: `now()`]
+  period_start timestamp [not null]
+  period_end timestamp [not null]
+
+  indexes {
+    (user_id, metric, period_start) [name: 'usage_user_metric_period_idx']
+    subscription_id [name: 'usage_subscription_idx']
+  }
+}
+
+table webhook_logs {
+  id serial [pk, not null, increment]
+  provider payment_provider [not null]
+  event_type varchar(100) [not null]
+  invoice_id varchar(255)
+  payload jsonb [not null]
+  signature text
+  status varchar(50) [not null]
+  error_message text
+  attempts integer [not null, default: 1]
+  processed_at timestamp
+  created_at timestamp [not null, default: `now()`]
+
+  indexes {
+    provider [name: 'webhook_provider_idx']
+    status [name: 'webhook_status_idx']
+    created_at [name: 'webhook_created_at_idx']
+  }
+}
+
+table chat {
+  id text [pk, not null]
+  creator_id text [not null]
+  title text [not null]
+  description text
+  type chat_type [not null, default: 'direct']
+  style chat_style [not null, default: 'brainstorm']
+  visibility chat_visibility [not null, default: 'private']
+  share_link text [unique]
+  link_enabled boolean [not null, default: false]
+  instructions text
+  message_count integer [not null, default: 0]
+  member_count integer [not null, default: 1]
+  total_tokens integer [not null, default: 0]
+  total_cost "numeric(10, 4)" [not null, default: '0.0000']
+  deleted boolean [not null, default: false]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+
+  indexes {
+    creator_id [name: 'chat_creator_id_idx']
+    type [name: 'chat_type_idx']
+    visibility [name: 'chat_visibility_idx']
+    share_link [name: 'chat_share_link_idx']
+    (creator_id, created_at) [name: 'chat_creator_created_at_idx']
+    
+  }
+}
+
+table chat_agent {
+  id text [pk, not null]
+  chat_id text [not null]
+  agent_id uuid [not null]
+  speak_order integer [not null]
+  enabled boolean [not null, default: true]
+  custom_system_prompt text
+  custom_temperature "numeric(3, 2)"
+  added_by text [not null]
+  created_at timestamp [not null, default: `now()`]
+
+  indexes {
+    chat_id [name: 'chat_agent_chat_id_idx']
+    agent_id [name: 'chat_agent_agent_id_idx']
+    (chat_id, speak_order) [name: 'chat_agent_chat_order_idx']
+    (chat_id, agent_id) [name: 'chat_agent_unique_idx', unique]
+    (chat_id, speak_order) [name: 'chat_agent_unique_order_idx', unique]
+    
+  }
+}
+
+table chat_invitation {
+  id text [pk, not null]
+  chat_id text [not null]
+  inviter_id text [not null]
+  email text [not null]
+  invitee_id text
+  role text [not null, default: 'member']
+  status invitation_status [not null, default: 'pending']
+  token text [not null, unique]
+  message text
+  expires_at timestamp [not null]
+  accepted_at timestamp
+  created_at timestamp [not null, default: `now()`]
+
+  indexes {
+    chat_id [name: 'chat_invitation_chat_id_idx']
+    inviter_id [name: 'chat_invitation_inviter_id_idx']
+    email [name: 'chat_invitation_email_idx']
+    invitee_id [name: 'chat_invitation_invitee_id_idx']
+    status [name: 'chat_invitation_status_idx']
+    token [name: 'chat_invitation_token_idx']
+    expires_at [name: 'chat_invitation_expires_at_idx']
+  }
+}
+
+table chat_knowledge_base {
+  id text [pk, not null]
+  chat_id text [not null]
+  knowledge_base_id text [not null]
+  enabled boolean [not null, default: true]
+  added_by text [not null]
+  created_at timestamp [not null, default: `now()`]
+
+  indexes {
+    chat_id [name: 'chat_kb_chat_id_idx']
+    knowledge_base_id [name: 'chat_kb_kb_id_idx']
+    (chat_id, knowledge_base_id) [name: 'chat_kb_unique_idx', unique]
+  }
+}
+
+table chat_member {
+  id text [pk, not null]
+  chat_id text [not null]
+  user_id text [not null]
+  role text [not null, default: 'member']
+  can_invite boolean [not null, default: false]
+  can_manage_agents boolean [not null, default: false]
+  can_manage_knowledge boolean [not null, default: false]
+  notifications_enabled boolean [not null, default: true]
+  last_read_at timestamp
+  unread_count integer [not null, default: 0]
+  joined_at timestamp [not null, default: `now()`]
+  left_at timestamp
+
+  indexes {
+    chat_id [name: 'chat_member_chat_id_idx']
+    user_id [name: 'chat_member_user_id_idx']
+    (chat_id, user_id) [name: 'chat_member_chat_user_idx', unique]
+    role [name: 'chat_member_role_idx']
+    
+  }
+}
+
+table memories {
+  id uuid [pk, not null, default: `gen_random_uuid()`]
+  chat_id text [not null]
+  owner_id text [not null]
+  agent_id uuid
+  type text [not null]
+  content text [not null]
+  metadata jsonb [default: `{}`]
+  expires_at timestamp
+  deleted boolean [not null, default: false]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+
+  indexes {
+    chat_id [name: 'memory_chat_id_idx']
+    owner_id [name: 'memory_owner_id_idx']
+    agent_id [name: 'memory_agent_id_idx']
+    type [name: 'memory_type_idx']
+    expires_at [name: 'memory_expires_at_idx']
+    metadata [name: 'memory_metadata_gin_idx']
+    
+  }
+}
+
+table memory_embeddings {
+  id serial [pk, not null, increment]
+  memory_id uuid [not null]
+  embedding vector(1536) [not null]
+
+  indexes {
+    memory_id [name: 'memory_embedding_memory_id_idx']
+    embedding [name: 'memory_embedding_vector_idx']
+  }
+}
+
+table documents {
+  id text [not null]
+  createdAt timestamp [not null]
+  title text [not null]
+  content text
+  kind varchar [not null, default: 'text']
+  userId text [not null]
+  chatId text
+
+  indexes {
+    (id, createdAt) [pk]
+    userId [name: 'documents_user_idx']
+    chatId [name: 'documents_chat_idx']
+  }
+}
+
+table message {
+  id text [pk, not null]
+  chat_id text [not null]
+  user_id text
+  agent_id uuid
+  content text [not null]
+  token_count integer [not null, default: 0]
+  cost "numeric(10, 6)" [default: '0.000000']
+  role varchar [not null]
+  parts jsonb [not null]
+  attachments jsonb [not null]
+  quoted_message_id text
+  is_edited boolean [not null, default: false]
+  edited_at timestamp
+  deleted boolean [not null, default: false]
+  deleted_at timestamp
+  created_at timestamp [not null, default: `now()`]
+
+  indexes {
+    chat_id [name: 'message_chat_id_idx']
+    user_id [name: 'message_user_id_idx']
+    agent_id [name: 'message_agent_id_idx']
+    (chat_id, created_at) [name: 'message_chat_created_at_idx']
+    quoted_message_id [name: 'message_quoted_idx']
+    
+    
+  }
+}
+
+table message_reaction {
+  id text [pk, not null]
+  message_id text [not null]
+  user_id text [not null]
+  emoji text [not null]
+  created_at timestamp [not null, default: `now()`]
+
+  indexes {
+    message_id [name: 'message_reaction_message_id_idx']
+    user_id [name: 'message_reaction_user_id_idx']
+    (user_id, message_id, emoji) [name: 'message_reaction_unique_user_message_emoji_idx', unique]
+  }
+}
+
+table stream {
+  id text [not null]
+  chatId text [not null]
+  createdAt timestamp [not null]
+
+  indexes {
+    id [pk]
+    chatId [name: 'stream_chat_idx']
+  }
+}
+
+table suggestion {
+  id text [not null]
+  documentId text [not null]
+  documentCreatedAt timestamp [not null]
+  originalText text [not null]
+  suggestedText text [not null]
+  description text
+  isResolved boolean [not null, default: false]
+  userId text [not null]
+  createdAt timestamp [not null]
+
+  indexes {
+    id [pk]
+    
+    (documentId, documentCreatedAt) [name: 'suggestion_document_idx']
+    userId [name: 'suggestion_user_idx']
+  }
+}
+
+table votes {
+  chatId text [not null]
+  messageId text [not null]
+  userId text [not null]
+  isUpvoted boolean [not null]
+
+  indexes {
+    (chatId, messageId, userId) [pk]
+    messageId [name: 'votes_message_idx']
+    userId [name: 'votes_user_idx']
+  }
+}
+
+table document_processing_queue {
+  id text [pk, not null]
+  document_id text [not null]
+  priority integer [not null, default: 0]
+  attempts integer [not null, default: 0]
+  max_attempts integer [not null, default: 3]
+  status processing_status [not null, default: 'pending']
+  error text
+  started_at timestamp
+  completed_at timestamp
+  created_at timestamp [not null, default: `now()`]
+
+  indexes {
+    document_id [name: 'doc_processing_queue_document_id_idx', unique]
+    status [name: 'doc_processing_queue_status_idx']
+    (priority, status) [name: 'doc_processing_queue_priority_status_idx']
+    
+  }
+}
+
+table embedding {
+  id text [pk, not null]
+  knowledge_base_id text [not null]
+  document_id text [not null]
+  content text [not null]
+  chunk_index integer [not null]
+  token_count integer [not null]
+  start_page integer
+  end_page integer
+  metadata text
+  embedding vector(1536) [not null]
+  content_tsv tsvector
+  created_at timestamp [not null, default: `now()`]
+
+  indexes {
+    knowledge_base_id [name: 'embedding_kb_id_idx']
+    document_id [name: 'embedding_doc_id_idx']
+    (document_id, chunk_index) [name: 'embedding_doc_chunk_idx', unique]
+    embedding [name: 'embedding_vector_hnsw_idx']
+    content_tsv [name: 'embedding_content_fts_idx']
+    
+    
+    
+  }
+}
+
+table knowledge_base {
+  id text [pk, not null]
+  user_id text [not null]
+  name text [not null]
+  description text
+  embedding_model text [not null, default: 'text-embedding-3-small']
+  embedding_dimension integer [not null, default: 1536]
+  document_count integer [not null, default: 0]
+  total_tokens integer [not null, default: 0]
+  total_size integer [not null, default: 0]
+  is_public boolean [not null, default: false]
+  deleted boolean [not null, default: false]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+
+  indexes {
+    user_id [name: 'kb_user_id_idx']
+    is_public [name: 'kb_is_public_idx']
+    
+    
+  }
+}
+
+table knowledge_document {
+  id text [pk, not null]
+  knowledge_base_id text [not null]
+  filename text [not null]
+  file_url text [not null]
+  file_size integer [not null]
+  mime_type text [not null]
+  title text
+  author text
+  metadata text
+  chunk_count integer [not null, default: 0]
+  token_count integer [not null, default: 0]
+  processing_status processing_status [not null, default: 'pending']
+  processing_error text
+  processing_started_at timestamp
+  processing_completed_at timestamp
+  deleted boolean [not null, default: false]
+  created_at timestamp [not null, default: `now()`]
+  updated_at timestamp [not null, default: `now()`]
+
+  indexes {
+    knowledge_base_id [name: 'document_kb_id_idx']
+    processing_status [name: 'document_status_idx']
+    (knowledge_base_id, processing_status) [name: 'document_kb_status_idx']
+    
+    
+  }
+}
+
+ref: invoice_line_items.invoice_id > invoices.id
+
+ref: invoices.user_id - user.id
+
+ref: invoices.subscription_id > subscriptions.id
+
+ref: subscription_history.subscription_id > subscriptions.id
+
+ref: subscription_history.plan_id > subscription_plans.id
+
+ref: subscriptions.user_id - user.id
+
+ref: subscriptions.plan_id > subscription_plans.id
+
+ref: usage_metrics.user_id - user.id
+
+ref: usage_metrics.subscription_id > subscriptions.id
+
+ref: account.user_id > user.id
+
+ref: agent.user_id > user.id
+
+ref: agent.template_id > agent_template.id
+
+ref: agent_template.creator_id > user.id
+
+ref: chat_agent.chat_id > chat.id
+
+ref: chat_agent.agent_id > agent.id
+
+ref: chat_agent.added_by - user.id
+
+ref: chat_invitation.chat_id > chat.id
+
+ref: chat_invitation.inviter_id > user.id
+
+ref: chat_invitation.invitee_id > user.id
+
+ref: chat_knowledge_base.chat_id > chat.id
+
+ref: chat_knowledge_base.knowledge_base_id > knowledge_base.id
+
+ref: chat_knowledge_base.added_by - user.id
+
+ref: chat_member.chat_id > chat.id
+
+ref: chat_member.user_id > user.id
+
+ref: chat.creator_id > user.id
+
+ref: knowledge_document.id - document_processing_queue.document_id
+
+ref: documents.userId > user.id
+
+ref: documents.chatId > chat.id
+
+ref: embedding.knowledge_base_id > knowledge_base.id
+
+ref: embedding.document_id > knowledge_document.id
+
+ref: knowledge_base.user_id > user.id
+
+ref: knowledge_document.knowledge_base_id > knowledge_base.id
+
+ref: mcp_servers.chat_id - chat.id
+
+ref: message_reaction.message_id > message.id
+
+ref: message_reaction.user_id > user.id
+
+ref: message.chat_id > chat.id
+
+ref: message.user_id > user.id
+
+ref: message.agent_id > agent.id
+
+ref: message.quoted_message_id > message.id
+
+ref: session.user_id > user.id
+
+ref: suggestion.(documentId, documentCreatedAt) > documents.(id, createdAt)
+
+ref: suggestion.userId > user.id
+
+ref: tool.user_id > user.id
+
+ref: tool.mcp_server_id > mcp_servers.id

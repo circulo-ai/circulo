@@ -5,7 +5,7 @@ import z from "zod";
 
 export const GET = api({
     auth: true,
-    params: z.object({ id: z.uuid() }),
+    params: z.object({ id: z.string().min(1) }),
 }, async (req, ctx) => {
     const chat = await chatRepo.findById(ctx.params.id);
     // Verify ownership
