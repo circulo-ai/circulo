@@ -21,14 +21,14 @@ export function Nav() {
         exponential={true}
       />
 
-      <div className="flex items-center gap-2">
+      <div className="flex w-48 items-center gap-2">
         <Logo />
         <h1 className="text-4xl text-teal-50">Circulo</h1>
       </div>
 
       <ul
         id={ulId}
-        className="fixed inset-x-0 mx-auto flex w-fit items-center gap-4 rounded-full border-2 border-teal-50/5 bg-teal-50/5 p-2 ps-4"
+        className="flex items-center gap-4 rounded-full border-2 border-teal-50/5 bg-teal-50/5 p-2 ps-4"
       >
         {navItems.map(
           (navItem) =>
@@ -76,13 +76,15 @@ export function Nav() {
         </li>
       </ul>
 
-      <EnhancedLink
-        href="/auth/sign-in"
-        buttonProps={{ variant: "text", size: "text" }}
-      >
-        <User className="size-5" />
-        Sign in
-      </EnhancedLink>
+      <div className="flex w-48 items-center justify-end">
+        <EnhancedLink
+          href="/auth/sign-in"
+          buttonProps={{ variant: "text", size: "text" }}
+        >
+          <User className="size-5" />
+          Sign in
+        </EnhancedLink>
+      </div>
     </nav>
   );
 }
