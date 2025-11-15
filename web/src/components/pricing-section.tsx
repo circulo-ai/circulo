@@ -3,10 +3,10 @@ import { PlanFeatures } from "@/db/schema/billing";
 import { generateRandomPath, Step } from "@/lib/border-walk";
 import { Icon } from "@/types/icon";
 import {
-  BookOpenText,
   Bot,
   Gauge,
   Headphones,
+  LibraryBig,
   MessageSquare,
   ReceiptText,
   Users,
@@ -66,7 +66,7 @@ async function Plans() {
   const featureIcons: Record<keyof PlanFeatures, Icon> = {
     customBilling: ReceiptText,
     dedicatedSupport: Headphones,
-    kbSlots: BookOpenText,
+    kbSlots: LibraryBig,
     maxAgents: Bot,
     maxChats: MessageSquare,
     teamMembers: Users,
