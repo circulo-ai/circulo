@@ -45,6 +45,7 @@ export interface ToolExecutionContext {
   agentId?: string;
   parameters: Record<string, any>;
   metadata?: Record<string, any>;
+  dataStream?: UIMessageStreamWriter<ChatMessage>;
 }
 
 export interface ToolExecutionResult {
@@ -291,7 +292,7 @@ const builtinToolHandlers: Record<
 
   // Document Tools
   createDocument: async (context: ToolExecutionContext) => {
-    const { userId, chatId, parameters, metadata } = context;
+    const { userId, chatId, parameters, dataStream } = context;
     const { title, kind } = parameters;
 
     if (!title || !kind) {
@@ -299,11 +300,6 @@ const builtinToolHandlers: Record<
     }
 
     const documentId = generateUUID();
-
-    // Get the dataStream from metadata if available
-    const dataStream = metadata?.dataStream as
-      | UIMessageStreamWriter<ChatMessage>
-      | undefined;
 
     if (dataStream) {
       // Send document creation events to stream
@@ -362,7 +358,7 @@ const builtinToolHandlers: Record<
   },
 
   updateDocument: async (context: ToolExecutionContext) => {
-    const { userId, parameters, metadata } = context;
+    const { userId, parameters, dataStream } = context;
     const { id, description } = parameters;
 
     if (!id || !description) {
@@ -377,10 +373,6 @@ const builtinToolHandlers: Record<
     if (!document) {
       throw new Error("Document not found");
     }
-
-    const dataStream = metadata?.dataStream as
-      | UIMessageStreamWriter<ChatMessage>
-      | undefined;
 
     if (dataStream) {
       dataStream.write({
@@ -403,7 +395,7 @@ const builtinToolHandlers: Record<
     //   });
     // }
 
-    if (dataStream) {
+    if(dataStream) {
       dataStream.write({
         type: "data-finish",
         data: null,
@@ -495,7 +487,10 @@ const builtinToolHandlers: Record<
  */
 class ToolRegistry {
   private adapters = new Map<ToolType, ToolAdapter>();
-  private toolCache = new Map<string, UnifiedTool>();
+  private toolCache = new Map<
+    string,
+    { tool: UnifiedTool; expiresAt: number }
+  >();
   private cacheExpiry = 5 * 60 * 1000; // 5 minutes
 
   constructor() {
@@ -591,7 +586,13 @@ class ToolRegistry {
     // Check cache first
     const cached = this.toolCache.get(toolId);
     if (cached) {
-      return cached;
+      // Check if cache entry has expired
+      if (Date.now() < cached.expiresAt) {
+        return cached.tool;
+      } else {
+        // Remove expired entry
+        this.toolCache.delete(toolId);
+      }
     }
 
     // Try to find in database
@@ -603,7 +604,10 @@ class ToolRegistry {
 
     if (dbTool) {
       const unified = this.convertDbToUnified(dbTool);
-      this.toolCache.set(toolId, unified);
+      this.toolCache.set(toolId, {
+        tool: unified,
+        expiresAt: Date.now() + this.cacheExpiry,
+      });
       return unified;
     }
 
@@ -612,11 +616,31 @@ class ToolRegistry {
     const mcpTool = allMcpTools.find((t) => t.name === toolId);
     if (mcpTool) {
       const unified = this.convertMcpToUnified(mcpTool);
-      this.toolCache.set(toolId, unified);
+      this.toolCache.set(toolId, {
+        tool: unified,
+        expiresAt: Date.now() + this.cacheExpiry,
+      });
       return unified;
     }
 
     return null;
+  }
+
+  // Add method to clear specific tool from cache
+  invalidateTool(toolId: string): void {
+    this.toolCache.delete(toolId);
+  }
+
+  // Add periodic cleanup of expired entries
+  private startCacheCleanup(): void {
+    setInterval(() => {
+      const now = Date.now();
+      for (const [toolId, cached] of this.toolCache.entries()) {
+        if (now >= cached.expiresAt) {
+          this.toolCache.delete(toolId);
+        }
+      }
+    }, this.cacheExpiry);
   }
 
   /**
@@ -727,7 +751,6 @@ class ToolRegistry {
       return result;
     }
 
-    // Execute
     const result = await adapter.execute(tool, context);
 
     // Track execution for rate limiting

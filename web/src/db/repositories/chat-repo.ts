@@ -8,9 +8,11 @@ const chatRepoFactory = makeRepo(
     findLatest(limit = 20) {
       return base.findMany({ orderBy: sql`created_at desc`, limit });
     },
+
     findForUser(userId: string) {
       return base.findMany({ where: eq(chat.creatorId, userId) });
     },
+
     /**
      * Retrieve agents linked to a chat, ordered by speakOrder.
      * By default only returns enabled agents.
@@ -28,6 +30,7 @@ const chatRepoFactory = makeRepo(
       });
       return rows.map((r) => r.agent);
     },
+
     /**
      * Get the next available speak order for a chat.
      * Returns max speak order + 1 or 0 if no agents.
@@ -41,6 +44,7 @@ const chatRepoFactory = makeRepo(
         .where(eq(chatAgent.chatId, chatId));
       return (result[0]?.maxOrder ?? -1) + 1;
     },
+
     /**
      * Update an agent's chat configuration.
      */
@@ -54,12 +58,12 @@ const chatRepoFactory = makeRepo(
         customTemperature?: number | null;
       },
     ) {
-      return db
+      const [updated] = await db
         .update(chatAgent)
         .set({
           speakOrder: update.speakOrder,
           enabled: update.enabled,
-          customSystemPrompt: update.customSystemPrompt ?? null,
+          customSystemPrompt: update.customSystemPrompt ?? undefined,
           customTemperature: update.customTemperature
             ? String(update.customTemperature)
             : null,
@@ -68,17 +72,20 @@ const chatRepoFactory = makeRepo(
           and(eq(chatAgent.chatId, chatId), eq(chatAgent.agentId, agentId)),
         )
         .returning();
+      return updated;
     },
+
     /**
      * Remove an agent from a chat.
      */
     async removeAgent(chatId: string, agentId: string) {
-      return db
+      const [deleted] = await db
         .delete(chatAgent)
         .where(
           and(eq(chatAgent.chatId, chatId), eq(chatAgent.agentId, agentId)),
         )
         .returning();
+      return deleted;
     },
   }),
   { primaryKey: "id" },
