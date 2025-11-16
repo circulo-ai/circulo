@@ -15,6 +15,7 @@
     "db:migrate": "npx drizzle-kit migrate",
     "db:push": "npx drizzle-kit push",
     "db:studio": "npx drizzle-kit studio",
+    "db:dbml": "npx tsx dbml.ts",
     "db:seed:plans": "tsx src/db/scripts/plan-seed.ts",
     "db:seed:agents": "tsx src/db/scripts/agents-seed.ts"
   },

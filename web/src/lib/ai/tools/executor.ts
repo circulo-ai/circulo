@@ -62,6 +62,7 @@ export async function executeAgentWithDynamicTools(context: ExecutorContext) {
             chatId,
             agentId,
             parameters: args,
+            dataStream,
           });
 
           // Send metrics
@@ -237,7 +238,7 @@ function convertSchemaToZodInner(schema: any): z.ZodTypeAny {
         );
       }
 
-      return objectSchema; // ✔ FIXED
+      return objectSchema;
     }
 
     case "string": {

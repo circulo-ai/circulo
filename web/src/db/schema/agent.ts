@@ -246,6 +246,70 @@ export const mcpServer = pgTable(
   }),
 );
 
+export const insertToolSchema = createInsertSchema(tool);
+export const selectToolSchema = createSelectSchema(tool);
+
+export const createToolSchema = insertToolSchema
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    name: z.string().min(1).max(100),
+    description: z.string().min(1).max(500),
+    type: z.enum(["builtin", "mcp", "custom", "api"]),
+    configuration: z.record(z.string(), z.any()),
+    mcpServerId: z.string().optional(),
+    isSystem: z.boolean().default(false),
+    isActive: z.boolean().default(true),
+  });
+
+export const updateToolSchema = insertToolSchema
+  .omit({
+    id: true,
+    userId: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .partial()
+  .extend({
+    name: z.string().min(1).max(100).optional(),
+    description: z.string().min(1).max(500).optional(),
+    type: z.enum(["builtin", "mcp", "custom", "api"]).optional(),
+    configuration: z.record(z.string(), z.any()).optional(),
+    isActive: z.boolean().optional(),
+  });
+
+export const insertMcpServerSchema = createInsertSchema(mcpServer);
+export const selectMcpServerSchema = createSelectSchema(mcpServer);
+
+export const createMcpServerSchema = z.object({
+  id: z.string().optional(),
+  chatId: z.string(),
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+  transport: z.literal("streamable-http"),
+  url: z.string().url("Must be a valid URL"),
+  headers: z.record(z.string(), z.string()).default({}),
+  timeout: z.number().int().min(1000).max(300000).default(30000),
+  retries: z.number().int().min(0).max(10).default(3),
+  enabled: z.boolean().default(true),
+});
+
+export const updateMcpServerSchema = z
+  .object({
+    name: z.string().min(1).max(100).optional(),
+    description: z.string().max(500).optional().nullable(),
+    transport: z.literal("streamable-http").optional(),
+    url: z.string().url("Must be a valid URL").optional(),
+    headers: z.record(z.string(), z.string()).optional(),
+    timeout: z.number().int().min(1000).max(300000).optional(),
+    retries: z.number().int().min(0).max(10).optional(),
+    enabled: z.boolean().optional(),
+  })
+  .partial();
+
 // Types
 export type AgentTemplate = typeof agentTemplate.$inferSelect;
 export type NewAgentTemplate = typeof agentTemplate.$inferInsert;

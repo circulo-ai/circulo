@@ -24,6 +24,7 @@ type ActionContext = {
   create_chat: void;
   create_kb: void;
   add_chat_agent: { chatId: string };
+  create_mcp_server: void;
 };
 
 export class UsageRateLimiter {
