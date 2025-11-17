@@ -2,13 +2,14 @@
 
 import { saveChatModelAsCookie } from "@/app/(chat)/actions";
 import {
+  MentionItemType,
   PromptInput,
   PromptInputModelSelect,
   PromptInputModelSelectContent,
   PromptInputSubmit,
   PromptInputTextarea,
   PromptInputToolbar,
-  PromptInputTools,
+  PromptInputTools
 } from "@/components/ai-elements/prompt-input";
 import {
   ArrowUpIcon,
@@ -45,6 +46,8 @@ import { PreviewAttachment } from "./preview-attachment";
 import { SuggestedActions } from "./suggested-actions";
 import { Button } from "./ui/button";
 import type { VisibilityType } from "./visibility-selector";
+import { Agent, ChatAgent } from "@/db";
+import { AtSign } from "lucide-react";
 
 function PureMultimodalInput({
   chatId,
@@ -357,6 +360,22 @@ function PureMultimodalInput({
             <PromptInputTextarea
               enableMentions
               enableCommands
+              fetchMentions={async (query) => {
+                const response = await fetch(`/api/chat/${chatId}/agents`);
+                const json = (await response.json()) as {
+                  data: {
+                    agents: (Omit<ChatAgent & Agent, "agentId">)[]
+                  }
+                };
+                return json.data.agents.map(e => {
+                  return {
+                    type: 'mention',
+                    name: e.name,
+                    username: e.id,
+                    icon: <AtSign/>
+                  } satisfies MentionItemType
+                })
+              }}
               autoFocus
               className="placeholder:text-muted-foreground grow resize-none border-0! border-none! bg-transparent p-2 text-sm ring-0 outline-none [-ms-overflow-style:none] [scrollbar-width:none] focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none [&::-webkit-scrollbar]:hidden"
               data-testid="multimodal-input"
