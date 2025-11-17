@@ -8,7 +8,7 @@ import {
   LoaderIcon,
 } from "@/components/icons/icons";
 import type { Document } from "@/db/schema";
-import { useArtifact } from "@/hooks/chats/use-artifact";
+import { useArtifact } from "@/hooks/api/chats/use-artifact";
 import { fetcher } from "@/lib/swr";
 import { cn } from "@/lib/utils";
 import equal from "fast-deep-equal";

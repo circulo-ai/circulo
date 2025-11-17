@@ -5,7 +5,7 @@ import {
   MessageIcon,
   PencilEditIcon,
 } from "@/components/icons/icons";
-import { useArtifact } from "@/hooks/chats/use-artifact";
+import { useArtifact } from "@/hooks/api/chats/use-artifact";
 import { memo } from "react";
 import { toast } from "sonner";
 

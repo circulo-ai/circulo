@@ -2,7 +2,7 @@
 
 import { LoaderIcon } from "@/components/icons/icons";
 import type { Document } from "@/db/schema";
-import { useArtifact } from "@/hooks/chats/use-artifact";
+import { useArtifact } from "@/hooks/api/chats/use-artifact";
 import { getDocumentTimestampByIndex } from "@/lib/utils";
 import { isAfter } from "date-fns";
 import { motion } from "framer-motion";

@@ -15,9 +15,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { Vote } from "@/db/schema";
-import { useArtifactSelector } from "@/hooks/chats/use-artifact";
-import { useAutoResume } from "@/hooks/chats/use-auto-resume";
-import { useChatVisibility } from "@/hooks/chats/use-chat-visibility";
+import { useArtifactSelector } from "@/hooks/api/chats/use-artifact";
+import { useAutoResume } from "@/hooks/api/chats/use-auto-resume";
+import { useChatVisibility } from "@/hooks/api/chats/use-chat-visibility";
 import { ChatSDKError } from "@/lib/errors";
 import {
   clearCachePattern,

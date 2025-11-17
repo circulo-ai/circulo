@@ -1,15 +1,12 @@
 import {
   Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarHeader,
   SidebarInset,
   SidebarProvider,
 } from "@/components/ui/sidebar";
 import { getSession } from "@/lib/auth";
 import { cookies } from "next/headers";
 import { ReactNode } from "react";
+import { ChatSidebarInside } from "./chat-sidebar-inside";
 
 export async function ChatSidebar({ children }: { children: ReactNode }) {
   const [session, cookieStore] = await Promise.all([getSession(), cookies()]);
@@ -17,16 +14,9 @@ export async function ChatSidebar({ children }: { children: ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen={defaultOpen}>
-      {session?.user && (
-        <Sidebar>
-          <SidebarHeader />
-          <SidebarContent>
-            <SidebarGroup />
-            <SidebarGroup />
-          </SidebarContent>
-          <SidebarFooter />
-        </Sidebar>
-      )}
+      <Sidebar collapsible="icon" variant="inset">
+        {session?.user && <ChatSidebarInside user={session.user} />}
+      </Sidebar>
       <SidebarInset>{children}</SidebarInset>
     </SidebarProvider>
   );

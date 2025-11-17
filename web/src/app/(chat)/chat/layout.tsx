@@ -1,4 +1,4 @@
-import { ChatSidebar } from "@/components/chat-sidebar";
+import { ChatSidebar } from "@/app/(chat)/components/chat-sidebar";
 import { DataStreamProvider } from "@/components/data-stream-provider";
 import { PageSpinner } from "@/components/page-spinner";
 import { RedirectToSignIn, SignedIn } from "@daveyplate/better-auth-ui";

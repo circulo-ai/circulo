@@ -133,8 +133,8 @@ export async function getChatsByUserId({
 }: {
   id: string;
   limit: number;
-  startingAfter: string | null;
-  endingBefore: string | null;
+  startingAfter?: string;
+  endingBefore?: string;
 }) {
   try {
     const extendedLimit = limit + 1;
