@@ -42,10 +42,7 @@ const toolRepoFactory = makeRepo(
 
     async findByMcpServer(mcpServerId: string) {
       return base.findMany({
-        where: and(
-          eq(tool.mcpServerId, mcpServerId),
-          eq(tool.isActive, true),
-        ),
+        where: and(eq(tool.mcpServerId, mcpServerId), eq(tool.isActive, true)),
         orderBy: sql`name asc`,
       });
     },

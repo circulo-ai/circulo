@@ -395,7 +395,7 @@ const builtinToolHandlers: Record<
     //   });
     // }
 
-    if(dataStream) {
+    if (dataStream) {
       dataStream.write({
         type: "data-finish",
         data: null,

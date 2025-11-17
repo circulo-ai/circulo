@@ -1,7 +1,5 @@
 import { chatRepo } from "@/db/repositories/chat-repo";
-import { chatAgent, db } from "@/db";
 import { api, Errors, success } from "@/lib/server";
-import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 // POST /api/chats/:id/agents/reorder - Reorder agents in chat

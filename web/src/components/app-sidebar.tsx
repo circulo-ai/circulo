@@ -16,7 +16,6 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { fetcher } from "@/lib/swr";
-import useSWR from "swr";
 import { User } from "@/providers/session-provider";
 import { UserButton } from "@daveyplate/better-auth-ui";
 import { useParams, useRouter } from "next/navigation";

@@ -1,6 +1,6 @@
 import { getSession } from "@/lib/auth";
-import { UsageTracker } from "@/lib/billing/usage-tracker";
 import { UsageRateLimiter } from "@/lib/billing/rate-limiter";
+import { UsageTracker } from "@/lib/billing/usage-tracker";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +23,12 @@ export async function GET(req: NextRequest) {
     const usage: Record<string, number> = {};
 
     for (const metric of metrics) {
-      usage[metric] = await UsageTracker.getUsage(userId, metric, monthStart, now);
+      usage[metric] = await UsageTracker.getUsage(
+        userId,
+        metric,
+        monthStart,
+        now,
+      );
     }
 
     usage["chat_messages_today"] = await UsageTracker.getUsage(
