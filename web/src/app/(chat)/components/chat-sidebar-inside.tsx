@@ -14,17 +14,11 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSkeleton,
-  SidebarRail,
 } from "@/components/ui/sidebar";
 import { useChatHistory } from "@/hooks/api/chats/use-chat-history";
-import { Session } from "@/lib/auth";
 import { Home, Plus } from "lucide-react";
 
-interface ChatSidebarInsideProps {
-  user: Session["user"];
-}
-
-export function ChatSidebarInside({}: ChatSidebarInsideProps) {
+export function ChatSidebarInside() {
   const { data, currentChatId, isLoading } = useChatHistory();
 
   return (
@@ -55,7 +49,7 @@ export function ChatSidebarInside({}: ChatSidebarInsideProps) {
                       buttonProps={{ variant: "text" }}
                     >
                       <Home />
-                      <span>{item.title}</span>
+                      <span className="truncate">{item.title}</span>
                       <SidebarMenuAction className="pointer-events-none">
                         <EnhancedLinkSpinner />
                         <span className="sr-only">Add Project</span>
@@ -72,7 +66,6 @@ export function ChatSidebarInside({}: ChatSidebarInsideProps) {
           </SidebarGroupAction>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarRail />
     </>
   );
 }

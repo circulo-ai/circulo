@@ -14,3 +14,5 @@ export function useChatHistory() {
     currentChatId: id,
   };
 }
+
+// TODO should I debounce isLoading?

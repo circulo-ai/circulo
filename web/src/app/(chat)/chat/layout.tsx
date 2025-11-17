@@ -1,8 +1,7 @@
 import { ChatSidebar } from "@/app/(chat)/components/chat-sidebar";
 import { DataStreamProvider } from "@/components/data-stream-provider";
-import { PageSpinner } from "@/components/page-spinner";
 import { RedirectToSignIn, SignedIn } from "@daveyplate/better-auth-ui";
-import { ReactNode, Suspense } from "react";
+import { ReactNode } from "react";
 
 export default function Layout({ children }: { children: ReactNode }) {
   return (
@@ -10,9 +9,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       <RedirectToSignIn />
       <SignedIn>
         <DataStreamProvider>
-          <Suspense fallback={<PageSpinner />}>
-            <ChatSidebar>{children}</ChatSidebar>
-          </Suspense>
+          <ChatSidebar>{children}</ChatSidebar>
         </DataStreamProvider>
       </SignedIn>
     </>

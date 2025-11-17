@@ -75,10 +75,12 @@ export function Chat({
     currentModelIdRef.current = currentModelId;
   }, [currentModelId]);
 
-  const { data: agentsResponse } = useSWR<any>(
-    `/api/chat/${id}/agents`,
-    fetcher,
-  );
+  // const { data: agentsResponse } = useSWR<any>(
+  //   `/api/chat/${id}/agents`,
+  //   fetcher,
+  // );
+  const agentsResponse: any = undefined;
+  // TODO I did this so it would stop throwing api errors
 
   const {
     messages,
