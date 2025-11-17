@@ -17,14 +17,18 @@ import {
 } from "@/components/ui/sidebar";
 import { useChatHistory } from "@/hooks/api/chats/use-chat-history";
 import { Home, Plus } from "lucide-react";
+import { ChatSidebarBurgerMenu } from "./chat-sidebar-burger-menu";
+import { ChatSidebarSearch } from "./chat-sidebar-search";
 
 export function ChatSidebarInside() {
   const { data, currentChatId, isLoading } = useChatHistory();
 
   return (
     <>
-      <SidebarHeader>
-        {/* burger menu + its dialog + search + chat tabs + sidebar separator */}
+      <SidebarHeader className="flex-row">
+        {/* TODO add chat tabs + sidebar separator */}
+        <ChatSidebarBurgerMenu />
+        <ChatSidebarSearch />
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -37,28 +41,29 @@ export function ChatSidebarInside() {
                   </SidebarMenuItem>
                 ))}
 
-              {data?.chats.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    isActive={currentChatId === item.id}
-                    asChild
-                  >
-                    <EnhancedLink
-                      asButton={false}
-                      href={`/chat/${item.id}`}
-                      buttonProps={{ variant: "text" }}
+              {!isLoading &&
+                data?.chats.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      isActive={currentChatId === item.id}
+                      asChild
                     >
-                      <Home />
-                      <span className="truncate">{item.title}</span>
-                      <SidebarMenuAction className="pointer-events-none">
-                        <EnhancedLinkSpinner />
-                        <span className="sr-only">Add Project</span>
-                      </SidebarMenuAction>
-                    </EnhancedLink>
-                  </SidebarMenuButton>
-                  <SidebarMenuBadge>24</SidebarMenuBadge>
-                </SidebarMenuItem>
-              ))}
+                      <EnhancedLink
+                        asButton={false}
+                        href={`/chat/${item.id}`}
+                        buttonProps={{ variant: "text" }}
+                      >
+                        <Home />
+                        <span className="truncate">{item.title}</span>
+                        <SidebarMenuAction className="pointer-events-none">
+                          <EnhancedLinkSpinner />
+                          <span className="sr-only">Add Project</span>
+                        </SidebarMenuAction>
+                      </EnhancedLink>
+                    </SidebarMenuButton>
+                    <SidebarMenuBadge>24</SidebarMenuBadge>
+                  </SidebarMenuItem>
+                ))}
             </SidebarMenu>
           </SidebarGroupContent>
           <SidebarGroupAction title="Add Project">

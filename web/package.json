@@ -48,6 +48,7 @@
     "@hookform/resolvers": "^5.2.2",
     "@mhbdev/bdk": "^1.0.8",
     "@modelcontextprotocol/sdk": "^1.22.0",
+    "@noble/hashes": "^2.0.1",
     "@orbs-network/ton-access": "^2.3.3",
     "@paralleldrive/cuid2": "^3.0.4",
     "@radix-ui/react-accordion": "^1.2.12",

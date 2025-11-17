@@ -55,12 +55,12 @@ export async function ChatSidebar({ children }: { children: ReactNode }) {
           </Sidebar>
         </ChatSidebarResizablePanel>
         <ResizableHandle
-          size="12px"
+          size="8px"
           id={resizableHandleId}
-          className="bg-background"
+          className="bg-sidebar transition-colors hover:bg-teal-900"
         />
         <ResizablePanel id={secondResizablePanelId}>
-          <SidebarInset>{children}</SidebarInset>
+          <SidebarInset className="bg-chat">{children}</SidebarInset>
         </ResizablePanel>
       </ResizablePanelGroup>
     </SidebarProvider>

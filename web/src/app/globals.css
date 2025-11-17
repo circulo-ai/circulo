@@ -76,7 +76,7 @@
   --chart-3: oklch(0.546 0.245 262.881);
   --chart-4: oklch(0.488 0.243 264.376);
   --chart-5: oklch(0.424 0.199 265.638);
-  --sidebar: oklch(0.985 0 0);
+  --sidebar: var(--color-neutral-800);
   --sidebar-foreground: oklch(0.141 0.005 285.823);
   --sidebar-primary: oklch(0.546 0.245 262.881);
   --sidebar-primary-foreground: oklch(0.97 0.014 254.604);
@@ -118,7 +118,7 @@
   --chart-3: oklch(0.546 0.245 262.881);
   --chart-4: oklch(0.488 0.243 264.376);
   --chart-5: oklch(0.424 0.199 265.638);
-  --sidebar: oklch(0.21 0.006 285.885);
+  --sidebar: var(--color-neutral-800);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.623 0.214 259.815);
   --sidebar-primary-foreground: oklch(0.97 0.014 254.604);
@@ -373,4 +373,29 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+@utility bg-chat {
+  background:
+    url("/chat-bg.svg") fixed,
+    radial-gradient(
+      ellipse 100% 100% at bottom right,
+      var(--color-orange-900),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 100% 100% at bottom left,
+      var(--color-indigo-950),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 100% 100% at top right,
+      var(--color-teal-900),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 100% 100% at top left,
+      var(--color-slate-900),
+      transparent
+    );
 }

@@ -87,6 +87,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.22.0
         version: 1.22.0
+      '@noble/hashes':
+        specifier: ^2.0.1
+        version: 2.0.1
       '@orbs-network/ton-access':
         specifier: ^2.3.3
         version: 2.3.3
