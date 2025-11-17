@@ -8,7 +8,7 @@ import { useSidebar } from "@/components/ui/sidebar";
 import { VersionFooter } from "@/components/version-footer";
 import type { VisibilityType } from "@/components/visibility-selector";
 import type { Document, Vote } from "@/db/schema";
-import { useArtifact } from "@/hooks/chats/use-artifact";
+import { useArtifact } from "@/hooks/api/chats/use-artifact";
 import { fetcher } from "@/lib/swr";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { UseChatHelpers } from "@ai-sdk/react";

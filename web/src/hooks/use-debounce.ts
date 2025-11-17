@@ -1,25 +1,24 @@
 import { useEffect, useState } from "react";
 
-/**
- * A hook that debounces a value by a specified delay
- * @param value The value to debounce
- * @param delay The delay in milliseconds
- * @returns The debounced value
- */
-export function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+export const useDebounce = <T>(
+  state: T,
+  delay: number,
+): { debouncedState: T; isPending: boolean } => {
+  const [debouncedState, setDebouncedState] = useState<T>(state);
+  const [isPending, setIsPending] = useState<boolean>(false);
 
   useEffect(() => {
-    // Set a timeout to update the debounced value after the delay
-    const timer = setTimeout(() => {
-      setDebouncedValue(value);
+    setIsPending(true);
+
+    const handler = setTimeout(() => {
+      setDebouncedState(state);
+      setIsPending(false);
     }, delay);
 
-    // Clean up the timeout if the value changes before the delay has passed
     return () => {
-      clearTimeout(timer);
+      clearTimeout(handler);
     };
-  }, [value, delay]);
+  }, [state, delay]);
 
-  return debouncedValue;
-}
+  return { debouncedState, isPending };
+};

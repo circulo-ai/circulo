@@ -16,6 +16,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { fetcher } from "@/lib/swr";
+import useSWR from "swr";
 import { User } from "@/providers/session-provider";
 import { UserButton } from "@daveyplate/better-auth-ui";
 import { useParams, useRouter } from "next/navigation";
@@ -33,6 +34,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "./ui/alert-dialog";
+import { SubscriptionUsageIndicator } from "./usage-indicator";
 
 export function AppSidebar({ user }: { user: User }) {
   const router = useRouter();
@@ -256,6 +258,7 @@ export function AppSidebar({ user }: { user: User }) {
             })()}
         </SidebarContent>
         <SidebarFooter>
+          {user && <SubscriptionUsageIndicator />}
           {user && (
             <UserButton
               className="mb-1"

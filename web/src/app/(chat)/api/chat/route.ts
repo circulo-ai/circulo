@@ -15,6 +15,7 @@ import { executeAgentWithDynamicTools } from "@/lib/ai/tools/executor";
 import { agentFactory } from "@/lib/ai/tools/factory";
 import { getSession } from "@/lib/auth";
 import { UsageRateLimiter } from "@/lib/billing/rate-limiter";
+import { UsageTracker } from "@/lib/billing/usage-tracker";
 import { SubscriptionManager } from "@/lib/billing/subscription-manager";
 import { getAssistantAgentId } from "@/lib/chat/assistant-agent";
 import { ChatSDKError } from "@/lib/errors";
@@ -102,14 +103,17 @@ export async function POST(request: Request) {
     );
     if (subscription) {
       const dailyLimit = subscription.features.maxMessagesPerDay;
-      if (dailyLimit !== null && dailyLimit !== undefined) {
-        const recentUserMsgCount = await (
-          await import("@/db/queries")
-        ).getMessageCountByUserId({
-          id: session.user.id,
-          differenceInHours: 24,
-        });
-        if (recentUserMsgCount >= dailyLimit) {
+      if (dailyLimit != null) {
+        const now = new Date();
+        const dayStart = new Date(now);
+        dayStart.setHours(0, 0, 0, 0);
+        const chatMessagesToday = await UsageTracker.getUsage(
+          session.user.id,
+          "chat_messages",
+          dayStart,
+          now,
+        );
+        if (chatMessagesToday >= dailyLimit) {
           return new ChatSDKError("rate_limit:chat").toResponse();
         }
       }

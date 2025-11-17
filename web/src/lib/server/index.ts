@@ -1,31 +1,11 @@
 import { getSession, Session } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 import { output, z, ZodError } from "zod";
+import { ApiError } from "./types";
 
 // ============================================================================
 // Error Handling
 // ============================================================================
-
-export class ApiError extends Error {
-  constructor(
-    public readonly statusCode: number,
-    public readonly code: string,
-    message: string,
-    public readonly details?: unknown,
-  ) {
-    super(message);
-    this.name = "ApiError";
-    Error.captureStackTrace?.(this, ApiError);
-  }
-
-  toJSON() {
-    return {
-      error: this.message,
-      code: this.code,
-      details: this.details,
-    };
-  }
-}
 
 export const Errors = {
   badRequest: (msg: string, details?: unknown) =>
@@ -198,12 +178,7 @@ export function api<
 >(
   configOrHandler:
     | RouteConfig<TBody, TQuery, TParams, TAuth>
-    | Handler<
-        output<TBody>,
-        output<TQuery>,
-        output<TParams>,
-        boolean // Use boolean here to cover both true and false in overloads
-      >,
+    | Handler<output<TBody>, output<TQuery>, output<TParams>, boolean>,
   handler?: Handler<output<TBody>, output<TQuery>, output<TParams>, TAuth>,
 ): NextRouteHandler<StringParams<InferZodSchema<TParams>>> {
   // Determine if first arg is config or handler
