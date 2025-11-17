@@ -9,23 +9,27 @@ import {
   SidebarProvider,
 } from "@/components/ui/sidebar";
 import { cookies } from "next/headers";
-import { ReactNode, useId } from "react";
+import { ReactNode } from "react";
 import { ChatSidebarInside } from "./chat-sidebar-inside";
+import { ChatSidebarResizablePanel } from "./chat-sidebar-resizable-panel";
 
 export async function ChatSidebar({ children }: { children: ReactNode }) {
-  const resizablePanelGroupId = useId();
-  const firstResizablePanelId = useId();
-  const secondResizablePanelId = useId();
-  const resizableHandleId = useId();
+  const resizablePanelGroupId = "resizable-panel-group-id";
+  const firstResizablePanelId = "first-resizable-panel-id";
+  const secondResizablePanelId = "second-resizable-panel-id";
+  const resizableHandleId = "resizable-handle-id";
 
-  const cookiesStore = await cookies();
-  const chatSidebarCookie = cookiesStore.get("chat-sidebar");
+  const cookieStore = await cookies();
+
+  const chatSidebarCookie = cookieStore.get("chat-sidebar");
   const snapshot = chatSidebarCookie
     ? JSON.parse(chatSidebarCookie.value)
     : undefined;
 
+  const sidebarStateCookie = cookieStore.get("sidebar_state")?.value === "true";
+
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={sidebarStateCookie}>
       <ResizablePanelGroup
         id={resizablePanelGroupId}
         autosaveId="chat-sidebar"
@@ -33,7 +37,7 @@ export async function ChatSidebar({ children }: { children: ReactNode }) {
         orientation="horizontal"
         snapshot={snapshot}
       >
-        <ResizablePanel
+        <ChatSidebarResizablePanel
           id={firstResizablePanelId}
           min="256px"
           default="256px"
@@ -46,10 +50,10 @@ export async function ChatSidebar({ children }: { children: ReactNode }) {
             easing: "ease-in-out",
           }}
         >
-          <Sidebar className="w-full" collapsible="none" variant="inset">
+          <Sidebar className="static w-full" collapsible="icon" variant="inset">
             <ChatSidebarInside />
           </Sidebar>
-        </ResizablePanel>
+        </ChatSidebarResizablePanel>
         <ResizableHandle
           size="12px"
           id={resizableHandleId}
