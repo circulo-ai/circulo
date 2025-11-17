@@ -26,10 +26,10 @@ export async function ChatSidebar({ children }: { children: ReactNode }) {
     ? JSON.parse(chatSidebarCookie.value)
     : undefined;
 
-  const sidebarStateCookie = cookieStore.get("sidebar_state")?.value === "true";
+  const defaultClose = cookieStore.get("sidebar_state")?.value === "false";
 
   return (
-    <SidebarProvider defaultOpen={sidebarStateCookie}>
+    <SidebarProvider defaultOpen={!defaultClose}>
       <ResizablePanelGroup
         id={resizablePanelGroupId}
         autosaveId="chat-sidebar"
