@@ -54,3 +54,5 @@ function ResizableHandle({
 }
 
 export { ResizableHandle, ResizablePanel, ResizablePanelGroup };
+
+// TODO make pl to the shadcn repo in order to replace the old library with @window-splitter/react
