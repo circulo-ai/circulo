@@ -38,7 +38,7 @@ export const AlreadyLoggedInCard = () => {
 
           {/* Actions */}
           <div className="w-full space-y-3 pt-4">
-            <Link href="/dashboard" className="block w-full">
+            <Link href="/chat" className="block w-full">
               <Button size="lg" className="group w-full">
                 Go to Dashboard
                 <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />

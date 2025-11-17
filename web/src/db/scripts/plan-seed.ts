@@ -1,5 +1,6 @@
-import { subscriptionPlans, type PlanFeatures } from "@/db";
 import "dotenv/config";
+
+import { subscriptionPlans, type PlanFeatures } from "@/db";
 import { sql } from "drizzle-orm";
 import { db } from "..";
 

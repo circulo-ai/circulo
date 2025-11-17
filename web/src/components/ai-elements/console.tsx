@@ -1,7 +1,7 @@
 import { CrossSmallIcon, TerminalWindowIcon } from "@/components/icons/icons";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { useArtifactSelector } from "@/hooks/chats/use-artifact";
+import { useArtifactSelector } from "@/hooks/api/chats/use-artifact";
 import { cn } from "@/lib/utils";
 import {
   type Dispatch,

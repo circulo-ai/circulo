@@ -13,7 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useChatVisibility } from "@/hooks/chats/use-chat-visibility";
+import { useChatVisibility } from "@/hooks/api/chats/use-chat-visibility";
 import { cn } from "@/lib/utils";
 import { type ReactNode, useMemo, useState } from "react";
 

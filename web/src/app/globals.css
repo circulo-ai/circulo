@@ -333,6 +333,15 @@
 }
 
 @layer utilities {
+  .h-screen-fix {
+    height: 100vh;
+  }
+  @supports (height: 100lvh) {
+    .h-screen-fix {
+      height: 100lvh;
+    }
+  }
+
   .main-section:not(:first-of-type) {
     height: 100vh;
     padding-top: 5rem;

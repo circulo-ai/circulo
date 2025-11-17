@@ -1,11 +1,15 @@
 import { navItems } from "@/consts/nav";
+import { getSession } from "@/lib/auth";
+import { UserButton } from "@daveyplate/better-auth-ui";
 import { ArrowUpRight, Phone, User } from "lucide-react";
-import { useId } from "react";
+import { Suspense, useId } from "react";
 import { EnhancedLink } from "./enhanced-link";
+import { EnhancedLinkSpinner } from "./enhanced-link-spinner";
 import GradualBlur from "./gradual-blur";
 import { Logo } from "./logo";
 import { NavUlDot } from "./nav-ul-dot";
 import { Button } from "./ui/button";
+import { Spinner } from "./ui/spinner";
 
 export function Nav() {
   const ulId = useId();
@@ -77,14 +81,28 @@ export function Nav() {
       </ul>
 
       <div className="flex w-48 items-center justify-end">
-        <EnhancedLink
-          href="/auth/sign-in"
-          buttonProps={{ variant: "text", size: "text" }}
-        >
-          <User className="size-5" />
-          Sign in
-        </EnhancedLink>
+        <Suspense fallback={<Spinner />}>
+          <AuthLink />
+        </Suspense>
       </div>
     </nav>
+  );
+}
+
+async function AuthLink() {
+  const session = await getSession();
+  const signedIn = session?.user;
+
+  if (signedIn) return <UserButton variant="ghost" />;
+
+  return (
+    <EnhancedLink
+      href="/auth/sign-in"
+      buttonProps={{ variant: "text", size: "text" }}
+    >
+      <User className="size-5" />
+      Sign in
+      <EnhancedLinkSpinner />
+    </EnhancedLink>
   );
 }

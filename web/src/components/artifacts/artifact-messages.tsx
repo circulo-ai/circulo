@@ -1,6 +1,6 @@
 import { PreviewMessage, ThinkingMessage } from "@/components/messages/message";
 import type { Vote } from "@/db/schema";
-import { useMessages } from "@/hooks/chats/use-messages";
+import { useMessages } from "@/hooks/api/chats/use-messages";
 import type { ChatMessage } from "@/lib/types";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import equal from "fast-deep-equal";

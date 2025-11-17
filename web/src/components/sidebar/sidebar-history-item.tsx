@@ -22,7 +22,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import type { Chat } from "@/db/schema";
-import { useChatVisibility } from "@/hooks/chats/use-chat-visibility";
+import { useChatVisibility } from "@/hooks/api/chats/use-chat-visibility";
 import Link from "next/link";
 import { memo } from "react";
 

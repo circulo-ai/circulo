@@ -1,7 +1,10 @@
 "use client";
 
 import { artifactDefinitions } from "@/components/artifacts/artifact";
-import { initialArtifactData, useArtifact } from "@/hooks/chats/use-artifact";
+import {
+  initialArtifactData,
+  useArtifact,
+} from "@/hooks/api/chats/use-artifact";
 import { useEffect } from "react";
 import { useDataStream } from "./data-stream-provider";
 
