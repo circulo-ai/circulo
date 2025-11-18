@@ -32,24 +32,36 @@ export const Tool = ({ className, ...props }: ToolProps) => (
 export type ToolHeaderProps = {
   title?: string;
   type: ToolUIPart["type"];
-  state: ToolUIPart["state"];
+  state: ToolState;
   className?: string;
 };
 
-const getStatusBadge = (status: ToolUIPart["state"]) => {
-  const labels = {
+type ToolState =
+  | ToolUIPart["state"]
+  | "approval-requested"
+  | "approval-responded"
+  | "output-denied";
+
+const getStatusBadge = (status: ToolState) => {
+  const labels: Record<ToolState, string> = {
     "input-streaming": "Pending",
     "input-available": "Running",
+    "approval-requested": "Awaiting Approval",
+    "approval-responded": "Responded",
     "output-available": "Completed",
     "output-error": "Error",
-  } as const;
+    "output-denied": "Denied",
+  };
 
-  const icons = {
+  const icons: Record<ToolState, ReactNode> = {
     "input-streaming": <CircleIcon className="size-4" />,
     "input-available": <ClockIcon className="size-4 animate-pulse" />,
+    "approval-requested": <ClockIcon className="size-4 text-yellow-600" />,
+    "approval-responded": <CheckCircleIcon className="size-4 text-blue-600" />,
     "output-available": <CheckCircleIcon className="size-4 text-green-600" />,
     "output-error": <XCircleIcon className="size-4 text-red-600" />,
-  } as const;
+    "output-denied": <XCircleIcon className="size-4 text-orange-600" />,
+  };
 
   return (
     <Badge className="gap-1.5 rounded-full text-xs" variant="secondary">
@@ -74,13 +86,13 @@ export const ToolHeader = ({
     {...props}
   >
     <div className="flex items-center gap-2">
-      <WrenchIcon className="text-muted-foreground size-4" />
+      <WrenchIcon className="size-4 text-muted-foreground" />
       <span className="text-sm font-medium">
         {title ?? type.split("-").slice(1).join("-")}
       </span>
       {getStatusBadge(state)}
     </div>
-    <ChevronDownIcon className="text-muted-foreground size-4 transition-transform group-data-[state=open]:rotate-180" />
+    <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
   </CollapsibleTrigger>
 );
 
@@ -89,7 +101,7 @@ export type ToolContentProps = ComponentProps<typeof CollapsibleContent>;
 export const ToolContent = ({ className, ...props }: ToolContentProps) => (
   <CollapsibleContent
     className={cn(
-      "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-popover-foreground data-[state=closed]:animate-out data-[state=open]:animate-in outline-none",
+      "text-popover-foreground outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:animate-in data-[state=open]:slide-in-from-top-2",
       className,
     )}
     {...props}
@@ -102,10 +114,10 @@ export type ToolInputProps = ComponentProps<"div"> & {
 
 export const ToolInput = ({ className, input, ...props }: ToolInputProps) => (
   <div className={cn("space-y-2 overflow-hidden p-4", className)} {...props}>
-    <h4 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+    <h4 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
       Parameters
     </h4>
-    <div className="bg-muted/50 rounded-md">
+    <div className="rounded-md bg-muted/50">
       <CodeBlock code={JSON.stringify(input, null, 2)} language="json" />
     </div>
   </div>
@@ -138,7 +150,7 @@ export const ToolOutput = ({
 
   return (
     <div className={cn("space-y-2 p-4", className)} {...props}>
-      <h4 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+      <h4 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
         {errorText ? "Error" : "Result"}
       </h4>
       <div

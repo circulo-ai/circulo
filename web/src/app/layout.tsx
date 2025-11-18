@@ -1,17 +1,19 @@
+import { cn } from "@/lib/utils";
 import { AuthClientProvider } from "@/providers/auth-client-provider";
+import { PointerProvider } from "@/providers/pointer-provider";
 import { SessionProvider } from "@/providers/session-provider";
+import { SWRProvider } from "@/providers/swr-provider";
 import { ThemeProvider } from "@/providers/theme-provider";
-import { ZoomPrevention } from "@/providers/zoom-prevention";
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
 import { ReactNode } from "react";
 import { Toaster } from "sonner";
 import "./globals.css";
 
-const fontSans = Geist({
-  variable: "--font-sans",
-  subsets: ["latin"],
-});
+export const viewport = {
+  maximumScale: 1, // Disable auto-zoom on mobile Safari
+};
+
+// Use system font stack to avoid build-time font fetching
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -20,13 +22,20 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
-      <body className={fontSans.variable}>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className="snap-y snap-mandatory scroll-smooth"
+    >
+      <body className={cn("font-sans", "antialiased")}>
         <ThemeProvider>
           <SessionProvider>
-            <ZoomPrevention />
-            <AuthClientProvider>{children}</AuthClientProvider>
-            <Toaster />
+            <SWRProvider>
+              <PointerProvider>
+                <AuthClientProvider>{children}</AuthClientProvider>
+                <Toaster />
+              </PointerProvider>
+            </SWRProvider>
           </SessionProvider>
         </ThemeProvider>
       </body>

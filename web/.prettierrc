@@ -3,5 +3,6 @@
     "prettier-plugin-organize-imports",
     "prettier-plugin-tailwindcss"
   ],
-  "tailwindFunctions": ["clsx", "cn", "twmerge", "cva"]
+  "tailwindFunctions": ["clsx", "cn", "twmerge", "cva"],
+  "tailwindStylesheet": "./src/app/globals.css"
 }

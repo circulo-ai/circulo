@@ -11,16 +11,18 @@ import {
   useState,
 } from "react";
 
+export type User = {
+  id: string;
+  email: string;
+  emailVerified?: boolean;
+  name?: string | null;
+  image?: string | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+};
+
 export type AppSession = {
-  user: {
-    id: string;
-    email: string;
-    emailVerified?: boolean;
-    name?: string | null;
-    image?: string | null;
-    createdAt?: Date;
-    updatedAt?: Date;
-  } | null;
+  user: User | null;
   session?: {
     id?: string;
     userId?: string;
@@ -78,3 +80,5 @@ export function useSession(): SessionHookResult {
   }
   return ctx;
 }
+
+// TODO rewrite with swr

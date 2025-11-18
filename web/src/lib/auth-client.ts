@@ -1,11 +1,11 @@
 import type { auth } from "@/lib/auth";
 import { getEnv } from "@/lib/env";
-import { telegramClient } from "better-auth-telegram/client";
 import {
   apiKeyClient,
   customSessionClient,
   magicLinkClient,
   oneTimeTokenClient,
+  organizationClient,
 } from "better-auth/client/plugins";
 import { nextCookies } from "better-auth/next-js";
 import { createAuthClient } from "better-auth/react";
@@ -20,12 +20,12 @@ export const authClient = createAuthClient({
   baseURL:
     typeof window !== "undefined" ? window.location.origin : getBaseURL(),
   plugins: [
-    telegramClient(),
     oneTimeTokenClient(),
     nextCookies(),
     customSessionClient<typeof auth>(),
     apiKeyClient(),
     magicLinkClient(),
+    organizationClient(),
   ],
   fetchOptions: {
     onError(e) {
@@ -36,4 +36,5 @@ export const authClient = createAuthClient({
   },
 });
 
+export const { useActiveOrganization } = authClient;
 export const { signIn, signUp, signOut } = authClient;

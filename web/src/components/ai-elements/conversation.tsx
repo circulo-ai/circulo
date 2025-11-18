@@ -27,7 +27,10 @@ export const ConversationContent = ({
   className,
   ...props
 }: ConversationContentProps) => (
-  <StickToBottom.Content className={cn("p-4", className)} {...props} />
+  <StickToBottom.Content
+    className={cn("flex flex-col gap-8 p-4", className)}
+    {...props}
+  />
 );
 
 export type ConversationEmptyStateProps = ComponentProps<"div"> & {
@@ -57,7 +60,7 @@ export const ConversationEmptyState = ({
         <div className="space-y-1">
           <h3 className="text-sm font-medium">{title}</h3>
           {description && (
-            <p className="text-muted-foreground text-sm">{description}</p>
+            <p className="text-sm text-muted-foreground">{description}</p>
           )}
         </div>
       </>

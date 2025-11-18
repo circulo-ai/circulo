@@ -4,8 +4,8 @@
  * This module provides standardized console logging utilities for internal application logging.
  * It is separate from the user-facing logging system in logging.ts.
  */
-import chalk from 'chalk'
-import { env } from '@/lib/env'
+import { env } from "@/lib/env";
+import chalk from "chalk";
 
 /**
  * LogLevel enum defines the severity levels for logging
@@ -23,10 +23,10 @@ import { env } from '@/lib/env'
  *        These should be investigated and fixed
  */
 export enum LogLevel {
-  DEBUG = 'DEBUG',
-  INFO = 'INFO',
-  WARN = 'WARN',
-  ERROR = 'ERROR',
+  DEBUG = "DEBUG",
+  INFO = "INFO",
+  WARN = "WARN",
+  ERROR = "ERROR",
 }
 
 /**
@@ -37,21 +37,21 @@ export enum LogLevel {
  */
 const getMinLogLevel = (): LogLevel => {
   if (env.LOG_LEVEL) {
-    return env.LOG_LEVEL as LogLevel
+    return env.LOG_LEVEL as LogLevel;
   }
 
-  const ENV = (env.NODE_ENV || 'development') as string
+  const ENV = (env.NODE_ENV || "development") as string;
   switch (ENV) {
-    case 'development':
-      return LogLevel.DEBUG
-    case 'production':
-      return LogLevel.ERROR
-    case 'test':
-      return LogLevel.ERROR
+    case "development":
+      return LogLevel.DEBUG;
+    case "production":
+      return LogLevel.ERROR;
+    case "test":
+      return LogLevel.ERROR;
     default:
-      return LogLevel.DEBUG
+      return LogLevel.DEBUG;
   }
-}
+};
 
 /**
  * Configuration for different environments
@@ -77,11 +77,11 @@ const LOG_CONFIG = {
     minLevel: getMinLogLevel(),
     colorize: false,
   },
-}
+};
 
 // Get current environment
-const ENV = (env.NODE_ENV || 'development') as keyof typeof LOG_CONFIG
-const config = LOG_CONFIG[ENV] || LOG_CONFIG.development
+const ENV = (env.NODE_ENV || "development") as keyof typeof LOG_CONFIG;
+const config = LOG_CONFIG[ENV] || LOG_CONFIG.development;
 
 // Format objects for logging
 const formatObject = (obj: any): string => {
@@ -90,18 +90,18 @@ const formatObject = (obj: any): string => {
       return JSON.stringify(
         {
           message: obj.message,
-          stack: ENV === 'development' ? obj.stack : undefined,
+          stack: ENV === "development" ? obj.stack : undefined,
           ...(obj as any),
         },
         null,
-        ENV === 'development' ? 2 : 0
-      )
+        ENV === "development" ? 2 : 0,
+      );
     }
-    return JSON.stringify(obj, null, ENV === 'development' ? 2 : 0)
+    return JSON.stringify(obj, null, ENV === "development" ? 2 : 0);
   } catch (_error) {
-    return '[Circular or Non-Serializable Object]'
+    return "[Circular or Non-Serializable Object]";
   }
-}
+};
 
 /**
  * Logger class for standardized console logging
@@ -110,14 +110,14 @@ const formatObject = (obj: any): string => {
  * and handles formatting, colorization, and environment-specific behavior.
  */
 export class Logger {
-  private module: string
+  private module: string;
 
   /**
    * Create a new logger for a specific module
    * @param module The name of the module (e.g., 'OpenAIProvider', 'AgentBlockHandler')
    */
   constructor(module: string) {
-    this.module = module
+    this.module = module;
   }
 
   /**
@@ -128,18 +128,23 @@ export class Logger {
    * @returns boolean indicating whether the log should be displayed
    */
   private shouldLog(level: LogLevel): boolean {
-    if (!config.enabled) return false
+    if (!config.enabled) return false;
 
     // In production, only log on server-side (where window is undefined)
-    if (ENV === 'production' && typeof window !== 'undefined') {
-      return false
+    if (ENV === "production" && typeof window !== "undefined") {
+      return false;
     }
 
-    const levels = [LogLevel.DEBUG, LogLevel.INFO, LogLevel.WARN, LogLevel.ERROR]
-    const minLevelIndex = levels.indexOf(config.minLevel)
-    const currentLevelIndex = levels.indexOf(level)
+    const levels = [
+      LogLevel.DEBUG,
+      LogLevel.INFO,
+      LogLevel.WARN,
+      LogLevel.ERROR,
+    ];
+    const minLevelIndex = levels.indexOf(config.minLevel);
+    const currentLevelIndex = levels.indexOf(level);
 
-    return currentLevelIndex >= minLevelIndex
+    return currentLevelIndex >= minLevelIndex;
   }
 
   /**
@@ -150,10 +155,10 @@ export class Logger {
    */
   private formatArgs(args: any[]): any[] {
     return args.map((arg) => {
-      if (arg === null || arg === undefined) return arg
-      if (typeof arg === 'object') return formatObject(arg)
-      return arg
-    })
+      if (arg === null || arg === undefined) return arg;
+      if (typeof arg === "object") return formatObject(arg);
+      return arg;
+    });
   }
 
   /**
@@ -164,47 +169,47 @@ export class Logger {
    * @param args Additional arguments to log
    */
   private log(level: LogLevel, message: string, ...args: any[]) {
-    if (!this.shouldLog(level)) return
+    if (!this.shouldLog(level)) return;
 
-    const timestamp = new Date().toISOString()
-    const formattedArgs = this.formatArgs(args)
+    const timestamp = new Date().toISOString();
+    const formattedArgs = this.formatArgs(args);
 
     // Color configuration
     if (config.colorize) {
-      let levelColor
-      const moduleColor = chalk.cyan
-      const timestampColor = chalk.gray
+      let levelColor;
+      const moduleColor = chalk.cyan;
+      const timestampColor = chalk.gray;
 
       switch (level) {
         case LogLevel.DEBUG:
-          levelColor = chalk.blue
-          break
+          levelColor = chalk.blue;
+          break;
         case LogLevel.INFO:
-          levelColor = chalk.green
-          break
+          levelColor = chalk.green;
+          break;
         case LogLevel.WARN:
-          levelColor = chalk.yellow
-          break
+          levelColor = chalk.yellow;
+          break;
         case LogLevel.ERROR:
-          levelColor = chalk.red
-          break
+          levelColor = chalk.red;
+          break;
       }
 
-      const coloredPrefix = `${timestampColor(`[${timestamp}]`)} ${levelColor(`[${level}]`)} ${moduleColor(`[${this.module}]`)}`
+      const coloredPrefix = `${timestampColor(`[${timestamp}]`)} ${levelColor(`[${level}]`)} ${moduleColor(`[${this.module}]`)}`;
 
       if (level === LogLevel.ERROR) {
-        console.error(coloredPrefix, message, ...formattedArgs)
+        console.error(coloredPrefix, message, ...formattedArgs);
       } else {
-        console.log(coloredPrefix, message, ...formattedArgs)
+        console.log(coloredPrefix, message, ...formattedArgs);
       }
     } else {
       // No colors in production
-      const prefix = `[${timestamp}] [${level}] [${this.module}]`
+      const prefix = `[${timestamp}] [${level}] [${this.module}]`;
 
       if (level === LogLevel.ERROR) {
-        console.error(prefix, message, ...formattedArgs)
+        console.error(prefix, message, ...formattedArgs);
       } else {
-        console.log(prefix, message, ...formattedArgs)
+        console.log(prefix, message, ...formattedArgs);
       }
     }
   }
@@ -224,7 +229,7 @@ export class Logger {
    * @param args Additional arguments to log
    */
   debug(message: string, ...args: any[]) {
-    this.log(LogLevel.DEBUG, message, ...args)
+    this.log(LogLevel.DEBUG, message, ...args);
   }
 
   /**
@@ -242,7 +247,7 @@ export class Logger {
    * @param args Additional arguments to log
    */
   info(message: string, ...args: any[]) {
-    this.log(LogLevel.INFO, message, ...args)
+    this.log(LogLevel.INFO, message, ...args);
   }
 
   /**
@@ -259,7 +264,7 @@ export class Logger {
    * @param args Additional arguments to log
    */
   warn(message: string, ...args: any[]) {
-    this.log(LogLevel.WARN, message, ...args)
+    this.log(LogLevel.WARN, message, ...args);
   }
 
   /**
@@ -276,7 +281,7 @@ export class Logger {
    * @param args Additional arguments to log
    */
   error(message: string, ...args: any[]) {
-    this.log(LogLevel.ERROR, message, ...args)
+    this.log(LogLevel.ERROR, message, ...args);
   }
 }
 
@@ -299,5 +304,5 @@ export class Logger {
  * @returns A Logger instance
  */
 export function createLogger(module: string): Logger {
-  return new Logger(module)
+  return new Logger(module);
 }

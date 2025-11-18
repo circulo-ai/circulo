@@ -1,10 +1,16 @@
 import {
+  BatchInvitationEmail,
+  InvitationEmail,
   MagicLinkEmail,
   OTPVerificationEmail,
   PlanWelcomeEmail,
   ResetPasswordEmail,
+  SizpayRenewalEmail,
+  UsageThresholdEmail,
 } from "@/components/emails";
+import EnterpriseSubscriptionEmail from "@/components/emails/enterprise-subscription-email";
 import { getBrandConfig } from "@/lib/branding/branding";
+import { getBaseUrl } from "@/lib/urls/utils";
 import { render } from "@react-email/components";
 
 export async function renderOTPEmail(
@@ -28,6 +34,79 @@ export async function renderPasswordResetEmail(
       username,
       resetLink: resetLink,
       updatedDate: new Date(),
+    }),
+  );
+}
+
+export async function renderUsageThresholdEmail(params: {
+  userName?: string;
+  planName: string;
+  percentUsed: number;
+  currentUsage: number;
+  limit: number;
+  ctaLink: string;
+}): Promise<string> {
+  return await render(
+    UsageThresholdEmail({
+      userName: params.userName,
+      planName: params.planName,
+      percentUsed: params.percentUsed,
+      currentUsage: params.currentUsage,
+      limit: params.limit,
+      ctaLink: params.ctaLink,
+      updatedDate: new Date(),
+    }),
+  );
+}
+
+export async function renderEnterpriseSubscriptionEmail(
+  userName: string,
+  userEmail: string,
+): Promise<string> {
+  const baseUrl = getBaseUrl();
+  const loginLink = `${baseUrl}/auth/sign-in`;
+
+  return await render(
+    EnterpriseSubscriptionEmail({
+      userName,
+      userEmail,
+      loginLink,
+      createdDate: new Date(),
+    }),
+  );
+}
+
+export async function renderInvitationEmail(
+  inviterName: string,
+  organizationName: string,
+  invitationUrl: string,
+  email: string,
+): Promise<string> {
+  return await render(
+    InvitationEmail({
+      inviterName,
+      organizationName,
+      inviteLink: invitationUrl,
+      invitedEmail: email,
+      updatedDate: new Date(),
+    }),
+  );
+}
+
+export async function renderBatchInvitationEmail(
+  inviterName: string,
+  organizationName: string,
+  organizationRole: "admin" | "member",
+  workspaceInvitations: WorkspaceInvitation[],
+  acceptUrl: string,
+): Promise<string> {
+  return await render(
+    BatchInvitationEmail({
+      inviterName,
+      organizationName,
+      organizationRole,
+      workspaceInvitations,
+      acceptUrl,
     }),
   );
 }
@@ -58,7 +137,8 @@ export function getEmailSubject(
     | "enterprise-subscription"
     | "usage-threshold"
     | "plan-welcome-pro"
-    | "plan-welcome-team",
+    | "plan-welcome-team"
+    | "sizpay-renewal",
 ): string {
   const brandName = getBrandConfig().name;
 
@@ -85,6 +165,8 @@ export function getEmailSubject(
       return `Your Pro plan is now active on ${brandName}`;
     case "plan-welcome-team":
       return `Your Team plan is now active on ${brandName}`;
+    case "sizpay-renewal":
+      return `Your subscription is due for renewal on ${brandName}`;
     default:
       return brandName;
   }
@@ -101,6 +183,22 @@ export async function renderPlanWelcomeEmail(params: {
       userName: params.userName,
       loginLink: params.loginLink,
       createdDate: new Date(),
+    }),
+  );
+}
+
+export async function renderSizpayRenewalEmail(params: {
+  planName: "Pro" | "Team";
+  userName?: string | null;
+  periodEnd: Date;
+  renewLink: string;
+}): Promise<string> {
+  return await render(
+    SizpayRenewalEmail({
+      planName: params.planName,
+      userName: params.userName,
+      periodEnd: params.periodEnd,
+      renewLink: params.renewLink,
     }),
   );
 }
