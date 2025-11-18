@@ -2,6 +2,7 @@
 
 import { EnhancedLink } from "@/components/enhanced-link";
 import { EnhancedLinkSpinner } from "@/components/enhanced-link-spinner";
+import { CustomSidebarMenuSkeleton } from "@/components/ui-custom/sidebar";
 import {
   SidebarContent,
   SidebarGroup,
@@ -13,7 +14,6 @@ import {
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSkeleton,
 } from "@/components/ui/sidebar";
 import { useChatHistory } from "@/hooks/api/chats/use-chat-history";
 import { Home, Plus } from "lucide-react";
@@ -38,7 +38,7 @@ export function ChatSidebarInside() {
               {isLoading &&
                 Array.from({ length: 5 }).map((_, index) => (
                   <SidebarMenuItem key={index}>
-                    <SidebarMenuSkeleton />
+                    <CustomSidebarMenuSkeleton />
                   </SidebarMenuItem>
                 ))}
 

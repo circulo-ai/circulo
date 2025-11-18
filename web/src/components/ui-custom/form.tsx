@@ -3,12 +3,12 @@
 import { ComponentProps } from "react";
 import {
   FieldValues,
+  FormProvider,
   Form as RHForm,
   useForm,
   UseFormProps,
 } from "react-hook-form";
 import useSWR from "swr";
-import { Form } from "../ui/form";
 
 interface CustomFormProps<Output extends Input, Input extends FieldValues>
   extends ComponentProps<typeof RHForm> {
@@ -41,7 +41,7 @@ export function CustomForm<Output extends Input, Input extends FieldValues>({
       }}
       {...props}
     >
-      <Form {...form}>{children}</Form>
+      <FormProvider {...form}>{children}</FormProvider>
     </RHForm>
   );
 }

@@ -602,14 +602,21 @@ function SidebarMenuBadge({
 function SidebarMenuSkeleton({
   className,
   showIcon = false,
+  customSkeleton,
   ...props
 }: React.ComponentProps<"div"> & {
   showIcon?: boolean;
+  customSkeleton?: (props: React.ComponentProps<"div">) => React.JSX.Element;
 }) {
   // Random width between 50 to 90%.
   const width = React.useMemo(() => {
     return `${Math.floor(Math.random() * 40) + 50}%`;
   }, []);
+
+  const FinalSkeleton = React.useMemo(
+    () => customSkeleton ?? Skeleton,
+    [customSkeleton],
+  );
 
   return (
     <div
@@ -619,12 +626,12 @@ function SidebarMenuSkeleton({
       {...props}
     >
       {showIcon && (
-        <Skeleton
+        <FinalSkeleton
           className="size-4 rounded-md"
           data-sidebar="menu-skeleton-icon"
         />
       )}
-      <Skeleton
+      <FinalSkeleton
         className="h-4 max-w-(--skeleton-width) flex-1"
         data-sidebar="menu-skeleton-text"
         style={

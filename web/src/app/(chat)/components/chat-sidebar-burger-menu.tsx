@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/ui/user-avatar";
-import { useUser } from "@/hooks/api/chats/use-user";
+import { useSession } from "@/providers/session-provider";
 import {
   Bot,
   CreditCard,
@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 
 export function ChatSidebarBurgerMenu() {
-  const { user, isLoading } = useUser();
+  const { data, isPending } = useSession();
 
   return (
     <DropdownMenu>
@@ -35,8 +35,8 @@ export function ChatSidebarBurgerMenu() {
       <CustomDropdownMenuContent sideOffset={8} align="start">
         <DropdownMenuGroup>
           <CustomDropdownMenuItem>
-            <UserAvatar user={user} isPending={isLoading} size="xs" />
-            {user?.name}
+            <UserAvatar user={data?.user} isPending={isPending} size="xs" />
+            {data?.user?.name ?? "Loading..."}
           </CustomDropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
