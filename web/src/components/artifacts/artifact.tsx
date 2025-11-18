@@ -273,7 +273,7 @@ function PureArtifact({
           {!isMobile && (
             <motion.div
               animate={{ width: windowWidth, right: 0 }}
-              className="bg-background fixed h-dvh"
+              className="fixed h-dvh bg-background"
               exit={{
                 width: isSidebarOpen ? windowWidth - 256 : windowWidth,
                 right: 0,
@@ -298,7 +298,7 @@ function PureArtifact({
                   damping: 30,
                 },
               }}
-              className="bg-muted dark:bg-background relative h-dvh w-[400px] shrink-0"
+              className="relative h-dvh w-[400px] shrink-0 bg-muted dark:bg-background"
               exit={{
                 opacity: 0,
                 x: 0,
@@ -387,7 +387,7 @@ function PureArtifact({
                     },
                   }
             }
-            className="bg-background dark:bg-muted fixed flex h-dvh flex-col overflow-y-scroll border-zinc-200 md:border-l dark:border-zinc-700"
+            className="fixed flex h-dvh flex-col overflow-y-scroll border-zinc-200 bg-background md:border-l dark:border-zinc-700 dark:bg-muted"
             exit={{
               opacity: 0,
               scale: 0.5,
@@ -426,11 +426,11 @@ function PureArtifact({
                   <div className="font-medium">{artifact.title}</div>
 
                   {isContentDirty ? (
-                    <div className="text-muted-foreground text-sm">
+                    <div className="text-sm text-muted-foreground">
                       Saving changes...
                     </div>
                   ) : document ? (
-                    <div className="text-muted-foreground text-sm">
+                    <div className="text-sm text-muted-foreground">
                       {`Updated ${formatDistance(
                         new Date(document.createdAt),
                         new Date(),
@@ -440,7 +440,7 @@ function PureArtifact({
                       )}`}
                     </div>
                   ) : (
-                    <div className="bg-muted-foreground/20 mt-2 h-3 w-32 animate-pulse rounded-md" />
+                    <div className="mt-2 h-3 w-32 animate-pulse rounded-md bg-muted-foreground/20" />
                   )}
                 </div>
               </div>
@@ -456,7 +456,7 @@ function PureArtifact({
               />
             </div>
 
-            <div className="bg-background dark:bg-muted h-full max-w-full! items-center overflow-y-scroll">
+            <div className="h-full max-w-full! items-center overflow-y-scroll bg-background dark:bg-muted">
               <artifactDefinition.content
                 content={
                   isCurrentVersion

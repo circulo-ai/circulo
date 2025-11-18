@@ -218,7 +218,7 @@ export default function AuthLayout({
                     {/* Message bubble - appears above active agent */}
                     {isActive && (
                       <div
-                        className="animate-in fade-in slide-in-from-bottom-2 pointer-events-none absolute left-1/2 -translate-x-1/2 duration-500"
+                        className="pointer-events-none absolute left-1/2 -translate-x-1/2 animate-in duration-500 fade-in slide-in-from-bottom-2"
                         style={{
                           bottom: "70px",
                           width: "180px",

@@ -35,7 +35,7 @@ export function HeroSection() {
             >
               {line % 2 === 0 && (
                 <div
-                  className="animate-down absolute h-1/6 w-full bg-linear-to-b from-transparent to-teal-50"
+                  className="absolute h-1/6 w-full animate-down bg-linear-to-b from-transparent to-teal-50"
                   style={{ animationDelay: `-${line * 500}ms` }}
                 />
               )}
@@ -50,7 +50,7 @@ export function HeroSection() {
               key={i}
               className={cn(
                 tailwindColorMap[color],
-                "animation-duration-[4s] animate-pulse",
+                "animate-pulse animation-duration-[4s]",
               )}
               style={{ animationDelay: `-${i * 750}ms` }}
             />
@@ -64,7 +64,7 @@ export function HeroSection() {
               key={i}
               className={cn(
                 tailwindColorMap[color],
-                "animation-duration-[4s] animate-pulse",
+                "animate-pulse animation-duration-[4s]",
               )}
               style={{ animationDelay: `-${i * 750}ms` }}
             />

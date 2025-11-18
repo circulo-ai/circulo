@@ -19,7 +19,7 @@ export const AlreadyLoggedInCard = () => {
   const user = session.user;
 
   return (
-    <Card className="border-border/50 w-full max-w-md">
+    <Card className="w-full max-w-md border-border/50">
       <CardContent className="px-8 pt-8 pb-4">
         <div className="flex flex-col items-center space-y-6 text-center">
           {/* Avatar */}
@@ -27,13 +27,13 @@ export const AlreadyLoggedInCard = () => {
 
           {/* Welcome Message */}
           <div className="space-y-2">
-            <h1 className="text-foreground text-2xl font-semibold tracking-tight">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
               Welcome back, {user.name?.split(" ")[0]}!
             </h1>
-            <p className="text-muted-foreground text-sm">
+            <p className="text-sm text-muted-foreground">
               You're already signed in as
             </p>
-            <p className="text-foreground text-sm font-medium">{user.email}</p>
+            <p className="text-sm font-medium text-foreground">{user.email}</p>
           </div>
 
           {/* Actions */}

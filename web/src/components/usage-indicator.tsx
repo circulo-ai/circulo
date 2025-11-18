@@ -84,7 +84,7 @@ export function SubscriptionUsageIndicator() {
 
   const compact = (
     <button
-      className="hover:bg-sidebar-accent flex w-full items-center justify-between rounded-md px-2 py-1 text-xs"
+      className="flex w-full items-center justify-between rounded-md px-2 py-1 text-xs hover:bg-sidebar-accent"
       aria-label="Usage details"
     >
       <span className="ml-2 flex w-full flex-col items-center gap-3 tabular-nums">
@@ -139,20 +139,20 @@ export function SubscriptionUsageIndicator() {
               {planName ?? "No Active Plan"}
             </span>
             {subscription ? (
-              <span className="text-foreground/60 text-[10px] uppercase">
+              <span className="text-[10px] text-foreground/60 uppercase">
                 Active
               </span>
             ) : (
               <Link
                 href="/pricing"
-                className="text-primary text-[10px] uppercase"
+                className="text-[10px] text-primary uppercase"
               >
                 Upgrade
               </Link>
             )}
           </div>
           {periodStart && periodEnd && (
-            <div className="text-foreground/60 text-[10px]">
+            <div className="text-[10px] text-foreground/60">
               <span>Period</span>
               <span className="ml-2">
                 {new Intl.DateTimeFormat(undefined, {
@@ -232,7 +232,7 @@ export function SubscriptionUsageIndicator() {
           </div>
           {!subscription && (
             <div className="mt-1">
-              <Link href="/pricing" className="text-primary text-xs">
+              <Link href="/pricing" className="text-xs text-primary">
                 View plans
               </Link>
             </div>

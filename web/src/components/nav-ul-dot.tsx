@@ -36,7 +36,7 @@ export function NavUlDot({ ulId }: NavUlDotProps) {
   return (
     <div
       className={cn(
-        "bg-foreground pointer-events-none absolute size-1 rounded-full shadow-[0_0_0_0] shadow-teal-900 transition-all duration-300",
+        "pointer-events-none absolute size-1 rounded-full bg-foreground shadow-[0_0_0_0] shadow-teal-900 transition-all duration-300",
         x === undefined && "opacity-0",
         currentIndex === 3 &&
           "size-7 -translate-x-px bg-teal-900 shadow-[0_0_0_1px]",

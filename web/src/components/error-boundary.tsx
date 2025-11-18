@@ -64,7 +64,7 @@ export class ErrorBoundary extends Component<
         <div className="flex min-h-screen items-center justify-center p-4">
           <Card className="w-full max-w-md">
             <CardHeader>
-              <CardTitle className="text-destructive flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-destructive">
                 <AlertTriangleIcon className="h-5 w-5" />
                 Something went wrong
               </CardTitle>
@@ -83,7 +83,7 @@ export class ErrorBoundary extends Component<
                   <summary className="mb-2 cursor-pointer font-medium">
                     Error Details (Development)
                   </summary>
-                  <pre className="bg-muted max-h-32 overflow-auto rounded p-2 text-xs whitespace-pre-wrap">
+                  <pre className="max-h-32 overflow-auto rounded bg-muted p-2 text-xs whitespace-pre-wrap">
                     {this.state.error.toString()}
                     {this.state.errorInfo?.componentStack}
                   </pre>

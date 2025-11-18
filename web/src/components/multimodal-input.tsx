@@ -309,7 +309,7 @@ function PureMultimodalInput({
         type="file"
       />
 
-      <PromptInput className="border-border bg-background focus-within:border-border hover:border-muted-foreground/50 rounded-xl border p-3 shadow-xs transition-all duration-200">
+      <PromptInput className="rounded-xl border border-border bg-background p-3 shadow-xs transition-all duration-200 focus-within:border-border hover:border-muted-foreground/50">
         <form
           onSubmit={(event) => {
             event.preventDefault();
@@ -377,7 +377,7 @@ function PureMultimodalInput({
                 });
               }}
               autoFocus
-              className="placeholder:text-muted-foreground grow resize-none border-0! border-none! bg-transparent p-2 text-sm ring-0 outline-none [-ms-overflow-style:none] [scrollbar-width:none] focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none [&::-webkit-scrollbar]:hidden"
+              className="grow resize-none border-0! border-none! bg-transparent p-2 text-sm ring-0 outline-none [-ms-overflow-style:none] [scrollbar-width:none] placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none [&::-webkit-scrollbar]:hidden"
               data-testid="multimodal-input"
               disableAutoResize={true}
               maxHeight={200}
@@ -406,7 +406,7 @@ function PureMultimodalInput({
               <StopButton setMessages={setMessages} stop={stop} />
             ) : (
               <PromptInputSubmit
-                className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground size-8 rounded-full transition-colors duration-200"
+                className="size-8 rounded-full bg-primary text-primary-foreground transition-colors duration-200 hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground"
                 disabled={
                   (input.trim().length === 0 && attachments.length === 0) ||
                   uploadQueue.length > 0
@@ -460,7 +460,7 @@ function PureAttachmentsButton({
 
   return (
     <Button
-      className="hover:bg-accent aspect-square h-8 rounded-lg p-1 transition-colors"
+      className="aspect-square h-8 rounded-lg p-1 transition-colors hover:bg-accent"
       data-testid="attachments-button"
       disabled={
         status === "submitted" || status === "streaming" || isReasoningModel
@@ -523,7 +523,7 @@ function PureModelSelectorCompact({
           {chatModels.map((model) => (
             <SelectItem key={model.id} value={model.name}>
               <div className="truncate text-xs font-medium">{model.name}</div>
-              <div className="text-muted-foreground mt-px truncate text-[10px] leading-tight">
+              <div className="mt-px truncate text-[10px] leading-tight text-muted-foreground">
                 {model.description}
               </div>
             </SelectItem>
@@ -545,7 +545,7 @@ function PureStopButton({
 }) {
   return (
     <Button
-      className="bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground size-7 rounded-full p-1 transition-colors duration-200"
+      className="size-7 rounded-full bg-foreground p-1 text-background transition-colors duration-200 hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground"
       data-testid="stop-button"
       onClick={(event) => {
         event.preventDefault();

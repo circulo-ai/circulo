@@ -43,7 +43,7 @@ export type PromptInputProps = HTMLAttributes<HTMLDivElement>;
 export const PromptInput = ({ className, ...props }: PromptInputProps) => (
   <div
     className={cn(
-      "bg-background w-full overflow-hidden rounded-xl border shadow-xs",
+      "w-full overflow-hidden rounded-xl border bg-background shadow-xs",
       className,
     )}
     {...props}
@@ -444,11 +444,11 @@ export const PromptInputTextarea = forwardRef<
             />
             <CommandList>
               {loading ? (
-                <div className="text-muted-foreground py-6 text-center text-sm">
+                <div className="py-6 text-center text-sm text-muted-foreground">
                   Loading...
                 </div>
               ) : items.length === 0 ? (
-                <div className="text-muted-foreground py-6 text-center text-sm">
+                <div className="py-6 text-center text-sm text-muted-foreground">
                   No results found
                 </div>
               ) : (
@@ -464,7 +464,7 @@ export const PromptInputTextarea = forwardRef<
                     <div className="flex items-center gap-2">
                       {item.icon}
                       <span>{item.name}</span>
-                      <span className="text-muted-foreground ml-auto text-xs">
+                      <span className="ml-auto text-xs text-muted-foreground">
                         {item.type === "command"
                           ? `/${item.command}`
                           : `@${item.username}`}
@@ -589,7 +589,7 @@ export const PromptInputModelSelectTrigger = ({
 }: PromptInputModelSelectTriggerProps) => (
   <SelectTrigger
     className={cn(
-      "text-muted-foreground border-none bg-transparent font-medium shadow-none transition-colors",
+      "border-none bg-transparent font-medium text-muted-foreground shadow-none transition-colors",
       "hover:bg-accent hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground",
       "h-auto px-2 py-1.5",
       className,

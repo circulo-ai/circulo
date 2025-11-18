@@ -162,7 +162,7 @@ export function AppSidebar({ user }: { user: User }) {
                     {[44, 32, 28, 64, 52].map((w, i) => (
                       <div
                         key={i}
-                        className="bg-sidebar-accent-foreground/10 h-8 rounded-md"
+                        className="h-8 rounded-md bg-sidebar-accent-foreground/10"
                       />
                     ))}
                   </div>
