@@ -18,6 +18,40 @@ export const env = createEnv({
   server: {
     TONAPI_API_KEY: z.string(),
 
+    // OAuth Integration Credentials - All optional, enables third-party integrations
+    GOOGLE_CLIENT_ID: z.string().optional(), // Google OAuth client ID for Google services
+    GOOGLE_CLIENT_SECRET: z.string().optional(), // Google OAuth client secret
+    GITHUB_CLIENT_ID: z.string().optional(), // GitHub OAuth client ID for GitHub integration
+    GITHUB_CLIENT_SECRET: z.string().optional(), // GitHub OAuth client secret
+    GITHUB_REPO_CLIENT_ID: z.string().optional(), // GitHub OAuth client ID for repo access
+    GITHUB_REPO_CLIENT_SECRET: z.string().optional(), // GitHub OAuth client secret for repo access
+    X_CLIENT_ID: z.string().optional(), // X (Twitter) OAuth client ID
+    X_CLIENT_SECRET: z.string().optional(), // X (Twitter) OAuth client secret
+    CONFLUENCE_CLIENT_ID: z.string().optional(), // Atlassian Confluence OAuth client ID
+    CONFLUENCE_CLIENT_SECRET: z.string().optional(), // Atlassian Confluence OAuth client secret
+    JIRA_CLIENT_ID: z.string().optional(), // Atlassian Jira OAuth client ID
+    JIRA_CLIENT_SECRET: z.string().optional(), // Atlassian Jira OAuth client secret
+    AIRTABLE_CLIENT_ID: z.string().optional(), // Airtable OAuth client ID
+    AIRTABLE_CLIENT_SECRET: z.string().optional(), // Airtable OAuth client secret
+    SUPABASE_CLIENT_ID: z.string().optional(), // Supabase OAuth client ID
+    SUPABASE_CLIENT_SECRET: z.string().optional(), // Supabase OAuth client secret
+    NOTION_CLIENT_ID: z.string().optional(), // Notion OAuth client ID
+    NOTION_CLIENT_SECRET: z.string().optional(), // Notion OAuth client secret
+    DISCORD_CLIENT_ID: z.string().optional(), // Discord OAuth client ID
+    DISCORD_CLIENT_SECRET: z.string().optional(), // Discord OAuth client secret
+    MICROSOFT_CLIENT_ID: z.string().optional(), // Microsoft OAuth client ID for Office 365/Teams
+    MICROSOFT_CLIENT_SECRET: z.string().optional(), // Microsoft OAuth client secret
+    HUBSPOT_CLIENT_ID: z.string().optional(), // HubSpot OAuth client ID
+    HUBSPOT_CLIENT_SECRET: z.string().optional(), // HubSpot OAuth client secret
+    WEALTHBOX_CLIENT_ID: z.string().optional(), // WealthBox OAuth client ID
+    WEALTHBOX_CLIENT_SECRET: z.string().optional(), // WealthBox OAuth client secret
+    LINEAR_CLIENT_ID: z.string().optional(), // Linear OAuth client ID
+    LINEAR_CLIENT_SECRET: z.string().optional(), // Linear OAuth client secret
+    SLACK_CLIENT_ID: z.string().optional(), // Slack OAuth client ID
+    SLACK_CLIENT_SECRET: z.string().optional(), // Slack OAuth client secret
+    REDDIT_CLIENT_ID: z.string().optional(), // Reddit OAuth client ID
+    REDDIT_CLIENT_SECRET: z.string().optional(), // Reddit OAuth client secret
+
     // Payment & Billing
     STRIPE_SECRET_KEY: z.string().min(1).optional(), // Stripe secret key for payment processing
     STRIPE_PUBLISHABLE_KEY: z.string().min(1).optional(), // Stripe publishable key for client-side SDK
@@ -36,19 +70,6 @@ export const env = createEnv({
     ENTERPRISE_STORAGE_LIMIT_GB: z.number().optional().default(500), // Default storage limit in GB for enterprise tier (can be overridden per org)
     BILLING_ENABLED: z.boolean().optional(), // Enable billing enforcement and usage tracking
     OVERAGE_THRESHOLD_DOLLARS: z.number().optional().default(50), // Dollar threshold for incremental overage billing (default: $50)
-
-    // Optional crypto wallets for future payment providers
-    BTC_WALLET_ADDRESS: z.string().optional(),
-    ETH_WALLET_ADDRESS: z.string().optional(),
-    SOL_WALLET_ADDRESS: z.string().optional(),
-    USDC_WALLET_ADDRESS: z.string().optional(),
-
-    SIZPAY_MERCHANT_ID: z.string().optional(),
-    SIZPAY_TERMINAL_ID: z.string().optional(),
-    SIZPAY_USERNAME_B64: z.string().optional(),
-    SIZPAY_PASSWORD_B64: z.string().optional(),
-    SIZPAY_SIGN_KEY: z.string().optional(),
-    SIZPAY_RETURN_URL: z.string().optional(),
 
     // Cloud Storage - AWS S3
     AWS_REGION: z.string().optional(), // AWS region for S3 buckets
@@ -81,14 +102,14 @@ export const env = createEnv({
     AZURE_ACS_CONNECTION_STRING: z.string().optional(), // Azure Communication Services connection string
 
     // Core Database & Authentication
-    DATABASE_URL: z.string().url(), // Primary database connection string
-    BETTER_AUTH_URL: z.string().url(), // Base URL for Better Auth service
+    DATABASE_URL: z.url(), // Primary database connection string
+    BETTER_AUTH_URL: z.url(), // Base URL for Better Auth service
     BETTER_AUTH_SECRET: z.string().min(32), // Secret key for Better Auth JWT signing
     ENCRYPTION_KEY: z.string().min(32), // Key for encrypting sensitive data
     INTERNAL_API_SECRET: z.string().min(32), // Secret for internal API authentication
 
     // Database & Storage
-    REDIS_URL: z.string().url().optional(), // Redis connection string for caching/sessions
+    REDIS_URL: z.url().optional(), // Redis connection string for caching/sessions
 
     // AI/LLM Provider API Keys
     GOOGLE_GENERATIVE_AI_API_KEY: z.string().min(1).optional(), // Primary OpenAI API key
@@ -101,11 +122,11 @@ export const env = createEnv({
     ANTHROPIC_API_KEY_1: z.string().min(1).optional(), // Primary Anthropic Claude API key
     ANTHROPIC_API_KEY_2: z.string().min(1).optional(), // Additional Anthropic API key for load balancing
     ANTHROPIC_API_KEY_3: z.string().min(1).optional(), // Additional Anthropic API key for load balancing
-    OLLAMA_URL: z.string().url().optional(), // Ollama local LLM server URL
+    OLLAMA_URL: z.url().optional(), // Ollama local LLM server URL
     ELEVENLABS_API_KEY: z.string().min(1).optional(), // ElevenLabs API key for text-to-speech in deployed chat
 
     // Monitoring & Analytics
-    TELEMETRY_ENDPOINT: z.string().url().optional(), // Custom telemetry/analytics endpoint
+    TELEMETRY_ENDPOINT: z.url().optional(), // Custom telemetry/analytics endpoint
     LOG_LEVEL: z.enum(["DEBUG", "INFO", "WARN", "ERROR"]).optional(), // Minimum log level to display (defaults to ERROR in production, DEBUG in development)
 
     // Infrastructure & Deployment
@@ -114,7 +135,7 @@ export const env = createEnv({
 
     // Background Jobs & Scheduling
     TRIGGER_SECRET_KEY: z.string(), // Trigger.dev webhook secret for task execution
-    TRIGGER_API_URL: z.string().url().optional(), // Trigger.dev API base URL for self-hosted (e.g., http://localhost:8030)
+    TRIGGER_API_URL: z.url().optional(), // Trigger.dev API base URL for self-hosted (e.g., http://localhost:8030)
     CRON_SECRET: z.string().optional(), // Secret for authenticating cron job requests
     JOB_RETENTION_DAYS: z.string().optional().default("1"), // Days to retain job logs/data
 
@@ -129,22 +150,16 @@ export const env = createEnv({
     RATE_LIMIT_TEAM_ASYNC: z.string().optional().default("500"), // Team tier async API executions per minute
     RATE_LIMIT_ENTERPRISE_SYNC: z.string().optional().default("150"), // Enterprise tier sync API executions per minute
     RATE_LIMIT_ENTERPRISE_ASYNC: z.string().optional().default("1000"), // Enterprise tier async API executions per minute
-
-    // OAuth Integration Credentials - All optional, enables third-party integrations
-    GOOGLE_CLIENT_ID: z.string().optional(), // Google OAuth client ID for Google services
-    GOOGLE_CLIENT_SECRET: z.string().optional(), // Google OAuth client secret
-    GITHUB_CLIENT_ID: z.string().optional(), // GitHub OAuth client ID for GitHub integration
-    GITHUB_CLIENT_SECRET: z.string().optional(), // GitHub OAuth client secret
   },
 
   client: {
     NEXT_PUBLIC_BILLING_ENABLED: z.boolean().optional(), // Enable billing enforcement and usage tracking (client-side)
 
     // Core Application URLs - Required for frontend functionality
-    NEXT_PUBLIC_APP_URL: z.string().url(), // Base URL of the application (e.g., https://app.circulo.ir)
+    NEXT_PUBLIC_APP_URL: z.url(), // Base URL of the application (e.g., https://app.circulo.ir)
 
     // Trigger.dev Realtime base URL for self-hosted setups
-    NEXT_PUBLIC_TRIGGER_API_URL: z.string().url().optional(),
+    NEXT_PUBLIC_TRIGGER_API_URL: z.url().optional(),
 
     // Google Services - For client-side Google integrations
     NEXT_PUBLIC_GOOGLE_CLIENT_ID: z.string().optional(), // Google OAuth client ID for browser auth
