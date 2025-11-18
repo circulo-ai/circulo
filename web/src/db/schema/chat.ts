@@ -109,7 +109,7 @@ export const chat = pgTable(
 export const chatMember = pgTable(
   "chat_member",
   {
-    id: text("id").primaryKey(),
+    id: text("id").primaryKey().$defaultFn(generateUUID),
     chatId: text("chat_id")
       .notNull()
       .references(() => chat.id, { onDelete: "cascade" }),

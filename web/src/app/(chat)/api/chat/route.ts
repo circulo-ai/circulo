@@ -143,9 +143,6 @@ export async function POST(request: Request) {
       }
       messagesFromDb = await getMessagesByChatId({ id });
     } else {
-      if (!agentIds || agentIds.length === 0) {
-        return new ChatSDKError("bad_request:chat").toResponse();
-      }
       const title = await generateTitleFromUserMessage({ message });
       await saveChat({
         id,
