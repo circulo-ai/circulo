@@ -1,6 +1,7 @@
-import { Chat } from "@/db";
+import { Chat, chatMember, db } from "@/db";
 import { deleteAllChatsByUserId, getChatsByUserId } from "@/db/queries";
 import { api, Errors, success } from "@/lib/server";
+import { and, eq, inArray } from "drizzle-orm";
 import z from "zod";
 
 export const GetChatHistoryQueryParams = z.object({
@@ -11,7 +12,7 @@ export const GetChatHistoryQueryParams = z.object({
 });
 
 export type GetChatHistoryResponse = {
-  chats: Chat[];
+  chats: Array<Chat & { isPinned: boolean; pinOrder?: number }>;
   hasMore: boolean;
 };
 
@@ -33,7 +34,7 @@ export const GET = api(
       );
     }
 
-    const chats: GetChatHistoryResponse = await getChatsByUserId({
+    const chatsPage = await getChatsByUserId({
       id: ctx.user.id,
       limit,
       startingAfter,
@@ -41,7 +42,38 @@ export const GET = api(
       search,
     });
 
-    return success(chats);
+    const chatIds = chatsPage.chats.map((c) => c.id);
+
+    const pins = chatIds.length
+      ? await db
+          .select({
+            chatId: chatMember.chatId,
+            isPinned: chatMember.isPinned,
+            pinOrder: chatMember.pinOrder,
+          })
+          .from(chatMember)
+          .where(
+            and(
+              inArray(chatMember.chatId, chatIds),
+              eq(chatMember.userId, ctx.user.id),
+            ),
+          )
+      : [];
+
+    const pinMap = new Map<string, { isPinned: boolean; pinOrder?: number }>();
+    for (const p of pins)
+      pinMap.set(p.chatId, {
+        isPinned: Boolean(p.isPinned),
+        pinOrder: p.pinOrder ?? undefined,
+      });
+
+    const enriched = chatsPage.chats.map((c) => ({
+      ...c,
+      isPinned: pinMap.get(c.id)?.isPinned ?? false,
+      pinOrder: pinMap.get(c.id)?.pinOrder ?? null,
+    }));
+
+    return success({ chats: enriched, hasMore: chatsPage.hasMore });
   },
 );
 
