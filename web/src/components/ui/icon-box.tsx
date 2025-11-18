@@ -12,7 +12,7 @@ export function IconBox({ icon: Icon, className, ...props }: IconBoxProps) {
       className={cn("rounded-md border-2 border-teal-50/10 p-2", className)}
       {...props}
     >
-      <Icon className="text-foreground/75 size-4" />
+      <Icon className="size-4 text-foreground/75" />
     </div>
   );
 }

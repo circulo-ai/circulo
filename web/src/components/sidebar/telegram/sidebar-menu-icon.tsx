@@ -22,7 +22,7 @@ export default function SidebarMenuIcon({
         <Button
           variant="ghost"
           size="icon"
-          className="text-muted-foreground hover:text-foreground h-8 w-8"
+          className="h-8 w-8 text-muted-foreground hover:text-foreground"
         >
           <Menu className="h-5 w-5" />
         </Button>

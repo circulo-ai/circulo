@@ -108,7 +108,7 @@ export function Console({ consoleOutputs, setConsoleOutputs }: ConsoleProps) {
         )}
         style={{ height }}
       >
-        <div className="bg-muted sticky top-0 z-50 flex h-fit w-full flex-row items-center justify-between border-b border-zinc-200 px-2 py-1 dark:border-zinc-700">
+        <div className="sticky top-0 z-50 flex h-fit w-full flex-row items-center justify-between border-b border-zinc-200 bg-muted px-2 py-1 dark:border-zinc-700">
           <div className="flex flex-row items-center gap-3 pl-2 text-sm text-zinc-800 dark:text-zinc-50">
             <div className="text-muted-foreground">
               <TerminalWindowIcon />

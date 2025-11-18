@@ -42,7 +42,7 @@ function PureDocumentToolResult({
 
   return (
     <button
-      className="bg-background flex w-fit cursor-pointer flex-row items-start gap-3 rounded-xl border px-3 py-2"
+      className="flex w-fit cursor-pointer flex-row items-start gap-3 rounded-xl border bg-background px-3 py-2"
       onClick={(event) => {
         if (isReadonly) {
           toast.error(
@@ -72,7 +72,7 @@ function PureDocumentToolResult({
       }}
       type="button"
     >
-      <div className="text-muted-foreground mt-1">
+      <div className="mt-1 text-muted-foreground">
         {type === "create" ? (
           <FileIcon />
         ) : type === "update" ? (

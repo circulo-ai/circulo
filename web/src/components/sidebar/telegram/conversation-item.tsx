@@ -42,18 +42,18 @@ export function ConversationItem({
               </span>
             ))}
           </div>
-          <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             {conversation.hasAttachment && (
               <>
                 <ImageIcon className="h-3.5 w-3.5" />
-                <span className="bg-muted inline-block h-3.5 w-3.5 rounded" />
+                <span className="inline-block h-3.5 w-3.5 rounded bg-muted" />
               </>
             )}
             <span className="truncate">{conversation.lastMessage}</span>
           </div>
         </div>
         <div className="flex flex-shrink-0 flex-col items-end gap-1">
-          <span className="text-muted-foreground text-xs whitespace-nowrap">
+          <span className="text-xs whitespace-nowrap text-muted-foreground">
             {conversation.timestamp}
           </span>
         </div>
