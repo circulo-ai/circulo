@@ -129,10 +129,10 @@ export function SettingsNavigation({
         <div className="px-2 pb-4">
           <button
             onClick={handleHomepageClick}
-            className="group hover:bg-muted flex h-9 w-full cursor-pointer items-center rounded-[8px] px-2 py-2 font-sans text-sm font-medium transition-colors"
+            className="group flex h-9 w-full cursor-pointer items-center rounded-[8px] px-2 py-2 font-sans text-sm font-medium transition-colors hover:bg-muted"
           >
-            <Home className="text-muted-foreground group-hover:text-foreground mr-2 h-[14px] w-[14px] flex-shrink-0 transition-colors" />
-            <span className="text-muted-foreground group-hover:text-foreground min-w-0 flex-1 truncate pr-1 text-left transition-colors select-none">
+            <Home className="mr-2 h-[14px] w-[14px] flex-shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" />
+            <span className="min-w-0 flex-1 truncate pr-1 text-left text-muted-foreground transition-colors select-none group-hover:text-foreground">
               Homepage
             </span>
           </button>

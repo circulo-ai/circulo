@@ -25,7 +25,7 @@ export function FaqList(props: ComponentProps<typeof ScrollArea>) {
 
   return (
     <ScrollArea viewportRef={viewportRef} {...props}>
-      <div className="from-background pointer-events-none absolute inset-x-0 top-0 z-10 h-16 bg-linear-to-b to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-16 bg-linear-to-b from-background to-transparent" />
       <Accordion
         type="single"
         collapsible={true}
@@ -48,14 +48,14 @@ export function FaqList(props: ComponentProps<typeof ScrollArea>) {
                   <h4 className="font-semibold">{faq.question}</h4>
                 </CustomAccordionTrigger>
                 <AccordionContent>
-                  <p className="text-foreground/75 ms-13">{faq.answer}</p>
+                  <p className="ms-13 text-foreground/75">{faq.answer}</p>
                 </AccordionContent>
               </AccordionItem>
             );
           }}
         />
       </Accordion>
-      <div className="from-background pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-linear-to-t to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-linear-to-t from-background to-transparent" />
     </ScrollArea>
   );
 }

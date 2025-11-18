@@ -17,7 +17,7 @@ export const PreviewAttachment = ({
 
   return (
     <div
-      className="group bg-muted relative size-16 overflow-hidden rounded-lg border"
+      className="group relative size-16 overflow-hidden rounded-lg border bg-muted"
       data-testid="input-attachment-preview"
     >
       {contentType?.startsWith("image") ? (
@@ -29,7 +29,7 @@ export const PreviewAttachment = ({
           width={64}
         />
       ) : (
-        <div className="text-muted-foreground flex size-full items-center justify-center text-xs">
+        <div className="flex size-full items-center justify-center text-xs text-muted-foreground">
           File
         </div>
       )}

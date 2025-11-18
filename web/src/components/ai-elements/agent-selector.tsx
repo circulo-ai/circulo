@@ -64,7 +64,7 @@ function SortableAgentItem({
           {...listeners}
           className="cursor-grab touch-none active:cursor-grabbing"
         >
-          <GripVertical className="text-muted-foreground h-5 w-5" />
+          <GripVertical className="h-5 w-5 text-muted-foreground" />
         </div>
         <Badge variant="outline" className="shrink-0">
           #{index + 1}
@@ -86,7 +86,7 @@ function SortableAgentItem({
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium">{agent.name}</p>
           {agent.description && (
-            <p className="text-muted-foreground truncate text-xs">
+            <p className="truncate text-xs text-muted-foreground">
               {agent.description}
             </p>
           )}
@@ -144,7 +144,7 @@ export function AgentSelector({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="text-muted-foreground text-sm">Loading agents...</div>
+        <div className="text-sm text-muted-foreground">Loading agents...</div>
       </div>
     );
   }
@@ -159,7 +159,7 @@ export function AgentSelector({
             {selectedAgents.length > 0 && `(${selectedAgents.length})`}
           </h3>
           {selectedAgents.length > 1 && (
-            <span className="text-muted-foreground text-xs">
+            <span className="text-xs text-muted-foreground">
               Drag to reorder speaking sequence
             </span>
           )}
@@ -167,7 +167,7 @@ export function AgentSelector({
 
         {selectedAgents.length === 0 ? (
           <Card className="border-dashed p-8 text-center">
-            <p className="text-muted-foreground text-sm">
+            <p className="text-sm text-muted-foreground">
               No agents selected yet. Choose from available agents below.
             </p>
           </Card>
@@ -216,7 +216,7 @@ export function AgentSelector({
             <div className="space-y-2 p-2">
               {unselectedAgents.length === 0 ? (
                 <div className="p-8 text-center">
-                  <p className="text-muted-foreground text-sm">
+                  <p className="text-sm text-muted-foreground">
                     {availableAgents.length === 0
                       ? "No agents available. Create an agent first."
                       : "All available agents have been selected."}
@@ -226,7 +226,7 @@ export function AgentSelector({
                 unselectedAgents.map((agent) => (
                   <Card
                     key={agent.id}
-                    className="hover:bg-muted/50 cursor-pointer p-3 transition-colors"
+                    className="cursor-pointer p-3 transition-colors hover:bg-muted/50"
                     onClick={() => handleAddAgent(agent.id)}
                   >
                     <div className="flex items-center gap-3">
@@ -247,7 +247,7 @@ export function AgentSelector({
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium">{agent.name}</p>
                         {agent.description && (
-                          <p className="text-muted-foreground truncate text-xs">
+                          <p className="truncate text-xs text-muted-foreground">
                             {agent.description}
                           </p>
                         )}

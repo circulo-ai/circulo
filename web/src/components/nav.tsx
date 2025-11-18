@@ -71,7 +71,7 @@ export function Nav() {
             variant="primary"
             size="icon-xs"
             rounded="full"
-            className="data-active:text-foreground duration-300"
+            className="duration-300 data-active:text-foreground"
           >
             <a href="#contact-us">
               <Phone className="relative" />

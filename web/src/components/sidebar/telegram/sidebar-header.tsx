@@ -16,7 +16,7 @@ export function SidebarHeader({
 }: SidebarHeaderProps) {
   if (collapsed) {
     return (
-      <div className="border-border/50 sticky top-0 z-10 flex items-center justify-center border-b bg-[#1A1A1A] px-2 py-2">
+      <div className="sticky top-0 z-10 flex items-center justify-center border-b border-border/50 bg-[#1A1A1A] px-2 py-2">
         <SearchBar
           onNewChat={onNewChat}
           onDeleteAll={onDeleteAll}
@@ -27,7 +27,7 @@ export function SidebarHeader({
   }
 
   return (
-    <div className="border-border/50 sticky top-0 z-10 border-b bg-[#1A1A1A]">
+    <div className="sticky top-0 z-10 border-b border-border/50 bg-[#1A1A1A]">
       <SearchBar onNewChat={onNewChat} onDeleteAll={onDeleteAll} />
       <div className="flex items-center gap-2 overflow-x-auto px-2 pt-2 whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <TabButton label="Conversations" active />

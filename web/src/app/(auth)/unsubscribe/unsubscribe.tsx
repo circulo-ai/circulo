@@ -136,10 +136,10 @@ function UnsubscribeContent() {
 
   if (loading) {
     return (
-      <div className="bg-background flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <Card className="w-full max-w-md border shadow-sm">
           <CardContent className="flex items-center justify-center p-8">
-            <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </CardContent>
         </Card>
       </div>
@@ -148,7 +148,7 @@ function UnsubscribeContent() {
 
   if (error) {
     return (
-      <div className="bg-background flex min-h-screen items-center justify-center p-4">
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md border shadow-sm">
           <CardHeader className="text-center">
             <XCircle className="mx-auto mb-2 h-12 w-12 text-red-500" />
@@ -167,10 +167,10 @@ function UnsubscribeContent() {
             </div>
 
             <div className="space-y-3">
-              <p className="text-muted-foreground text-sm">
+              <p className="text-sm text-muted-foreground">
                 This could happen if:
               </p>
-              <ul className="text-muted-foreground ml-4 list-inside list-disc space-y-1 text-sm">
+              <ul className="ml-4 list-inside list-disc space-y-1 text-sm text-muted-foreground">
                 <li>The link is missing required parameters</li>
                 <li>The link has expired or been used already</li>
                 <li>The link was copied incorrectly</li>
@@ -199,7 +199,7 @@ function UnsubscribeContent() {
             </div>
 
             <div className="mt-4 text-center">
-              <p className="text-muted-foreground text-xs">
+              <p className="text-xs text-muted-foreground">
                 Need immediate help? Email us at{" "}
                 <a
                   href={`mailto:${brand.supportEmail}`}
@@ -218,7 +218,7 @@ function UnsubscribeContent() {
   // Handle transactional emails
   if (data?.isTransactional) {
     return (
-      <div className="bg-background flex min-h-screen items-center justify-center p-4">
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md border shadow-sm">
           <CardHeader className="text-center">
             <Info className="mx-auto mb-2 h-12 w-12 text-blue-500" />
@@ -240,10 +240,10 @@ function UnsubscribeContent() {
             </div>
 
             <div className="space-y-3">
-              <p className="text-foreground text-sm">
+              <p className="text-sm text-foreground">
                 If you no longer wish to receive these emails, you can:
               </p>
-              <ul className="text-muted-foreground ml-4 list-inside list-disc space-y-1 text-sm">
+              <ul className="ml-4 list-inside list-disc space-y-1 text-sm text-muted-foreground">
                 <li>Close your account entirely</li>
                 <li>Contact our support team for assistance</li>
               </ul>
@@ -277,7 +277,7 @@ function UnsubscribeContent() {
 
   if (unsubscribed) {
     return (
-      <div className="bg-background flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <Card className="w-full max-w-md border shadow-sm">
           <CardHeader className="text-center">
             <CheckCircle className="mx-auto mb-2 h-12 w-12 text-green-500" />
@@ -290,7 +290,7 @@ function UnsubscribeContent() {
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
-            <p className="text-muted-foreground text-sm">
+            <p className="text-sm text-muted-foreground">
               If you change your mind, you can always update your email
               preferences in your account settings or contact us at{" "}
               <a
@@ -307,7 +307,7 @@ function UnsubscribeContent() {
   }
 
   return (
-    <div className="bg-background flex min-h-screen items-center justify-center p-4">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md border shadow-sm">
         <CardHeader className="text-center">
           <Heart className="mx-auto mb-2 h-12 w-12 text-red-500" />
@@ -318,10 +318,10 @@ function UnsubscribeContent() {
             We understand email preferences are personal. Choose which emails
             you&apos;d like to stop receiving from Sim.
           </CardDescription>
-          <div className="bg-muted/50 mt-2 rounded-lg border p-3">
-            <p className="text-muted-foreground text-xs">
+          <div className="mt-2 rounded-lg border bg-muted/50 p-3">
+            <p className="text-xs text-muted-foreground">
               Email:{" "}
-              <span className="text-foreground font-medium">{data?.email}</span>
+              <span className="font-medium text-foreground">{data?.email}</span>
             </p>
           </div>
         </CardHeader>
@@ -343,7 +343,7 @@ function UnsubscribeContent() {
                 : "Unsubscribe from All Marketing Emails"}
             </Button>
 
-            <div className="text-muted-foreground text-center text-sm">
+            <div className="text-center text-sm text-muted-foreground">
               or choose specific types:
             </div>
 
@@ -403,14 +403,14 @@ function UnsubscribeContent() {
           </div>
 
           <div className="mt-6 space-y-3">
-            <div className="bg-muted/50 rounded-lg border p-3">
-              <p className="text-muted-foreground text-center text-xs">
+            <div className="rounded-lg border bg-muted/50 p-3">
+              <p className="text-center text-xs text-muted-foreground">
                 <strong>Note:</strong> You&apos;ll continue receiving important
                 account emails like password resets and security alerts.
               </p>
             </div>
 
-            <p className="text-muted-foreground text-center text-xs">
+            <p className="text-center text-xs text-muted-foreground">
               Questions? Contact us at{" "}
               <a
                 href={`mailto:${brand.supportEmail}`}
@@ -430,10 +430,10 @@ export default function Unsubscribe() {
   return (
     <Suspense
       fallback={
-        <div className="bg-background flex min-h-screen items-center justify-center">
+        <div className="flex min-h-screen items-center justify-center bg-background">
           <Card className="w-full max-w-md border shadow-sm">
             <CardContent className="flex items-center justify-center p-8">
-              <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </CardContent>
           </Card>
         </div>

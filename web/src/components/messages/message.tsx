@@ -66,7 +66,7 @@ const PurePreviewMessage = ({
         })}
       >
         {message.role === "assistant" && (
-          <div className="bg-background ring-border -mt-1 flex size-8 shrink-0 items-center justify-center rounded-full ring-1">
+          <div className="-mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-background ring-1 ring-border">
             <SparklesIcon size={14} />
           </div>
         )}
@@ -301,12 +301,12 @@ export const ThinkingMessage = () => {
       transition={{ duration: 0.2 }}
     >
       <div className="flex items-start justify-start gap-3">
-        <div className="bg-background ring-border -mt-1 flex size-8 shrink-0 items-center justify-center rounded-full ring-1">
+        <div className="-mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-background ring-1 ring-border">
           <SparklesIcon size={14} />
         </div>
 
         <div className="flex w-full flex-col gap-2 md:gap-4">
-          <div className="text-muted-foreground p-0 text-sm">Thinking...</div>
+          <div className="p-0 text-sm text-muted-foreground">Thinking...</div>
         </div>
       </div>
     </motion.div>

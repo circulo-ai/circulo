@@ -27,7 +27,7 @@ export const Suggestion = ({
       {isExpanded ? (
         <motion.div
           animate={{ opacity: 1, y: -20 }}
-          className="bg-background absolute -right-12 z-50 flex w-56 flex-col gap-3 rounded-2xl border p-3 font-sans text-sm shadow-xl md:-right-16"
+          className="absolute -right-12 z-50 flex w-56 flex-col gap-3 rounded-2xl border bg-background p-3 font-sans text-sm shadow-xl md:-right-16"
           exit={{ opacity: 0, y: -10 }}
           initial={{ opacity: 0, y: -10 }}
           key={suggestion.id}
@@ -36,7 +36,7 @@ export const Suggestion = ({
         >
           <div className="flex flex-row items-center justify-between">
             <div className="flex flex-row items-center gap-2">
-              <div className="bg-muted-foreground/25 size-4 rounded-full" />
+              <div className="size-4 rounded-full bg-muted-foreground/25" />
               <div className="font-medium">Assistant</div>
             </div>
             <button
@@ -60,7 +60,7 @@ export const Suggestion = ({
         </motion.div>
       ) : (
         <motion.div
-          className={cn("text-muted-foreground cursor-pointer p-1", {
+          className={cn("cursor-pointer p-1 text-muted-foreground", {
             "absolute -right-8": artifactKind === "text",
             "sticky top-0 right-4": artifactKind === "code",
           })}

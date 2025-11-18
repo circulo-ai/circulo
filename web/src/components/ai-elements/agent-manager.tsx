@@ -78,7 +78,7 @@ function SortableChatAgent({
               {...listeners}
               className="cursor-grab touch-none active:cursor-grabbing"
             >
-              <GripVertical className="text-muted-foreground h-5 w-5" />
+              <GripVertical className="h-5 w-5 text-muted-foreground" />
             </div>
             <Badge variant="outline" className="shrink-0">
               #{index + 1}
@@ -100,7 +100,7 @@ function SortableChatAgent({
             <div className="min-w-0 flex-1">
               <p className="truncate font-medium">{agent.name}</p>
               {agent.description && (
-                <p className="text-muted-foreground truncate text-xs">
+                <p className="truncate text-xs text-muted-foreground">
                   {agent.description}
                 </p>
               )}
@@ -128,7 +128,7 @@ function SortableChatAgent({
             </div>
             <div className="space-y-2">
               <Label className="text-xs">System Prompt</Label>
-              <p className="text-muted-foreground text-sm">
+              <p className="text-sm text-muted-foreground">
                 {agent.systemPrompt.substring(0, 200)}
                 {agent.systemPrompt.length > 200 ? "..." : ""}
               </p>
@@ -181,7 +181,7 @@ export function ChatAgentManager({
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold">Manage Chat Agents</h3>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             Reorder agents to control speaking sequence
           </p>
         </div>
@@ -192,7 +192,7 @@ export function ChatAgentManager({
 
       {localAgents.length === 0 ? (
         <Card className="border-dashed p-8 text-center">
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             No agents in this chat. Add agents to start collaborating.
           </p>
         </Card>

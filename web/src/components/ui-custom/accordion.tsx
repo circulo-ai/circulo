@@ -11,7 +11,7 @@ export function CustomAccordionTrigger({
 }: CustomAccordionTriggerProps) {
   return (
     <AccordionTrigger
-      className={cn("text-foreground/75 ms-auto", className)}
+      className={cn("ms-auto text-foreground/75", className)}
       {...props}
     />
   );

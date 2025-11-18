@@ -23,7 +23,7 @@ export function ContactInfoCard({
 
       <div
         className={cn(
-          "text-foreground/75 flex flex-col items-start gap-2",
+          "flex flex-col items-start gap-2 text-foreground/75",
           className,
         )}
         {...props}

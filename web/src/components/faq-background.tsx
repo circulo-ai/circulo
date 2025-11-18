@@ -19,10 +19,10 @@ export function FaqBackground() {
       />
 
       {Array.from({ length: 4 * 8 }, (_, i) => (
-        <div key={i} className="bg-background relative" />
+        <div key={i} className="relative bg-background" />
       ))}
 
-      <div className="to-background absolute size-full bg-radial-[at_center_left] from-transparent" />
+      <div className="absolute size-full bg-radial-[at_center_left] from-transparent to-background" />
     </div>
   );
 }

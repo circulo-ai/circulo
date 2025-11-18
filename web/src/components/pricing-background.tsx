@@ -99,12 +99,12 @@ export function PricingBackground({ paths }: { paths: Step[][] }) {
           <div
             id={generateGridId(row, col)}
             key={`${row}-${col}`}
-            className="bg-background relative flex items-center justify-center"
+            className="relative flex items-center justify-center bg-background"
           />
         )),
       )}
 
-      <div className="to-background absolute size-full bg-radial from-transparent" />
+      <div className="absolute size-full bg-radial from-transparent to-background" />
     </div>
   );
 }

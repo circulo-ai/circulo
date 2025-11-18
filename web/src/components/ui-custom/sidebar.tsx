@@ -11,7 +11,7 @@ export function CustomSidebarInset({
 }: CustomSidebarInsetProps) {
   return (
     <SidebarInset className={cn("bg-chat", className)} {...props}>
-      <div className="from-background/50 pointer-events-none absolute inset-y-0 start-0 w-4 bg-linear-to-r to-transparent" />
+      <div className="pointer-events-none absolute inset-y-0 start-0 w-4 bg-linear-to-r from-background/50 to-transparent" />
       {children}
     </SidebarInset>
   );

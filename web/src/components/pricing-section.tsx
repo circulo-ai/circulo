@@ -87,7 +87,7 @@ async function Plans() {
         return (
           <article
             key={plan.id}
-            className="bg-background/75 backdrop-blur-xs_ relative col-span-3 row-span-5 row-start-3 flex flex-col px-12 py-8"
+            className="backdrop-blur-xs_ relative col-span-3 row-span-5 row-start-3 flex flex-col bg-background/75 px-12 py-8"
           >
             <h4 className="flex items-center justify-start text-3xl">
               {plan.name}

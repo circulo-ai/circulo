@@ -124,7 +124,7 @@ const Tool = ({
         </motion.div>
       </TooltipTrigger>
       <TooltipContent
-        className="bg-foreground text-background rounded-2xl p-3 px-4"
+        className="rounded-2xl bg-foreground p-3 px-4 text-background"
         side="left"
         sideOffset={16}
       >
@@ -182,7 +182,7 @@ const ReadingLevelSelector = ({
           key={id}
           transition={{ delay: 0.1 }}
         >
-          <div className="bg-muted-foreground/40 size-2 rounded-full" />
+          <div className="size-2 rounded-full bg-muted-foreground/40" />
         </motion.div>
       ))}
 
@@ -191,7 +191,7 @@ const ReadingLevelSelector = ({
           <TooltipTrigger asChild>
             <motion.div
               className={cx(
-                "bg-background absolute flex flex-row items-center rounded-full border p-3",
+                "absolute flex flex-row items-center rounded-full border bg-background p-3",
                 {
                   "bg-primary text-primary-foreground": currentLevel !== 2,
                   "bg-background text-foreground": currentLevel === 2,
@@ -235,7 +235,7 @@ const ReadingLevelSelector = ({
             </motion.div>
           </TooltipTrigger>
           <TooltipContent
-            className="bg-foreground text-background rounded-2xl p-3 px-4 text-sm"
+            className="rounded-2xl bg-foreground p-3 px-4 text-sm text-background"
             side="left"
             sideOffset={16}
           >
@@ -402,7 +402,7 @@ const PureToolbar = ({
                 }
             : { opacity: 1, y: 0, height: 54, transition: { delay: 0 } }
         }
-        className="bg-background absolute right-6 bottom-6 flex cursor-pointer flex-col justify-end rounded-full border p-1.5 shadow-lg"
+        className="absolute right-6 bottom-6 flex cursor-pointer flex-col justify-end rounded-full border bg-background p-1.5 shadow-lg"
         exit={{ opacity: 0, y: -20, transition: { duration: 0.1 } }}
         initial={{ opacity: 0, y: -20, scale: 1 }}
         onAnimationComplete={() => {

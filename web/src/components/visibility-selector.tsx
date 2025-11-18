@@ -64,7 +64,7 @@ export function VisibilitySelector({
       <DropdownMenuTrigger
         asChild
         className={cn(
-          "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground w-fit",
+          "w-fit data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
           className,
         )}
       >
@@ -94,12 +94,12 @@ export function VisibilitySelector({
             <div className="flex flex-col items-start gap-1">
               {visibility.label}
               {visibility.description && (
-                <div className="text-muted-foreground text-xs">
+                <div className="text-xs text-muted-foreground">
                   {visibility.description}
                 </div>
               )}
             </div>
-            <div className="text-foreground dark:text-foreground opacity-0 group-data-[active=true]/item:opacity-100">
+            <div className="text-foreground opacity-0 group-data-[active=true]/item:opacity-100 dark:text-foreground">
               <CheckCircleFillIcon />
             </div>
           </DropdownMenuItem>

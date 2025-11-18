@@ -289,11 +289,11 @@ export function Account(_props: AccountProps) {
               {/* User Details */}
               <div className="flex flex-1 flex-col justify-center">
                 <h3 className="text-base font-medium">{name}</h3>
-                <p className="text-muted-foreground text-sm font-normal">
+                <p className="text-sm font-normal text-muted-foreground">
                   {email}
                 </p>
                 {uploadError && (
-                  <p className="text-destructive mt-1 text-xs">{uploadError}</p>
+                  <p className="mt-1 text-xs text-destructive">{uploadError}</p>
                 )}
               </div>
             </div>
@@ -302,7 +302,7 @@ export function Account(_props: AccountProps) {
             <div className="flex flex-col gap-2">
               <Label
                 htmlFor="name"
-                className="text-muted-foreground text-sm font-normal"
+                className="text-sm font-normal text-muted-foreground"
               >
                 Name
               </Label>
@@ -326,7 +326,7 @@ export function Account(_props: AccountProps) {
                   <span className="text-base">{name}</span>
                   <Button
                     variant="ghost"
-                    className="text-muted-foreground hover:text-foreground h-auto p-0 text-sm font-normal transition-colors hover:bg-transparent"
+                    className="h-auto p-0 text-sm font-normal text-muted-foreground transition-colors hover:bg-transparent hover:text-foreground"
                     onClick={() => setIsEditingName(true)}
                   >
                     update
@@ -338,7 +338,7 @@ export function Account(_props: AccountProps) {
 
             {/* Email Field - Read Only */}
             <div className="flex flex-col gap-2">
-              <Label className="text-muted-foreground text-sm font-normal">
+              <Label className="text-sm font-normal text-muted-foreground">
                 Email
               </Label>
               <p className="text-base">{email}</p>
