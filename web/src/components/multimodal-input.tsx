@@ -2,6 +2,7 @@
 
 import { saveChatModelAsCookie } from "@/app/(chat)/actions";
 import {
+  MentionItemType,
   PromptInput,
   PromptInputModelSelect,
   PromptInputModelSelectContent,
@@ -18,6 +19,7 @@ import {
   StopIcon,
 } from "@/components/icons/icons";
 import { SelectItem } from "@/components/ui/select";
+import { Agent, ChatAgent } from "@/db";
 import { chatModels } from "@/lib/ai/models";
 import { myProvider } from "@/lib/ai/providers";
 import type { Attachment, ChatMessage } from "@/lib/types";
@@ -27,6 +29,7 @@ import type { UseChatHelpers } from "@ai-sdk/react";
 import { Trigger } from "@radix-ui/react-select";
 import type { UIMessage } from "ai";
 import equal from "fast-deep-equal";
+import { AtSign } from "lucide-react";
 import {
   type ChangeEvent,
   type Dispatch,
@@ -179,7 +182,7 @@ function PureMultimodalInput({
 
       if (response.ok) {
         const data = await response.json();
-        const { url, pathname, contentType } = data;
+        const { url, path: pathname, type: contentType } = data;
 
         return {
           url,
@@ -357,6 +360,22 @@ function PureMultimodalInput({
             <PromptInputTextarea
               enableMentions
               enableCommands
+              fetchMentions={async (query) => {
+                const response = await fetch(`/api/chat/${chatId}/agents`);
+                const json = (await response.json()) as {
+                  data: {
+                    agents: Omit<ChatAgent & Agent, "agentId">[];
+                  };
+                };
+                return json.data.agents.map((e) => {
+                  return {
+                    type: "mention",
+                    name: e.name,
+                    username: e.id,
+                    icon: <AtSign />,
+                  } satisfies MentionItemType;
+                });
+              }}
               autoFocus
               className="placeholder:text-muted-foreground grow resize-none border-0! border-none! bg-transparent p-2 text-sm ring-0 outline-none [-ms-overflow-style:none] [scrollbar-width:none] focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none [&::-webkit-scrollbar]:hidden"
               data-testid="multimodal-input"
