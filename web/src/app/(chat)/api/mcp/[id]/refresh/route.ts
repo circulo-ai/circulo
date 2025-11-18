@@ -54,7 +54,7 @@ export const POST = api(
 
       throw Errors.unprocessable(
         "Failed to refresh tools: " +
-        (error instanceof Error ? error.message : "Unknown error"),
+          (error instanceof Error ? error.message : "Unknown error"),
       );
     }
   },

@@ -13,9 +13,9 @@ const supportingLanguageModels = {
       objectGeneration: true,
       toolUsage: true,
       toolStreaming: true,
-    }
+    },
   },
-} as const
+} as const;
 
 export const LLM_MODELS = Object.keys(supportingLanguageModels);
 
@@ -24,9 +24,11 @@ export type modelID = keyof typeof supportingLanguageModels;
 export const myProvider = customProvider({
   languageModels: {
     ...Object.fromEntries(
-      (Object.keys(supportingLanguageModels) as Array<keyof typeof supportingLanguageModels>).map(
-        key => [key, supportingLanguageModels[key].gateway]
-      )
+      (
+        Object.keys(supportingLanguageModels) as Array<
+          keyof typeof supportingLanguageModels
+        >
+      ).map((key) => [key, supportingLanguageModels[key].gateway]),
     ),
     "chat-model": google("gemini-2.5-flash"),
     "chat-model-reasoning": wrapLanguageModel({

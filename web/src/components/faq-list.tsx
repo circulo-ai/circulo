@@ -3,12 +3,8 @@
 import { faqs } from "@/consts/faq-section";
 import { useFaq } from "@/providers/faq-provider";
 import { ComponentProps, useEffect, useMemo, useRef } from "react";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "./ui/accordion";
+import { CustomAccordionTrigger } from "./ui-custom/accordion";
+import { Accordion, AccordionContent, AccordionItem } from "./ui/accordion";
 import { AnimatedList } from "./ui/animated-list";
 import { IconBox } from "./ui/icon-box";
 import { ScrollArea } from "./ui/scroll-area";
@@ -47,10 +43,10 @@ export function FaqList(props: ComponentProps<typeof ScrollArea>) {
                 value={faq.index.toString()}
                 key={faq.index}
               >
-                <AccordionTrigger className="items-center underline-offset-6">
+                <CustomAccordionTrigger className="items-center underline-offset-6">
                   <IconBox icon={faq.icon} />
                   <h4 className="font-semibold">{faq.question}</h4>
-                </AccordionTrigger>
+                </CustomAccordionTrigger>
                 <AccordionContent>
                   <p className="text-foreground/75 ms-13">{faq.answer}</p>
                 </AccordionContent>
