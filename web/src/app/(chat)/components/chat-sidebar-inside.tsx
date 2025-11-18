@@ -21,14 +21,15 @@ import { ChatSidebarBurgerMenu } from "./chat-sidebar-burger-menu";
 import { ChatSidebarSearch } from "./chat-sidebar-search";
 
 export function ChatSidebarInside() {
-  const { data, currentChatId, isLoading } = useChatHistory();
+  const { data, currentChatId, isLoading, search, setSearch } =
+    useChatHistory();
 
   return (
     <>
       <SidebarHeader className="flex-row">
         {/* TODO add chat tabs + sidebar separator */}
         <ChatSidebarBurgerMenu />
-        <ChatSidebarSearch />
+        <ChatSidebarSearch search={search} setSearch={setSearch} />
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -43,7 +44,7 @@ export function ChatSidebarInside() {
 
               {!isLoading &&
                 data?.chats.map((item) => (
-                  <SidebarMenuItem key={item.title}>
+                  <SidebarMenuItem key={item.id}>
                     <SidebarMenuButton
                       isActive={currentChatId === item.id}
                       asChild

@@ -95,6 +95,7 @@
     "@workflow/ai": "4.0.1-beta.9",
     "@xyflow/react": "^12.9.2",
     "ai": "6.0.0-beta.98",
+    "babel-plugin-react-compiler": "^1.0.0",
     "bcrypt-ts": "^7.1.0",
     "better-auth": "^1.3.34",
     "better-auth-telegram": "^0.3.2",
