@@ -29,13 +29,10 @@ export const GET = api(
       // }
     }
 
-    const agents = await chatRepo.findAgentsForChat(
-      ctx.params.id,
-      {
-        includeDisabled: ctx.query.includeDisabled,
-        search: ctx.query.search,
-      }
-    );
+    const agents = await chatRepo.findAgentsForChat(ctx.params.id, {
+      includeDisabled: ctx.query.includeDisabled,
+      search: ctx.query.search,
+    });
     return success({ agents });
   },
 );

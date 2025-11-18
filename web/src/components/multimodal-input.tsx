@@ -9,7 +9,7 @@ import {
   PromptInputSubmit,
   PromptInputTextarea,
   PromptInputToolbar,
-  PromptInputTools
+  PromptInputTools,
 } from "@/components/ai-elements/prompt-input";
 import {
   ArrowUpIcon,
@@ -19,6 +19,7 @@ import {
   StopIcon,
 } from "@/components/icons/icons";
 import { SelectItem } from "@/components/ui/select";
+import { Agent, ChatAgent } from "@/db";
 import { chatModels } from "@/lib/ai/models";
 import { myProvider } from "@/lib/ai/providers";
 import type { Attachment, ChatMessage } from "@/lib/types";
@@ -28,6 +29,7 @@ import type { UseChatHelpers } from "@ai-sdk/react";
 import { Trigger } from "@radix-ui/react-select";
 import type { UIMessage } from "ai";
 import equal from "fast-deep-equal";
+import { AtSign } from "lucide-react";
 import {
   type ChangeEvent,
   type Dispatch,
@@ -46,8 +48,6 @@ import { PreviewAttachment } from "./preview-attachment";
 import { SuggestedActions } from "./suggested-actions";
 import { Button } from "./ui/button";
 import type { VisibilityType } from "./visibility-selector";
-import { Agent, ChatAgent } from "@/db";
-import { AtSign } from "lucide-react";
 
 function PureMultimodalInput({
   chatId,
@@ -364,17 +364,17 @@ function PureMultimodalInput({
                 const response = await fetch(`/api/chat/${chatId}/agents`);
                 const json = (await response.json()) as {
                   data: {
-                    agents: (Omit<ChatAgent & Agent, "agentId">)[]
-                  }
+                    agents: Omit<ChatAgent & Agent, "agentId">[];
+                  };
                 };
-                return json.data.agents.map(e => {
+                return json.data.agents.map((e) => {
                   return {
-                    type: 'mention',
+                    type: "mention",
                     name: e.name,
                     username: e.id,
-                    icon: <AtSign/>
-                  } satisfies MentionItemType
-                })
+                    icon: <AtSign />,
+                  } satisfies MentionItemType;
+                });
               }}
               autoFocus
               className="placeholder:text-muted-foreground grow resize-none border-0! border-none! bg-transparent p-2 text-sm ring-0 outline-none [-ms-overflow-style:none] [scrollbar-width:none] focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none [&::-webkit-scrollbar]:hidden"
