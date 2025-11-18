@@ -1,13 +1,10 @@
+import { CustomSidebarInset } from "@/components/ui-custom/sidebar";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import {
-  Sidebar,
-  SidebarInset,
-  SidebarProvider,
-} from "@/components/ui/sidebar";
+import { Sidebar, SidebarProvider } from "@/components/ui/sidebar";
 import { cookies } from "next/headers";
 import { ReactNode } from "react";
 import { ChatSidebarInside } from "./chat-sidebar-inside";
@@ -55,12 +52,12 @@ export async function ChatSidebar({ children }: { children: ReactNode }) {
           </Sidebar>
         </ChatSidebarResizablePanel>
         <ResizableHandle
-          size="12px"
+          size="8px"
           id={resizableHandleId}
-          className="bg-background"
+          className="bg-sidebar transition-colors hover:bg-teal-900"
         />
         <ResizablePanel id={secondResizablePanelId}>
-          <SidebarInset>{children}</SidebarInset>
+          <CustomSidebarInset>{children}</CustomSidebarInset>
         </ResizablePanel>
       </ResizablePanelGroup>
     </SidebarProvider>

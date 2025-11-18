@@ -52,3 +52,28 @@ export function convertToUIMessages(messages: DBMessage[]): ChatMessage[] {
     },
   }));
 }
+
+export function toQueryString<T extends Record<string, unknown>>(
+  params: T,
+): string {
+  const searchParams = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === "") continue;
+
+    // Arrays become multiple key=value items
+    if (Array.isArray(value)) {
+      for (const v of value) {
+        if (v !== undefined && v !== null && v !== "") {
+          searchParams.append(key, String(v));
+        }
+      }
+      continue;
+    }
+
+    searchParams.append(key, String(value));
+  }
+
+  const qs = searchParams.toString();
+  return qs ? `?${qs}` : "";
+}

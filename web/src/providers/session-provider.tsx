@@ -80,3 +80,5 @@ export function useSession(): SessionHookResult {
   }
   return ctx;
 }
+
+// TODO rewrite with swr

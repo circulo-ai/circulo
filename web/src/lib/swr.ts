@@ -3,12 +3,35 @@ import { mutate as globalMutate, mutate, SWRConfiguration } from "swr";
 import { getRequest } from "./api/client";
 import { ChatSDKError, ErrorCode } from "./errors";
 import { ApiError } from "./server/types";
+import { toQueryString } from "./utils";
 
-export const fetcher = async <T>(url: string): Promise<T> => {
-  return getRequest<T>(url);
+export const fetcher = async <T>(
+  url: [string, Record<string, unknown>] | string,
+): Promise<T> => {
+  if (typeof url === "string") return getRequest<T>(url);
+  const [path, queryParams] = url;
+  return getRequest<T>(path + toQueryString(queryParams));
 };
 
 export const swrConfig: SWRConfiguration = {
+  // TODO add caching securely
+  // provider() {
+  //   if (typeof window === "undefined") {
+  //     return new Map([]) as Map<string, State<any, any>>;
+  //   }
+
+  //   // When initializing, we restore the data from `localStorage` into a map.
+  //   const map = new Map(JSON.parse(localStorage.getItem("app-cache") || "[]"));
+
+  //   // Before unloading the app, we write back all the data into `localStorage`.
+  //   window.addEventListener("beforeunload", () => {
+  //     const appCache = JSON.stringify(Array.from(map.entries()));
+  //     localStorage.setItem("app-cache", appCache);
+  //   });
+
+  //   // We still use the map for write & read for performance.
+  //   return map as Cache<any>;
+  // },
   fetcher,
   shouldRetryOnError: (error) => {
     // Don't retry on client errors (4xx)

@@ -130,10 +130,15 @@ function InputGroupText({ className, ...props }: React.ComponentProps<"span">) {
 
 function InputGroupInput({
   className,
+  as,
   ...props
-}: React.ComponentProps<"input">) {
+}: React.ComponentProps<"input"> & {
+  as?: (props: React.ComponentProps<"input">) => React.JSX.Element;
+}) {
+  const Comp = as ?? Input;
+
   return (
-    <Input
+    <Comp
       data-slot="input-group-control"
       className={cn(
         "flex-1 rounded-none border-0 bg-transparent shadow-none focus-visible:ring-0 dark:bg-transparent",

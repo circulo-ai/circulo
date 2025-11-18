@@ -1,5 +1,6 @@
 "use client";
 
+import { GetChatHistoryResponse } from "@/app/(chat)/api/history/route";
 import { LoaderIcon } from "@/components/icons/icons";
 import {
   AlertDialog,
@@ -34,11 +35,6 @@ type GroupedChats = {
   lastWeek: Chat[];
   lastMonth: Chat[];
   older: Chat[];
-};
-
-export type ChatHistory = {
-  chats: Chat[];
-  hasMore: boolean;
 };
 
 const PAGE_SIZE = 20;
@@ -78,7 +74,7 @@ const groupChatsByDate = (chats: Chat[]): GroupedChats => {
 
 export function getChatHistoryPaginationKey(
   pageIndex: number,
-  previousPageData: ChatHistory,
+  previousPageData: GetChatHistoryResponse,
 ) {
   if (previousPageData && previousPageData.hasMore === false) {
     return null;
@@ -107,9 +103,13 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     isValidating,
     isLoading,
     mutate,
-  } = useSWRInfinite<ChatHistory>(getChatHistoryPaginationKey, fetcher, {
-    fallbackData: [],
-  });
+  } = useSWRInfinite<GetChatHistoryResponse>(
+    getChatHistoryPaginationKey,
+    fetcher,
+    {
+      fallbackData: [],
+    },
+  );
 
   const router = useRouter();
   const [deleteId, setDeleteId] = useState<string | null>(null);

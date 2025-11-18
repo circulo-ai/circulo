@@ -1,17 +1,18 @@
 import { buttonVariants } from "@/consts/button";
-import { cn } from "@/lib/utils";
 import { Slot } from "@radix-ui/react-slot";
-import { VariantProps } from "class-variance-authority";
-import { ComponentProps } from "react";
+import { type VariantProps } from "class-variance-authority";
+import * as React from "react";
 
-export function Button({
+import { cn } from "@/lib/utils";
+
+function Button({
   className,
   variant,
   size,
   rounded,
   asChild = false,
   ...props
-}: ComponentProps<"button"> &
+}: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean;
   }) {
@@ -25,3 +26,5 @@ export function Button({
     />
   );
 }
+
+export { Button, buttonVariants };
