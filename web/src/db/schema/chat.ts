@@ -135,6 +135,11 @@ export const chatMember = pgTable(
     lastReadAt: timestamp("last_read_at"),
     unreadCount: integer("unread_count").notNull().default(0),
 
+    // Pinning (per member)
+    isPinned: boolean("is_pinned").notNull().default(false),
+    pinnedAt: timestamp("pinned_at"),
+    pinOrder: integer("pin_order"),
+
     joinedAt: timestamp("joined_at").notNull().defaultNow(),
     leftAt: timestamp("left_at"), // null if still active
   },
@@ -149,6 +154,14 @@ export const chatMember = pgTable(
     unreadCountNonNegative: check(
       "chat_member_unread_count_non_negative",
       sql`unread_count >= 0`,
+    ),
+    pinnedIdx: index("chat_member_user_pinned_idx").on(
+      table.userId,
+      table.isPinned,
+    ),
+    pinOrderUnique: uniqueIndex("chat_member_user_pin_order_unique").on(
+      table.userId,
+      table.pinOrder,
     ),
   }),
 );

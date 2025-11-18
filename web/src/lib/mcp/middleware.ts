@@ -10,7 +10,7 @@ export type McpPermissionLevel = "read" | "write" | "admin";
 
 export interface McpAuthContext {
   userId: string;
-  workspaceId: string;
+  chatId: string;
   requestId: string;
 }
 
@@ -116,7 +116,7 @@ async function validateMcpAuth(
       success: true,
       context: {
         userId: auth.userId,
-        workspaceId,
+        chatId: workspaceId,
         requestId,
       },
     };
