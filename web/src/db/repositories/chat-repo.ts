@@ -39,7 +39,7 @@ const chatRepoFactory = makeRepo(
         agents = agents.filter(
           (agent) =>
             agent.name.toLowerCase().includes(searchLower) ||
-            agent.description?.toLowerCase().includes(searchLower)
+            agent.description?.toLowerCase().includes(searchLower),
         );
       }
 

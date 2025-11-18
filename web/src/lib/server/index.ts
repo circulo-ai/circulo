@@ -317,6 +317,15 @@ export const notFound = (message?: string): NextResponse =>
 export const forbidden = (message?: string): NextResponse =>
   json({ success: false, error: message ?? "Forbidden" }, 403);
 
+export const notAuthorized = (message?: string): NextResponse =>
+  json(
+    {
+      success: false,
+      error: message ?? "Unauthorized",
+    },
+    401,
+  );
+
 // ============================================================================
 // Composable Middleware
 // ============================================================================
