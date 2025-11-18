@@ -37,7 +37,7 @@ import { after } from "next/server";
 import {
   createResumableStreamContext,
   type ResumableStreamContext,
-} from "resumable-stream";
+} from "resumable-stream/ioredis";
 import type { ModelCatalog } from "tokenlens/core";
 import { fetchModels } from "tokenlens/fetch";
 import { postRequestBodySchema, type PostRequestBody } from "./schema";

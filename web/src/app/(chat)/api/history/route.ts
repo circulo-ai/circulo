@@ -11,12 +11,14 @@ export const GET = api(
       limit: z.number().min(1).max(100).optional(),
       starting_after: z.string().optional(),
       ending_before: z.string().optional(),
+      search: z.string().optional(),
     }),
   },
   async (_, ctx) => {
     const limit = ctx.query.limit ?? 10;
     const startingAfter = ctx.query.starting_after;
     const endingBefore = ctx.query.ending_before;
+    const search = ctx.query.search?.trim() || undefined;
 
     if (startingAfter && endingBefore) {
       throw Errors.badRequest(
@@ -29,6 +31,7 @@ export const GET = api(
       limit,
       startingAfter,
       endingBefore,
+      search,
     });
 
     return success(chats);

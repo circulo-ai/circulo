@@ -13,6 +13,8 @@ import {
   gte,
   inArray,
   lt,
+  or,
+  ilike,
   type SQL,
 } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
@@ -130,26 +132,40 @@ export async function getChatsByUserId({
   limit,
   startingAfter,
   endingBefore,
+  search,
 }: {
   id: string;
   limit: number;
   startingAfter?: string;
   endingBefore?: string;
+  search?: string;
 }) {
   try {
     const extendedLimit = limit + 1;
 
-    const query = (whereCondition?: SQL<any>) =>
-      db
+    const searchCondition = search
+      ? or(
+          ilike(chat.title, `%${search}%`),
+          ilike(chat.description, `%${search}%`),
+        )
+      : undefined;
+
+    const query = (whereCondition?: SQL<any>) => {
+      const whereClause = searchCondition
+        ? whereCondition
+          ? and(eq(chat.creatorId, id), whereCondition, searchCondition)
+          : and(eq(chat.creatorId, id), searchCondition)
+        : whereCondition
+          ? and(whereCondition, eq(chat.creatorId, id))
+          : eq(chat.creatorId, id);
+
+      return db
         .select()
         .from(chat)
-        .where(
-          whereCondition
-            ? and(whereCondition, eq(chat.creatorId, id))
-            : eq(chat.creatorId, id),
-        )
+        .where(whereClause)
         .orderBy(desc(chat.createdAt))
         .limit(extendedLimit);
+    };
 
     let filteredChats: Chat[] = [];
 
