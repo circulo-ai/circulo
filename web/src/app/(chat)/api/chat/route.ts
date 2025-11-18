@@ -15,8 +15,8 @@ import { executeAgentWithDynamicTools } from "@/lib/ai/tools/executor";
 import { agentFactory } from "@/lib/ai/tools/factory";
 import { getSession } from "@/lib/auth";
 import { UsageRateLimiter } from "@/lib/billing/rate-limiter";
-import { UsageTracker } from "@/lib/billing/usage-tracker";
 import { SubscriptionManager } from "@/lib/billing/subscription-manager";
+import { UsageTracker } from "@/lib/billing/usage-tracker";
 import { getAssistantAgentId } from "@/lib/chat/assistant-agent";
 import { ChatSDKError } from "@/lib/errors";
 import { calculateCostFromUsage } from "@/lib/server-utils";
@@ -37,7 +37,7 @@ import { after } from "next/server";
 import {
   createResumableStreamContext,
   type ResumableStreamContext,
-} from "resumable-stream";
+} from "resumable-stream/ioredis";
 import type { ModelCatalog } from "tokenlens/core";
 import { fetchModels } from "tokenlens/fetch";
 import { postRequestBodySchema, type PostRequestBody } from "./schema";

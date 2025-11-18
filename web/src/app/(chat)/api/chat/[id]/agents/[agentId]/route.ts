@@ -1,5 +1,5 @@
-import { chatRepo } from "@/db/repositories/chat-repo";
 import { db } from "@/db";
+import { chatRepo } from "@/db/repositories/chat-repo";
 import { api, Errors, success } from "@/lib/server";
 import { z } from "zod";
 
@@ -29,10 +29,7 @@ export const PATCH = api(
     // Verify chat agent exists
     const chatAgent = await db.query.chatAgent.findFirst({
       where: (ca, { eq, and }) =>
-        and(
-          eq(ca.chatId, ctx.params.id),
-          eq(ca.agentId, ctx.params.agentId),
-        ),
+        and(eq(ca.chatId, ctx.params.id), eq(ca.agentId, ctx.params.agentId)),
     });
 
     if (!chatAgent) {
@@ -69,10 +66,7 @@ export const DELETE = api(
     // Verify chat agent exists
     const chatAgent = await db.query.chatAgent.findFirst({
       where: (ca, { eq, and }) =>
-        and(
-          eq(ca.chatId, ctx.params.id),
-          eq(ca.agentId, ctx.params.agentId),
-        ),
+        and(eq(ca.chatId, ctx.params.id), eq(ca.agentId, ctx.params.agentId)),
     });
 
     if (!chatAgent) {

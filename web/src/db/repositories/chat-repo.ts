@@ -19,16 +19,31 @@ const chatRepoFactory = makeRepo(
      */
     async findAgentsForChat(
       chatId: string,
-      opts?: { includeDisabled?: boolean },
+      opts?: { includeDisabled?: boolean; search?: string },
     ) {
+      let whereClause = opts?.includeDisabled
+        ? eq(chatAgent.chatId, chatId)
+        : and(eq(chatAgent.chatId, chatId), eq(chatAgent.enabled, true));
+
       const rows = await db.query.chatAgent.findMany({
-        where: opts?.includeDisabled
-          ? eq(chatAgent.chatId, chatId)
-          : and(eq(chatAgent.chatId, chatId), eq(chatAgent.enabled, true)),
+        where: whereClause,
         orderBy: (ca, { asc }) => [asc(ca.speakOrder)],
         with: { agent: true },
       });
-      return rows.map((r) => r.agent);
+
+      let agents = rows.map((r) => r.agent);
+
+      // Apply search filter if provided
+      if (opts?.search) {
+        const searchLower = opts.search.toLowerCase();
+        agents = agents.filter(
+          (agent) =>
+            agent.name.toLowerCase().includes(searchLower) ||
+            agent.description?.toLowerCase().includes(searchLower)
+        );
+      }
+
+      return agents;
     },
 
     /**

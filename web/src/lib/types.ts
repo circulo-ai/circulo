@@ -1,6 +1,6 @@
 import type { ArtifactKind } from "@/components/artifacts/artifact";
 import type { Suggestion } from "@/db/schema";
-import type { InferUITool, UIMessage } from "ai";
+import type { UIMessage } from "ai";
 import { z } from "zod";
 import type { AppUsage } from "./usage";
 

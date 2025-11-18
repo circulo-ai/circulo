@@ -1,6 +1,6 @@
+import { chatAgent, db } from "@/db";
 import { agentRepo } from "@/db/repositories/agent-repo";
 import { chatRepo } from "@/db/repositories/chat-repo";
-import { chatAgent, db } from "@/db";
 import { UsageRateLimiter } from "@/lib/billing/rate-limiter";
 import { api, Errors, success } from "@/lib/server";
 import { generateUUID } from "@/lib/utils";
@@ -11,6 +11,10 @@ export const GET = api(
   {
     auth: true,
     params: z.object({ id: z.string() }),
+    query: z.object({
+      search: z.string().optional(),
+      includeDisabled: z.boolean().optional(),
+    }),
   },
   async (req, ctx) => {
     const chat = await chatRepo.findById(ctx.params.id);
@@ -25,7 +29,13 @@ export const GET = api(
       // }
     }
 
-    const agents = await chatRepo.findAgentsForChat(ctx.params.id);
+    const agents = await chatRepo.findAgentsForChat(
+      ctx.params.id,
+      {
+        includeDisabled: ctx.query.includeDisabled,
+        search: ctx.query.search,
+      }
+    );
     return success({ agents });
   },
 );
