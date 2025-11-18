@@ -61,8 +61,6 @@ export async function authorizeCredentialUse(
     };
   }
 
-
-
   if (auth.authType === "internal_jwt") {
     return {
       ok: true,
