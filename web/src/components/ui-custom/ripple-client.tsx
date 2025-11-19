@@ -1,19 +1,19 @@
 "use client";
 
 import Position from "@/types";
-import { FC, useCallback, useEffect, useState } from "react";
+import { CSSProperties, useCallback, useEffect, useId, useState } from "react";
 
 interface Ripple {
   id: string;
   position: Position;
 }
 
-interface RipplesProps {
+interface RippleClientProps {
   id: string;
   disabled?: boolean;
 }
 
-const Ripples: FC<RipplesProps> = ({ id, disabled }) => {
+export function RippleClient({ id, disabled }: RippleClientProps) {
   const [container, setContainer] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -29,7 +29,7 @@ const Ripples: FC<RipplesProps> = ({ id, disabled }) => {
         setRipples((ripples) => [
           ...ripples,
           {
-            id: Math.random().toString(),
+            id: useId(),
             position: {
               x: e.pageX - containersRect.x,
               y: e.pageY - containersRect.y,
@@ -102,18 +102,15 @@ const Ripples: FC<RipplesProps> = ({ id, disabled }) => {
       id={ripple.id}
       key={ripple.id}
       className="ripple pointer-events-none absolute aspect-square -translate-x-1/2 -translate-y-1/2 animate-ripple rounded-full duration-1000"
-      // @ts-expect-error don't worry about this
-      style={{
-        ...{
+      style={
+        {
           "--initial-top": ripple.position.y.toString() + "px",
           "--initial-left": ripple.position.x.toString() + "px",
-        },
-      }}
+        } as CSSProperties
+      }
     />
   ));
-};
-
-export default Ripples;
+}
 
 // TODO add a proper timing function to the ripple animation
 // TODO rethink the logic

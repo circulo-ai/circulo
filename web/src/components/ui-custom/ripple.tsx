@@ -1,25 +1,22 @@
 import { cn } from "@/lib/utils";
-import { ButtonHTMLAttributes, DetailedHTMLProps, FC } from "react";
-import RippleClient from "./ripple-client";
+import { ComponentProps, useId } from "react";
+import { Button } from "../ui/button";
+import { RippleClient } from "./ripple-client";
 
-interface RippleProps
-  extends DetailedHTMLProps<
-    ButtonHTMLAttributes<HTMLButtonElement>,
-    HTMLButtonElement
-  > {
-  customProp?: string;
-}
+interface RippleProps extends ComponentProps<typeof Button> {}
 
-const Ripple: FC<RippleProps> = ({
+export function Ripple({
   className,
   children,
-  disabled: disabledProp,
+  disabled,
+  id: explicitId,
   ...otherProps
-}) => {
-  const id = Math.random().toString();
+}: RippleProps) {
+  const implicitId = useId();
+  const id = explicitId ?? implicitId;
 
   return (
-    <button
+    <Button
       id={id}
       disabled
       className={cn(
@@ -29,9 +26,7 @@ const Ripple: FC<RippleProps> = ({
       {...otherProps}
     >
       {children}
-      <RippleClient id={id} disabled={disabledProp} />
-    </button>
+      <RippleClient id={id} disabled={disabled} />
+    </Button>
   );
-};
-
-export default Ripple;
+}
