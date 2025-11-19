@@ -1,6 +1,5 @@
-import { getSession } from "@/lib/auth";
 import { SubscriptionManager } from "@/lib/billing/subscription-manager";
-import { NextRequest, NextResponse } from "next/server";
+import { api, success } from "@/lib/server";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -10,48 +9,19 @@ const createSubscriptionSchema = z.object({
   provider: z.enum(["changelly"]).default("changelly"),
 });
 
-export async function POST(req: NextRequest) {
-  try {
-    const session = await getSession();
-    const userId = session?.user.id;
+export const POST = api(
+  { auth: true, body: createSubscriptionSchema },
+  async (req, { user, body }) => {
+    const { planSlug, provider } = body;
 
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const body = await req.json();
-    const validation = createSubscriptionSchema.safeParse(body);
-
-    if (!validation.success) {
-      return NextResponse.json(
-        { error: "Invalid request", details: validation.error.issues },
-        { status: 400 },
-      );
-    }
-
-    const { planSlug, provider } = validation.data;
-
-    const result = await SubscriptionManager.createSubscription(
-      userId,
+    const invoice = await SubscriptionManager.createSubscriptionInvoice(
+      user.id,
       planSlug,
       provider,
     );
 
-    return NextResponse.json({
-      subscription: result.subscription,
-      checkoutUrl: result.invoice?.checkoutUrl,
-      invoiceId: result.invoice?.invoice?.id,
+    return success({
+      invoice,
     });
-  } catch (error) {
-    console.error("Error creating subscription:", error);
-
-    if (error instanceof Error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-
-    return NextResponse.json(
-      { error: "Failed to create subscription" },
-      { status: 500 },
-    );
-  }
-}
+  },
+);

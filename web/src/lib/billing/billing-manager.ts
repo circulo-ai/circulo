@@ -6,6 +6,7 @@ import {
   subscriptionPlans,
   subscriptions,
 } from "@/db/schema/billing";
+import { SubscriptionManager } from "@/lib/billing/subscription-manager";
 import { and, eq, lte } from "drizzle-orm";
 import { PaymentProvider } from "./abstraction/payment-provider";
 import { CreateInvoiceParams, InvoiceStatus } from "./abstraction/types";
@@ -80,7 +81,6 @@ export class BillingManager {
   ): Promise<void> {
     const now = new Date();
 
-    // Update invoice
     const [updatedInvoice] = await db
       .update(invoices)
       .set({
@@ -95,19 +95,72 @@ export class BillingManager {
       throw new Error(`Invoice not found: ${providerInvoiceId}`);
     }
 
-    // Handle subscription activation/renewal if applicable
-    if (
-      newStatus === "paid" &&
-      updatedInvoice.type === "subscription" &&
-      updatedInvoice.subscriptionId
-    ) {
-      await this.activateSubscription(updatedInvoice.subscriptionId);
+    if (newStatus === "paid" && updatedInvoice.type === "subscription") {
+      const meta = updatedInvoice.metadata as Record<string, any>;
+
+      // CASE 1: New Subscription
+      if (meta?.isNewSubscription) {
+        await SubscriptionManager.activateNewSubscription(
+          updatedInvoice.userId,
+          meta.planId,
+          updatedInvoice.id,
+        );
+      }
+      // CASE 2: Plan Change / Upgrade
+      else if (meta?.type === "plan_change" && meta?.newPlanId) {
+        await SubscriptionManager.finalizePlanChange(
+          meta.subscriptionId,
+          meta.newPlanId,
+          updatedInvoice.id,
+        );
+      }
+      // CASE 3: Standard Renewal
+      else if (updatedInvoice.subscriptionId) {
+        await this.renewSubscription(updatedInvoice.subscriptionId);
+      }
     }
 
     // Handle failed payment
     if (newStatus === "failed" && updatedInvoice.subscriptionId) {
       await this.handleFailedPayment(updatedInvoice.subscriptionId);
     }
+  }
+
+  /**
+   * Renew an existing subscription (different from activating new one)
+   */
+  private async renewSubscription(subscriptionId: number): Promise<void> {
+    const subscription = await db.query.subscriptions.findFirst({
+      where: eq(subscriptions.id, subscriptionId),
+      with: { plan: true },
+    });
+
+    if (!subscription) {
+      throw new Error(`Subscription not found: ${subscriptionId}`);
+    }
+
+    const now = new Date();
+    const billingDays = subscription.plan.billingIntervalDays;
+    const newEndDate = new Date(
+      now.getTime() + billingDays * 24 * 60 * 60 * 1000,
+    );
+
+    await db
+      .update(subscriptions)
+      .set({
+        status: "active",
+        endDate: newEndDate,
+      })
+      .where(eq(subscriptions.id, subscriptionId));
+
+    await db.insert(subscriptionHistory).values({
+      subscriptionId,
+      planId: subscription.planId,
+      oldStatus: subscription.status,
+      newStatus: "active",
+      reason: "renewed",
+      changedAt: now,
+    });
   }
 
   /**

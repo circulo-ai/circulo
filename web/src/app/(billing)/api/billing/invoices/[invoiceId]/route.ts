@@ -2,7 +2,6 @@ import { db } from "@/db";
 import { invoices } from "@/db/schema/billing";
 import { api, notFound, success } from "@/lib/server";
 import { and, eq } from "drizzle-orm";
-import { NextResponse } from "next/server";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -16,18 +15,10 @@ export const GET = api(
   },
   async (req, ctx) => {
     const userId = ctx.user.id;
-
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { invoiceId } = ctx.params;
 
     if (isNaN(invoiceId)) {
-      return NextResponse.json(
-        { error: "Invalid invoice ID" },
-        { status: 400 },
-      );
+      return notFound();
     }
 
     const invoice = await db.query.invoices.findFirst({
