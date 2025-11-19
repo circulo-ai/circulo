@@ -1,5 +1,6 @@
 import { db } from "@/db";
 import { usageMetrics } from "@/db/schema/billing";
+import { SubscriptionManager } from "@/lib/billing/subscription-manager";
 import { and, eq, gte, lte, sql } from "drizzle-orm";
 
 type UsageEvent = {
@@ -32,12 +33,14 @@ export class UsageTracker {
     subscriptionId?: number,
   ): Promise<void> {
     const { start, end } = this.getDayBoundaries();
+    const activeSubscription =
+      await SubscriptionManager.getActiveSubscription(userId);
 
     await db
       .insert(usageMetrics)
       .values({
         userId,
-        subscriptionId: subscriptionId || null,
+        subscriptionId: subscriptionId || activeSubscription?.id || undefined,
         metric,
         count,
         recordedAt: new Date(),

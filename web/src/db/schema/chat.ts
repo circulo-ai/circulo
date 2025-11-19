@@ -10,7 +10,6 @@ import {
   foreignKey,
   index,
   integer,
-  json,
   jsonb,
   numeric,
   pgEnum,
@@ -19,7 +18,6 @@ import {
   serial,
   text,
   timestamp,
-  unique,
   uniqueIndex,
   uuid,
   varchar,
@@ -88,10 +86,6 @@ export const chat = pgTable(
       table.creatorId,
       table.createdAt,
     ),
-    countsNonNegative: check(
-      "chat_counts_non_negative",
-      sql`message_count >= 0 AND member_count >= 0 AND total_tokens >= 0 AND total_cost >= 0`,
-    ),
   }),
 );
 
@@ -148,10 +142,6 @@ export const chatMember = pgTable(
     pinnedIdx: index("chat_member_user_pinned_idx").on(
       table.userId,
       table.isPinned,
-    ),
-    pinOrderUnique: uniqueIndex("chat_member_user_pin_order_unique").on(
-      table.userId,
-      table.pinOrder,
     ),
   }),
 );
@@ -212,7 +202,6 @@ export const chatAgent = pgTable(
       .references(() => agent.id, { onDelete: "cascade" }),
 
     enabled: boolean("enabled").notNull().default(true),
-    speakOrder: integer("speak_order").default(0),
 
     // Custom configuration per chat (can override agent defaults)
     customSystemPrompt: text("custom_system_prompt"),
@@ -223,7 +212,7 @@ export const chatAgent = pgTable(
 
     addedBy: text("added_by")
       .notNull()
-      .references(() => user.id, { onDelete: "set null" }),
+      .references(() => user.id, { onDelete: "cascade" }),
 
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
@@ -233,11 +222,6 @@ export const chatAgent = pgTable(
     uniqueChatAgentIdx: uniqueIndex("chat_agent_unique_idx").on(
       table.chatId,
       table.agentId,
-    ),
-    uniqueChatOrderIdx: unique("chat_agent_unique_order_idx").on(table.chatId),
-    speakOrderNonNegative: check(
-      "chat_agent_speak_order_non_negative",
-      sql`speak_order >= 0`,
     ),
   }),
 );
@@ -258,7 +242,7 @@ export const chatKnowledgeBase = pgTable(
 
     addedBy: text("added_by")
       .notNull()
-      .references(() => user.id, { onDelete: "set null" }),
+      .references(() => user.id, { onDelete: "cascade" }),
 
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
@@ -295,6 +279,9 @@ export const message = pgTable(
     attachments: jsonb("attachments").notNull(),
 
     quotedMessageId: text("quoted_message_id"),
+    // .references(() => message.id, {
+    // onDelete: "set null",
+    // }),
 
     // Message metadata
     isEdited: boolean("is_edited").notNull().default(false),
@@ -313,10 +300,6 @@ export const message = pgTable(
       table.createdAt,
     ),
     quotedMessageIdx: index("message_quoted_idx").on(table.quotedMessageId),
-    senderCheck: check(
-      "message_sender_check",
-      sql`(user_id IS NOT NULL AND agent_id IS NULL) OR (user_id IS NULL AND agent_id IS NOT NULL)`,
-    ),
     countsNonNegative: check(
       "message_counts_non_negative",
       sql`token_count >= 0 AND cost >= 0`,
@@ -481,16 +464,21 @@ export const chatMemories = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
-  (table) => [
-    index("chat_memory_chat_id_idx").on(table.chatId),
-    index("chat_memory_owner_id_idx").on(table.ownerId),
-    index("chat_memory_agent_id_idx").on(table.agentId),
-    index("chat_memory_type_idx").on(table.type),
-    index("chat_memory_expires_at_idx").on(table.expiresAt),
-    index("chat_memory_metadata_gin_idx").using("gin", table.metadata),
-
-    check("chat_memory_content_non_empty", sql`length(content) > 0`),
-  ],
+  (table) => ({
+    chatIdIdx: index("chat_memory_chat_id_idx").on(table.chatId),
+    ownerIdIdx: index("chat_memory_owner_id_idx").on(table.ownerId),
+    agentIdIdx: index("chat_memory_agent_id_idx").on(table.agentId),
+    typeIdx: index("chat_memory_type_idx").on(table.type),
+    expiresAtIdx: index("chat_memory_expires_at_idx").on(table.expiresAt),
+    metadataGinIdx: index("chat_memory_metadata_gin_idx").using(
+      "gin",
+      table.metadata,
+    ),
+    contentNonEmpty: check(
+      "chat_memory_content_non_empty",
+      sql`length(content) > 0`,
+    ),
+  }),
 );
 
 export const chatMemoryEmbeddings = pgTable(
@@ -505,17 +493,34 @@ export const chatMemoryEmbeddings = pgTable(
     // Adjust this dimension to your embedding model (OpenAI = 1536)
     embedding: vector("embedding", { dimensions: 1536 }).notNull(),
   },
-  (table) => [
-    index("chat_memory_embedding_memory_id_idx").on(table.memoryId),
-
-    // Vector index (IVFFLAT or HNSW depending on pgvector version)
-    // drizzle-kit will generate:
-    // CREATE INDEX ... USING ivfflat (embedding vector_cosine_ops)
-    index("chat_memory_embedding_vector_idx").using(
+  (table) => ({
+    memoryIdIdx: index("chat_memory_embedding_memory_id_idx").on(
+      table.memoryId,
+    ),
+    vectorIdx: index("chat_memory_embedding_vector_idx").using(
       "ivfflat",
       table.embedding.op("vector_cosine_ops"),
     ),
-  ],
+  }),
+);
+
+export const chatEnvironment = pgTable(
+  "chat_environment",
+  {
+    id: text("id").primaryKey(),
+    chatId: text("chat_id")
+      .notNull()
+      .references(() => chat.id, { onDelete: "cascade" }),
+    variables: jsonb("variables").notNull().default({}),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at")
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    chatUniqueIdx: uniqueIndex("chat_environment_chat_unique").on(table.chatId),
+  }),
 );
 
 // Types
@@ -548,21 +553,3 @@ export type Vote = typeof vote.$inferSelect;
 export type Stream = typeof stream.$inferSelect;
 export type Document = typeof document.$inferSelect;
 export type Suggestion = typeof suggestion.$inferSelect;
-
-export const chatEnvironment = pgTable(
-  "chat_environment",
-  {
-    id: text("id").primaryKey(),
-    chatId: text("chat_id")
-      .notNull()
-      .references(() => chat.id, { onDelete: "cascade" }),
-    variables: json("variables").notNull().default("{}"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  },
-  (table) => ({
-    workspaceUnique: uniqueIndex("chat_environment_chat_unique").on(
-      table.chatId,
-    ),
-  }),
-);

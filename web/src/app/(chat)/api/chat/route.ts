@@ -1,5 +1,4 @@
 import { generateTitleFromUserMessage } from "@/app/(chat)/actions";
-import { chatAgent, db } from "@/db";
 import {
   createStreamId,
   deleteChatById,
@@ -8,16 +7,15 @@ import {
   saveChat,
   saveMessages,
 } from "@/db/queries";
+import { agentRepo } from "@/db/repositories/agent-repo";
 import { chatRepo } from "@/db/repositories/chat-repo";
 import { systemPrompt } from "@/lib/ai/prompts";
 import { myProvider } from "@/lib/ai/providers";
 import { executeAgentWithDynamicTools } from "@/lib/ai/tools/executor";
-import { agentFactory } from "@/lib/ai/tools/factory";
 import { getSession } from "@/lib/auth";
 import { UsageRateLimiter } from "@/lib/billing/rate-limiter";
 import { SubscriptionManager } from "@/lib/billing/subscription-manager";
 import { UsageTracker } from "@/lib/billing/usage-tracker";
-import { getAssistantAgentId } from "@/lib/chat/assistant-agent";
 import { ChatSDKError } from "@/lib/errors";
 import { calculateCostFromUsage } from "@/lib/server-utils";
 import {
@@ -40,6 +38,7 @@ import {
 import type { ModelCatalog } from "tokenlens/core";
 import { fetchModels } from "tokenlens/fetch";
 import { postRequestBodySchema, type PostRequestBody } from "./schema";
+
 export const maxDuration = 60;
 
 let globalStreamContext: ResumableStreamContext | null = null;
@@ -90,13 +89,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { id, message, selectedVisibilityType, agentIds } =
-      requestBody as any;
+    const { id, message, selectedVisibilityType, agentIds } = requestBody;
     const session = await getSession();
     if (!session?.user) {
       return new ChatSDKError("unauthorized:chat").toResponse();
     }
 
+    // Check subscription limits
     const subscription = await SubscriptionManager.getActiveSubscription(
       session.user.id,
     );
@@ -118,8 +117,9 @@ export async function POST(request: Request) {
       }
     }
 
+    // Rate limiting
     try {
-      await UsageRateLimiter.enforce(session.user.id, "api_calls", 1, 60_000);
+      await UsageRateLimiter.enforce(session.user.id, "api_calls", 1);
     } catch (err: any) {
       const msg = String(err?.message || "");
       if (msg.includes("Rate limit exceeded")) {
@@ -150,9 +150,10 @@ export async function POST(request: Request) {
         visibility: selectedVisibilityType,
       });
       createdNewChat = true;
-      await UsageRateLimiter.trackOnly(session.user.id, "chats_created", 1);
+      await UsageTracker.track(session.user.id, "chats_created", 1);
     }
 
+    // Check agent limits for new chats
     if (createdNewChat && agentIds && agentIds.length > 0) {
       for (const aId of agentIds) {
         const { allowed } = await UsageRateLimiter.canPerformAction(
@@ -163,20 +164,12 @@ export async function POST(request: Request) {
         if (!allowed) {
           break;
         }
-        const speakOrder = await chatRepo.getNextSpeakOrder(id);
-        await db.insert(chatAgent).values({
-          id: generateUUID(),
-          chatId: id,
-          agentId: aId,
-          speakOrder,
-          enabled: true,
-          addedBy: session.user.id,
-        });
       }
     }
 
     const uiMessages = [...convertToUIMessages(messagesFromDb), message];
 
+    // Save user message
     await saveMessages({
       messages: [
         {
@@ -200,23 +193,36 @@ export async function POST(request: Request) {
       ],
     });
 
-    await UsageRateLimiter.trackOnly(session.user.id, "chat_messages", 1);
+    await UsageTracker.track(session.user.id, "chat_messages", 1);
 
     const streamId = generateUUID();
     await createStreamId({ streamId, chatId: id });
 
     let finalUsage: any | undefined;
+
+    // 1. specific agent requested
     let firstAgentId = Array.isArray(agentIds)
       ? agentIds.find((v) => typeof v === "string" && v.length > 0)
       : undefined;
-    let agent =
-      typeof firstAgentId === "string" && firstAgentId.length > 0
-        ? await agentFactory.get(firstAgentId, session.user.id)
-        : null;
 
+    let agent: any = null;
+
+    if (firstAgentId) {
+      // Fetch directly from DB
+      agent = await agentRepo.findById(firstAgentId);
+    }
+
+    // 2. Fallback: If no specific agent, find the first enabled agent for this chat
     if (!agent) {
-      firstAgentId = await getAssistantAgentId(id, session.user.id);
-      agent = await agentFactory.get(firstAgentId, session.user.id);
+      // Use chatRepo to find agents linked to this chat
+      // TODO: Implement agent orchestration
+      const chatAgents = await chatRepo.findAgentsForChat(id);
+
+      if (chatAgents && chatAgents.length > 0) {
+        // Default to the first agent attached to the chat
+        agent = chatAgents[0];
+        firstAgentId = agent.id;
+      }
     }
 
     const stream = createUIMessageStream({
@@ -232,6 +238,7 @@ export async function POST(request: Request) {
           result.consumeStream();
           dataStream.merge(result.toUIMessageStream({ sendReasoning: true }));
         } else {
+          // Fallback to default chat model
           const headers = request.headers;
           const requestHints = {
             latitude: headers.get("x-vercel-ip-latitude") || "0",
@@ -239,6 +246,7 @@ export async function POST(request: Request) {
             city: headers.get("x-vercel-ip-city") || "",
             country: headers.get("x-vercel-ip-country") || "",
           } as any;
+
           const result = streamText({
             model: myProvider.languageModel("chat-model"),
             system: systemPrompt({
@@ -261,43 +269,52 @@ export async function POST(request: Request) {
       },
       generateId: generateUUID,
       onFinish: async ({ messages }) => {
-        const toSave = messages
-          .filter((m) => m.role === "assistant")
-          .map((m) => ({
-            id: m.id,
-            role: m.role,
-            parts: m.parts,
-            createdAt: new Date(),
-            attachments: [],
-            chatId: id,
-            userId: null,
-            agentId: firstAgentId!,
-            content: getTextFromMessage(m),
-            tokenCount: 0,
-            cost: "0.000000",
-            quotedMessageId: null,
-            isEdited: false,
-            editedAt: null,
-            deleted: false,
-            deletedAt: null,
-          }));
+        const assistantMessages = messages.filter(
+          (m) => m.role === "assistant",
+        );
+
+        if (assistantMessages.length === 0) {
+          return;
+        }
+
+        const toSave = assistantMessages.map((m) => ({
+          id: m.id,
+          role: m.role,
+          parts: m.parts,
+          createdAt: new Date(),
+          attachments: [],
+          chatId: id,
+          content: getTextFromMessage(m),
+          authorType: "agent" as const,
+          authorId: firstAgentId!,
+          tokenCount: 0,
+          cost: "0.000000",
+          quotedMessageId: null,
+          isEdited: false,
+          editedAt: null,
+          deleted: false,
+          deletedAt: null,
+        }));
+
+        // Calculate cost if usage data is available
         if (finalUsage) {
           const inputTokens = Number(finalUsage.inputTokens || 0);
           const outputTokens = Number(finalUsage.outputTokens || 0);
           const totalTokens = inputTokens + outputTokens;
-          const modelId = agent?.config?.model ?? "gemini-2.5-flash";
+          const modelId =
+            agent?.model ?? agent?.config?.model ?? "gemini-2.5-flash";
           const costNum = calculateCostFromUsage(
             String(modelId),
             inputTokens,
             outputTokens,
           );
+
           for (const msg of toSave) {
-            if (msg.role === "assistant") {
-              msg.tokenCount = totalTokens;
-              msg.cost = String(costNum.toFixed ? costNum.toFixed(6) : costNum);
-            }
+            msg.tokenCount = totalTokens;
+            msg.cost = String(costNum.toFixed ? costNum.toFixed(6) : costNum);
           }
         }
+
         await saveMessages({ messages: toSave as any });
       },
       onError: () => {
@@ -305,6 +322,7 @@ export async function POST(request: Request) {
       },
     });
 
+    // Use resumable stream if available
     const streamContext = getStreamContext();
     if (streamContext) {
       return new Response(
@@ -313,12 +331,15 @@ export async function POST(request: Request) {
         ),
       );
     }
+
     return new Response(stream.pipeThrough(new JsonToSseTransformStream()));
   } catch (error) {
     const vercelId = request.headers.get("x-vercel-id");
+
     if (error instanceof ChatSDKError) {
       return error.toResponse();
     }
+
     if (
       error instanceof Error &&
       error.message?.includes(
@@ -327,6 +348,7 @@ export async function POST(request: Request) {
     ) {
       return new ChatSDKError("bad_request:activate_gateway").toResponse();
     }
+
     console.error("Unhandled error in chat API:", error, { vercelId });
     return new ChatSDKError("offline:chat").toResponse();
   }
@@ -348,7 +370,11 @@ export async function DELETE(request: Request) {
 
   const chat = await getChatById({ id });
 
-  if (chat?.creatorId !== session.user.id) {
+  if (!chat) {
+    return new ChatSDKError("bad_request:api").toResponse();
+  }
+
+  if (chat.creatorId !== session.user.id) {
     return new ChatSDKError("forbidden:chat").toResponse();
   }
 

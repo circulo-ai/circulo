@@ -5,13 +5,11 @@ import {
   decimal,
   index,
   integer,
-  json,
+  jsonb,
   pgTable,
   text,
   timestamp,
-  uniqueIndex,
 } from "drizzle-orm/pg-core";
-
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -22,6 +20,20 @@ export const user = pgTable("user", {
   createdAt: timestamp("created_at").notNull(),
   updatedAt: timestamp("updated_at").notNull(),
   stripeCustomerId: text("stripe_customer_id"),
+});
+
+export const organization = pgTable("organization", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  logo: text("logo"),
+  metadata: jsonb("metadata"),
+  orgUsageLimit: decimal("org_usage_limit"),
+  storageUsedBytes: bigint("storage_used_bytes", { mode: "number" })
+    .notNull()
+    .default(0), // Storage tracking for team/enterprise
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const session = pgTable(
@@ -88,20 +100,6 @@ export const verification = pgTable(
     identifierIdx: index("verification_identifier_idx").on(table.identifier),
   }),
 );
-
-export const organization = pgTable("organization", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  slug: text("slug").notNull(),
-  logo: text("logo"),
-  metadata: json("metadata"),
-  orgUsageLimit: decimal("org_usage_limit"),
-  storageUsedBytes: bigint("storage_used_bytes", { mode: "number" })
-    .notNull()
-    .default(0), // Storage tracking for team/enterprise
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
 
 export const invitation = pgTable(
   "invitation",
@@ -191,7 +189,7 @@ export const settings = pgTable("settings", {
   telemetryEnabled: boolean("telemetry_enabled").notNull().default(true),
 
   // Email preferences
-  emailPreferences: json("email_preferences").notNull().default("{}"),
+  emailPreferences: jsonb("email_preferences").notNull().default({}),
 
   // Billing usage notifications preference
   billingUsageNotificationsEnabled: boolean(
@@ -209,11 +207,9 @@ export const environment = pgTable("environment", {
     .notNull()
     .references(() => user.id, { onDelete: "cascade" })
     .unique(), // One environment per user
-  variables: json("variables").notNull(),
+  variables: jsonb("variables").notNull(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
-
-
 
 export type User = typeof user.$inferSelect;
 export type NewUser = typeof user.$inferInsert;

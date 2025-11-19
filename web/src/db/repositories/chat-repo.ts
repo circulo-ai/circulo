@@ -14,7 +14,7 @@ const chatRepoFactory = makeRepo(
     },
 
     /**
-     * Retrieve agents linked to a chat, ordered by speakOrder.
+     * Retrieve agents linked to a chat
      * By default only returns enabled agents.
      */
     async findAgentsForChat(
@@ -27,7 +27,6 @@ const chatRepoFactory = makeRepo(
 
       const rows = await db.query.chatAgent.findMany({
         where: whereClause,
-        orderBy: (ca, { asc }) => [asc(ca.speakOrder)],
         with: { agent: true },
       });
 
@@ -47,27 +46,12 @@ const chatRepoFactory = makeRepo(
     },
 
     /**
-     * Get the next available speak order for a chat.
-     * Returns max speak order + 1 or 0 if no agents.
-     */
-    async getNextSpeakOrder(chatId: string) {
-      const result = await db
-        .select({
-          maxOrder: sql<number>`COALESCE(MAX(${chatAgent.speakOrder}), -1)::int`,
-        })
-        .from(chatAgent)
-        .where(eq(chatAgent.chatId, chatId));
-      return (result[0]?.maxOrder ?? -1) + 1;
-    },
-
-    /**
      * Update an agent's chat configuration.
      */
     async updateAgent(
       chatId: string,
       agentId: string,
       update: {
-        speakOrder?: number;
         enabled?: boolean;
         customSystemPrompt?: string | null;
         customTemperature?: number | null;
@@ -76,7 +60,6 @@ const chatRepoFactory = makeRepo(
       const [updated] = await db
         .update(chatAgent)
         .set({
-          speakOrder: update.speakOrder,
           enabled: update.enabled,
           customSystemPrompt: update.customSystemPrompt ?? undefined,
           customTemperature: update.customTemperature

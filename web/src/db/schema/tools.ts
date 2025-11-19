@@ -2,10 +2,8 @@ import { user } from "@/db/schema/auth";
 import { chat } from "@/db/schema/chat";
 import {
   boolean,
-  foreignKey,
   index,
   integer,
-  json,
   jsonb,
   pgTable,
   text,
@@ -15,48 +13,8 @@ import {
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import z from "zod";
 
-// Tool definitions for agents
-export const tool = pgTable(
-  "tool",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }), // null for system tools
-
-    name: text("name").notNull(),
-    description: text("description").notNull(),
-
-    // Tool configuration
-    type: text("type").notNull(), // 'function', 'mcp_server', 'api', etc.
-    configuration: jsonb("configuration")
-      .$type<Record<string, any>>()
-      .notNull(),
-
-    // For MCP servers
-    mcpServerId: text("mcp_server_id"),
-
-    isSystem: boolean("is_system").notNull().default(false), // System-provided tools
-    isActive: boolean("is_active").notNull().default(true),
-
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at")
-      .notNull()
-      .defaultNow()
-      .$onUpdate(() => new Date()),
-  },
-  (table) => [
-    index("tool_user_id_idx").on(table.userId),
-    index("tool_mcp_server_idx").on(table.mcpServerId),
-    index("tool_type_idx").on(table.type),
-    index("tool_is_system_idx").on(table.isSystem),
-    foreignKey({
-      columns: [table.mcpServerId],
-      foreignColumns: [mcpServer.id],
-      name: "tool_mcp_server_id_mcp_servers_id_fk",
-    }).onDelete("set null"),
-  ],
-);
-
 // MCP (Model Context Protocol) Server definitions
+// Must be defined before tool since tool references it
 export const mcpServer = pgTable(
   "mcp_servers",
   {
@@ -76,7 +34,7 @@ export const mcpServer = pgTable(
     transport: text("transport").notNull(),
     url: text("url"),
 
-    headers: json("headers").default("{}"),
+    headers: jsonb("headers").default({}),
     timeout: integer("timeout").default(30000),
     retries: integer("retries").default(3),
 
@@ -93,20 +51,58 @@ export const mcpServer = pgTable(
     deletedAt: timestamp("deleted_at"),
 
     createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at")
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
   },
   (table) => ({
-    // Primary access pattern - active servers by chat
     chatEnabledIdx: index("mcp_servers_chat_enabled_idx").on(
       table.chatId,
       table.enabled,
     ),
-
-    // Soft delete pattern - chat + not deleted
     chatDeletedIdx: index("mcp_servers_chat_deleted_idx").on(
       table.chatId,
       table.deletedAt,
     ),
+  }),
+);
+
+// Tool definitions for agents
+export const tool = pgTable(
+  "tool",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }), // null for system tools
+
+    name: text("name").notNull(),
+    description: text("description").notNull(),
+
+    // Tool configuration
+    type: text("type").notNull(), // 'function', 'mcp_server', 'api', etc.
+    configuration: jsonb("configuration")
+      .$type<Record<string, any>>()
+      .notNull(),
+
+    // For MCP servers
+    mcpServerId: text("mcp_server_id").references(() => mcpServer.id, {
+      onDelete: "set null",
+    }),
+
+    isSystem: boolean("is_system").notNull().default(false), // System-provided tools
+    isActive: boolean("is_active").notNull().default(true),
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at")
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => ({
+    userIdIdx: index("tool_user_id_idx").on(table.userId),
+    mcpServerIdx: index("tool_mcp_server_idx").on(table.mcpServerId),
+    typeIdx: index("tool_type_idx").on(table.type),
+    isSystemIdx: index("tool_is_system_idx").on(table.isSystem),
   }),
 );
 
