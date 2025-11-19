@@ -2,7 +2,10 @@
 
 import { EnhancedLink } from "@/components/enhanced-link";
 import { EnhancedLinkSpinner } from "@/components/enhanced-link-spinner";
-import { CustomSidebarMenuSkeleton } from "@/components/ui-custom/sidebar";
+import {
+  CustomSidebarMenuButton,
+  CustomSidebarMenuSkeleton,
+} from "@/components/ui-custom/sidebar";
 import {
   SidebarContent,
   SidebarGroup,
@@ -12,11 +15,10 @@ import {
   SidebarMenu,
   SidebarMenuAction,
   SidebarMenuBadge,
-  SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { useChatHistory } from "@/hooks/api/chats/use-chat-history";
-import { Home, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { ChatSidebarBurgerMenu } from "./chat-sidebar-burger-menu";
 import { ChatSidebarSearch } from "./chat-sidebar-search";
 
@@ -45,7 +47,7 @@ export function ChatSidebarInside() {
               {!isLoading &&
                 data?.chats.map((item) => (
                   <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
+                    <CustomSidebarMenuButton
                       isActive={currentChatId === item.id}
                       asChild
                     >
@@ -54,14 +56,14 @@ export function ChatSidebarInside() {
                         href={`/chat/${item.id}`}
                         buttonProps={{ variant: "text" }}
                       >
-                        <Home />
+                        <div className="size-12 rounded-full bg-teal-500" />
                         <span className="truncate">{item.title}</span>
                         <SidebarMenuAction className="pointer-events-none">
                           <EnhancedLinkSpinner />
                           <span className="sr-only">Add Project</span>
                         </SidebarMenuAction>
                       </EnhancedLink>
-                    </SidebarMenuButton>
+                    </CustomSidebarMenuButton>
                     <SidebarMenuBadge>24</SidebarMenuBadge>
                   </SidebarMenuItem>
                 ))}

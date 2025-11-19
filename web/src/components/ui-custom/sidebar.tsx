@@ -1,6 +1,10 @@
 import { cn } from "@/lib/utils";
 import { ComponentProps } from "react";
-import { SidebarInset, SidebarMenuSkeleton } from "../ui/sidebar";
+import {
+  SidebarInset,
+  SidebarMenuButton,
+  SidebarMenuSkeleton,
+} from "../ui/sidebar";
 import { CustomSkeleton } from "./skeleton";
 
 interface CustomSidebarInsetProps extends ComponentProps<typeof SidebarInset> {}
@@ -20,11 +24,28 @@ export function CustomSidebarInset({
 
 // TODO make a component out of the shadow
 
+interface CustomSidebarMenuButtonProps
+  extends ComponentProps<typeof SidebarMenuButton> {}
+
+export function CustomSidebarMenuButton({
+  className,
+  ...props
+}: CustomSidebarMenuButtonProps) {
+  return (
+    <SidebarMenuButton
+      className={cn(className, "h-auto hover:bg-teal-50/5")}
+      {...props}
+    />
+  );
+}
+
 interface CustomSidebarMenuSkeletonProps
   extends ComponentProps<typeof SidebarMenuSkeleton> {}
 
 export function CustomSidebarMenuSkeleton(
   props: CustomSidebarMenuSkeletonProps,
 ) {
-  return <SidebarMenuSkeleton customSkeleton={CustomSkeleton} {...props} />;
+  return (
+    <SidebarMenuSkeleton showIcon customSkeleton={CustomSkeleton} {...props} />
+  );
 }
