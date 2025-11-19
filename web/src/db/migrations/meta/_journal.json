@@ -43,6 +43,13 @@
       "when": 1763576671932,
       "tag": "0005_majestic_wolfpack",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1763578979248,
+      "tag": "0006_soft_oracle",
+      "breakpoints": true
     }
   ]
 }
