@@ -17,10 +17,10 @@ export interface CredentialAccessResult {
  * - Uses checkHybridAuth to authenticate the caller
  * - Fetches credential owner
  * - Authorization rules:
- *   - session/api_key: allow if requester owns the credential; otherwise require workflowId and
- *     verify BOTH requester and owner have access to the workflow's workspace
- *   - internal_jwt: require workflowId (by default) and verify credential owner has access to the
- *     workflow's workspace (requester identity is the system/workflow)
+ *   - session/api_key: allow if requester owns the credential; otherwise require chatId and
+ *     verify BOTH requester and owner have access to the chat's workspace
+ *   - internal_jwt: require chatId (by default) and verify credential owner has access to the
+ *     chat's workspace (requester identity is the system/chat)
  */
 export async function authorizeCredentialUse(
   request: NextRequest,

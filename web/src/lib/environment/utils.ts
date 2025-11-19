@@ -42,7 +42,7 @@ export async function getEnvironmentVariableKeys(userId: string): Promise<{
   }
 }
 
-export async function getPersonalAndWorkspaceEnv(
+export async function getPersonalAndChatEnv(
   userId: string,
   chatId?: string,
 ): Promise<{
@@ -107,7 +107,7 @@ export async function getEffectiveDecryptedEnv(
   userId: string,
   chatId?: string,
 ): Promise<Record<string, string>> {
-  const { personalDecrypted, chatDecrypted } = await getPersonalAndWorkspaceEnv(
+  const { personalDecrypted, chatDecrypted } = await getPersonalAndChatEnv(
     userId,
     chatId,
   );

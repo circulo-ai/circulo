@@ -1,23 +1,21 @@
+import { chat } from "@/db";
 import { user } from "@/db/schema/auth";
-import { sql } from "drizzle-orm";
 import {
   boolean,
-  check,
   foreignKey,
   index,
   integer,
   json,
   jsonb,
-  numeric,
   pgEnum,
   pgTable,
   text,
   timestamp,
   uuid,
+  varchar,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import z from "zod";
-import { chat } from "./chat";
 
 export const agentVisibilityEnum = pgEnum("agent_visibility", [
   "private",
@@ -31,125 +29,33 @@ export const agentTemplateStatusEnum = pgEnum("agent_template_status", [
   "archived",
 ]);
 
-// Predefined agent templates (seeded data)
-export const agentTemplate = pgTable(
-  "agent_template",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    creatorId: text("creator_id").references(() => user.id, {
-      onDelete: "set null",
-    }), // Can be null for system templates
+// Agent Templates (User-created agent configurations)
+export const agent = pgTable("agents", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: text("user_id")
+    .references(() => user.id)
+    .notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  systemPrompt: text("system_prompt").notNull(),
+  model: varchar("model", { length: 100 })
+    .notNull()
+    .default("claude-sonnet-4-20250514"),
+  temperature: integer("temperature").default(70), // 0-100
+  avatarUrl: text("avatar_url"),
+  isPublic: boolean("is_public").default(false), // Can others use this agent?
 
-    name: text("name").notNull(),
-    description: text("description"),
-    longDescription: text("long_description"),
-    systemPrompt: text("system_prompt").notNull(),
+  // Default capabilities
+  defaultTools: jsonb("default_tools").$type<string[]>().default([]),
+  defaultMcpServers: jsonb("default_mcp_servers").$type<string[]>().default([]),
+  defaultKnowledgeBases: jsonb("default_knowledge_bases")
+    .$type<string[]>()
+    .default([]),
 
-    category: text("category"),
-
-    // Model configuration (defaults for instances)
-    model: text("model").notNull().default("gpt-4"),
-    temperature: numeric("temperature", { precision: 3, scale: 2 })
-      .notNull()
-      .default("0.7"),
-    maxTokens: integer("max_tokens").default(2000),
-
-    // Visual identity
-    avatar: text("avatar"),
-    color: text("color").default("#3B82F6"),
-    tags: jsonb("tags").$type<string[]>().default([]),
-
-    // Tools configuration - references to tool definitions
-    toolIds: jsonb("tool_ids").$type<string[]>().default([]),
-
-    // Template status and visibility
-    status: agentTemplateStatusEnum("status").notNull().default("draft"),
-    visibility: agentVisibilityEnum("visibility").notNull().default("private"),
-
-    // Stats
-    instanceCount: integer("instance_count").notNull().default(0),
-    usageCount: integer("usage_count").notNull().default(0),
-
-    // SEO & Discovery
-    slug: text("slug").unique(),
-    featured: boolean("featured").notNull().default(false),
-    isSystem: boolean("is_system").notNull().default(false), // System-provided templates
-
-    deleted: boolean("deleted").notNull().default(false),
-
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at")
-      .notNull()
-      .defaultNow()
-      .$onUpdate(() => new Date()),
-    publishedAt: timestamp("published_at"),
-  },
-  (table) => [
-    index("agent_template_creator_id_idx").on(table.creatorId),
-    index("agent_template_status_idx").on(table.status),
-    index("agent_template_visibility_idx").on(table.visibility),
-    index("agent_template_featured_idx").on(table.featured),
-    index("agent_template_slug_idx").on(table.slug),
-    index("agent_template_is_system_idx").on(table.isSystem),
-    check(
-      "agent_template_counts_non_negative",
-      sql`instance_count >= 0 AND usage_count >= 0`,
-    ),
-  ],
-);
-
-// User-created agent instances
-export const agent = pgTable(
-  "agent",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-
-    // Link to template (nullable for custom agents)
-    templateId: uuid("template_id").references(() => agentTemplate.id, {
-      onDelete: "set null",
-    }),
-
-    name: text("name").notNull(),
-    description: text("description"),
-    systemPrompt: text("system_prompt").notNull(),
-
-    // Model configuration (can override template defaults)
-    model: text("model").notNull().default("gpt-4"),
-    temperature: numeric("temperature", { precision: 3, scale: 2 })
-      .notNull()
-      .default("0.7"),
-    maxTokens: integer("max_tokens").default(2000),
-
-    // Avatar and styling
-    avatar: text("avatar"),
-    color: text("color").default("#3B82F6"),
-
-    // Tools configuration - references to tool IDs
-    toolIds: jsonb("tool_ids").$type<string[]>().default([]),
-
-    // Usage stats (for this instance)
-    usageCount: integer("usage_count").notNull().default(0),
-    lastUsedAt: timestamp("last_used_at"),
-
-    deleted: boolean("deleted").notNull().default(false),
-
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at")
-      .notNull()
-      .defaultNow()
-      .$onUpdate(() => new Date()),
-  },
-  (table) => [
-    index("agent_user_id_idx").on(table.userId),
-    index("agent_template_id_idx").on(table.templateId),
-    index("agent_user_template_idx").on(table.userId, table.templateId),
-    index("agent_last_used_idx").on(table.lastUsedAt),
-    check("agent_usage_count_non_negative", sql`usage_count >= 0`),
-  ],
-);
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
 
 // Tool definitions for agents
 export const tool = pgTable(
@@ -311,8 +217,6 @@ export const updateMcpServerSchema = z
   .partial();
 
 // Types
-export type AgentTemplate = typeof agentTemplate.$inferSelect;
-export type NewAgentTemplate = typeof agentTemplate.$inferInsert;
 export type AgentVisibility = (typeof agentVisibilityEnum.enumValues)[number];
 export type AgentTemplateStatus =
   (typeof agentTemplateStatusEnum.enumValues)[number];
@@ -337,18 +241,6 @@ export const insertAgentSchema = createInsertSchema(agent, {
 });
 
 export const selectAgentSchema = createSelectSchema(agent, {
-  temperature: z.string().transform((val) => parseFloat(val)),
-});
-
-export const insertAgentTemplateSchema = createInsertSchema(agentTemplate, {
-  temperature: z
-    .number()
-    .min(0)
-    .max(2)
-    .transform((val) => val.toString()),
-});
-
-export const selectAgentTemplateSchema = createSelectSchema(agentTemplate, {
   temperature: z.string().transform((val) => parseFloat(val)),
 });
 

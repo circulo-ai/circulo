@@ -64,22 +64,12 @@ export const chat = pgTable(
     description: text("description"),
 
     type: chatTypeEnum("type").notNull().default("direct"),
-    style: chatStyleEnum("style").notNull().default("brainstorm"),
     visibility: chatVisibilityEnum("visibility").notNull().default("private"),
 
-    // Sharing
-    shareLink: text("share_link").unique(),
-    linkEnabled: boolean("link_enabled").notNull().default(false),
+    orchestrationEnabled: boolean("orchestration_enabled").default(true),
 
+    // Chat instructions
     instructions: text("instructions"),
-
-    // Stats
-    messageCount: integer("message_count").notNull().default(0),
-    memberCount: integer("member_count").notNull().default(1), // Including creator
-    totalTokens: integer("total_tokens").notNull().default(0),
-    totalCost: decimal("total_cost", { precision: 10, scale: 4 })
-      .notNull()
-      .default("0.0000"),
 
     deleted: boolean("deleted").notNull().default(false),
 
@@ -93,7 +83,6 @@ export const chat = pgTable(
     creatorIdIdx: index("chat_creator_id_idx").on(table.creatorId),
     typeIdx: index("chat_type_idx").on(table.type),
     visibilityIdx: index("chat_visibility_idx").on(table.visibility),
-    shareLinkIdx: index("chat_share_link_idx").on(table.shareLink),
     creatorCreatedAtIdx: index("chat_creator_created_at_idx").on(
       table.creatorId,
       table.createdAt,
@@ -298,11 +287,9 @@ export const message = pgTable(
       .notNull()
       .references(() => chat.id, { onDelete: "cascade" }),
 
-    // Sender (either user or agent)
-    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
-    agentId: uuid("agent_id").references(() => agent.id, {
-      onDelete: "set null",
-    }),
+    // Author (either user or agent)
+    authorType: varchar("author_type", { length: 50 }).notNull(), // user, agent, system
+    authorId: varchar("author_id", { length: 255 }).notNull(), // userId or chatAgentId
 
     content: text("content").notNull(),
 
@@ -326,8 +313,7 @@ export const message = pgTable(
   },
   (table) => ({
     chatIdIdx: index("message_chat_id_idx").on(table.chatId),
-    userIdIdx: index("message_user_id_idx").on(table.userId),
-    agentIdIdx: index("message_agent_id_idx").on(table.agentId),
+    authorIdIdx: index("message_author_id_idx").on(table.authorId),
     chatCreatedAtIdx: index("message_chat_created_at_idx").on(
       table.chatId,
       table.createdAt,

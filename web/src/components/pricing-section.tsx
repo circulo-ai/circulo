@@ -1,4 +1,4 @@
-import { getSubscriptionPlans } from "@/actions/subscription/get-plans";
+import { getSubscriptionPlans } from "@/app/(billing)/actions/get-plans";
 import { PlanFeatures } from "@/db/schema/billing";
 import { generateRandomPath, Step } from "@/lib/border-walk";
 import { Icon } from "@/types/icon";
