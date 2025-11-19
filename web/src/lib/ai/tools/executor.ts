@@ -119,7 +119,7 @@ export async function executeAgentWithDynamicTools(context: ExecutorContext) {
       system: chatAgent.agent.systemPrompt,
       messages,
       temperature: chatAgent.agent.temperature ?? undefined,
-      maxOutputTokens: chatAgent.agent.maxTokens,
+      maxOutputTokens: chatAgent.agent.maxTokens ?? 1000,
       tools: aiSdkTools,
       onFinish: async ({ usage }) => {
         logger.info(`Agent ${agentId} execution finished`, { usage });
