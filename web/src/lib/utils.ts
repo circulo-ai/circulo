@@ -17,6 +17,10 @@ export function generateUUID(): string {
   });
 }
 
+export function generateRequestId(): string {
+  return generateUUID();
+}
+
 export function getTextFromMessage(message: ChatMessage | UIMessage): string {
   return message.parts
     .filter((part) => part.type === "text")

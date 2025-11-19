@@ -2,8 +2,8 @@ import { refreshAccessTokenIfNeeded } from "@/app/api/auth/oauth/utils";
 import { getSession } from "@/lib/auth";
 import { createLogger } from "@/lib/logs/console/logger";
 import { generateRequestId } from "@/lib/utils";
-import { db } from "@sim/db";
-import { account } from "@sim/db/schema";
+import { db } from "@/db";
+import { account } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { type NextRequest, NextResponse } from "next/server";
 
@@ -135,7 +135,7 @@ export async function GET(request: NextRequest) {
         (file: any) =>
           file.name?.toLowerCase().endsWith(".xlsx") ||
           file.mimeType ===
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       )
       .map((file: any) => ({
         id: file.id,
@@ -151,11 +151,11 @@ export async function GET(request: NextRequest) {
         size: file.size?.toString(),
         owners: file.createdBy
           ? [
-              {
-                displayName: file.createdBy.user?.displayName || "Unknown",
-                emailAddress: file.createdBy.user?.email || "",
-              },
-            ]
+            {
+              displayName: file.createdBy.user?.displayName || "Unknown",
+              emailAddress: file.createdBy.user?.email || "",
+            },
+          ]
           : [],
       }));
 

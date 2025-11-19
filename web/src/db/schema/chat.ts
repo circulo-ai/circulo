@@ -10,6 +10,7 @@ import {
   foreignKey,
   index,
   integer,
+  json,
   jsonb,
   numeric,
   pgEnum,
@@ -211,6 +212,7 @@ export const chatAgent = pgTable(
       .references(() => agent.id, { onDelete: "cascade" }),
 
     enabled: boolean("enabled").notNull().default(true),
+    speakOrder: integer("speak_order").default(0),
 
     // Custom configuration per chat (can override agent defaults)
     customSystemPrompt: text("custom_system_prompt"),
@@ -546,3 +548,21 @@ export type Vote = typeof vote.$inferSelect;
 export type Stream = typeof stream.$inferSelect;
 export type Document = typeof document.$inferSelect;
 export type Suggestion = typeof suggestion.$inferSelect;
+
+export const chatEnvironment = pgTable(
+  "chat_environment",
+  {
+    id: text("id").primaryKey(),
+    chatId: text("chat_id")
+      .notNull()
+      .references(() => chat.id, { onDelete: "cascade" }),
+    variables: json("variables").notNull().default("{}"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    workspaceUnique: uniqueIndex("chat_environment_chat_unique").on(
+      table.chatId,
+    ),
+  }),
+);

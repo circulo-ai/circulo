@@ -3,7 +3,7 @@ import { ComponentProps } from "react";
 import { InputGroup, InputGroupInput } from "../ui/input-group";
 import { CustomInput } from "./input";
 
-interface CustomInputGroupProps extends ComponentProps<typeof InputGroup> {}
+interface CustomInputGroupProps extends ComponentProps<typeof InputGroup> { }
 
 export function CustomInputGroup({
   className,
@@ -13,7 +13,7 @@ export function CustomInputGroup({
 }
 
 interface CustomInputGroupInputProps
-  extends ComponentProps<typeof InputGroupInput> {}
+  extends ComponentProps<typeof InputGroupInput> { }
 
 export function CustomInputGroupInput({
   className,
@@ -21,7 +21,7 @@ export function CustomInputGroupInput({
 }: CustomInputGroupInputProps) {
   return (
     <InputGroupInput
-      as={CustomInput}
+      as={CustomInput as any}
       className={cn(className, "")}
       {...props}
     />

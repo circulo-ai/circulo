@@ -11,7 +11,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { chat } from "./chat";
+
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -213,23 +213,7 @@ export const environment = pgTable("environment", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-export const chatEnvironment = pgTable(
-  "chat_environment",
-  {
-    id: text("id").primaryKey(),
-    chatId: text("chat_id")
-      .notNull()
-      .references(() => chat.id, { onDelete: "cascade" }),
-    variables: json("variables").notNull().default("{}"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  },
-  (table) => ({
-    workspaceUnique: uniqueIndex("chat_environment_chat_unique").on(
-      table.chatId,
-    ),
-  }),
-);
+
 
 export type User = typeof user.$inferSelect;
 export type NewUser = typeof user.$inferInsert;

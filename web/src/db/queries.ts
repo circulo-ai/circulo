@@ -38,7 +38,7 @@ import {
 // use the Drizzle adapter for Auth.js / NextAuth
 // https://authjs.dev/reference/adapter/drizzle
 
-// biome-ignore lint: Forbidden non-null assertion.
+
 const client = postgres(process.env.DATABASE_URL!);
 const db = drizzle(client);
 
@@ -165,9 +165,9 @@ export async function getChatsByUserId({
 
     const searchCondition = search
       ? or(
-          ilike(chat.title, `%${search}%`),
-          ilike(chat.description, `%${search}%`),
-        )
+        ilike(chat.title, `%${search}%`),
+        ilike(chat.description, `%${search}%`),
+      )
       : undefined;
 
     const query = (whereCondition?: SQL<any>) => {

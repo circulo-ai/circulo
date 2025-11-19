@@ -1,4 +1,5 @@
-import { agent, agentTemplate, mcpServer, tool } from "@/db/schema/agent";
+import { agent } from "@/db/schema/agent";
+import { mcpServer, tool } from "@/db/schema/tools";
 import { account, session, user } from "@/db/schema/auth";
 import {
   chat,
@@ -27,7 +28,7 @@ export const userRelations = relations(user, ({ many }) => ({
 
   // Agent relations
   agents: many(agent),
-  agentTemplates: many(agentTemplate),
+
   tools: many(tool),
   mcpServers: many(mcpServer),
 
@@ -63,26 +64,14 @@ export const accountRelations = relations(account, ({ one }) => ({
 
 // ==================== AGENT RELATIONS ====================
 
-export const agentTemplateRelations = relations(
-  agentTemplate,
-  ({ one, many }) => ({
-    creator: one(user, {
-      fields: [agentTemplate.creatorId],
-      references: [user.id],
-    }),
-    instances: many(agent),
-  }),
-);
+
 
 export const agentRelations = relations(agent, ({ one, many }) => ({
   user: one(user, {
     fields: [agent.userId],
     references: [user.id],
   }),
-  template: one(agentTemplate, {
-    fields: [agent.templateId],
-    references: [agentTemplate.id],
-  }),
+
   chatAgents: many(chatAgent),
   messages: many(message),
 }));
@@ -238,14 +227,7 @@ export const messageRelations = relations(message, ({ one, many }) => ({
     fields: [message.chatId],
     references: [chat.id],
   }),
-  user: one(user, {
-    fields: [message.userId],
-    references: [user.id],
-  }),
-  agent: one(agent, {
-    fields: [message.agentId],
-    references: [agent.id],
-  }),
+
   quotedMessage: one(message, {
     fields: [message.quotedMessageId],
     references: [message.id],
