@@ -66,29 +66,32 @@ export async function saveChat({
 }) {
   try {
     return await db.transaction(async (tx) => {
-      const [chatEntity] = await tx.insert(chat).values({
-        id,
-        createdAt: new Date(),
-        creatorId: userId,
-        title,
-        visibility,
-      }).returning({id: chat.id});
+      const [chatEntity] = await tx
+        .insert(chat)
+        .values({
+          id,
+          createdAt: new Date(),
+          creatorId: userId,
+          title,
+          visibility,
+        })
+        .returning({ id: chat.id });
 
-      if(chatEntity) {
-        const chatMemberEntity = await tx.insert(chatMember).values({
+      if (chatEntity) {
+        await tx.insert(chatMember).values({
           chatId: chatEntity.id,
           userId: userId,
           canInvite: true,
           canManageKnowledge: true,
           notificationsEnabled: true,
-          role: 'owner',
+          role: "owner",
         });
       } else {
         throw new Error("Could not create chat entity!");
       }
 
       return chatEntity;
-    })
+    });
   } catch (_error) {
     throw new ChatSDKError("bad_request:database", "Failed to save chat");
   }

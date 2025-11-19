@@ -1,5 +1,5 @@
 import { generateTitleFromUserMessage } from "@/app/(chat)/actions";
-import { chat, chatAgent, db } from "@/db";
+import { chatAgent, db } from "@/db";
 import {
   createStreamId,
   deleteChatById,
@@ -31,7 +31,6 @@ import {
   JsonToSseTransformStream,
   streamText,
 } from "ai";
-import { eq, sql } from "drizzle-orm";
 import { unstable_cache as cache } from "next/cache";
 import { after } from "next/server";
 import {
@@ -188,8 +187,8 @@ export async function POST(request: Request) {
           attachments: [],
           content: getTextFromMessage(message),
           createdAt: new Date(),
-          userId: session.user.id,
-          agentId: null,
+          authorType: "user",
+          authorId: session.user.id,
           tokenCount: 0,
           cost: "0.000000",
           quotedMessageId: null,
@@ -298,14 +297,6 @@ export async function POST(request: Request) {
               msg.cost = String(costNum.toFixed ? costNum.toFixed(6) : costNum);
             }
           }
-          await db
-            .update(chat)
-            .set({
-              messageCount: sql`message_count + ${toSave.length}`,
-              totalTokens: sql`total_tokens + ${totalTokens}`,
-              totalCost: sql`total_cost + ${costNum}`,
-            })
-            .where(eq(chat.id, id));
         }
         await saveMessages({ messages: toSave as any });
       },
