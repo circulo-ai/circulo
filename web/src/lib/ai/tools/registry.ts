@@ -559,13 +559,13 @@ class ToolRegistry {
       where: (agents, { eq }) => eq(agents.id, agentId),
     });
 
-    if (!agent || !agent.toolIds || agent.toolIds.length === 0) {
+    if (!agent || !agent.defaultTools || agent.defaultTools.length === 0) {
       return [];
     }
 
     const tools: UnifiedTool[] = [];
 
-    for (const toolId of agent.toolIds) {
+    for (const toolId of agent.defaultTools) {
       const tool = await this.getTool(toolId, agent.userId, chatId);
       if (tool && tool.isActive) {
         tools.push(tool);

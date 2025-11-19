@@ -210,7 +210,6 @@ export const chatAgent = pgTable(
       .notNull()
       .references(() => agent.id, { onDelete: "cascade" }),
 
-    speakOrder: integer("speak_order").notNull(),
     enabled: boolean("enabled").notNull().default(true),
 
     // Custom configuration per chat (can override agent defaults)
@@ -229,18 +228,11 @@ export const chatAgent = pgTable(
   (table) => ({
     chatIdIdx: index("chat_agent_chat_id_idx").on(table.chatId),
     agentIdIdx: index("chat_agent_agent_id_idx").on(table.agentId),
-    chatOrderIdx: index("chat_agent_chat_order_idx").on(
-      table.chatId,
-      table.speakOrder,
-    ),
     uniqueChatAgentIdx: uniqueIndex("chat_agent_unique_idx").on(
       table.chatId,
       table.agentId,
     ),
-    uniqueChatOrderIdx: unique("chat_agent_unique_order_idx").on(
-      table.chatId,
-      table.speakOrder,
-    ),
+    uniqueChatOrderIdx: unique("chat_agent_unique_order_idx").on(table.chatId),
     speakOrderNonNegative: check(
       "chat_agent_speak_order_non_negative",
       sql`speak_order >= 0`,

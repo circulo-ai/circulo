@@ -1,4 +1,5 @@
 export interface ErrorResponse {
+  success: false;
   error: string;
   code: string;
   details?: unknown;
@@ -18,9 +19,10 @@ export class ApiError extends Error {
 
   toJSON(): ErrorResponse {
     return {
+      success: false,
       error: this.message,
       code: this.code,
-      details: this.details,
+      details: this.details ?? undefined,
     };
   }
 

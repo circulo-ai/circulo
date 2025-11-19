@@ -5,22 +5,40 @@ import { makeRepo } from "../helpers/repo";
 const chatAgentRepoFactory = makeRepo(
   chatAgent,
   (base) => ({
-    async findEnabledForChat(chatId: string) {
+    async findForChat(chatId: string) {
       return db.query.chatAgent.findMany({
         where: and(eq(chatAgent.chatId, chatId), eq(chatAgent.enabled, true)),
-        orderBy: (ca, { asc }) => [asc(ca.speakOrder)],
         with: { agent: true },
       });
     },
 
-    async updateSpeakOrder(chatId: string, agentId: string, newOrder: number) {
-      return db
-        .update(chatAgent)
-        .set({ speakOrder: newOrder })
-        .where(
-          and(eq(chatAgent.chatId, chatId), eq(chatAgent.agentId, agentId)),
-        )
-        .returning();
+    async findForUserAndChat(userId: string, chatId: string) {
+      return db.query.chatAgent.findMany({
+        where: and(
+          eq(chatAgent.chatId, chatId),
+          eq(chatAgent.enabled, true),
+          eq(chatAgent.addedBy, userId),
+        ),
+        with: { agent: true },
+      });
+    },
+
+    async findEnabledForChat(chatId: string) {
+      return db.query.chatAgent.findMany({
+        where: and(eq(chatAgent.chatId, chatId), eq(chatAgent.enabled, true)),
+        with: { agent: true },
+      });
+    },
+
+    async findAgentInChat(agentId: string, chatId: string) {
+      return db.query.chatAgent.findMany({
+        where: and(
+          eq(chatAgent.chatId, chatId),
+          eq(chatAgent.agentId, agentId),
+          eq(chatAgent.enabled, true),
+        ),
+        with: { agent: true },
+      });
     },
 
     async toggleEnabled(chatId: string, agentId: string) {

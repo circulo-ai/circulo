@@ -12,7 +12,6 @@ export const PATCH = api(
       agentId: z.uuid(),
     }),
     body: z.object({
-      speakOrder: z.number().int().min(0).optional(),
       enabled: z.boolean().optional(),
       customSystemPrompt: z.string().optional().nullable(),
       customTemperature: z.number().min(0).max(2).optional().nullable(),

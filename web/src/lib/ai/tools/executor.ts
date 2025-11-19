@@ -1,5 +1,5 @@
+import { chatAgentRepo } from "@/db/repositories/chat-agent-repo";
 import { myProvider } from "@/lib/ai/providers";
-import { agentFactory } from "@/lib/ai/tools/factory";
 import { toolRegistry } from "@/lib/ai/tools/registry";
 import { createLogger } from "@/lib/logs/console/logger";
 import type { ChatMessage } from "@/lib/types";
@@ -28,8 +28,8 @@ export async function executeAgentWithDynamicTools(context: ExecutorContext) {
   logger.info(`Executing agent ${agentId} with dynamic tools`);
 
   // Get agent configuration and tools
-  const agent = await agentFactory.get(agentId, userId);
-  if (!agent) {
+  const [chatAgent] = await chatAgentRepo.findAgentInChat(agentId, userId);
+  if (!chatAgent) {
     throw new Error(`Agent not found: ${agentId}`);
   }
 
@@ -37,7 +37,7 @@ export async function executeAgentWithDynamicTools(context: ExecutorContext) {
   const agentTools = await toolRegistry.getAgentTools(agentId, chatId);
 
   logger.info(
-    `Agent ${agent.config.name} has ${agentTools.length} tools available`,
+    `Agent ${chatAgent.agent.name} has ${agentTools.length} tools available`,
   );
 
   // Convert UnifiedTools to AI SDK tool format
@@ -113,13 +113,13 @@ export async function executeAgentWithDynamicTools(context: ExecutorContext) {
   return {
     result: streamText({
       // TODO: handle models
-      model: agent.config.model
-        ? google(agent.config.model)
+      model: chatAgent.agent.model
+        ? google(chatAgent.agent.model)
         : myProvider.languageModel("chat-model"),
-      system: agent.config.systemPrompt,
+      system: chatAgent.agent.systemPrompt,
       messages,
-      temperature: agent.config.temperature,
-      maxOutputTokens: agent.config.maxTokens,
+      temperature: chatAgent.agent.temperature ?? undefined,
+      maxOutputTokens: chatAgent.agent.maxTokens,
       tools: aiSdkTools,
       onFinish: async ({ usage }) => {
         logger.info(`Agent ${agentId} execution finished`, { usage });
@@ -131,7 +131,7 @@ export async function executeAgentWithDynamicTools(context: ExecutorContext) {
         });
       },
     }),
-    agent,
+    agent: chatAgent,
   };
 }
 

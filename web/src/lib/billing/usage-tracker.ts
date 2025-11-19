@@ -10,7 +10,20 @@ type UsageEvent = {
 
 export class UsageTracker {
   /**
-   * Track usage metric
+   * Helper to get UTC start of day to ensure consistency across server timezones
+   */
+  private static getDayBoundaries(date: Date = new Date()) {
+    const start = new Date(date);
+    start.setUTCHours(0, 0, 0, 0);
+
+    const end = new Date(start);
+    end.setUTCDate(end.getUTCDate() + 1);
+
+    return { start, end };
+  }
+
+  /**
+   * Track a single usage event
    */
   static async track(
     userId: string,
@@ -18,12 +31,7 @@ export class UsageTracker {
     count = 1,
     subscriptionId?: number,
   ): Promise<void> {
-    const now = new Date();
-    const periodStart = new Date(now);
-    periodStart.setHours(0, 0, 0, 0);
-
-    const periodEnd = new Date(periodStart);
-    periodEnd.setDate(periodEnd.getDate() + 1);
+    const { start, end } = this.getDayBoundaries();
 
     await db
       .insert(usageMetrics)
@@ -32,9 +40,9 @@ export class UsageTracker {
         subscriptionId: subscriptionId || null,
         metric,
         count,
-        recordedAt: now,
-        periodStart,
-        periodEnd,
+        recordedAt: new Date(),
+        periodStart: start,
+        periodEnd: end,
       })
       .onConflictDoUpdate({
         target: [
@@ -46,25 +54,37 @@ export class UsageTracker {
       });
   }
 
+  /**
+   * Track multiple events at once (optimized)
+   */
   static async trackBatch(userId: string, events: UsageEvent[]): Promise<void> {
-    const now = new Date();
+    if (events.length === 0) return;
 
-    const records = events.map((event) => {
-      const periodStart = new Date(now);
-      periodStart.setHours(0, 0, 0, 0); // Daily period
-      const periodEnd = new Date(periodStart);
-      periodEnd.setDate(periodEnd.getDate() + 1);
+    const { start, end } = this.getDayBoundaries();
 
-      return {
-        userId,
-        subscriptionId: event.subscriptionId || null,
-        metric: event.metric,
-        count: event.count || 1,
-        recordedAt: now,
-        periodStart,
-        periodEnd,
+    // Pre-aggregate in memory to prevent duplicate key errors
+    const aggregated = new Map<string, { count: number; subId?: number }>();
+
+    for (const event of events) {
+      const current = aggregated.get(event.metric) || {
+        count: 0,
+        subId: event.subscriptionId,
       };
-    });
+      aggregated.set(event.metric, {
+        count: current.count + (event.count || 1),
+        subId: event.subscriptionId,
+      });
+    }
+
+    const records = Array.from(aggregated.entries()).map(([metric, data]) => ({
+      userId,
+      subscriptionId: data.subId || null,
+      metric,
+      count: data.count,
+      recordedAt: new Date(),
+      periodStart: start,
+      periodEnd: end,
+    }));
 
     await db
       .insert(usageMetrics)
@@ -75,44 +95,35 @@ export class UsageTracker {
           usageMetrics.metric,
           usageMetrics.periodStart,
         ],
-        set: { count: sql`${usageMetrics.count} + EXCLUDED.count` },
+        set: { count: sql`${usageMetrics.count} + excluded.count` },
       });
   }
 
   /**
    * Get usage for a period
+   * Used by UsageRateLimiter to calculate billing cycles
    */
   static async getUsage(
     userId: string,
     metric: string,
-    periodStart: Date,
-    periodEnd: Date,
-  ) {
-    const records = await db.query.usageMetrics.findMany({
-      where: and(
-        eq(usageMetrics.userId, userId),
-        eq(usageMetrics.metric, metric),
-        lte(usageMetrics.periodStart, periodEnd),
-        gte(usageMetrics.periodEnd, periodStart),
-      ),
-    });
+    periodStart: Date = new Date(0),
+    periodEnd: Date = new Date(),
+  ): Promise<number> {
+    const [result] = await db
+      .select({
+        total: sql<number>`sum(${usageMetrics.count})`.mapWith(Number),
+      })
+      .from(usageMetrics)
+      .where(
+        and(
+          eq(usageMetrics.userId, userId),
+          eq(usageMetrics.metric, metric),
+          // Sums up all DAILY buckets that fall within the requested range
+          lte(usageMetrics.periodStart, periodEnd),
+          gte(usageMetrics.periodEnd, periodStart),
+        ),
+      );
 
-    return records.reduce((sum, record) => sum + record.count, 0);
-  }
-
-  /**
-   * Check if user has exceeded limit
-   */
-  static async checkLimit(
-    userId: string,
-    metric: string,
-    limit: number | null,
-    windowMs: number = 60_000, // default 1 min
-  ): Promise<boolean> {
-    if (limit === null) return false;
-    const now = new Date();
-    const windowStart = new Date(now.getTime() - windowMs);
-    const usage = await this.getUsage(userId, metric, windowStart, now);
-    return usage >= limit;
+    return result?.total || 0;
   }
 }

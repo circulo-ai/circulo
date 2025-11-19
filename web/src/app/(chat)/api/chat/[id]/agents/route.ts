@@ -2,7 +2,7 @@ import { chatAgent, db } from "@/db";
 import { agentRepo } from "@/db/repositories/agent-repo";
 import { chatRepo } from "@/db/repositories/chat-repo";
 import { UsageRateLimiter } from "@/lib/billing/rate-limiter";
-import { api, Errors, success } from "@/lib/server";
+import { api, created, Errors, success } from "@/lib/server";
 import { generateUUID } from "@/lib/utils";
 import { z } from "zod";
 
@@ -44,7 +44,6 @@ export const POST = api(
     params: z.object({ id: z.string() }),
     body: z.object({
       agentId: z.uuid(),
-      speakOrder: z.number().int().min(0).optional(),
       enabled: z.boolean().default(true),
       customSystemPrompt: z.string().optional(),
       customTemperature: z.number().min(0).max(2).optional(),
@@ -87,10 +86,6 @@ export const POST = api(
       throw Errors.conflict("Agent is already in this chat");
     }
 
-    // Get next speak order if not provided
-    const speakOrder =
-      ctx.body.speakOrder ?? (await chatRepo.getNextSpeakOrder(ctx.params.id));
-
     // Add agent to chat
     const [newChatAgent] = await db
       .insert(chatAgent)
@@ -98,7 +93,6 @@ export const POST = api(
         id: generateUUID(),
         chatId: ctx.params.id,
         agentId: ctx.body.agentId,
-        speakOrder,
         enabled: ctx.body.enabled,
         customSystemPrompt: ctx.body.customSystemPrompt || null,
         customTemperature: ctx.body.customTemperature
@@ -109,6 +103,6 @@ export const POST = api(
       })
       .returning();
 
-    return success({ chatAgent: newChatAgent }, 201);
+    return created({ agent: newChatAgent });
   },
 );

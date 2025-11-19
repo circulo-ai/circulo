@@ -1,6 +1,7 @@
-import { updateAgentSchema } from "@/db";
+import { agent } from "@/db";
 import { agentRepo } from "@/db/repositories/agent-repo";
 import { api, Errors, success } from "@/lib/server";
+import { createUpdateSchema } from "drizzle-zod";
 import z from "zod";
 
 export const GET = api(
@@ -25,7 +26,7 @@ export const PATCH = api(
   {
     auth: true,
     params: z.object({ id: z.uuid() }),
-    body: updateAgentSchema,
+    body: createUpdateSchema(agent),
   },
   async (req, ctx) => {
     // Verify ownership

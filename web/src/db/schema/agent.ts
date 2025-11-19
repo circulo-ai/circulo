@@ -40,10 +40,10 @@ export const agent = pgTable("agents", {
   systemPrompt: text("system_prompt").notNull(),
   model: varchar("model", { length: 100 })
     .notNull()
-    .default("claude-sonnet-4-20250514"),
+    .default("gemini-2.5-flash"),
+  maxTokens: integer("max_output_tokens").default(1000),
   temperature: integer("temperature").default(70), // 0-100
   avatarUrl: text("avatar_url"),
-  isPublic: boolean("is_public").default(false), // Can others use this agent?
 
   // Default capabilities
   defaultTools: jsonb("default_tools").$type<string[]>().default([]),
@@ -229,57 +229,3 @@ export type NewTool = typeof tool.$inferInsert;
 
 export type McpServer = typeof mcpServer.$inferSelect;
 export type NewMcpServer = typeof mcpServer.$inferInsert;
-
-// Generate base Zod schemas from Drizzle tables
-// Override numeric fields to work with numbers in API, convert to strings for DB
-export const insertAgentSchema = createInsertSchema(agent, {
-  temperature: z
-    .number()
-    .min(0)
-    .max(2)
-    .transform((val) => val.toString()),
-});
-
-export const selectAgentSchema = createSelectSchema(agent, {
-  temperature: z.string().transform((val) => parseFloat(val)),
-});
-
-// API input schema - accepts numbers, validates, then transforms to strings for DB
-export const createAgentSchema = insertAgentSchema
-  .omit({
-    id: true, // Exclude auto-generated fields
-    createdAt: true,
-    updatedAt: true,
-    usageCount: true,
-    lastUsedAt: true,
-    deleted: true,
-  })
-  .extend({
-    // Add custom validations
-    name: z.string().min(1).max(100),
-    systemPrompt: z.string().min(10).max(5000),
-    temperature: z.number().min(0).max(2).default(0.7),
-    toolIds: z.array(z.uuid()).optional().default([]),
-  })
-  .transform((data) => ({
-    ...data,
-    temperature: data.temperature.toString(), // Convert to string for DB
-  }));
-
-export const updateAgentSchema = insertAgentSchema
-  .omit({
-    id: true,
-    userId: true, // Can't change ownership
-    createdAt: true,
-    updatedAt: true,
-    deleted: true,
-  })
-  .partial() // Make all fields optional for updates
-  .extend({
-    temperature: z.number().min(0).max(2).optional(),
-  })
-  .transform((data) => ({
-    ...data,
-    temperature:
-      data.temperature !== undefined ? data.temperature.toString() : undefined,
-  }));

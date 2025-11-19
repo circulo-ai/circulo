@@ -6,7 +6,6 @@ import {
   subscriptionPlans,
   subscriptions,
 } from "@/db/schema/billing";
-import { SubscriptionManager } from "@/lib/billing/subscription-manager";
 import { and, eq, lte } from "drizzle-orm";
 import { PaymentProvider } from "./abstraction/payment-provider";
 import { CreateInvoiceParams, InvoiceStatus } from "./abstraction/types";
@@ -96,6 +95,8 @@ export class BillingManager {
     }
 
     if (newStatus === "paid" && updatedInvoice.type === "subscription") {
+      const { SubscriptionManager } = await import("./subscription-manager");
+
       const meta = updatedInvoice.metadata as Record<string, any>;
 
       // CASE 1: New Subscription
@@ -294,6 +295,8 @@ export class BillingManager {
   static async processExpiredSubscriptions(): Promise<void> {
     const now = new Date();
 
+    // Find subscriptions that expired in the last 24 hours to avoid double-processing
+    // (In a real prod app, use a specific 'next_billing_date' field)
     const expired = await db.query.subscriptions.findMany({
       where: and(
         eq(subscriptions.status, "active"),
@@ -301,16 +304,31 @@ export class BillingManager {
       ),
     });
 
+    // We need a provider instance.
+    // Strategy: Either pass it in, or instantiate a default one (e.g. Changelly)
+    const { getProvider } = await import("."); // Dynamic import
+    const provider = getProvider("changelly");
+    const manager = new BillingManager(provider);
+
     for (const sub of expired) {
       if (sub.autoRenew) {
-        // TODO: maybe we can handle autoRenew for free plans in here
-        // Create renewal invoice
-        // const manager = new BillingManager(getProvider('stripe')); // Default provider
-        // await manager.createSubscriptionInvoice(
-        //   sub.userId,
-        //   sub.id,
-        //   sub.planId
-        // );
+        // 1. Create the renewal invoice
+        const invoiceResult = await manager.createSubscriptionInvoice(
+          sub.userId,
+          sub.id,
+          sub.planId,
+        );
+
+        console.log(
+          `Renewal invoice created for user ${sub.userId}: ${invoiceResult.invoice.id}`,
+        );
+
+        // 2. TODO: IMPORTANT: Since this is Crypto (Push Payment), we cannot "charge" them.
+        // We must Email them the invoice.
+        // await EmailService.sendRenewalInvoice(sub.userId, invoiceResult.checkoutUrl);
+
+        // 3. Optional: Mark subscription as "past_due" instead of expired until they pay?
+        // For now, we leave it 'active' but expired, or update to 'past_due'.
       } else {
         // Mark as expired
         await db

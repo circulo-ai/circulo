@@ -1,4 +1,3 @@
-// lib/audit/tool-audit.ts
 import { db } from "@/db";
 import { auditLog } from "@/db/schema";
 import { createLogger } from "@/lib/logs/console/logger";

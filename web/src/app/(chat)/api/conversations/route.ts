@@ -1,34 +1,43 @@
 import { getConversationSummariesByUserId } from "@/db/queries";
 import { getSession } from "@/lib/auth";
 import { ChatSDKError } from "@/lib/errors";
-import type { NextRequest } from "next/server";
+import { api } from "@/lib/server";
+import z from "zod";
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = request.nextUrl;
+export const GET = api(
+  {
+    query: z.object({
+      limit: z.number().min(1).max(100).optional(),
+      starting_after: z.string().optional(),
+      ending_before: z.string().optional(),
+      search: z.string().optional(),
+    }),
+  },
+  async (req, ctx) => {
+    const limit = ctx.query.limit ?? 10;
+    const startingAfter = ctx.query.starting_after;
+    const endingBefore = ctx.query.ending_before;
 
-  const limit = Number.parseInt(searchParams.get("limit") || "10", 10);
-  const startingAfter = searchParams.get("starting_after");
-  const endingBefore = searchParams.get("ending_before");
+    if (startingAfter && endingBefore) {
+      return new ChatSDKError(
+        "bad_request:api",
+        "Only one of starting_after or ending_before can be provided.",
+      ).toResponse();
+    }
 
-  if (startingAfter && endingBefore) {
-    return new ChatSDKError(
-      "bad_request:api",
-      "Only one of starting_after or ending_before can be provided.",
-    ).toResponse();
-  }
+    const session = await getSession();
 
-  const session = await getSession();
+    if (!session?.user) {
+      return new ChatSDKError("unauthorized:chat").toResponse();
+    }
 
-  if (!session?.user) {
-    return new ChatSDKError("unauthorized:chat").toResponse();
-  }
+    const result = await getConversationSummariesByUserId({
+      id: session.user.id,
+      limit,
+      startingAfter,
+      endingBefore,
+    });
 
-  const result = await getConversationSummariesByUserId({
-    id: session.user.id,
-    limit,
-    startingAfter,
-    endingBefore,
-  });
-
-  return Response.json(result);
-}
+    return Response.json(result);
+  },
+);

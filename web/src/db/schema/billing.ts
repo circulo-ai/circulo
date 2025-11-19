@@ -351,3 +351,4 @@ export const usageRelations = relations(usageMetrics, ({ one }) => ({
 }));
 
 export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
+export type Subscription = typeof subscriptions.$inferSelect;

@@ -258,8 +258,8 @@ export async function getConversationSummariesByUserId({
 }: {
   id: string;
   limit: number;
-  startingAfter: string | null;
-  endingBefore: string | null;
+  startingAfter?: string;
+  endingBefore?: string;
 }): Promise<{ conversations: ConversationSummary[]; hasMore: boolean }> {
   try {
     const extendedLimit = limit + 1;

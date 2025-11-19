@@ -4,110 +4,108 @@ import {
   getStreamIdsByChatId,
 } from "@/db/queries";
 import type { Chat } from "@/db/schema";
-import { getSession } from "@/lib/auth";
 import { ChatSDKError } from "@/lib/errors";
+import { api, Errors, noContent } from "@/lib/server";
 import type { ChatMessage } from "@/lib/types";
 import { createUIMessageStream, JsonToSseTransformStream } from "ai";
 import { differenceInSeconds } from "date-fns";
+import z from "zod";
 import { getStreamContext } from "../../route";
 
-export async function GET(
-  _: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const { id: chatId } = await params;
+export const GET = api(
+  {
+    auth: true,
+    params: z.object({
+      id: z.uuid(),
+    }),
+  },
+  async (_, { user, params: { id: chatId } }) => {
+    const streamContext = getStreamContext();
+    const resumeRequestedAt = new Date();
 
-  const streamContext = getStreamContext();
-  const resumeRequestedAt = new Date();
-
-  if (!streamContext) {
-    return new Response(null, { status: 204 });
-  }
-
-  if (!chatId) {
-    return new ChatSDKError("bad_request:api").toResponse();
-  }
-
-  const session = await getSession();
-
-  if (!session?.user) {
-    return new ChatSDKError("unauthorized:chat").toResponse();
-  }
-
-  let chat: Chat | null;
-
-  try {
-    chat = await getChatById({ id: chatId });
-  } catch {
-    return new ChatSDKError("not_found:chat").toResponse();
-  }
-
-  if (!chat) {
-    return new ChatSDKError("not_found:chat").toResponse();
-  }
-
-  if (chat.visibility === "private" && chat.creatorId !== session.user.id) {
-    return new ChatSDKError("forbidden:chat").toResponse();
-  }
-
-  const streamIds = await getStreamIdsByChatId({ chatId });
-
-  if (!streamIds.length) {
-    return new ChatSDKError("not_found:stream").toResponse();
-  }
-
-  const recentStreamId = streamIds.at(-1);
-
-  if (!recentStreamId) {
-    return new ChatSDKError("not_found:stream").toResponse();
-  }
-
-  const emptyDataStream = createUIMessageStream<ChatMessage>({
-    // biome-ignore lint/suspicious/noEmptyBlockStatements: "Needs to exist"
-    execute: () => {},
-  });
-
-  const stream = await streamContext.resumableStream(recentStreamId, () =>
-    emptyDataStream.pipeThrough(new JsonToSseTransformStream()),
-  );
-
-  /*
-   * For when the generation is streaming during SSR
-   * but the resumable stream has concluded at this point.
-   */
-  if (!stream) {
-    const messages = await getMessagesByChatId({ id: chatId });
-    const mostRecentMessage = messages.at(-1);
-
-    if (!mostRecentMessage) {
-      return new Response(emptyDataStream, { status: 200 });
+    if (!streamContext) {
+      return noContent();
     }
 
-    if (mostRecentMessage.role !== "assistant") {
-      return new Response(emptyDataStream, { status: 200 });
+    if (!chatId) {
+      throw Errors.badRequest();
     }
 
-    const messageCreatedAt = new Date(mostRecentMessage.createdAt);
+    let chat: Chat | null;
 
-    if (differenceInSeconds(resumeRequestedAt, messageCreatedAt) > 15) {
-      return new Response(emptyDataStream, { status: 200 });
+    try {
+      chat = await getChatById({ id: chatId });
+    } catch {
+      return new ChatSDKError("not_found:chat").toResponse();
     }
 
-    const restoredStream = createUIMessageStream<ChatMessage>({
-      execute: ({ writer }) => {
-        writer.write({
-          type: "data-appendMessage",
-          data: JSON.stringify(mostRecentMessage),
-          transient: true,
-        });
-      },
+    if (!chat) {
+      return new ChatSDKError("not_found:chat").toResponse();
+    }
+
+    if (chat.visibility === "private" && chat.creatorId !== user.id) {
+      return new ChatSDKError("forbidden:chat").toResponse();
+    }
+
+    const streamIds = await getStreamIdsByChatId({ chatId });
+
+    if (!streamIds.length) {
+      throw Errors.notFound();
+    }
+
+    const recentStreamId = streamIds.at(-1);
+
+    if (!recentStreamId) {
+      throw Errors.notFound();
+    }
+
+    const emptyDataStream = createUIMessageStream<ChatMessage>({
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: "Needs to exist"
+      execute: () => {},
     });
 
-    return new Response(
-      restoredStream.pipeThrough(new JsonToSseTransformStream()),
-      { status: 200 },
+    const stream = await streamContext.resumableStream(recentStreamId, () =>
+      emptyDataStream.pipeThrough(new JsonToSseTransformStream()),
     );
-  }
 
-  return new Response(stream, { status: 200 });
-}
+    /*
+     * For when the generation is streaming during SSR
+     * but the resumable stream has concluded at this point.
+     */
+    if (!stream) {
+      const messages = await getMessagesByChatId({ id: chatId });
+      const mostRecentMessage = messages.at(-1);
+
+      if (!mostRecentMessage) {
+        return new Response(emptyDataStream, { status: 200 });
+      }
+
+      if (mostRecentMessage.role !== "assistant") {
+        return new Response(emptyDataStream, { status: 200 });
+      }
+
+      const messageCreatedAt = new Date(mostRecentMessage.createdAt);
+
+      if (differenceInSeconds(resumeRequestedAt, messageCreatedAt) > 15) {
+        return new Response(emptyDataStream, { status: 200 });
+      }
+
+      const restoredStream = createUIMessageStream<ChatMessage>({
+        execute: ({ writer }) => {
+          writer.write({
+            type: "data-appendMessage",
+            data: JSON.stringify(mostRecentMessage),
+            transient: true,
+          });
+        },
+      });
+
+      return new Response(
+        restoredStream.pipeThrough(new JsonToSseTransformStream()),
+        { status: 200 },
+      );
+    }
+
+    return new Response(stream, { status: 200 });
+  },
+);

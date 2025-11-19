@@ -8,29 +8,35 @@ import { ApiError } from "./types";
 // ============================================================================
 
 export const Errors = {
-  badRequest: (msg: string, details?: unknown) =>
-    new ApiError(400, "BAD_REQUEST", msg, details),
-  unauthorized: (msg = "Unauthorized") =>
-    new ApiError(401, "UNAUTHORIZED", msg),
-  forbidden: (msg = "Forbidden") => new ApiError(403, "FORBIDDEN", msg),
-  notFound: (msg = "Not found") => new ApiError(404, "NOT_FOUND", msg),
-  conflict: (msg: string, details?: unknown) =>
-    new ApiError(409, "CONFLICT", msg, details),
-  unprocessable: (msg: string, details?: unknown) =>
-    new ApiError(422, "UNPROCESSABLE_ENTITY", msg, details),
-  tooManyRequests: (msg = "Too many requests", details?: unknown) =>
-    new ApiError(429, "TOO_MANY_REQUESTS", msg, details),
-  internal: (msg = "Internal server error") =>
-    new ApiError(500, "INTERNAL_ERROR", msg),
+  badRequest: (msg: string = "Bad Request", code?: string, details?: unknown) =>
+    new ApiError(400, code ?? "BAD_REQUEST", msg, details),
+  unauthorized: (msg = "Unauthorized", code?: string) =>
+    new ApiError(401, code ?? "UNAUTHORIZED", msg),
+  forbidden: (msg = "Forbidden", code?: string) =>
+    new ApiError(403, code ?? "FORBIDDEN", msg),
+  notFound: (msg = "Not found", code?: string) =>
+    new ApiError(404, code ?? "NOT_FOUND", msg),
+  conflict: (msg: string, code?: string, details?: unknown) =>
+    new ApiError(409, code ?? "CONFLICT", msg, details),
+  unprocessable: (msg: string, code?: string, details?: unknown) =>
+    new ApiError(422, code ?? "UNPROCESSABLE_ENTITY", msg, details),
+  tooManyRequests: (
+    msg = "Too many requests",
+    code?: string,
+    details?: unknown,
+  ) => new ApiError(429, code ?? "TOO_MANY_REQUESTS", msg, details),
+  internal: (msg = "Internal server error", code?: string) =>
+    new ApiError(500, code ?? "INTERNAL_ERROR", msg),
 } as const;
 
 function handleError(error: unknown): NextResponse {
   console.error("[API Error]", error);
 
-  // Zod validation errors
+  // Zod errors → consistent shape
   if (error instanceof ZodError) {
-    return NextResponse.json(
+    return json(
       {
+        success: false,
         error: "Validation failed",
         code: "VALIDATION_ERROR",
         details: error.issues.map((issue) => ({
@@ -39,22 +45,23 @@ function handleError(error: unknown): NextResponse {
           code: issue.code,
         })),
       },
-      { status: 400 },
+      400,
     );
   }
 
   // Custom API errors
   if (error instanceof ApiError) {
-    return NextResponse.json(error.toJSON(), { status: error.statusCode });
+    return json(error.toJSON(), error.statusCode);
   }
 
   // Unknown errors
-  return NextResponse.json(
+  return json(
     {
+      success: false,
       error: "Internal server error",
       code: "INTERNAL_ERROR",
     },
-    { status: 500 },
+    500,
   );
 }
 
@@ -311,20 +318,9 @@ export const created = <T>(data: T): NextResponse => success(data, 201);
 export const noContent = (): NextResponse =>
   new NextResponse(null, { status: 204 });
 
-export const notFound = (message?: string): NextResponse =>
-  json({ success: false, error: message ?? "Entity not found!" }, 404);
-
-export const forbidden = (message?: string): NextResponse =>
-  json({ success: false, error: message ?? "Forbidden" }, 403);
-
-export const notAuthorized = (message?: string): NextResponse =>
-  json(
-    {
-      success: false,
-      error: message ?? "Unauthorized",
-    },
-    401,
-  );
+export const notFound = (msg = "Entity not found!") => {
+  throw Errors.notFound(msg);
+};
 
 // ============================================================================
 // Composable Middleware
@@ -402,7 +398,7 @@ export function withRateLimit<
 
         if (requestCount >= maxRequests) {
           await onLimit?.(req, ctx);
-          throw Errors.tooManyRequests("Rate limit exceeded", {
+          throw Errors.tooManyRequests("Rate limit exceeded", undefined, {
             limit: maxRequests,
             window: `${windowMs}ms`,
             retryAfter: windowSeconds,
@@ -415,7 +411,7 @@ export function withRateLimit<
 
         if (recent.length >= maxRequests) {
           await onLimit?.(req, ctx);
-          throw Errors.tooManyRequests("Rate limit exceeded", {
+          throw Errors.tooManyRequests("Rate limit exceeded", undefined, {
             limit: maxRequests,
             window: `${windowMs}ms`,
             retryAfter: windowSeconds,

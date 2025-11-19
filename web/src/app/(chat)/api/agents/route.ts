@@ -1,7 +1,8 @@
+import { agent } from "@/db";
 import { agentRepo } from "@/db/repositories/agent-repo";
-import { createAgentSchema } from "@/db/schema";
 import { UsageRateLimiter } from "@/lib/billing/rate-limiter";
 import { api, success } from "@/lib/server";
+import { createInsertSchema } from "drizzle-zod";
 
 export const GET = api(
   {
@@ -16,7 +17,7 @@ export const GET = api(
 export const POST = api(
   {
     auth: true,
-    body: createAgentSchema,
+    body: createInsertSchema(agent),
   },
   async (req, ctx) => {
     const { allowed } = await UsageRateLimiter.canPerformAction(
