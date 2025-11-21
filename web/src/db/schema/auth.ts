@@ -19,7 +19,7 @@ import {
 export const permissionTypeEnum = pgEnum("permission_type", [
   "admin",
   "write",
-  "read,
+  "read",
 ]);
 
 // ==================== CORE AUTH TABLES ====================
@@ -274,7 +274,7 @@ export const apiKey = pgTable(
       "api_keys_type_check",
       sql`
           (type = 'organization' AND organization_id IS NOT NULL)
-          OR 
+          OR
     (type = 'personal' AND organization_id IS NULL)
       `
     )

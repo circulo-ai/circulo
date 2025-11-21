@@ -1234,8 +1234,8 @@ export const auth = betterAuth({
     }),
     organization({
       // TODO: Limitation based on user active subscription should be applied in future
-      allowUserToCreateOrganization: tre,
-    ),
+      allowUserToCreateOrganization: true,
+    }),
   ],
 });
 

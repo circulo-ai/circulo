@@ -20,7 +20,7 @@ import {
   agentToolConfig,
   customTool,
   mcpServer,
-  mcpServerToo,
+  mcpServerTool,
 } from "@/db/schema/tools";
 
 // Knowledge
@@ -28,7 +28,7 @@ import {
   documentProcessingQueue,
   embedding,
   knowledgeBase,
-  knowledgeDocumen,
+  knowledgeDocument,
 } from "@/db/schema/knowledge";
 
 // Chat
@@ -93,7 +93,7 @@ export const userRelations = relations(user, ({ many, one }) => ({
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
-  user: one(user, { fields: [session.userId], references: [user.id] ),
+  user: one(user, { fields: [session.userId], references: [user.id] }),
 }));
 
 export const accountRelations = relations(account, ({ one }) => ({

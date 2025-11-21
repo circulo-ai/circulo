@@ -119,7 +119,7 @@ export const chatMember = pgTable(
   (t) => ({
     chatUserIdx: uniqueIndex("chat_members_chat_user_idx").on(
       t.chatId,
-      t.userI,
+      t.userId,
     ),
     userIdx: index("chat_members_user_idx").on(t.userId),
     userPinnedIdx: index("chat_members_user_pinned_idx").on(
@@ -128,9 +128,8 @@ export const chatMember = pgTable(
     ),
     unreadCheck: check(
       "chat_members_unread_check",
-      sql`unread_count
-    >= 0,
-    ,
+      sql`unread_count >= 0`,
+    ),
   }),
 );
 

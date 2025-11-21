@@ -76,7 +76,7 @@ export const subscriptionPlan = pgTable(
       .defaultNow(),
   },
   (t) => ({
-    slugIdx: index("subscription_plans_slug_idx").on(t.slug,
+    slugIdx: index("subscription_plans_slug_idx").on(t.slug),
   }),
 );
 
