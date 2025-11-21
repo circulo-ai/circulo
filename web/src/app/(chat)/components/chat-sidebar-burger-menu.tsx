@@ -36,11 +36,9 @@ export function ChatSidebarBurgerMenu() {
           component={Button}
           componentProps={{
             variant: "ghost-sidebar",
-            rounded: "full-percent",
+            rounded: "full",
             size: "icon",
-            className: cn(
-              "group-data-[state=collapsed]:h-17 group-data-[state=collapsed]:w-full group-data-[state=collapsed]:rounded-none",
-            ),
+            className: cn(""),
           }}
         >
           <TextAlignJustify />

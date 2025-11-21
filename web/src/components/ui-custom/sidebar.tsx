@@ -17,10 +17,7 @@ export function CustomSidebar({ className, ...props }: CustomSidebarProps) {
     <Sidebar
       collapsible="icon"
       variant="inset"
-      className={cn(
-        className,
-        "static w-full pr-0 transition-all group-data-[state=collapsed]:p-0",
-      )}
+      className={cn(className, "static w-full pr-0")}
       {...props}
     />
   );
@@ -33,15 +30,7 @@ export function CustomSidebarHeader({
   className,
   ...props
 }: CustomSidebarHeaderProps) {
-  return (
-    <SidebarHeader
-      className={cn(
-        "flex-row transition-all group-data-[state=collapsed]:p-0",
-        className,
-      )}
-      {...props}
-    />
-  );
+  return <SidebarHeader className={cn("flex-row", className)} {...props} />;
 }
 
 interface CustomSidebarGroupProps extends ComponentProps<typeof SidebarGroup> {}
@@ -50,15 +39,7 @@ export function CustomSidebarGroup({
   className,
   ...props
 }: CustomSidebarGroupProps) {
-  return (
-    <SidebarGroup
-      className={cn(
-        "transition-all group-data-[state=collapsed]:p-0",
-        className,
-      )}
-      {...props}
-    />
-  );
+  return <SidebarGroup className={cn("", className)} {...props} />;
 }
 
 interface CustomSidebarInsetProps extends ComponentProps<typeof SidebarInset> {}
