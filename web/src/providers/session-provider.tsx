@@ -1,6 +1,7 @@
 "use client";
 
 import { authClient } from "@/lib/auth-client";
+import { AuthUIContext } from "@daveyplate/better-auth-ui";
 import type React from "react";
 import {
   createContext,
@@ -19,6 +20,15 @@ export type User = {
   image?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
+};
+
+export type Organization = {
+  id: string;
+  name: string;
+  slug: string;
+  createdAt: Date;
+  logo?: string | null | undefined;
+  metadata?: any;
 };
 
 export type AppSession = {
@@ -62,13 +72,34 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [loadSession]);
 
   const value = useMemo<SessionHookResult>(
-    () => ({ data, isPending, error, refetch: loadSession }),
+    () => ({
+      data,
+      isPending,
+      error,
+      refetch: loadSession,
+    }),
     [data, isPending, error, loadSession],
   );
 
   return (
     <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
   );
+}
+
+export function useOrganizations() {
+  const ctx = useContext(SessionContext);
+  if (!ctx) {
+    throw new Error(
+      "SessionProvider is not mounted. Wrap your app with <SessionProvider> in app/layout.tsx.",
+    );
+  }
+  const {
+    hooks: { useListOrganizations, useActiveOrganization },
+  } = useContext(AuthUIContext);
+  return {
+    useListOrganizations,
+    useActiveOrganization,
+  };
 }
 
 export function useSession(): SessionHookResult {

@@ -13,20 +13,30 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { useUser } from "@/hooks/api/chats/use-user";
+import { authClient } from "@/lib/auth-client";
+import { useOrganizations } from "@/providers/session-provider";
+import { CreateOrganizationDialog } from "@daveyplate/better-auth-ui";
 import {
   Bot,
   CreditCard,
   LibraryBig,
   LogOut,
+  Plus,
   Settings,
   TextAlignJustify,
 } from "lucide-react";
+import { useState } from "react";
 
 export function ChatSidebarBurgerMenu() {
   const { user, isLoading } = useUser();
+  const { useActiveOrganization, useListOrganizations } = useOrganizations();
+  const { data: activeOrganization } = useActiveOrganization();
+  const { data: organizations } = useListOrganizations();
+  const [open, setOpen] = useState(false);
 
   return (
     <DropdownMenu>
+      <CreateOrganizationDialog open={open} onOpenChange={setOpen} />
       <DropdownMenuTrigger asChild>
         <Button variant="ghost-sidebar" rounded="full" size="icon">
           <TextAlignJustify />
@@ -36,7 +46,29 @@ export function ChatSidebarBurgerMenu() {
         <DropdownMenuGroup>
           <CustomDropdownMenuItem>
             <UserAvatar user={user} isPending={isLoading} size="xs" />
-            {user?.name}
+            {activeOrganization?.name}
+          </CustomDropdownMenuItem>
+          {organizations &&
+            organizations
+              .filter((e) => e.id != activeOrganization?.id)
+              .map((e) => (
+                <CustomDropdownMenuItem
+                  onClick={async () => {
+                    await authClient.organization.setActive({
+                      organizationId: e.id,
+                    });
+                  }}
+                >
+                  {e?.name}
+                </CustomDropdownMenuItem>
+              ))}
+          <CustomDropdownMenuItem
+            onClick={() => {
+              setOpen(true);
+            }}
+          >
+            <Plus />
+            New Workspace
           </CustomDropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
