@@ -53,6 +53,7 @@ export function ChatSidebarBurgerMenu() {
               .filter((e) => e.id != activeOrganization?.id)
               .map((e) => (
                 <CustomDropdownMenuItem
+                  key={`org-${e.id}`}
                   onClick={async () => {
                     await authClient.organization.setActive({
                       organizationId: e.id,
