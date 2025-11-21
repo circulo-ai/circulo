@@ -14,7 +14,7 @@ export function ChatSidebarSearch({
   setSearch,
 }: ChatSidebarSearchProps) {
   return (
-    <CustomInputGroup className="group-data-[state=collapsed]:hidden">
+    <CustomInputGroup className="min-w-47">
       <InputGroupInput
         placeholder="Search..."
         value={search}

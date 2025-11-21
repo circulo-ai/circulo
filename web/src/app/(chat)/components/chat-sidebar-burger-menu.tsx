@@ -4,6 +4,7 @@ import {
   CustomDropdownMenuContent,
   CustomDropdownMenuItem,
 } from "@/components/ui-custom/dropdown-menu";
+import { WithRipple } from "@/components/ui-custom/ripple";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,7 +12,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useSidebar } from "@/components/ui/sidebar";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { cn } from "@/lib/utils";
 import { useSession } from "@/providers/session-provider";
 import {
   Bot,
@@ -24,20 +27,30 @@ import {
 
 export function ChatSidebarBurgerMenu() {
   const { data, isPending } = useSession();
+  const { open } = useSidebar();
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost-sidebar"
-          rounded="full"
-          size="icon"
-          className="group-data-[state=collapsed]:h-13 group-data-[state=collapsed]:w-full group-data-[state=collapsed]:rounded-none"
+        <WithRipple
+          component={Button}
+          componentProps={{
+            variant: "ghost-sidebar",
+            rounded: "full-percent",
+            size: "icon",
+            className: cn(
+              "group-data-[state=collapsed]:h-17 group-data-[state=collapsed]:w-full group-data-[state=collapsed]:rounded-none",
+            ),
+          }}
         >
           <TextAlignJustify />
-        </Button>
+        </WithRipple>
       </DropdownMenuTrigger>
-      <CustomDropdownMenuContent>
+      <CustomDropdownMenuContent
+        sideOffset={8}
+        alignOffset={open ? 0 : 8}
+        align="start"
+      >
         <DropdownMenuGroup>
           <CustomDropdownMenuItem>
             <UserAvatar user={data?.user} isPending={isPending} size="xs" />

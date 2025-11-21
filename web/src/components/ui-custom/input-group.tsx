@@ -21,7 +21,7 @@ export function CustomInputGroupInput({
 }: CustomInputGroupInputProps) {
   return (
     <InputGroupInput
-      as={CustomInput}
+      as={CustomInput} // TODO
       className={cn(className, "")}
       {...props}
     />

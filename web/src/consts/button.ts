@@ -41,6 +41,7 @@ export const buttonVariants = cva(
       rounded: {
         default: "rounded-md",
         full: "rounded-full",
+        "full-percent": "rounded-[100%]",
         none: "rounded-none",
       },
     },
