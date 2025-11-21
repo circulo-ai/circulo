@@ -1,7 +1,7 @@
 "use client";
 
 import Position from "@/types";
-import { CSSProperties, useCallback, useEffect, useId, useState } from "react";
+import { CSSProperties, useCallback, useEffect, useState } from "react";
 
 interface Ripple {
   id: string;
@@ -29,7 +29,7 @@ export function RippleClient({ id, disabled }: RippleClientProps) {
         setRipples((ripples) => [
           ...ripples,
           {
-            id: useId(),
+            id: Math.random().toString(),
             position: {
               x: e.pageX - containersRect.x,
               y: e.pageY - containersRect.y,
@@ -114,3 +114,4 @@ export function RippleClient({ id, disabled }: RippleClientProps) {
 
 // TODO add a proper timing function to the ripple animation
 // TODO rethink the logic
+// TODO when the mouse click is released outside the button, the ripple incorrectly remains visible

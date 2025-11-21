@@ -2,6 +2,7 @@
 
 import { EnhancedLink } from "@/components/enhanced-link";
 import { EnhancedLinkSpinner } from "@/components/enhanced-link-spinner";
+import { WithRipple } from "@/components/ui-custom/ripple";
 import {
   CustomSidebarMenuButton,
   CustomSidebarMenuSkeleton,
@@ -23,8 +24,14 @@ import { ChatSidebarBurgerMenu } from "./chat-sidebar-burger-menu";
 import { ChatSidebarSearch } from "./chat-sidebar-search";
 
 export function ChatSidebarInside() {
-  const { data, currentChatId, isLoading, search, setSearch } =
-    useChatHistory();
+  const {
+    data,
+    isLoading,
+    search,
+    setSearch,
+    currentChatId,
+    setCurrentChatId,
+  } = useChatHistory();
 
   return (
     <>
@@ -51,10 +58,14 @@ export function ChatSidebarInside() {
                       isActive={currentChatId === item.id}
                       asChild
                     >
-                      <EnhancedLink
-                        asButton={false}
-                        href={`/chat/${item.id}`}
-                        buttonProps={{ variant: "text" }}
+                      <WithRipple
+                        component={EnhancedLink}
+                        componentProps={{
+                          asButton: false,
+                          href: `/chat/${item.id}`,
+                          buttonProps: { variant: "text" },
+                          onClick: () => setCurrentChatId(item.id),
+                        }}
                       >
                         <div className="size-12 rounded-full bg-teal-500" />
                         <span className="truncate">{item.title}</span>
@@ -62,7 +73,7 @@ export function ChatSidebarInside() {
                           <EnhancedLinkSpinner />
                           <span className="sr-only">Add Project</span>
                         </SidebarMenuAction>
-                      </EnhancedLink>
+                      </WithRipple>
                     </CustomSidebarMenuButton>
                     <SidebarMenuBadge>24</SidebarMenuBadge>
                   </SidebarMenuItem>
@@ -77,3 +88,5 @@ export function ChatSidebarInside() {
     </>
   );
 }
+
+// TODO add the controlled input from the Toco project

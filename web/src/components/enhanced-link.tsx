@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { ComponentProps, useId } from "react";
+import { ComponentProps, useId, useMemo } from "react";
 import { EnhancedLinkClient } from "./enhanced-link-client";
 import { Button } from "./ui/button";
 
@@ -16,14 +16,14 @@ export function EnhancedLink({
   enableLinkStatus = true,
   asButton = true,
   className: linkClassname,
+  id: explicitId,
   ...linkProps
 }: EnhancedLinkProps) {
-  const id = useId();
+  const implicitId = useId();
+  const id = explicitId ?? implicitId;
 
-  const Parent = asButton ? ButtonWrapper : FragmentWrapper;
-
-  return (
-    <Parent {...buttonProps}>
+  const mainElement = useMemo(
+    () => (
       <Link
         id={enableLinkStatus ? id : undefined}
         prefetch={true}
@@ -33,14 +33,10 @@ export function EnhancedLink({
         {enableLinkStatus && <EnhancedLinkClient id={id} />}
         {children}
       </Link>
-    </Parent>
+    ),
+    [enableLinkStatus, id, children, linkProps, linkClassname],
   );
-}
 
-function ButtonWrapper(props: ComponentProps<typeof Button>) {
-  return <Button asChild {...props} />;
-}
-
-function FragmentWrapper({ children }: ComponentProps<typeof Button>) {
-  return <>{children}</>;
+  if (asButton) return <Button {...buttonProps}>{mainElement}</Button>;
+  else return mainElement;
 }

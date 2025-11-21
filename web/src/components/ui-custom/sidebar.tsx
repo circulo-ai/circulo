@@ -33,7 +33,10 @@ export function CustomSidebarMenuButton({
 }: CustomSidebarMenuButtonProps) {
   return (
     <SidebarMenuButton
-      className={cn(className, "h-auto hover:bg-teal-50/5")}
+      className={cn(
+        className,
+        "h-auto transition-all hover:bg-teal-50/5 active:bg-teal-50/10 data-[active=true]:bg-teal-800",
+      )}
       {...props}
     />
   );
