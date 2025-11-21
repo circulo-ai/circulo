@@ -54,6 +54,7 @@ export interface ToolRuntimeContext<TConfig = Record<string, unknown>> {
 
 class ToolRegistry {
   private tools = new Map<string, BaseToolDefinition>();
+  private initialized = false;
 
   register<TParams extends ZodType, TConfig extends ZodType>(
     tool: ToolDefinition<TParams, TConfig>,
@@ -79,6 +80,14 @@ class ToolRegistry {
 
   getCategories(): string[] {
     return [...new Set(this.getAll().map((t) => t.category))];
+  }
+
+  async initBuiltins(): Promise<void> {
+    if (this.initialized) return;
+    await Promise.all([
+      import("@/ai/tools/telegram"),
+    ]);
+    this.initialized = true;
   }
 
   /**

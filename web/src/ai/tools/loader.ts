@@ -3,11 +3,7 @@ import { agentToolConfig } from "@/db/schema";
 import { Tool as CoreTool } from "ai";
 import { eq } from "drizzle-orm";
 import { ToolEnvVars, toolRegistry } from "./registry";
-
-// Import all tool definitions to register them
-import { telegramSendMessage } from "@/ai/tools/telegram";
 import { getMergedEnv } from "@/lib/environment/utils";
-import "./telegram";
 
 // ==================== TYPES ====================
 
@@ -38,6 +34,7 @@ export async function loadToolsForAgent(
   agentId: string,
   context: ToolLoadContext,
 ): Promise<ToolLoadResult> {
+  await toolRegistry.initBuiltins();
   // Get agent's tool configurations
   const configs = await db.query.agentToolConfig.findMany({
     where: eq(agentToolConfig.agentId, agentId),
@@ -57,9 +54,6 @@ export async function loadToolsForAgent(
   const tools: Record<string, CoreTool> = {};
   const loaded: string[] = [];
   const failed: Array<{ toolId: string; reason: string }> = [];
-
-  // What the fuck / to register the telegram tool
-  const test = telegramSendMessage;
 
   const enabledConfigs = configs.filter((c) => c.isEnabled);
   const orderedConfigs = enabledConfigs.slice().sort((a, b) => {
@@ -145,6 +139,7 @@ export async function getAvailableToolsForAgent(
     missingEnvVars: string[];
   }>
 > {
+  await toolRegistry.initBuiltins();
   const configs = await db.query.agentToolConfig.findMany({
     where: eq(agentToolConfig.agentId, agentId),
   });
@@ -184,6 +179,7 @@ export async function loadToolsById(
   toolIds: string[],
   context: ToolLoadContext,
 ): Promise<ToolLoadResult> {
+  await toolRegistry.initBuiltins();
   const baseEnv = await getMergedEnv({
     organizationId: context.organizationId,
     userId: context.userId,
