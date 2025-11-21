@@ -1,29 +1,64 @@
-import { user } from "@/db/schema/auth";
+import { agent } from "@/db/schema/agent";
+import { organization, user } from "@/db/schema/auth";
 import { chat } from "@/db/schema/chat";
 import {
   boolean,
   index,
   integer,
+  json,
   jsonb,
+  pgEnum,
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import z from "zod";
 
-// MCP (Model Context Protocol) Server definitions
-// Must be defined before tool since tool references it
+// ==================== ENUMS ====================
+export const mcpTransportEnum = pgEnum("mcp_transport", [
+  "stdio",
+  "http",
+  "websocket",
+]);
+export const connectionStatusEnum = pgEnum("connection_status", [
+  "connected",
+  "disconnected",
+  "error",
+]);
+
+// ==================== CUSTOM TOOLS (Organization-scoped) ====================
+// These are user-defined tools with custom code
+export const customTool = pgTable(
+  "custom_tools",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id").references(() => organization.id, {
+      onDelete: "cascade",
+    }),
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    schema: json("schema").notNull(),
+    code: text("code").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    organizationIdIdx: index("custom_tools_organization_id_idx").on(
+      table.organizationId,
+    ),
+  }),
+);
+
+// ==================== MCP SERVERS (Chat-scoped) ====================
+// MCP servers are attached to specific chats
 export const mcpServer = pgTable(
   "mcp_servers",
   {
-    id: text("id").primaryKey(),
-    chatId: text("chat_id")
+    id: uuid("id").defaultRandom().primaryKey(),
+    chatId: uuid("chat_id")
       .notNull()
       .references(() => chat.id, { onDelete: "cascade" }),
-
-    // Track who created the server, but chat owns it
     createdBy: text("created_by").references(() => user.id, {
       onDelete: "set null",
     }),
@@ -31,147 +66,125 @@ export const mcpServer = pgTable(
     name: text("name").notNull(),
     description: text("description"),
 
-    transport: text("transport").notNull(),
+    // Connection config
+    transport: mcpTransportEnum("transport").notNull(),
     url: text("url"),
-
-    headers: jsonb("headers").default({}),
+    headers: jsonb("headers").$type<Record<string, string>>().default({}),
     timeout: integer("timeout").default(30000),
     retries: integer("retries").default(3),
 
-    enabled: boolean("enabled").notNull().default(true),
-    lastConnected: timestamp("last_connected"),
-    connectionStatus: text("connection_status").default("disconnected"),
+    // State
+    isEnabled: boolean("is_enabled").notNull().default(true),
+    connectionStatus:
+      connectionStatusEnum("connection_status").default("disconnected"),
+    lastConnectedAt: timestamp("last_connected_at", { withTimezone: true }),
     lastError: text("last_error"),
 
+    // Stats
     toolCount: integer("tool_count").default(0),
-    lastToolsRefresh: timestamp("last_tools_refresh"),
+    lastToolsRefreshAt: timestamp("last_tools_refresh_at", {
+      withTimezone: true,
+    }),
     totalRequests: integer("total_requests").default(0),
-    lastUsed: timestamp("last_used"),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
 
-    deletedAt: timestamp("deleted_at"),
-
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at")
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow()
       .$onUpdate(() => new Date()),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
-  (table) => ({
+  (t) => ({
+    chatIdx: index("mcp_servers_chat_idx").on(t.chatId),
     chatEnabledIdx: index("mcp_servers_chat_enabled_idx").on(
-      table.chatId,
-      table.enabled,
-    ),
-    chatDeletedIdx: index("mcp_servers_chat_deleted_idx").on(
-      table.chatId,
-      table.deletedAt,
+      t.chatId,
+      t.isEnabled,
     ),
   }),
 );
 
-// Tool definitions for agents
-export const tool = pgTable(
-  "tool",
+// ==================== MCP SERVER TOOLS (Discovered tools from MCP) ====================
+// Tools discovered from MCP servers
+export const mcpServerTool = pgTable(
+  "mcp_server_tools",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
-    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }), // null for system tools
+    id: uuid("id").defaultRandom().primaryKey(),
+    mcpServerId: uuid("mcp_server_id")
+      .notNull()
+      .references(() => mcpServer.id, { onDelete: "cascade" }),
 
     name: text("name").notNull(),
-    description: text("description").notNull(),
+    description: text("description"),
+    schema: jsonb("schema").$type<Record<string, unknown>>().notNull(),
 
-    // Tool configuration
-    type: text("type").notNull(), // 'function', 'mcp_server', 'api', etc.
-    configuration: jsonb("configuration")
-      .$type<Record<string, any>>()
-      .notNull(),
+    isEnabled: boolean("is_enabled").notNull().default(true),
 
-    // For MCP servers
-    mcpServerId: text("mcp_server_id").references(() => mcpServer.id, {
-      onDelete: "set null",
-    }),
+    lastDiscoveredAt: timestamp("last_discovered_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    serverIdx: index("mcp_server_tools_server_idx").on(t.mcpServerId),
+    serverNameIdx: uniqueIndex("mcp_server_tools_server_name_idx").on(
+      t.mcpServerId,
+      t.name,
+    ),
+  }),
+);
 
-    isSystem: boolean("is_system").notNull().default(false), // System-provided tools
-    isActive: boolean("is_active").notNull().default(true),
+// ==================== AGENT TOOL CONFIGS (Per-agent tool settings) ====================
+// Configuration for tools attached to specific agents
+export const agentToolConfig = pgTable(
+  "agent_tool_configs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    agentId: uuid("agent_id")
+      .notNull()
+      .references(() => agent.id, { onDelete: "cascade" }),
 
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at")
+    // Reference to tool (can be custom tool ID or built-in tool ID)
+    toolId: text("tool_id").notNull(),
+    toolType: text("tool_type").notNull(), // 'custom' | 'builtin' | 'mcp'
+
+    // Instance-specific configuration (overrides defaults)
+    config: json("config")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+
+    // Environment variable overrides for this specific instance
+    envOverrides: jsonb("env_overrides")
+      .$type<Record<string, string>>()
+      .default({}),
+
+    isEnabled: boolean("is_enabled").notNull().default(true),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
-  (table) => ({
-    userIdIdx: index("tool_user_id_idx").on(table.userId),
-    mcpServerIdx: index("tool_mcp_server_idx").on(table.mcpServerId),
-    typeIdx: index("tool_type_idx").on(table.type),
-    isSystemIdx: index("tool_is_system_idx").on(table.isSystem),
+  (t) => ({
+    agentIdx: index("agent_tool_configs_agent_idx").on(t.agentId),
+    agentToolIdx: index("agent_tool_configs_agent_tool_idx").on(
+      t.agentId,
+      t.toolId,
+    ),
   }),
 );
 
-export const insertToolSchema = createInsertSchema(tool);
-export const selectToolSchema = createSelectSchema(tool);
-
-export const createToolSchema = insertToolSchema
-  .omit({
-    id: true,
-    createdAt: true,
-    updatedAt: true,
-  })
-  .extend({
-    name: z.string().min(1).max(100),
-    description: z.string().min(1).max(500),
-    type: z.enum(["builtin", "mcp", "custom", "api"]),
-    configuration: z.record(z.string(), z.any()),
-    mcpServerId: z.string().optional(),
-    isSystem: z.boolean().default(false),
-    isActive: z.boolean().default(true),
-  });
-
-export const updateToolSchema = insertToolSchema
-  .omit({
-    id: true,
-    userId: true,
-    createdAt: true,
-    updatedAt: true,
-  })
-  .partial()
-  .extend({
-    name: z.string().min(1).max(100).optional(),
-    description: z.string().min(1).max(500).optional(),
-    type: z.enum(["builtin", "mcp", "custom", "api"]).optional(),
-    configuration: z.record(z.string(), z.any()).optional(),
-    isActive: z.boolean().optional(),
-  });
-
-export const insertMcpServerSchema = createInsertSchema(mcpServer);
-export const selectMcpServerSchema = createSelectSchema(mcpServer);
-
-export const createMcpServerSchema = z.object({
-  id: z.string().optional(),
-  chatId: z.string(),
-  name: z.string().min(1).max(100),
-  description: z.string().max(500).optional(),
-  transport: z.literal("streamable-http"),
-  url: z.string().url("Must be a valid URL"),
-  headers: z.record(z.string(), z.string()).default({}),
-  timeout: z.number().int().min(1000).max(300000).default(30000),
-  retries: z.number().int().min(0).max(10).default(3),
-  enabled: z.boolean().default(true),
-});
-
-export const updateMcpServerSchema = z
-  .object({
-    name: z.string().min(1).max(100).optional(),
-    description: z.string().max(500).optional().nullable(),
-    transport: z.literal("streamable-http").optional(),
-    url: z.string().url("Must be a valid URL").optional(),
-    headers: z.record(z.string(), z.string()).optional(),
-    timeout: z.number().int().min(1000).max(300000).optional(),
-    retries: z.number().int().min(0).max(10).optional(),
-    enabled: z.boolean().optional(),
-  })
-  .partial();
-
-export type Tool = typeof tool.$inferSelect;
-export type NewTool = typeof tool.$inferInsert;
-
+// ==================== TYPES ====================
+export type CustomTool = typeof customTool.$inferSelect;
+export type NewCustomTool = typeof customTool.$inferInsert;
 export type McpServer = typeof mcpServer.$inferSelect;
 export type NewMcpServer = typeof mcpServer.$inferInsert;
+export type McpServerTool = typeof mcpServerTool.$inferSelect;
+export type AgentToolConfig = typeof agentToolConfig.$inferSelect;
+export type McpTransport = (typeof mcpTransportEnum.enumValues)[number];
+export type ConnectionStatus = (typeof connectionStatusEnum.enumValues)[number];

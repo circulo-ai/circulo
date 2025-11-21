@@ -1,10 +1,16 @@
-import { db, subscriptionPlans } from "@/db";
+import { db, subscriptionPlan as subscriptionPlans } from "@/db";
 import { eq } from "drizzle-orm";
 
 export const plansRepo = {
   async findById(id: number) {
-    return db.query.subscriptionPlans.findFirst({
+    return db.query.subscriptionPlan.findFirst({
       where: eq(subscriptionPlans.id, id),
+    });
+  },
+
+  async findAll() {
+    return db.query.subscriptionPlan.findMany({
+      orderBy: (plans, { asc }) => [asc(plans.usdPrice)],
     });
   },
 

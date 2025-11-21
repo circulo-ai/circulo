@@ -4,7 +4,7 @@ import * as schema from "@/db/schema";
 import { getBaseURL } from "@/lib/auth-client";
 import { sendEmail } from "@/lib/email/mailer";
 import { createLogger } from "@/lib/logs/console/logger";
-import { betterAuth } from "better-auth";
+import { betterAuth, User } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import {
@@ -12,20 +12,67 @@ import {
   genericOAuth,
   magicLink,
   oneTimeToken,
+  organization,
 } from "better-auth/plugins";
 import { eq } from "drizzle-orm";
+import { nanoid } from "nanoid";
 import { headers } from "next/headers";
 import { env } from "./env";
 
 const logger = createLogger("Auth");
+
+const createPersonalOrganization = async (user: User) => {
+  try {
+    const firstName = user.name?.trim()?.split(" ")[0] ?? null;
+
+    const workspaceName = firstName
+      ? `${firstName}'s Workspace`
+      : "Personal Workspace";
+
+    const orgId = nanoid(); // you are using text pk, so nanoid is perfect
+    const slug = `personal-${orgId}`; // guaranteed unique
+
+    // 1. Create organization
+    await db.insert(schema.organization).values({
+      id: orgId,
+      name: workspaceName,
+      slug,
+      metadata: { type: "personal", userId: user.id },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    // 2. Create membership
+    await db.insert(schema.member).values({
+      id: nanoid(), // if your member table uses text PK
+      userId: user.id,
+      organizationId: orgId,
+      role: "owner",
+      createdAt: new Date(),
+    });
+
+    logger.info("Created personal workspace for new user", {
+      userId: user.id,
+      organizationId: orgId,
+    });
+
+    return orgId;
+  } catch (error) {
+    logger.error("Failed to create personal organization", {
+      userId: user.id,
+      error,
+    });
+    throw error;
+  }
+};
 
 const handleNewUser = async (userId: string) => {
   try {
     // Get the free tier plan (you'll need to ensure this exists in your database)
     const freePlan = await db
       .select()
-      .from(schema.subscriptionPlans)
-      .where(eq(schema.subscriptionPlans.slug, "free"))
+      .from(schema.subscriptionPlan)
+      .where(eq(schema.subscriptionPlan.slug, "free"))
       .limit(1);
 
     if (!freePlan[0]) {
@@ -34,7 +81,7 @@ const handleNewUser = async (userId: string) => {
     }
 
     // Create subscription for new user
-    await db.insert(schema.subscriptions).values({
+    await db.insert(schema.subscription).values({
       userId: userId,
       planId: freePlan[0].id,
       status: "active",
@@ -67,7 +114,19 @@ export const auth = betterAuth({
             await handleNewUser(user.id);
           } catch (error) {
             logger.error(
-              "[databaseHooks.user.create.after] Failed to initialize user stats",
+              "[databaseHooks.user.create.after] Failed to create subscription",
+              {
+                userId: user.id,
+                error,
+              },
+            );
+          }
+
+          try {
+            await createPersonalOrganization(user);
+          } catch (error) {
+            logger.error(
+              "[databaseHooks.user.create.after] Failed to create personal organization",
               {
                 userId: user.id,
                 error,
@@ -1173,6 +1232,10 @@ export const auth = betterAuth({
         },
       ],
     }),
+    organization({
+      // TODO: Limitation based on user active subscription should be applied in future
+      allowUserToCreateOrganization: tre,
+    ),
   ],
 });
 

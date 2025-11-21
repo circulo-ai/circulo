@@ -1,6 +1,5 @@
 import { Chat } from "@/components/chat";
 import { DataStreamHandler } from "@/components/data-stream-handler";
-import { DEFAULT_CHAT_MODEL } from "@/lib/ai/models";
 import { getSession } from "@/lib/auth";
 import { generateUUID } from "@/lib/utils";
 import { cookies } from "next/headers";
@@ -24,7 +23,6 @@ export default async function Page() {
         <Chat
           autoResume={false}
           id={id}
-          initialChatModel={DEFAULT_CHAT_MODEL}
           initialMessages={[]}
           initialVisibilityType="private"
           isReadonly={false}
@@ -41,7 +39,6 @@ export default async function Page() {
       <Chat
         autoResume={false}
         id={id}
-        initialChatModel={DEFAULT_CHAT_MODEL}
         initialMessages={[]}
         initialVisibilityType="private"
         isReadonly={false}

@@ -1,4 +1,4 @@
-import { user } from "@/db/schema/auth";
+import { organization, user } from "@/db/schema/auth";
 import { tsvector } from "@/db/schema/types";
 import { SQL, sql } from "drizzle-orm";
 import {
@@ -11,9 +11,11 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  uuid,
   vector,
 } from "drizzle-orm/pg-core";
 
+// ==================== ENUMS ====================
 export const processingStatusEnum = pgEnum("processing_status", [
   "pending",
   "processing",
@@ -21,112 +23,129 @@ export const processingStatusEnum = pgEnum("processing_status", [
   "failed",
 ]);
 
-// Knowledge bases for RAG
+// ==================== KNOWLEDGE BASES (Organization-scoped) ====================
 export const knowledgeBase = pgTable(
-  "knowledge_base",
+  "knowledge_bases",
   {
-    id: text("id").primaryKey(),
-    userId: text("user_id")
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: text("organization_id")
       .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+      .references(() => organization.id, { onDelete: "cascade" }),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id, { onDelete: "set null" }),
 
     name: text("name").notNull(),
     description: text("description"),
 
+    // Embedding configuration
     embeddingModel: text("embedding_model")
       .notNull()
       .default("text-embedding-3-small"),
     embeddingDimension: integer("embedding_dimension").notNull().default(1536),
 
+    // Stats
     documentCount: integer("document_count").notNull().default(0),
     totalTokens: integer("total_tokens").notNull().default(0),
-    totalSize: integer("total_size").notNull().default(0), // Total size in bytes
+    totalSizeBytes: integer("total_size_bytes").notNull().default(0),
 
     isPublic: boolean("is_public").notNull().default(false),
+    isDeleted: boolean("is_deleted").notNull().default(false),
 
-    deleted: boolean("deleted").notNull().default(false),
-
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at")
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
-  (table) => ({
-    userIdIdx: index("kb_user_id_idx").on(table.userId),
-    isPublicIdx: index("kb_is_public_idx").on(table.isPublic),
-    countsNonNegative: check(
-      "kb_counts_non_negative",
-      sql`document_count >= 0 AND total_tokens >= 0 AND total_size >= 0`,
+  (t) => ({
+    orgIdx: index("knowledge_bases_org_idx").on(t.organizationId),
+    orgNameIdx: uniqueIndex("knowledge_bases_org_name_idx").on(
+      t.organizationId,
+      t.name,
     ),
-    embeddingDimPositive: check(
-      "kb_embedding_dimension_positive",
-      sql`embedding_dimension > 0`,
+    statsCheck: check(
+      "knowledge_bases_stats_check",
+      sql`
+        document_count
+        >= 0 AND total_tokens >= 0 AND total_size_bytes >= 0 AND embedding_dimension > 0
+      ,
     ),
   }),
 );
 
-// Documents within knowledge bases
+// ==================== KNOWLEDGE DOCUMENTS ====================
 export const knowledgeDocument = pgTable(
-  "knowledge_document",
+  "knowledge_documents",
   {
-    id: text("id").primaryKey(),
-    knowledgeBaseId: text("knowledge_base_id")
+    id: uuid("id").defaultRandom().primaryKey(),
+    knowledgeBaseId: uuid("knowledge_base_id")
       .notNull()
       .references(() => knowledgeBase.id, { onDelete: "cascade" }),
 
     filename: text("filename").notNull(),
     fileUrl: text("file_url").notNull(),
-    fileSize: integer("file_size").notNull(),
+    fileSizeBytes: integer("file_size_bytes").notNull(),
     mimeType: text("mime_type").notNull(),
 
-    // Document metadata
+    // Optional metadata
     title: text("title"),
     author: text("author"),
-    metadata: text("metadata"), // JSON string for additional metadata
+    metadata: text("metadata"), // JSON string
 
+    // Processing stats
     chunkCount: integer("chunk_count").notNull().default(0),
     tokenCount: integer("token_count").notNull().default(0),
 
+    // Processing state
     processingStatus: processingStatusEnum("processing_status")
       .notNull()
       .default("pending"),
     processingError: text("processing_error"),
-    processingStartedAt: timestamp("processing_started_at"),
-    processingCompletedAt: timestamp("processing_completed_at"),
+    processingStartedAt: timestamp("processing_started_at", {
+      withTimezone: true,
+    }),
+    processingCompletedAt: timestamp("processing_completed_at", {
+      withTimezone: true,
+    }),
 
-    deleted: boolean("deleted").notNull().default(false),
+    isDeleted: boolean("is_deleted").notNull().default(false),
 
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at")
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
-  (table) => ({
-    kbIdIdx: index("document_kb_id_idx").on(table.knowledgeBaseId),
-    statusIdx: index("document_status_idx").on(table.processingStatus),
-    kbStatusIdx: index("document_kb_status_idx").on(
-      table.knowledgeBaseId,
-      table.processingStatus,
+  (t) => ({
+    kbIdx: index("knowledge_documents_kb_idx").on(t.knowledgeBaseId),
+    statusIdx: index("knowledge_documents_status_idx").on(t.processingStatus),
+    kbStatusIdx: index("knowledge_documents_kb_status_idx").on(
+      t.knowledgeBaseId,
+      t.processingStatus,
     ),
-    fileSizePositive: check("document_file_size_positive", sql`file_size > 0`),
-    countsNonNegative: check(
-      "document_counts_non_negative",
-      sql`chunk_count >= 0 AND token_count >= 0`,
+    statsCheck: check(
+      "knowledge_documents_stats_check",
+      sql`
+    file_size_bytes > 0 AND chunk_count >= 0 AND token_count >= 0
+  `,
     ),
   }),
 );
 
-// Embeddings for document chunks
+// ==================== EMBEDDINGS ====================
 export const embedding = pgTable(
-  "embedding",
+  "embeddings",
   {
-    id: text("id").primaryKey(),
-    knowledgeBaseId: text("knowledge_base_id")
+    id: uuid("id").defaultRandom().primaryKey(),
+    knowledgeBaseId: uuid("knowledge_base_id")
       .notNull()
       .references(() => knowledgeBase.id, { onDelete: "cascade" }),
-    documentId: text("document_id")
+    documentId: uuid("document_id")
       .notNull()
       .references(() => knowledgeDocument.id, { onDelete: "cascade" }),
 
@@ -134,60 +153,53 @@ export const embedding = pgTable(
     chunkIndex: integer("chunk_index").notNull(),
     tokenCount: integer("token_count").notNull(),
 
-    // Chunk metadata
+    // Position metadata
     startPage: integer("start_page"),
     endPage: integer("end_page"),
-    metadata: text("metadata"), // JSON string for additional chunk metadata
+    metadata: text("metadata"), // JSON string
 
+    // Vector embedding
     embedding: vector("embedding", { dimensions: 1536 }).notNull(),
 
-    // Full-text search vector
+    // Full-text search
     contentTsv: tsvector("content_tsv").generatedAlwaysAs(
       (): SQL => sql`to_tsvector('english', ${embedding.content})`,
     ),
 
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
-  (table) => ({
-    kbIdIdx: index("embedding_kb_id_idx").on(table.knowledgeBaseId),
-    docIdIdx: index("embedding_doc_id_idx").on(table.documentId),
-    docChunkIdx: uniqueIndex("embedding_doc_chunk_idx").on(
-      table.documentId,
-      table.chunkIndex,
+  (t) => ({
+    kbIdx: index("embeddings_kb_idx").on(t.knowledgeBaseId),
+    docIdx: index("embeddings_doc_idx").on(t.documentId),
+    docChunkIdx: uniqueIndex("embeddings_doc_chunk_idx").on(
+      t.documentId,
+      t.chunkIndex,
     ),
-
-    // HNSW index for vector similarity search
-    embeddingVectorIdx: index("embedding_vector_hnsw_idx")
-      .using("hnsw", table.embedding.op("vector_cosine_ops"))
+    // HNSW index for vector similarity
+    vectorIdx: index("embeddings_vector_hnsw_idx")
+      .using("hnsw", t.embedding.op("vector_cosine_ops"))
       .with({ m: 16, ef_construction: 64 }),
-
     // Full-text search index
-    contentFtsIdx: index("embedding_content_fts_idx").using(
-      "gin",
-      table.contentTsv,
-    ),
-
-    chunkIndexNonNegative: check(
-      "embedding_chunk_index_non_negative",
-      sql`chunk_index >= 0`,
-    ),
-    tokenCountNonNegative: check(
-      "embedding_token_count_non_negative",
-      sql`token_count >= 0`,
-    ),
-    pagesNonNegative: check(
-      "embedding_pages_non_negative",
-      sql`(start_page IS NULL OR start_page >= 0) AND (end_page IS NULL OR end_page >= 0)`,
+    ftsIdx: index("embeddings_fts_idx").using("gin", t.contentTsv),
+    statsCheck: check(
+      "embeddings_stats_check",
+      sql`
+    chunk_index >= 0 AND token_count >= 0 AND 
+    (start_page IS NULL OR start_page >= 0) AND 
+    (end_page IS NULL OR end_page >= 0)
+  `,
     ),
   }),
 );
 
-// Document processing queue for async processing
+// ==================== DOCUMENT PROCESSING QUEUE ====================
 export const documentProcessingQueue = pgTable(
   "document_processing_queue",
   {
-    id: text("id").primaryKey(),
-    documentId: text("document_id")
+    id: uuid("id").defaultRandom().primaryKey(),
+    documentId: uuid("document_id")
       .notNull()
       .references(() => knowledgeDocument.id, { onDelete: "cascade" }),
 
@@ -198,39 +210,30 @@ export const documentProcessingQueue = pgTable(
     status: processingStatusEnum("status").notNull().default("pending"),
     error: text("error"),
 
-    startedAt: timestamp("started_at"),
-    completedAt: timestamp("completed_at"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
 
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
-  (table) => ({
-    documentIdIdx: uniqueIndex("doc_processing_queue_document_id_idx").on(
-      table.documentId,
+  (t) => ({
+    documentIdx: uniqueIndex("doc_queue_document_idx").on(t.documentId),
+    statusPriorityIdx: index("doc_queue_status_priority_idx").on(
+      t.status,
+      t.priority,
     ),
-    statusIdx: index("doc_processing_queue_status_idx").on(table.status),
-    priorityStatusIdx: index("doc_processing_queue_priority_status_idx").on(
-      table.priority,
-      table.status,
-    ),
-    attemptsNonNegative: check(
-      "doc_processing_queue_attempts_non_negative",
+    attemptsCheck: check(
+      "doc_queue_attempts_check",
       sql`attempts >= 0 AND max_attempts > 0`,
     ),
   }),
 );
 
-// Types
+// ==================== TYPES ====================
 export type KnowledgeBase = typeof knowledgeBase.$inferSelect;
 export type NewKnowledgeBase = typeof knowledgeBase.$inferInsert;
-
 export type KnowledgeDocument = typeof knowledgeDocument.$inferSelect;
 export type NewKnowledgeDocument = typeof knowledgeDocument.$inferInsert;
-export type ProcessingStatus = (typeof processingStatusEnum.enumValues)[number];
-
 export type Embedding = typeof embedding.$inferSelect;
-export type NewEmbedding = typeof embedding.$inferInsert;
-
-export type DocumentProcessingQueue =
-  typeof documentProcessingQueue.$inferSelect;
-export type NewDocumentProcessingQueue =
-  typeof documentProcessingQueue.$inferInsert;
+export type ProcessingStatus = (typeof processingStatusEnum.enumValues)[number];

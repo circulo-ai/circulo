@@ -1,3 +1,4 @@
+import { streamAgent } from "@/ai/agent/runner";
 import { generateTitleFromUserMessage } from "@/app/(chat)/actions";
 import {
   createStreamId,
@@ -9,9 +10,6 @@ import {
 } from "@/db/queries";
 import { agentRepo } from "@/db/repositories/agent-repo";
 import { chatRepo } from "@/db/repositories/chat-repo";
-import { systemPrompt } from "@/lib/ai/prompts";
-import { myProvider } from "@/lib/ai/providers";
-import { executeAgentWithDynamicTools } from "@/lib/ai/tools/executor";
 import { getSession } from "@/lib/auth";
 import { UsageRateLimiter } from "@/lib/billing/rate-limiter";
 import { SubscriptionManager } from "@/lib/billing/subscription-manager";
@@ -27,7 +25,6 @@ import {
   convertToModelMessages,
   createUIMessageStream,
   JsonToSseTransformStream,
-  streamText,
 } from "ai";
 import { unstable_cache as cache } from "next/cache";
 import { after } from "next/server";
@@ -143,11 +140,15 @@ export async function POST(request: Request) {
       messagesFromDb = await getMessagesByChatId({ id });
     } else {
       const title = await generateTitleFromUserMessage({ message });
+      const activeOrganizationId =
+        (session as any)?.session?.activeOrganizationId ||
+        (session as any)?.activeOrganizationId;
       await saveChat({
         id,
         userId: session.user.id,
         title,
-        visibility: selectedVisibilityType,
+        visibility: selectedVisibilityType as any,
+        organizationId: activeOrganizationId,
       });
       createdNewChat = true;
       await UsageTracker.track(session.user.id, "chats_created", 1);
@@ -187,7 +188,7 @@ export async function POST(request: Request) {
           quotedMessageId: null,
           isEdited: false,
           editedAt: null,
-          deleted: false,
+          isDeleted: false,
           deletedAt: null,
         },
       ],
@@ -228,40 +229,16 @@ export async function POST(request: Request) {
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
         if (agent && firstAgentId) {
-          const { result } = await executeAgentWithDynamicTools({
-            userId: session.user.id,
-            chatId: id,
+          const activeOrganizationId =
+            (session as any)?.session?.activeOrganizationId ||
+            (session as any)?.activeOrganizationId ||
+            "";
+          const result = await streamAgent({
             agentId: firstAgentId,
+            chatId: id,
+            userId: session.user.id,
+            organizationId: activeOrganizationId,
             messages: convertToModelMessages(uiMessages),
-            dataStream,
-          });
-          result.consumeStream();
-          dataStream.merge(result.toUIMessageStream({ sendReasoning: true }));
-        } else {
-          // Fallback to default chat model
-          const headers = request.headers;
-          const requestHints = {
-            latitude: headers.get("x-vercel-ip-latitude") || "0",
-            longitude: headers.get("x-vercel-ip-longitude") || "0",
-            city: headers.get("x-vercel-ip-city") || "",
-            country: headers.get("x-vercel-ip-country") || "",
-          } as any;
-
-          const result = streamText({
-            model: myProvider.languageModel("chat-model"),
-            system: systemPrompt({
-              selectedChatModel: "chat-model",
-              requestHints,
-            }),
-            messages: convertToModelMessages(uiMessages),
-            onFinish: async ({ usage }) => {
-              finalUsage = usage;
-              dataStream.write({
-                type: "data-usage",
-                data: usage as any,
-                transient: true,
-              });
-            },
           });
           result.consumeStream();
           dataStream.merge(result.toUIMessageStream({ sendReasoning: true }));

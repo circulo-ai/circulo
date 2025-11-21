@@ -1,5 +1,6 @@
-import { user } from "@/db/schema/auth";
+import { organization, user } from "@/db/schema/auth";
 import {
+  boolean,
   index,
   integer,
   jsonb,
@@ -7,66 +8,73 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
-  varchar,
 } from "drizzle-orm/pg-core";
 
+// ==================== ENUMS ====================
 export const agentVisibilityEnum = pgEnum("agent_visibility", [
-  "private",
-  "public",
-  "marketplace",
+  "private", // Only creator can use
+  "team", // Organization members can use
+  "public", // Anyone can use (future marketplace)
 ]);
 
-export const agentTemplateStatusEnum = pgEnum("agent_template_status", [
-  "draft",
-  "published",
-  "archived",
-]);
-
-// Agent Templates (User-created agent configurations)
+// ==================== AGENTS ====================
+// Agents belong to organizations (workspaces) for proper scope management
 export const agent = pgTable(
   "agents",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    userId: text("user_id")
-      .references(() => user.id, { onDelete: "cascade" })
-      .notNull(),
-    name: varchar("name", { length: 255 }).notNull(),
-    description: text("description"),
-    systemPrompt: text("system_prompt").notNull(),
-    model: varchar("model", { length: 100 })
+
+    // Ownership: Organization is primary owner, userId tracks creator
+    organizationId: text("organization_id")
       .notNull()
-      .default("gemini-2.5-flash"),
-    maxTokens: integer("max_output_tokens").default(1000),
-    temperature: integer("temperature").default(70), // 0-100
+      .references(() => organization.id, { onDelete: "cascade" }),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id, { onDelete: "set null" }),
+
+    // Basic info
+    name: text("name").notNull(),
+    description: text("description"),
+    instructions: text("instructions").notNull(),
     avatarUrl: text("avatar_url"),
 
-    // Default capabilities
-    defaultTools: jsonb("default_tools").$type<string[]>().default([]),
-    defaultMcpServers: jsonb("default_mcp_servers")
-      .$type<string[]>()
-      .default([]),
-    defaultKnowledgeBases: jsonb("default_knowledge_bases")
+    // Model configuration
+    model: text("model").notNull().default("gemini-2.5-flash"),
+    maxTokens: integer("max_tokens").default(1000),
+    temperature: integer("temperature").default(70), // 0-100 scale
+
+    // Visibility & status
+    visibility: agentVisibilityEnum("visibility").notNull().default("team"),
+    isArchived: boolean("is_archived").notNull().default(false),
+
+    // Default attachments (IDs of tools, knowledge bases, etc.)
+    defaultToolIds: jsonb("default_tool_ids").$type<string[]>().default([]),
+    defaultKnowledgeBaseIds: jsonb("default_knowledge_base_ids")
       .$type<string[]>()
       .default([]),
 
-    metadata: jsonb("metadata"),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
-      .defaultNow()
+    // Extensible metadata
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
       .$onUpdate(() => new Date()),
   },
-  (table) => ({
-    userIdIdx: index("agents_user_id_idx").on(table.userId),
-    nameIdx: index("agents_name_idx").on(table.name),
+  (t) => ({
+    orgIdx: index("agents_org_idx").on(t.organizationId),
+    creatorIdx: index("agents_creator_idx").on(t.createdBy),
+    visibilityIdx: index("agents_visibility_idx").on(t.visibility),
+    orgNameIdx: uniqueIndex("agents_org_name_idx").on(t.organizationId, t.name),
   }),
 );
 
-// Types
-export type AgentVisibility = (typeof agentVisibilityEnum.enumValues)[number];
-export type AgentTemplateStatus =
-  (typeof agentTemplateStatusEnum.enumValues)[number];
-
+// ==================== TYPES ====================
 export type Agent = typeof agent.$inferSelect;
 export type NewAgent = typeof agent.$inferInsert;
+export type AgentVisibility = (typeof agentVisibilityEnum.enumValues)[number];

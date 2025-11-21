@@ -11,11 +11,14 @@ import { z } from "zod";
 const getEnv = (variable: string) =>
   runtimeEnv(variable) ?? process.env[variable];
 
-
 export const env = createEnv({
   skipValidation: true,
 
   server: {
+    E2B_ENABLED: z.boolean().default(false),
+
+    API_ENCRYPTION_KEY: z.string().min(32).optional(), // Dedicated key for encrypting API keys (optional for OSS)
+
     TONAPI_API_KEY: z.string(),
 
     // OAuth Integration Credentials - All optional, enables third-party integrations

@@ -4,7 +4,6 @@ import { notFound, redirect } from "next/navigation";
 import { Chat } from "@/components/chat";
 import { DataStreamHandler } from "@/components/data-stream-handler";
 import { getChatById, getMessagesByChatId } from "@/db/queries";
-import { DEFAULT_CHAT_MODEL } from "@/lib/ai/models";
 import { getSession } from "@/lib/auth";
 import { convertToUIMessages } from "@/lib/utils";
 
@@ -48,7 +47,6 @@ export default async function Page(props: { params: Promise<{ id: string }> }) {
         <Chat
           autoResume={true}
           id={chat.id}
-          initialChatModel={DEFAULT_CHAT_MODEL}
           initialMessages={uiMessages}
           initialVisibilityType={chat.visibility}
           isReadonly={session?.user?.id !== chat.creatorId}

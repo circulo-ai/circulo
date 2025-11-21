@@ -15,7 +15,7 @@ const logger = createLogger("OAuthTokenAPI");
 /**
  * Get an access token for a specific credential
  * Supports both session-based authentication (for client-side requests)
- * and workflow-based authentication (for server-side requests)
+ * and chat-based authentication (for server-side requests)
  */
 export async function POST(request: NextRequest) {
   const requestId = generateRequestId();
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
   try {
     // Parse request body
     const body = await request.json();
-    const { credentialId, workflowId } = body;
+    const { credentialId, chatId } = body;
 
     if (!credentialId) {
       logger.warn(`[${requestId}] Credential ID is required`);
@@ -35,11 +35,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // We already have workflowId from the parsed body; avoid forcing hybrid auth to re-read it
+    // We already have chatId from the parsed body; avoid forcing hybrid auth to re-read it
     const authz = await authorizeCredentialUse(request, {
       credentialId,
-      workflowId,
-      requireWorkflowIdForInternal: false,
+      chatId,
+      requireChatIdForInternal: false,
     });
     if (!authz.ok || !authz.credentialOwnerUserId) {
       return NextResponse.json(
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
     }
 
     // For GET requests, we only support session-based authentication
-    const auth = await checkHybridAuth(request, { requireWorkflowId: false });
+    const auth = await checkHybridAuth(request, { requireChatId: false });
     if (!auth.success || auth.authType !== "session" || !auth.userId) {
       return NextResponse.json(
         { error: "User not authenticated" },

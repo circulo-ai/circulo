@@ -43,7 +43,7 @@ import type { VisibilityType } from "./visibility-selector";
 export function Chat({
   id,
   initialMessages,
-  initialChatModel,
+  initialChatModel = "gemini-2.5-flash",
   initialVisibilityType,
   isReadonly,
   autoResume,
@@ -51,7 +51,7 @@ export function Chat({
 }: {
   id: string;
   initialMessages: ChatMessage[];
-  initialChatModel: string;
+  initialChatModel?: string;
   initialVisibilityType: VisibilityType;
   isReadonly: boolean;
   autoResume: boolean;

@@ -1,6 +1,12 @@
+import { chat, db } from "@/db";
+import {
+  authenticateApiKeyFromHeader,
+  updateApiKeyLastUsed,
+} from "@/lib/api-key/service";
 import { getSession } from "@/lib/auth";
 import { verifyInternalToken } from "@/lib/auth/internal";
 import { createLogger } from "@/lib/logs/console/logger";
+import { eq } from "drizzle-orm";
 import type { NextRequest } from "next/server";
 
 const logger = createLogger("HybridAuth");
@@ -15,23 +21,83 @@ export interface AuthResult {
 /**
  * Check for authentication using any of the 3 supported methods:
  * 1. Session authentication (cookies)
- * 2. Internal JWT authentication (Authorization: Bearer header)
+ * 2. API key authentication (X-API-Key header)
+ * 3. Internal JWT authentication (Authorization: Bearer header)
  *
- * For internal JWT calls, requires workflowId to determine user context
+ * For internal JWT calls, requires chatId to determine user context
  */
 export async function checkHybridAuth(
   request: NextRequest,
-  options: { requireWorkflowId?: boolean } = {},
+  options: { requireChatId?: boolean } = {},
 ): Promise<AuthResult> {
   try {
     // 1. Check for internal JWT token first
     const authHeader = request.headers.get("authorization");
     if (authHeader?.startsWith("Bearer ")) {
       const token = authHeader.split(" ")[1];
-      const isInternalCall = await verifyInternalToken(token);
+      const verification = await verifyInternalToken(token);
 
-      if (isInternalCall) {
-        // Internal call without context - still valid for some routes
+      if (verification.valid) {
+        let chatId: string | null = null;
+        let userId: string | null = verification.userId || null;
+
+        const { searchParams } = new URL(request.url);
+        chatId = searchParams.get("chatId");
+        if (!userId) {
+          userId = searchParams.get("userId");
+        }
+
+        if (!chatId && !userId && request.method === "POST") {
+          try {
+            // Clone the request to avoid consuming the original body
+            const clonedRequest = request.clone();
+            const bodyText = await clonedRequest.text();
+            if (bodyText) {
+              const body = JSON.parse(bodyText);
+              chatId = body.chatId || body._context?.chatId;
+              userId = userId || body.userId || body._context?.userId;
+            }
+          } catch {
+            // Ignore JSON parse errors
+          }
+        }
+
+        if (userId) {
+          return {
+            success: true,
+            userId,
+            authType: "internal_jwt,
+          };
+        }
+
+        if (chatId) {
+          const [chatData] = await db
+            .select({ userId: chat.creatorId })
+            .from(chat)
+            .where(eq(chat.id, chatId))
+            .limit(1);
+
+          if (!chatData) {
+            return {
+              success: false,
+              error: "Chat not found,
+            };
+          }
+
+          return {
+            success: true,
+            userId: chatData.userId,
+            authType: "internal_jwt,
+          };
+        }
+
+        if (options.requireChatId !== false) {
+          return {
+            success: false,
+            error: "chatId or userId required for internal JWT calls"
+          };
+        }
+
         return {
           success: true,
           authType: "internal_jwt",
@@ -46,6 +112,25 @@ export async function checkHybridAuth(
         success: true,
         userId: session.user.id,
         authType: "session",
+      };
+    }
+
+    // 3. Try API key auth
+    const apiKeyHeader = request.headers.get("x-api-key");
+    if (apiKeyHeader) {
+      const result = await authenticateApiKeyFromHeader(apiKeyHeader);
+      if (result.success) {
+        await updateApiKeyLastUsed(result.keyId!);
+        return {
+          success: true,
+          userId: result.userId!,
+          authType: "api_key"
+        };
+      }
+
+      return {
+        success: false,
+        error: "Invalid API key"
       };
     }
 

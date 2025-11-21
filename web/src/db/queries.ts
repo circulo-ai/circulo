@@ -1,7 +1,6 @@
 import "server-only";
 
 import type { ArtifactKind } from "@/components/artifacts/artifact";
-import type { VisibilityType } from "@/components/visibility-selector";
 import { ChatSDKError } from "@/lib/errors";
 import {
   and,
@@ -19,6 +18,7 @@ import {
 } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import type { ChatVisibility } from "./schema";
 import {
   type Chat,
   chat,
@@ -27,8 +27,8 @@ import {
   document,
   message,
   stream,
-  type Suggestion,
   suggestion,
+  Suggestion,
   type User,
   user,
   vote,
@@ -37,7 +37,6 @@ import {
 // Optionally, if not using email/pass login, you can
 // use the Drizzle adapter for Auth.js / NextAuth
 // https://authjs.dev/reference/adapter/drizzle
-
 
 const client = postgres(process.env.DATABASE_URL!);
 const db = drizzle(client);
@@ -58,11 +57,13 @@ export async function saveChat({
   userId,
   title,
   visibility,
+  organizationId,
 }: {
   id: string;
   userId: string;
   title: string;
-  visibility: VisibilityType;
+  visibility: ChatVisibility;
+  organizationId: string;
 }) {
   try {
     return await db.transaction(async (tx) => {
@@ -70,7 +71,7 @@ export async function saveChat({
         .insert(chat)
         .values({
           id,
-          createdAt: new Date(),
+          organizationId,
           creatorId: userId,
           title,
           visibility,
@@ -165,9 +166,9 @@ export async function getChatsByUserId({
 
     const searchCondition = search
       ? or(
-        ilike(chat.title, `%${search}%`),
-        ilike(chat.description, `%${search}%`),
-      )
+          ilike(chat.title, `%${search}%`),
+          ilike(chat.description, `%${search}%`),
+        )
       : undefined;
 
     const query = (whereCondition?: SQL<any>) => {
@@ -542,10 +543,7 @@ export async function deleteDocumentsByIdAfterTimestamp({
     await db
       .delete(suggestion)
       .where(
-        and(
-          eq(suggestion.documentId, id),
-          gt(suggestion.documentCreatedAt, timestamp),
-        ),
+        and(eq(suggestion.documentId, id), gt(suggestion.createdAt, timetamp)),
       );
 
     return await db

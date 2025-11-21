@@ -1,6 +1,4 @@
-// src/db/schema/billing.ts
-import { user } from "@/db";
-import { relations } from "drizzle-orm";
+import { user } from "@/db/schema/auth";
 import {
   boolean,
   index,
@@ -16,12 +14,11 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-// -------------------- TYPES --------------------
-
+// ==================== TYPES ====================
 export type PlanFeatures = {
   maxMessagesPerDay: number;
   rateLimitPerMinute: number;
-  maxAgents: number | null; // null = unlimited
+  maxAgents: number | null;
   maxChats: number | null;
   kbSlots: number | null;
   maxAgentsInChat: number | null;
@@ -29,8 +26,8 @@ export type PlanFeatures = {
   dedicatedSupport?: boolean;
   customBilling?: boolean;
 };
-// -------------------- ENUMS --------------------
 
+// ==================== ENUMS ====================
 export const subscriptionStatusEnum = pgEnum("subscription_status", [
   "active",
   "inactive",
@@ -38,7 +35,6 @@ export const subscriptionStatusEnum = pgEnum("subscription_status", [
   "expired",
   "trialing",
 ]);
-
 export const invoiceStatusEnum = pgEnum("invoice_status", [
   "pending",
   "paid",
@@ -46,12 +42,22 @@ export const invoiceStatusEnum = pgEnum("invoice_status", [
   "expired",
   "canceled",
 ]);
+export const invoiceTypeEnum = pgEnum("invoice_type", [
+  "subscription",
+  "one_time",
+  "usage_based",
+  "addon",
+  "credit",
+  "refund",
+  "custom",
+]);
+export const paymentProviderEnum = pgEnum("payment_provider", [
+  "stripe",
+  "changelly",
+]);
 
-export const paymentProviderEnum = pgEnum("payment_provider", ["changelly"]);
-
-// -------------------- SUBSCRIPTION PLANS --------------------
-
-export const subscriptionPlans = pgTable(
+// ==================== SUBSCRIPTION PLANS ====================
+export const subscriptionPlan = pgTable(
   "subscription_plans",
   {
     id: serial("id").primaryKey(),
@@ -59,23 +65,23 @@ export const subscriptionPlans = pgTable(
     slug: varchar("slug", { length: 100 }).notNull().unique(),
     description: varchar("description", { length: 500 }),
 
-    // Pricing
     usdPrice: numeric("usd_price", { precision: 10, scale: 2 }).notNull(),
     billingIntervalDays: integer("billing_interval_days").notNull().default(30),
 
     features: jsonb("features").$type<PlanFeatures>(),
-
     isActive: boolean("is_active").notNull().default(true),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
-  (table) => ({
-    slugIdx: index("plans_slug_idx").on(table.slug),
+  (t) => ({
+    slugIdx: index("subscription_plans_slug_idx").on(t.slug,
   }),
 );
 
-// -------------------- SUBSCRIPTIONS --------------------
-
-export const subscriptions = pgTable(
+// ==================== SUBSCRIPTIONS ====================
+export const subscription = pgTable(
   "subscriptions",
   {
     id: serial("id").primaryKey(),
@@ -84,81 +90,68 @@ export const subscriptions = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     planId: integer("plan_id")
       .notNull()
-      .references(() => subscriptionPlans.id, { onDelete: "restrict" }),
+      .references(() => subscriptionPlan.id, { onDelete: "restrict" }),
 
     status: subscriptionStatusEnum("status").notNull().default("inactive"),
 
-    startDate: timestamp("start_date").notNull().defaultNow(),
-    endDate: timestamp("end_date"), // null = no end date
+    startDate: timestamp("start_date", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    endDate: timestamp("end_date", { withTimezone: true }),
     autoRenew: boolean("auto_renew").notNull().default(true),
 
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
   },
-  (table) => ({
-    userIdx: index("subscriptions_user_idx").on(table.userId),
-    statusIdx: index("subscriptions_status_idx").on(table.status),
-    endDateIdx: index("subscriptions_end_date_idx").on(table.endDate),
+  (t) => ({
+    userIdx: index("subscriptions_user_idx").on(t.userId),
+    statusIdx: index("subscriptions_status_idx").on(t.status),
+    endDateIdx: index("subscriptions_end_date_idx").on(t.endDate)
   }),
 );
 
-// -------------------- SUBSCRIPTION HISTORY --------------------
-
+// ==================== SUBSCRIPTION HISTORY ====================
 export const subscriptionHistory = pgTable(
   "subscription_history",
   {
     id: serial("id").primaryKey(),
     subscriptionId: integer("subscription_id")
       .notNull()
-      .references(() => subscriptions.id, { onDelete: "cascade" }),
+      .references(() => subscription.id, { onDelete: "cascade" }),
     planId: integer("plan_id")
       .notNull()
-      .references(() => subscriptionPlans.id, { onDelete: "restrict" }),
+      .references(() => subscriptionPlan.id, { onDelete: "restrict" }),
 
     oldStatus: subscriptionStatusEnum("old_status"),
     newStatus: subscriptionStatusEnum("new_status").notNull(),
 
-    reason: varchar("reason", { length: 255 }), // upgrade, downgrade, canceled, expired
+    reason: varchar("reason", { length: 255 }),
     metadata: jsonb("metadata").$type<Record<string, unknown>>(),
 
-    changedAt: timestamp("changed_at").notNull().defaultNow(),
+    changedAt: timestamp("changed_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
   },
-  (table) => ({
-    subscriptionIdx: index("history_subscription_idx").on(table.subscriptionId),
-    changedAtIdx: index("history_changed_at_idx").on(table.changedAt),
+  (t) => ({
+    subscriptionIdx: index("subscription_history_sub_idx").on(t.subscriptionId)
   }),
 );
 
-// -------------------- INVOICE TYPES --------------------
-
-export const invoiceTypeEnum = pgEnum("invoice_type", [
-  "subscription", // Recurring subscription payment
-  "one_time", // One-time purchase
-  "usage_based", // Pay-as-you-go usage charges
-  "addon", // Add-on features
-  "credit", // Account credit purchase
-  "refund", // Refund (negative amount)
-  "custom", // Custom/manual invoice
-]);
-
-// -------------------- INVOICES --------------------
-
-export const invoices = pgTable(
+// ==================== INVOICES ====================
+export const invoice = pgTable(
   "invoices",
   {
     id: serial("id").primaryKey(),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-
-    // Optional subscription reference (only for subscription-related invoices)
     subscriptionId: integer("subscription_id").references(
-      () => subscriptions.id,
+      () => subscription.id,
       { onDelete: "set null" },
     ),
 
     type: invoiceTypeEnum("type").notNull().default("one_time"),
-
-    // TODO: maybe no provider is needed and we need another payment table
     provider: paymentProviderEnum("provider").notNull(),
     providerInvoiceId: varchar("provider_invoice_id", {
       length: 255,
@@ -170,61 +163,54 @@ export const invoices = pgTable(
     description: varchar("description", { length: 500 }),
     metadata: jsonb("metadata").$type<Record<string, unknown>>(),
 
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    paidAt: timestamp("paid_at"),
-    failedAt: timestamp("failed_at"),
-    dueDate: timestamp("due_date"),
-    // Add expire date maybe to cleanup invoices
+    dueDate: timestamp("due_date", { withTimezone: true }),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    failedAt: timestamp("failed_at", { withTimezone: true }),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
   },
-  (table) => ({
-    providerInvoiceIdx: index("invoices_provider_invoice_idx").on(
-      table.provider,
-      table.providerInvoiceId,
+  (t) => ({
+    userIdx: index("invoices_user_idx").on(t.userId),
+    statusIdx: index("invoices_status_idx").on(t.status),
+    providerIdx: index("invoices_provider_idx").on(
+      t.provider,
+      t.providerInvoiceId
     ),
-    userIdx: index("invoices_user_idx").on(table.userId),
-    subscriptionIdx: index("invoices_subscription_idx").on(
-      table.subscriptionId,
-    ),
-    typeIdx: index("invoices_type_idx").on(table.type),
-    statusIdx: index("invoices_status_idx").on(table.status),
   }),
 );
 
-// -------------------- INVOICE LINE ITEMS --------------------
-
-export const invoiceLineItems = pgTable(
+// ==================== INVOICE LINE ITEMS ====================
+export const invoiceLineItem = pgTable(
   "invoice_line_items",
   {
     id: serial("id").primaryKey(),
     invoiceId: integer("invoice_id")
       .notNull()
-      .references(() => invoices.id, { onDelete: "cascade" }),
+      .references(() => invoice.id, { onDelete: "cascade" }),
 
     description: varchar("description", { length: 500 }).notNull(),
     quantity: integer("quantity").notNull().default(1),
     unitPrice: numeric("unit_price", { precision: 10, scale: 2 }).notNull(),
     totalPrice: numeric("total_price", { precision: 10, scale: 2 }).notNull(),
 
-    // Optional reference to what's being invoiced
-    referenceType: varchar("reference_type", { length: 100 }), // 'plan', 'addon', 'usage', etc.
-    referenceId: integer("reference_id"), // ID of the referenced item
+    referenceType: varchar("reference_type", { length: 100 }),
+    referenceId: integer("reference_id"),
 
     metadata: jsonb("metadata").$type<Record<string, unknown>>(),
 
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
   },
-  (table) => ({
-    invoiceIdx: index("line_items_invoice_idx").on(table.invoiceId),
-    referenceIdx: index("line_items_reference_idx").on(
-      table.referenceType,
-      table.referenceId,
-    ),
+  (t) => ({
+    invoiceIdx: index("invoice_line_items_invoice_idx").on(t.invoiceId)
   }),
 );
 
-// -------------------- USAGE METRICS --------------------
-
-export const usageMetrics = pgTable(
+// ==================== USAGE METRICS ====================
+export const usageMetric = pgTable(
   "usage_metrics",
   {
     id: serial("id").primaryKey(),
@@ -232,123 +218,60 @@ export const usageMetrics = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     subscriptionId: integer("subscription_id").references(
-      () => subscriptions.id,
+      () => subscription.id,
       { onDelete: "set null" },
     ),
 
-    metric: varchar("metric", { length: 100 }).notNull(), // api_calls, chat_messages, etc.
+    metric: varchar("metric", { length: 100 }).notNull(),
     count: integer("count").notNull().default(1),
 
-    // Time-based tracking
-    recordedAt: timestamp("recorded_at").notNull().defaultNow(),
-    periodStart: timestamp("period_start").notNull(),
-    periodEnd: timestamp("period_end").notNull(),
+    periodStart: timestamp("period_start", { withTimezone: true }).notNull(),
+    periodEnd: timestamp("period_end", { withTimezone: true }).notNull(),
+
+    recordedAt: timestamp("recorded_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
   },
-  (table) => ({
-    userMetricPeriodIdx: uniqueIndex("usage_user_metric_period_idx").on(
-      table.userId,
-      table.metric,
-      table.periodStart,
+  (t) => ({
+    userMetricPeriodIdx: uniqueIndex("usage_metrics_user_metric_period_idx").on(
+      t.userId,
+      t.metric,
+      t.periodStart
     ),
-    subscriptionIdx: index("usage_subscription_idx").on(table.subscriptionId),
   }),
 );
 
-export const webhookLogs = pgTable(
+// ==================== WEBHOOK LOGS ====================
+export const webhookLog = pgTable(
   "webhook_logs",
   {
     id: serial("id").primaryKey(),
     provider: paymentProviderEnum("provider").notNull(),
     eventType: varchar("event_type", { length: 100 }).notNull(),
     invoiceId: varchar("invoice_id", { length: 255 }),
+
     payload: jsonb("payload").notNull(),
     signature: text("signature"),
-    status: varchar("status", { length: 50 }).notNull(), // 'success', 'failed', 'pending'
+
+    status: varchar("status", { length: 50 }).notNull(),
     errorMessage: text("error_message"),
     attempts: integer("attempts").notNull().default(1),
-    processedAt: timestamp("processed_at"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
+
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
   },
-  (table) => ({
-    providerIdx: index("webhook_provider_idx").on(table.provider),
-    statusIdx: index("webhook_status_idx").on(table.status),
-    createdAtIdx: index("webhook_created_at_idx").on(table.createdAt),
+  (t) => ({
+    providerIdx: index("webhook_logs_provider_idx").on(t.provider),
+    statusIdx: index("webhook_logs_status_idx").on(t.status)
   }),
 );
 
-// -------------------- RELATIONS --------------------
-
-export const subscriptionPlansRelations = relations(
-  subscriptionPlans,
-  ({ many }) => ({
-    subscriptions: many(subscriptions),
-    history: many(subscriptionHistory),
-  }),
-);
-
-export const subscriptionRelations = relations(
-  subscriptions,
-  ({ one, many }) => ({
-    user: one(user, {
-      fields: [subscriptions.userId],
-      references: [user.id],
-    }),
-    plan: one(subscriptionPlans, {
-      fields: [subscriptions.planId],
-      references: [subscriptionPlans.id],
-    }),
-    invoices: many(invoices),
-    history: many(subscriptionHistory),
-    usageMetrics: many(usageMetrics),
-  }),
-);
-
-export const subscriptionHistoryRelations = relations(
-  subscriptionHistory,
-  ({ one }) => ({
-    subscription: one(subscriptions, {
-      fields: [subscriptionHistory.subscriptionId],
-      references: [subscriptions.id],
-    }),
-    plan: one(subscriptionPlans, {
-      fields: [subscriptionHistory.planId],
-      references: [subscriptionPlans.id],
-    }),
-  }),
-);
-
-export const invoiceRelations = relations(invoices, ({ one, many }) => ({
-  user: one(user, {
-    fields: [invoices.userId],
-    references: [user.id],
-  }),
-  subscription: one(subscriptions, {
-    fields: [invoices.subscriptionId],
-    references: [subscriptions.id],
-  }),
-  lineItems: many(invoiceLineItems),
-}));
-
-export const invoiceLineItemsRelations = relations(
-  invoiceLineItems,
-  ({ one }) => ({
-    invoice: one(invoices, {
-      fields: [invoiceLineItems.invoiceId],
-      references: [invoices.id],
-    }),
-  }),
-);
-
-export const usageRelations = relations(usageMetrics, ({ one }) => ({
-  user: one(user, {
-    fields: [usageMetrics.userId],
-    references: [user.id],
-  }),
-  subscription: one(subscriptions, {
-    fields: [usageMetrics.subscriptionId],
-    references: [subscriptions.id],
-  }),
-}));
-
-export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
-export type Subscription = typeof subscriptions.$inferSelect;
+// ==================== TYPES ====================
+export type SubscriptionPlan = typeof subscriptionPlan.$inferSelect;
+export type Subscription = typeof subscription.$inferSelect;
+export type Invoice = typeof invoice.$inferSelect;
+export type SubscriptionStatus =
+  (typeof subscriptionStatusEnum.enumValues)[number];
+export type InvoiceStatus = (typeof invoiceStatusEnum.enumValues)[number];

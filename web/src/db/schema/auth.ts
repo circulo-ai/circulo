@@ -1,93 +1,102 @@
 import { DEFAULT_FREE_CREDITS } from "@/db/constants";
+import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
+  check,
   decimal,
   index,
   integer,
   jsonb,
+  pgEnum,
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-export const user = pgTable("user", {
+// ==================== ENUMS ====================
+export const permissionTypeEnum = pgEnum("permission_type", [
+  "admin",
+  "write",
+  "read,
+]);
+
+// ==================== CORE AUTH TABLES ====================
+export const user = pgTable("users", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
-  emailVerified: boolean("email_verified").notNull(),
+  emailVerified: boolean("email_verified").notNull().default(false),
   image: text("image"),
   createdAt: timestamp("created_at").notNull(),
   updatedAt: timestamp("updated_at").notNull(),
   stripeCustomerId: text("stripe_customer_id"),
 });
 
-export const organization = pgTable("organization", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  slug: text("slug").notNull().unique(),
-  logo: text("logo"),
-  metadata: jsonb("metadata"),
-  orgUsageLimit: decimal("org_usage_limit"),
-  storageUsedBytes: bigint("storage_used_bytes", { mode: "number" })
-    .notNull()
-    .default(0), // Storage tracking for team/enterprise
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
 export const session = pgTable(
-  "session",
+  "sessions",
   {
     id: text("id").primaryKey(),
-    expiresAt: timestamp("expires_at").notNull(),
-    token: text("token").notNull().unique(),
-    createdAt: timestamp("created_at").notNull(),
-    updatedAt: timestamp("updated_at").notNull(),
-    ipAddress: text("ip_address"),
-    userAgent: text("user_agent"),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    activeOrganizationId: text("active_organization_id").references(
-      () => organization.id,
-      {
-        onDelete: "set null",
-      },
-    ),
+    token: text("token").notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    activeOrganizationId: text("active_organization_id"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
   },
-  (table) => ({
-    userIdIdx: index("session_user_id_idx").on(table.userId),
-    tokenIdx: index("session_token_idx").on(table.token),
+  (t) => ({
+    userIdIdx: index("sessions_user_id_idx").on(t.userId),
+    tokenIdx: index("sessions_token_idx").on(t.token)
   }),
 );
 
 export const account = pgTable(
-  "account",
+  "accounts",
   {
     id: text("id").primaryKey(),
-    accountId: text("account_id").notNull(),
-    providerId: text("provider_id").notNull(),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    providerId: text("provider_id").notNull(),
+    accountId: text("account_id").notNull(),
     accessToken: text("access_token"),
     refreshToken: text("refresh_token"),
     idToken: text("id_token"),
-    accessTokenExpiresAt: timestamp("access_token_expires_at"),
-    refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
+    accessTokenExpiresAt: timestamp("access_token_expires_at", {
+      withTimezone: true
+    }),
+    refreshTokenExpiresAt: timestamp("refresh_token_expires_at", {
+      withTimezone: true
+    }),
     scope: text("scope"),
     password: text("password"),
-    createdAt: timestamp("created_at").notNull(),
-    updatedAt: timestamp("updated_at").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
   },
-  (table) => ({
-    userIdIdx: index("account_user_id_idx").on(table.userId),
+  (t) => ({
+    userIdIdx: index("accounts_user_id_idx").on(t.userId),
+    providerIdx: uniqueIndex("accounts_provider_idx").on(
+      t.providerId,
+      t.accountId
+    )
   }),
 );
 
 export const verification = pgTable(
-  "verification",
+  "verifications",
   {
     id: text("id").primaryKey(),
     identifier: text("identifier").notNull(),
@@ -96,13 +105,59 @@ export const verification = pgTable(
     createdAt: timestamp("created_at"),
     updatedAt: timestamp("updated_at"),
   },
-  (table) => ({
-    identifierIdx: index("verification_identifier_idx").on(table.identifier),
+  (t) => ({
+    identifierIdx: index("verifications_identifier_idx").on(t.identifier)
+  }),
+);
+
+// ==================== ORGANIZATION ====================
+export const organization = pgTable("organizations", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  logo: text("logo"),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+  orgUsageLimit: decimal("org_usage_limit", { precision: 10, scale: 2 }),
+  storageUsedBytes: bigint("storage_used_bytes", { mode: "number" })
+    .notNull()
+    .default(0),
+  allowPersonalApiKeys: boolean("allow_personal_api_keys")
+    .notNull()
+    .default(true),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+});
+
+export const member = pgTable(
+  "members",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    role: text("role").notNull().default("member"), // 'owner', 'admin', 'member'
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+  },
+  (t) => ({
+    userOrgIdx: uniqueIndex("members_user_org_idx").on(
+      t.userId,
+      t.organizationId
+    ),
+    orgIdx: index("members_org_idx").on(t.organizationId)
   }),
 );
 
 export const invitation = pgTable(
-  "invitation",
+  "invitations",
   {
     id: text("id").primaryKey(),
     email: text("email").notNull(),
@@ -113,112 +168,149 @@ export const invitation = pgTable(
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
     role: text("role").notNull(),
-    status: text("status").notNull(),
-    expiresAt: timestamp("expires_at").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    status: text("status").notNull().default("pending"), // pending, accepted, declined, expired
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
   },
-  (table) => ({
-    emailIdx: index("invitation_email_idx").on(table.email),
-    organizationIdIdx: index("invitation_organization_id_idx").on(
-      table.organizationId,
-    ),
+  (t) => ({
+    emailIdx: index("invitations_email_idx").on(t.email),
+    orgIdx: index("invitations_org_idx").on(t.organizationId)
   }),
 );
 
-export const member = pgTable(
-  "member",
-  {
-    id: text("id").primaryKey(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    organizationId: text("organization_id")
-      .notNull()
-      .references(() => organization.id, { onDelete: "cascade" }),
-    role: text("role").notNull(), // 'admin' or 'member' - team-level permissions only
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-  },
-  (table) => ({
-    userIdIdx: index("member_user_id_idx").on(table.userId),
-    organizationIdIdx: index("member_organization_id_idx").on(
-      table.organizationId,
-    ),
-  }),
-);
-
+// ==================== USER SETTINGS & STATS ====================
 export const userStats = pgTable("user_stats", {
-  id: text("id").primaryKey(),
   userId: text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" })
-    .unique(), // One record per user
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
   totalChatExecutions: integer("total_chat_executions").notNull().default(0),
   totalTokensUsed: integer("total_tokens_used").notNull().default(0),
-  totalCost: decimal("total_cost").notNull().default("0"),
-  currentUsageLimit: decimal("current_usage_limit").default(
-    DEFAULT_FREE_CREDITS.toString(),
-  ), // Default $10 for free plan, null for team/enterprise
-  usageLimitUpdatedAt: timestamp("usage_limit_updated_at").defaultNow(),
-  // Billing period tracking
-  currentPeriodCost: decimal("current_period_cost").notNull().default("0"), // Usage in current billing period
-  lastPeriodCost: decimal("last_period_cost").default("0"), // Usage from previous billing period
-  billedOverageThisPeriod: decimal("billed_overage_this_period")
+  totalCost: decimal("total_cost", { precision: 12, scale: 6 })
     .notNull()
-    .default("0"), // Amount of overage already billed via threshold billing
-  // Pro usage snapshot when joining a team (to prevent double-billing)
-  proPeriodCostSnapshot: decimal("pro_period_cost_snapshot").default("0"), // Snapshot of Pro usage when joining team
-  // Storage tracking (for free/pro users)
+    .default("0"),
+  currentUsageLimit: decimal("current_usage_limit", {
+    precision: 10,
+    scale: 2
+  }).default(DEFAULT_FREE_CREDITS.toString()),
+  usageLimitUpdatedAt: timestamp("usage_limit_updated_at", {
+    withTimezone: true
+  }).defaultNow(),
+  currentPeriodCost: decimal("current_period_cost", { precision: 12, scale: 6 })
+    .notNull()
+    .default("0"),
+  lastPeriodCost: decimal("last_period_cost", {
+    precision: 12,
+    scale: 6
+  }).default("0"),
+  billedOverageThisPeriod: decimal("billed_overage_this_period", {
+    precision: 12,
+    scale: 6
+  })
+    .notNull()
+    .default("0"),
+  proPeriodCostSnapshot: decimal("pro_period_cost_snapshot", {
+    precision: 12,
+    scale: 6
+  }).default("0"),
   storageUsedBytes: bigint("storage_used_bytes", { mode: "number" })
     .notNull()
     .default(0),
-  lastActive: timestamp("last_active").notNull().defaultNow(),
+  lastActive: timestamp("last_active", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
   billingBlocked: boolean("billing_blocked").notNull().default(false),
 });
 
 export const settings = pgTable("settings", {
-  id: text("id").primaryKey(), // Use the user id as the key
   userId: text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" })
-    .unique(), // One settings record per user
-
-  // General settings
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
   theme: text("theme").notNull().default("system"),
-
-  // Privacy settings
   telemetryEnabled: boolean("telemetry_enabled").notNull().default(true),
-
-  // Email preferences
-  emailPreferences: jsonb("email_preferences").notNull().default({}),
-
-  // Billing usage notifications preference
+  emailPreferences: jsonb("email_preferences")
+    .$type<Record<string, boolean>>()
+    .notNull()
+    .default({}),
   billingUsageNotificationsEnabled: boolean(
     "billing_usage_notifications_enabled",
   )
     .notNull()
     .default(true),
-
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
-
-export const environment = pgTable("environment", {
-  id: text("id").primaryKey(), // Use the user id as the key
-  userId: text("user_id")
+  updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
-    .references(() => user.id, { onDelete: "cascade" })
-    .unique(), // One environment per user
-  variables: jsonb("variables").notNull(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    .defaultNow()
 });
 
+// ==================== API KEYS ====================
+export const apiKey = pgTable(
+  "api_keys",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id").references(() => organization.id, {
+      onDelete: "cascade"
+    }),
+    createdBy: text("created_by").references(() => user.id, {
+      onDelete: "set null"
+    }),
+    name: text("name").notNull(),
+    keyHash: text("key_hash").notNull().unique(), // Store hash, not plain key
+    keyPrefix: text("key_prefix").notNull(), // First 8 chars for identification
+    type: text("type").notNull().default("personal"), // 'personal' | 'organization'
+    lastUsed: timestamp("last_used", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+  },
+  (t) => ({
+    userIdx: index("api_keys_user_idx").on(t.userId),
+    orgIdx: index("api_keys_org_idx").on(t.organizationId),
+    typeCheck: check(
+      "api_keys_type_check",
+      sql`
+          (type = 'organization' AND organization_id IS NOT NULL)
+          OR 
+    (type = 'personal' AND organization_id IS NULL)
+      `
+    )
+  })
+);
+
+// ==================== PERMISSIONS ====================
+export const permissions = pgTable(
+  "permissions",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    entityType: text("entity_type").notNull(), // 'organization', 'chat', 'agent', etc.
+    entityId: text("entity_id").notNull(),
+    permissionType: permissionTypeEnum("permission_type").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+  },
+  (t) => ({
+    userEntityIdx: uniqueIndex("permissions_unique").on(
+      t.userId,
+      t.entityType,
+      t.entityId
+    ),
+    entityIdx: index("permissions_entity_idx").on(t.entityType, t.entityId)
+  })
+);
+
+// ==================== TYPES ====================
 export type User = typeof user.$inferSelect;
 export type NewUser = typeof user.$inferInsert;
-
+export type Organization = typeof organization.$inferSelect;
+export type Member = typeof member.$inferSelect;
 export type Session = typeof session.$inferSelect;
-export type NewSession = typeof session.$inferInsert;
-
 export type Account = typeof account.$inferSelect;
-export type NewAccount = typeof account.$inferInsert;
-
-export type Verification = typeof verification.$inferSelect;
-export type NewVerification = typeof verification.$inferInsert;
+export type PermissionType = (typeof permissionTypeEnum.enumValues)[number];
