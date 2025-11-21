@@ -11,7 +11,7 @@ export function CustomDropdownMenuContent({
 }: CustomDropdownMenuContentProps) {
   return (
     <DropdownMenuContent
-      className={cn(className, "w-48 bg-teal-50/5 backdrop-blur-xl")}
+      className={cn(className, "w-48 bg-sidebar/75 backdrop-blur-xl")}
       {...props}
     />
   );

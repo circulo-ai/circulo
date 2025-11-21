@@ -35,7 +35,7 @@ export function CustomSidebarMenuButton({
     <SidebarMenuButton
       className={cn(
         className,
-        "h-auto transition-all hover:bg-teal-50/5 active:bg-teal-50/10 data-[active=true]:bg-teal-800",
+        "h-auto transition-all hover:bg-teal-50/5 active:bg-teal-50/10 data-[active=true]:bg-teal-600",
       )}
       {...props}
     />

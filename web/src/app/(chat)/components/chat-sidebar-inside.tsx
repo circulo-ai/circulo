@@ -51,33 +51,32 @@ export function ChatSidebarInside() {
                   </SidebarMenuItem>
                 ))}
 
-              {!isLoading &&
-                data?.chats.map((item) => (
-                  <SidebarMenuItem key={item.id}>
-                    <CustomSidebarMenuButton
-                      isActive={currentChatId === item.id}
-                      asChild
+              {data?.chats.map((item) => (
+                <SidebarMenuItem key={item.id}>
+                  <CustomSidebarMenuButton
+                    isActive={currentChatId === item.id}
+                    asChild
+                  >
+                    <WithRipple
+                      component={EnhancedLink}
+                      componentProps={{
+                        asButton: false,
+                        href: `/chat/${item.id}`,
+                        buttonProps: { variant: "text" },
+                        onClick: () => setCurrentChatId(item.id),
+                      }}
                     >
-                      <WithRipple
-                        component={EnhancedLink}
-                        componentProps={{
-                          asButton: false,
-                          href: `/chat/${item.id}`,
-                          buttonProps: { variant: "text" },
-                          onClick: () => setCurrentChatId(item.id),
-                        }}
-                      >
-                        <div className="size-12 rounded-full bg-teal-500" />
-                        <span className="truncate">{item.title}</span>
-                        <SidebarMenuAction className="pointer-events-none">
-                          <EnhancedLinkSpinner />
-                          <span className="sr-only">Add Project</span>
-                        </SidebarMenuAction>
-                      </WithRipple>
-                    </CustomSidebarMenuButton>
-                    <SidebarMenuBadge>24</SidebarMenuBadge>
-                  </SidebarMenuItem>
-                ))}
+                      <div className="size-12 rounded-full bg-foreground" />
+                      <span className="truncate">{item.title}</span>
+                      <SidebarMenuAction className="pointer-events-none">
+                        <EnhancedLinkSpinner />
+                        <span className="sr-only">Add Project</span>
+                      </SidebarMenuAction>
+                    </WithRipple>
+                  </CustomSidebarMenuButton>
+                  <SidebarMenuBadge>24</SidebarMenuBadge>
+                </SidebarMenuItem>
+              ))}
             </SidebarMenu>
           </SidebarGroupContent>
           <SidebarGroupAction title="Add Project">
