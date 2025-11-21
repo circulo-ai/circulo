@@ -19,8 +19,8 @@ export async function POST(req: NextRequest) {
       userId,
       organizationId: orgId,
       messages: convertToModelMessages(messages),
-      agentId: "ba4de936-3799-46ac-a18d-8fa728aa1c75",
-      chatId: "1a75d0f6-dfa3-46dc-9ee3-8b1e2ae47142",
+      agentId: "8a13c8a1-190e-4468-97ec-a8edd6cbbb97",
+      chatId: "62b9b2da-aecc-427a-a315-9711fd3730ed",
     });
 
     return stream.toUIMessageStreamResponse();

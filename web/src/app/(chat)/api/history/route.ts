@@ -1,5 +1,6 @@
 import { Chat, chatMember, db } from "@/db";
-import { deleteAllChatsByUserId, getChatsByUserId } from "@/db/queries";
+import { deleteAllChatsByUserId, getChatsByOrgId } from "@/db/queries";
+import { getActiveOrganizationId } from "@/lib/auth";
 import { api, Errors, success } from "@/lib/server";
 import { and, eq, inArray } from "drizzle-orm";
 import z from "zod";
@@ -9,6 +10,7 @@ export const GetChatHistoryQueryParams = z.object({
   starting_after: z.string().optional(),
   ending_before: z.string().optional(),
   search: z.string().optional(),
+  activeOrganizationId: z.string().optional(),
 });
 
 export type GetChatHistoryResponse = {
@@ -34,8 +36,8 @@ export const GET = api(
       );
     }
 
-    const chatsPage = await getChatsByUserId({
-      id: ctx.user.id,
+    const chatsPage = await getChatsByOrgId({
+      id: ctx.query.activeOrganizationId ?? (await getActiveOrganizationId()),
       limit,
       startingAfter,
       endingBefore,

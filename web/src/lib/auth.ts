@@ -4,6 +4,7 @@ import * as schema from "@/db/schema";
 import { getBaseURL } from "@/lib/auth-client";
 import { sendEmail } from "@/lib/email/mailer";
 import { createLogger } from "@/lib/logs/console/logger";
+import { Errors } from "@/lib/server";
 import { betterAuth, User } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
@@ -1245,4 +1246,13 @@ export type Session = NonNullable<SessionResponse>;
 // Server-side auth helpers
 export async function getSession(): Promise<SessionResponse> {
   return await auth.api.getSession({ headers: await headers() });
+}
+
+export async function getActiveOrganizationId(): Promise<string> {
+  const session = await getSession();
+  const activeOrgId = (session?.session as any).activeOrganizationId;
+  if (!activeOrgId) {
+    throw Errors.notFound("No organization id provided");
+  }
+  return activeOrgId;
 }

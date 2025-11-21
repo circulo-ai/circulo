@@ -196,7 +196,7 @@ export async function streamAgent(options: RunAgentOptions) {
     organizationId,
     userId,
     chatId,
-  } as any);
+  });
   const orderedConfigs2 = enabledConfigs.slice().sort((a, b) => {
     if (a.toolId === b.toolId) {
       const at = (a as any).createdAt

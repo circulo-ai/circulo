@@ -53,13 +53,16 @@ const sendMessageParamsSchema = z.object({
 });
 
 const sendMessageConfigSchema = z
-  .object({
-    defaultChatId: z.string().optional(),
-    parseMode: z
-      .enum(["HTML", "Markdown", "MarkdownV2"])
-      .optional()
-      .default("HTML"),
-  })
+  .union([
+    z.object({
+      defaultChatId: z.string().optional(),
+      parseMode: z
+        .enum(["HTML", "Markdown", "MarkdownV2"])
+        .optional()
+        .default("HTML"),
+    }),
+    z.string(),
+  ])
   .optional();
 
 export const telegramSendMessage = defineTool({
@@ -74,7 +77,7 @@ export const telegramSendMessage = defineTool({
   optionalEnvVars: ["TELEGRAM_DEFAULT_CHAT_ID"],
   summarizeInstance: (env, config) => {
     const out: string[] = [];
-    const cfg = config || {};
+    const cfg = typeof config === "string" ? { defaultChatId: config } : config || {};
     const parseMode = (cfg as any).parseMode as string | undefined;
     if (parseMode) out.push(`parseMode=${parseMode}`);
     const hasDefaultChat = Boolean(
@@ -86,7 +89,9 @@ export const telegramSendMessage = defineTool({
 
   createRuntime: (ctx) => {
     const botToken = ctx.env.TELEGRAM_BOT_TOKEN!;
-    const config = ctx.config;
+    const rawConfig = ctx.config as any;
+    const config =
+      typeof rawConfig === "string" ? { defaultChatId: rawConfig } : rawConfig;
     const defaultChatId =
       config?.defaultChatId || ctx.env.TELEGRAM_DEFAULT_CHAT_ID;
     const alias = (config as any)?.alias as string | undefined;

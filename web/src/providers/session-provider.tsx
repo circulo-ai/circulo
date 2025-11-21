@@ -86,7 +86,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function useOrganizations() {
+export function useOrganizationsHooks() {
   const ctx = useContext(SessionContext);
   if (!ctx) {
     throw new Error(

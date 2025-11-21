@@ -14,7 +14,7 @@ import {
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { useUser } from "@/hooks/api/chats/use-user";
 import { authClient } from "@/lib/auth-client";
-import { useOrganizations } from "@/providers/session-provider";
+import { useOrganizationsHooks } from "@/providers/session-provider";
 import { CreateOrganizationDialog } from "@daveyplate/better-auth-ui";
 import {
   Bot,
@@ -29,7 +29,8 @@ import { useState } from "react";
 
 export function ChatSidebarBurgerMenu() {
   const { user, isLoading } = useUser();
-  const { useActiveOrganization, useListOrganizations } = useOrganizations();
+  const { useActiveOrganization, useListOrganizations } =
+    useOrganizationsHooks();
   const { data: activeOrganization } = useActiveOrganization();
   const { data: organizations } = useListOrganizations();
   const [open, setOpen] = useState(false);
