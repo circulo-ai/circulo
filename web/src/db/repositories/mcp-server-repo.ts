@@ -42,7 +42,7 @@ export const mcpServerRepo = {
     ];
 
     if (filters?.enabled !== undefined) {
-      conditions.push(eq(mcpServer.enabled, filters.enabled));
+      conditions.push(eq(mcpServer.isEnabled, filters.enabled));
     }
 
     return db.query.mcpServer.findMany({
@@ -55,7 +55,7 @@ export const mcpServerRepo = {
     return db.query.mcpServer.findMany({
       where: and(
         eq(mcpServer.chatId, chatId),
-        eq(mcpServer.enabled, true),
+        eq(mcpServer.isEnabled, true),
         isNull(mcpServer.deletedAt),
       ),
       orderBy: sql`created_at desc`,
@@ -78,7 +78,7 @@ export const mcpServerRepo = {
       .update(mcpServer)
       .set({
         deletedAt: new Date(),
-        enabled: false,
+        isEnabled: false,
         updatedAt: new Date(),
       })
       .where(eq(mcpServer.id, id))
@@ -86,14 +86,14 @@ export const mcpServerRepo = {
     return deleted;
   },
 
-  async toggleEnabled(id: string, enabled: boolean) {
-    return this.update(id, { enabled });
+  async toggleEnabled(id: string, isEnabled: boolean) {
+    return this.update(id, { isEnabled });
   },
 
   async updateConnectionStatus(
     id: string,
     status: {
-      connectionStatus: string;
+      connectionStatus: "connected" | "disconnected" | "error";
       lastConnected?: Date;
       lastError?: string | null;
     },
@@ -107,7 +107,7 @@ export const mcpServerRepo = {
   async updateToolCount(id: string, toolCount: number) {
     return this.update(id, {
       toolCount,
-      lastToolsRefresh: new Date(),
+      lastToolsRefreshAt: new Date(),
       updatedAt: new Date(),
     });
   },
@@ -117,7 +117,7 @@ export const mcpServerRepo = {
       .update(mcpServer)
       .set({
         totalRequests: sql`${mcpServer.totalRequests} + 1`,
-        lastUsed: new Date(),
+        lastUsedAt: new Date(),
         updatedAt: new Date(),
       })
       .where(eq(mcpServer.id, id));

@@ -110,7 +110,7 @@ export class UsageRateLimiter {
         const [result] = await db
           .select({ count: count() })
           .from(agent)
-          .where(eq(agent.userId, userId));
+          .where(eq(agent.createdBy, userId));
 
         const current = result?.count || 0;
 
@@ -157,7 +157,7 @@ export class UsageRateLimiter {
         const [result] = await db
           .select({ count: count() })
           .from(knowledgeBase)
-          .where(eq(knowledgeBase.userId, userId));
+          .where(eq(knowledgeBase.createdBy, userId));
 
         const current = result?.count || 0;
 
@@ -228,11 +228,14 @@ export class UsageRateLimiter {
     const { start, end } = getBillingCycle(subscription.startDate);
 
     const [agentRes, kbRes, chatsCreated] = await Promise.all([
-      db.select({ count: count() }).from(agent).where(eq(agent.userId, userId)),
+      db
+        .select({ count: count() })
+        .from(agent)
+        .where(eq(agent.createdBy, userId)),
       db
         .select({ count: count() })
         .from(knowledgeBase)
-        .where(eq(knowledgeBase.userId, userId)),
+        .where(eq(knowledgeBase.createdBy, userId)),
       UsageTracker.getUsage(userId, "chats_created", start, end),
     ]);
 

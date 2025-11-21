@@ -543,7 +543,7 @@ export async function deleteDocumentsByIdAfterTimestamp({
     await db
       .delete(suggestion)
       .where(
-        and(eq(suggestion.documentId, id), gt(suggestion.createdAt, timetamp)),
+        and(eq(suggestion.documentId, id), gt(suggestion.createdAt, timestamp)),
       );
 
     return await db

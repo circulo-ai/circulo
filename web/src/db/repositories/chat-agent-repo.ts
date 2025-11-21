@@ -32,7 +32,7 @@ export const chatAgentRepo = {
 
   async findForChat(chatId: string) {
     return db.query.chatAgent.findMany({
-      where: and(eq(chatAgent.chatId, chatId), eq(chatAgent.enabled, true)),
+      where: and(eq(chatAgent.chatId, chatId), eq(chatAgent.isEnabled, true)),
       with: { agent: true },
     });
   },
@@ -41,7 +41,7 @@ export const chatAgentRepo = {
     return db.query.chatAgent.findMany({
       where: and(
         eq(chatAgent.chatId, chatId),
-        eq(chatAgent.enabled, true),
+        eq(chatAgent.isEnabled, true),
         eq(chatAgent.addedBy, userId),
       ),
       with: { agent: true },
@@ -50,7 +50,7 @@ export const chatAgentRepo = {
 
   async findEnabledForChat(chatId: string) {
     return db.query.chatAgent.findMany({
-      where: and(eq(chatAgent.chatId, chatId), eq(chatAgent.enabled, true)),
+      where: and(eq(chatAgent.chatId, chatId), eq(chatAgent.isEnabled, true)),
       with: { agent: true },
     });
   },
@@ -60,7 +60,7 @@ export const chatAgentRepo = {
       where: and(
         eq(chatAgent.chatId, chatId),
         eq(chatAgent.agentId, agentId),
-        eq(chatAgent.enabled, true),
+        eq(chatAgent.isEnabled, true),
       ),
       with: { agent: true },
     });
@@ -75,7 +75,7 @@ export const chatAgentRepo = {
 
     const [row] = await db
       .update(chatAgent)
-      .set({ enabled: !current.enabled })
+      .set({ isEnabled: !current.isEnabled })
       .where(and(eq(chatAgent.chatId, chatId), eq(chatAgent.agentId, agentId)))
       .returning();
     return row;

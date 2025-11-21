@@ -1,10 +1,10 @@
 import { db } from "@/db";
 import {
-  invoiceLineItems,
-  invoices,
+  invoiceLineItem as invoiceLineItems,
+  invoice as invoices,
   subscriptionHistory,
-  subscriptionPlans,
-  subscriptions,
+  subscriptionPlan as subscriptionPlans,
+  subscription as subscriptions,
 } from "@/db/schema/billing";
 import { and, eq, lte } from "drizzle-orm";
 import { PaymentProvider } from "./abstraction/payment-provider";
@@ -131,7 +131,7 @@ export class BillingManager {
    * Renew an existing subscription (different from activating new one)
    */
   private async renewSubscription(subscriptionId: number): Promise<void> {
-    const subscription = await db.query.subscriptions.findFirst({
+    const subscription = await db.query.subscription.findFirst({
       where: eq(subscriptions.id, subscriptionId),
       with: { plan: true },
     });
@@ -168,7 +168,7 @@ export class BillingManager {
    * Activate or renew a subscription
    */
   private async activateSubscription(subscriptionId: number): Promise<void> {
-    const subscription = await db.query.subscriptions.findFirst({
+    const subscription = await db.query.subscription.findFirst({
       where: eq(subscriptions.id, subscriptionId),
       with: { plan: true },
     });
@@ -211,7 +211,7 @@ export class BillingManager {
    * Handle failed payment
    */
   private async handleFailedPayment(subscriptionId: number): Promise<void> {
-    const subscription = await db.query.subscriptions.findFirst({
+    const subscription = await db.query.subscription.findFirst({
       where: eq(subscriptions.id, subscriptionId),
     });
 
@@ -242,7 +242,7 @@ export class BillingManager {
     subscriptionId: number,
     planId: number,
   ) {
-    const plan = await db.query.subscriptionPlans.findFirst({
+    const plan = await db.query.subscriptionPlan.findFirst({
       where: eq(subscriptionPlans.id, planId),
     });
 
@@ -297,7 +297,7 @@ export class BillingManager {
 
     // Find subscriptions that expired in the last 24 hours to avoid double-processing
     // (In a real prod app, use a specific 'next_billing_date' field)
-    const expired = await db.query.subscriptions.findMany({
+    const expired = await db.query.subscription.findMany({
       where: and(
         eq(subscriptions.status, "active"),
         lte(subscriptions.endDate, now),

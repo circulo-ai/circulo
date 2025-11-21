@@ -1,9 +1,9 @@
-import { db, invoices } from "@/db";
+import { db, invoice as invoices } from "@/db";
 import {
   type PlanFeatures,
   subscriptionHistory,
-  subscriptionPlans,
-  subscriptions,
+  subscriptionPlan as subscriptionPlans,
+  subscription as subscriptions,
 } from "@/db/schema/billing";
 import { and, eq } from "drizzle-orm";
 import { getProvider } from ".";
@@ -20,7 +20,7 @@ export class SubscriptionManager {
     provider: "changelly" = "changelly",
   ) {
     // Get plan
-    const plan = await db.query.subscriptionPlans.findFirst({
+    const plan = await db.query.subscriptionPlan.findFirst({
       where: and(
         eq(subscriptionPlans.slug, planSlug),
         eq(subscriptionPlans.isActive, true),
@@ -32,7 +32,7 @@ export class SubscriptionManager {
     }
 
     // Check for existing active subscription
-    const existing = await db.query.subscriptions.findFirst({
+    const existing = await db.query.subscriptionPlan.findFirst({
       where: and(
         eq(subscriptions.userId, userId),
         eq(subscriptions.status, "active"),
@@ -77,7 +77,7 @@ export class SubscriptionManager {
    * Create free subscription immediately (no payment needed)
    */
   private static async createFreeSubscription(userId: string, planId: number) {
-    const plan = await db.query.subscriptionPlans.findFirst({
+    const plan = await db.query.subscriptionPlan.findFirst({
       where: eq(subscriptionPlans.id, planId),
     });
 
@@ -120,7 +120,7 @@ export class SubscriptionManager {
     planId: number,
     invoiceId: number,
   ) {
-    const plan = await db.query.subscriptionPlans.findFirst({
+    const plan = await db.query.subscriptionPlan.findFirst({
       where: eq(subscriptionPlans.id, planId),
     });
 
@@ -172,7 +172,7 @@ export class SubscriptionManager {
     newPlanSlug: string,
     provider: "changelly" = "changelly",
   ) {
-    const subscription = await db.query.subscriptions.findFirst({
+    const subscription = await db.query.subscription.findFirst({
       where: and(
         eq(subscriptions.userId, userId),
         eq(subscriptions.status, "active"),
@@ -182,7 +182,7 @@ export class SubscriptionManager {
 
     if (!subscription) throw new Error("No active subscription found");
 
-    const newPlan = await db.query.subscriptionPlans.findFirst({
+    const newPlan = await db.query.subscriptionPlan.findFirst({
       where: eq(subscriptionPlans.slug, newPlanSlug),
     });
 
@@ -273,7 +273,7 @@ export class SubscriptionManager {
     newPlanId: number,
     invoiceId: number,
   ) {
-    const subscription = await db.query.subscriptions.findFirst({
+    const subscription = await db.query.subscription.findFirst({
       where: eq(subscriptions.id, subscriptionId),
     });
 
@@ -314,7 +314,7 @@ export class SubscriptionManager {
     userId: string,
     immediately = false,
   ): Promise<void> {
-    const subscription = await db.query.subscriptions.findFirst({
+    const subscription = await db.query.subscription.findFirst({
       where: and(
         eq(subscriptions.userId, userId),
         eq(subscriptions.status, "active"),
@@ -367,7 +367,7 @@ export class SubscriptionManager {
    * Reactivate canceled subscription
    */
   static async reactivateSubscription(userId: string): Promise<void> {
-    const subscription = await db.query.subscriptions.findFirst({
+    const subscription = await db.query.subscription.findFirst({
       where: and(
         eq(subscriptions.userId, userId),
         eq(subscriptions.status, "canceled"),
@@ -401,7 +401,7 @@ export class SubscriptionManager {
    * Get user's active subscription with features
    */
   static async getActiveSubscription(userId: string) {
-    const subscription = await db.query.subscriptions.findFirst({
+    const subscription = await db.query.subscription.findFirst({
       where: and(
         eq(subscriptions.userId, userId),
         eq(subscriptions.status, "active"),

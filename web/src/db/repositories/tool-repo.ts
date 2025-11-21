@@ -173,7 +173,7 @@ export const toolRepo = {
     return db.query.customTool.findFirst({
       where: and(
         eq(customTool.id, id),
-        eq(customTool.organizationId, rganizatonId),
+        eq(customTool.organizationId, organizationId),
       ),
     });
   },

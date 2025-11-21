@@ -47,8 +47,8 @@ export const agentRepo = {
       tools: agentEntity.toolConfigs.map((tc) => ({
         toolId: tc.toolId,
         toolType: tc.toolType,
-        isEnabled: tc.isEnabed,
-      )),
+        isEnabled: tc.isEnabled,
+      })),
     };
   },
 
@@ -100,8 +100,8 @@ export const agentRepo = {
       conditions.push(
         or(
           ilike(agent.name, `%${filters.search}%`),
-          ilike(agent.description, `%${filters.search}%`)
-        )!
+          ilike(agent.description, `%${filters.search}%`),
+        )!,
       );
     }
 
@@ -109,7 +109,7 @@ export const agentRepo = {
       where: and(...conditions),
       orderBy: desc(agent.createdAt),
       limit: filters.limit ?? 50,
-      offset: filters.offset ?? 0
+      offset: filters.offset ?? 0,
     });
   },
 
@@ -121,9 +121,9 @@ export const agentRepo = {
       where: and(
         eq(agent.createdBy, userId),
         eq(agent.organizationId, organizationId),
-        eq(agent.isArchived, false)
+        eq(agent.isArchived, false),
       ),
-      orderBy: desc(agent.createdAt)
+      orderBy: desc(agent.createdAt),
     });
   },
 
@@ -134,8 +134,8 @@ export const agentRepo = {
       .where(
         and(
           eq(agent.organizationId, organizationId),
-          eq(agent.isArchived, false)
-        )
+          eq(agent.isArchived, false),
+        ),
       );
     return result[0]?.count ?? 0;
   },
@@ -159,7 +159,7 @@ export const agentRepo = {
         toolType: config.toolType,
         config: config.config ?? {},
         envOverrides: config.envOverrides ?? {},
-        isEnabled: true
+        isEnabled: true,
       })
       .onConflictDoUpdate({
         target: [agentToolConfig.agentId, agentToolConfig.toolId],
@@ -167,8 +167,8 @@ export const agentRepo = {
           config: config.config ?? {},
           envOverrides: config.envOverrides ?? {},
           isEnabled: true,
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       })
       .returning();
     return row;
@@ -180,8 +180,8 @@ export const agentRepo = {
       .where(
         and(
           eq(agentToolConfig.agentId, agentId),
-          eq(agentToolConfig.toolId, toolId)
-        )
+          eq(agentToolConfig.toolId, toolId),
+        ),
       )
       .returning();
     return row;
@@ -202,13 +202,13 @@ export const agentRepo = {
         config: update.config,
         envOverrides: update.envOverrides,
         isEnabled: update.isEnabled,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       })
       .where(
         and(
           eq(agentToolConfig.agentId, agentId),
-          eq(agentToolConfig.toolId, toolId)
-        )
+          eq(agentToolConfig.toolId, toolId),
+        ),
       )
       .returning();
     return row;
@@ -216,7 +216,7 @@ export const agentRepo = {
 
   async getToolConfigs(agentId: string) {
     return db.query.agentToolConfig.findMany({
-      where: eq(agentToolConfig.agentId, agentId)
+      where: eq(agentToolConfig.agentId, agentId),
     });
   },
 
@@ -246,7 +246,7 @@ export const agentRepo = {
         visibility: "private", // Always start as private
         defaultToolIds: original.defaultToolIds,
         defaultKnowledgeBaseIds: original.defaultKnowledgeBaseIds,
-        metadata: original.metadata
+        metadata: original.metadata,
       })
       .returning();
 
@@ -260,8 +260,8 @@ export const agentRepo = {
           toolType: tc.toolType,
           config: tc.config,
           envOverrides: tc.envOverrides,
-          isEnabled: tc.isEnabled
-        }))
+          isEnabled: tc.isEnabled,
+        })),
       );
     }
 

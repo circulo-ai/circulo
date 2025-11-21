@@ -81,7 +81,8 @@ export async function POST(request: Request) {
   try {
     const json = await request.json();
     requestBody = postRequestBodySchema.parse(json);
-  } catch (_) {
+  } catch (e) {
+    console.log(e);
     return new ChatSDKError("bad_request:api").toResponse();
   }
 
@@ -114,20 +115,20 @@ export async function POST(request: Request) {
       }
     }
 
-    // Rate limiting
-    try {
-      await UsageRateLimiter.enforce(session.user.id, "api_calls", 1);
-    } catch (err: any) {
-      const msg = String(err?.message || "");
-      if (msg.includes("Rate limit exceeded")) {
-        return new ChatSDKError("rate_limit:api").toResponse();
-      }
-      if (msg.includes("No active subscription")) {
-        // Gracefully proceed without enforcing per-minute rate limit when no subscription exists
-      } else {
-        return new ChatSDKError("bad_request:api", msg).toResponse();
-      }
-    }
+    // TODO: Rate limiting
+    // try {
+    //   await UsageRateLimiter.enforce(session.user.id, "api_calls", 1);
+    // } catch (err: any) {
+    //   const msg = String(err?.message || "");
+    //   if (msg.includes("Rate limit exceeded")) {
+    //     return new ChatSDKError("rate_limit:api").toResponse();
+    //   }
+    //   if (msg.includes("No active subscription")) {
+    //     // Gracefully proceed without enforcing per-minute rate limit when no subscription exists
+    //   } else {
+    //     return new ChatSDKError("bad_request:api", msg).toResponse();
+    //   }
+    // }
 
     const existingChat = await getChatById({ id });
     let messagesFromDb: any[] = [];
@@ -254,22 +255,32 @@ export async function POST(request: Request) {
           return;
         }
 
+        // Ensure we have a valid authorId.
+        // If logic permits 'system' or non-agent responses, handle fallback here.
+        const authorId = firstAgentId ?? "system_fallback";
+
+        // Map to DB Schema
         const toSave = assistantMessages.map((m) => ({
           id: m.id,
-          role: m.role,
-          parts: m.parts,
-          createdAt: new Date(),
-          attachments: [],
           chatId: id,
+          role: m.role,
           content: getTextFromMessage(m),
+          // Ensure parts is treated as a JSON-compatible array
+          parts: m.parts as unknown as any[],
+          attachments: [],
           authorType: "agent" as const,
-          authorId: firstAgentId!,
+          authorId: authorId,
+          createdAt: new Date(),
+
+          // Token/Cost default initialization
           tokenCount: 0,
           cost: "0.000000",
+
           quotedMessageId: null,
           isEdited: false,
           editedAt: null,
-          deleted: false,
+
+          isDeleted: false,
           deletedAt: null,
         }));
 
@@ -280,6 +291,7 @@ export async function POST(request: Request) {
           const totalTokens = inputTokens + outputTokens;
           const modelId =
             agent?.model ?? agent?.config?.model ?? "gemini-2.5-flash";
+
           const costNum = calculateCostFromUsage(
             String(modelId),
             inputTokens,
@@ -292,7 +304,8 @@ export async function POST(request: Request) {
           }
         }
 
-        await saveMessages({ messages: toSave as any });
+        // Save to DB
+        await saveMessages({ messages: toSave });
       },
       onError: () => {
         return "Oops, an error occurred!";

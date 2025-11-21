@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { usageMetrics } from "@/db/schema/billing";
+import { usageMetric as usageMetrics } from "@/db/schema/billing";
 import { SubscriptionManager } from "@/lib/billing/subscription-manager";
 import { and, eq, gte, lte, sql } from "drizzle-orm";
 

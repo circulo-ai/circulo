@@ -61,7 +61,7 @@ export const chatRepo = {
     opts?: {
       limit?: number;
       includeDeleted?: boolean;
-    ,
+    },
   ) {
     const conditions = [eq(chat.creatorId, userId)];
     if (!opts?.includeDeleted) {
@@ -72,7 +72,7 @@ export const chatRepo = {
       where: and(...conditions),
       orderBy: sql`created_at
       desc`,
-      limit: opts?.limit ?? 50
+      limit: opts?.limit ?? 50,
     });
   },
 
@@ -83,7 +83,7 @@ export const chatRepo = {
     opts?: {
       includeDisabled?: boolean;
       search?: string;
-    }
+    },
   ) {
     const conditions = [eq(chatAgent.chatId, chatId)];
     if (!opts?.includeDisabled) {
@@ -102,7 +102,7 @@ export const chatRepo = {
       agents = agents.filter(
         (a) =>
           a.name.toLowerCase().includes(searchLower) ||
-          a.description?.toLowerCase().includes(searchLower)
+          a.description?.toLowerCase().includes(searchLower),
       );
     }
 
@@ -111,15 +111,15 @@ export const chatRepo = {
 
   async findAgentInChat(
     chatId: string,
-    agentId: string
+    agentId: string,
   ): Promise<Agent | undefined> {
     const row = await db.query.chatAgent.findFirst({
       where: and(
         eq(chatAgent.chatId, chatId),
         eq(chatAgent.agentId, agentId),
-        eq(chatAgent.isEnabled, true)
+        eq(chatAgent.isEnabled, true),
       ),
-      with: { agent: true }
+      with: { agent: true },
     });
 
     if (!row?.agent) return undefined;
@@ -130,7 +130,7 @@ export const chatRepo = {
       instructions: row.customInstructions ?? row.agent.instructions,
       temperature: row.customTemperature
         ? parseInt(row.customTemperature, 10)
-        : row.agent.temperature
+        : row.agent.temperature,
     } as Agent;
   },
 
@@ -140,7 +140,7 @@ export const chatRepo = {
       .values({ chatId, agentId, addedBy })
       .onConflictDoUpdate({
         target: [chatAgent.chatId, chatAgent.agentId],
-        set: { isEnabled: true }
+        set: { isEnabled: true },
       })
       .returning();
     return row;
@@ -160,7 +160,7 @@ export const chatRepo = {
       .set({
         isEnabled: update.isEnabled,
         customInstructions: update.customInstructions ?? undefined,
-        customTemperature: update.customTemperature?.toString() ?? null
+        customTemperature: update.customTemperature?.toString() ?? null,
       })
       .where(and(eq(chatAgent.chatId, chatId), eq(chatAgent.agentId, agentId)))
       .returning();

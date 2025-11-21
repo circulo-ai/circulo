@@ -184,16 +184,6 @@ export function Chat({
     msg?: Parameters<typeof sendMessage>[0],
     options?: Parameters<typeof sendMessage>[1],
   ): ReturnType<typeof sendMessage> => {
-    const enabledAgentCount = Array.isArray(agentsResponse?.data?.agents)
-      ? agentsResponse.data.agents.length
-      : 0;
-    if (messages.length === 0 && enabledAgentCount === 0) {
-      toast({
-        type: "error",
-        description: "Add at least one agent to start this chat",
-      });
-      return Promise.resolve();
-    }
     return sendMessage(msg, options);
   };
 

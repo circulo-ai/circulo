@@ -43,6 +43,13 @@
       "when": 1763685571929,
       "tag": "0005_strange_diamondback",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1763734798540,
+      "tag": "0006_sloppy_lenny_balinger",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { webhookLogs } from "@/db/schema/billing";
+import { webhookLog as webhookLogs } from "@/db/schema/billing";
 import { eq } from "drizzle-orm";
 import { getProvider } from ".";
 import { BillingManager } from "./billing-manager";
