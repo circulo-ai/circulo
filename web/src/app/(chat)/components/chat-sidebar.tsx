@@ -1,10 +1,13 @@
-import { CustomSidebarInset } from "@/components/ui-custom/sidebar";
+import {
+  CustomSidebar,
+  CustomSidebarInset,
+} from "@/components/ui-custom/sidebar";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Sidebar, SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { cookies } from "next/headers";
 import { ReactNode } from "react";
 import { ChatSidebarInside } from "./chat-sidebar-inside";
@@ -47,9 +50,9 @@ export async function ChatSidebar({ children }: { children: ReactNode }) {
             easing: "ease-in-out",
           }}
         >
-          <Sidebar className="static w-full" collapsible="icon" variant="inset">
+          <CustomSidebar>
             <ChatSidebarInside />
-          </Sidebar>
+          </CustomSidebar>
         </ChatSidebarResizablePanel>
         <ResizableHandle
           size="8px"
@@ -63,3 +66,7 @@ export async function ChatSidebar({ children }: { children: ReactNode }) {
     </SidebarProvider>
   );
 }
+
+// TODO fix the bg-chat when the svg has not loaded yet
+// TODO the suspense state flickers
+// TODO the first page spinner shows up late

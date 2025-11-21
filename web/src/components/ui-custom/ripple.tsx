@@ -25,7 +25,7 @@ export function Ripple({
       id={id}
       disabled
       className={cn(
-        "relative touch-none overflow-hidden select-none [&_.ripple]:bg-teal-50/10",
+        "relative touch-none overflow-hidden select-none [&_.ripple]:bg-teal-50/15",
         className,
       )}
       {...otherProps}

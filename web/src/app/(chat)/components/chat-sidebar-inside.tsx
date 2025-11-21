@@ -4,15 +4,15 @@ import { EnhancedLink } from "@/components/enhanced-link";
 import { EnhancedLinkSpinner } from "@/components/enhanced-link-spinner";
 import { WithRipple } from "@/components/ui-custom/ripple";
 import {
+  CustomSidebarGroup,
+  CustomSidebarHeader,
   CustomSidebarMenuButton,
   CustomSidebarMenuSkeleton,
 } from "@/components/ui-custom/sidebar";
 import {
   SidebarContent,
-  SidebarGroup,
   SidebarGroupAction,
   SidebarGroupContent,
-  SidebarHeader,
   SidebarMenu,
   SidebarMenuAction,
   SidebarMenuBadge,
@@ -35,13 +35,13 @@ export function ChatSidebarInside() {
 
   return (
     <>
-      <SidebarHeader className="flex-row">
+      <CustomSidebarHeader>
         {/* TODO add chat tabs + sidebar separator */}
         <ChatSidebarBurgerMenu />
         <ChatSidebarSearch search={search} setSearch={setSearch} />
-      </SidebarHeader>
+      </CustomSidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
+        <CustomSidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
               {isLoading &&
@@ -82,7 +82,7 @@ export function ChatSidebarInside() {
           <SidebarGroupAction title="Add Project">
             <Plus /> <span className="sr-only">Add Project</span>
           </SidebarGroupAction>
-        </SidebarGroup>
+        </CustomSidebarGroup>
       </SidebarContent>
     </>
   );

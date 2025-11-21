@@ -28,11 +28,16 @@ export function ChatSidebarBurgerMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost-sidebar" rounded="full" size="icon">
+        <Button
+          variant="ghost-sidebar"
+          rounded="full"
+          size="icon"
+          className="group-data-[state=collapsed]:h-13 group-data-[state=collapsed]:w-full group-data-[state=collapsed]:rounded-none"
+        >
           <TextAlignJustify />
         </Button>
       </DropdownMenuTrigger>
-      <CustomDropdownMenuContent sideOffset={8} align="start">
+      <CustomDropdownMenuContent>
         <DropdownMenuGroup>
           <CustomDropdownMenuItem>
             <UserAvatar user={data?.user} isPending={isPending} size="xs" />
