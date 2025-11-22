@@ -1,4 +1,4 @@
-import { refreshAccessTokenIfNeeded } from "@/app/(auth)/api/oauth/utils";
+import { refreshAccessTokenIfNeeded } from "@/app/(auth)/api/auth/oauth/utils";
 import { db } from "@/db";
 import { account } from "@/db/schema";
 import { getSession } from "@/lib/auth";

@@ -1,12 +1,13 @@
 import { Chat, chatMember, db } from "@/db";
 import { deleteAllChatsByUserId, getChatsByOrgId } from "@/db/queries";
 import { getActiveOrganizationId } from "@/lib/auth";
-import { api, Errors, success } from "@/lib/server";
+import { createSafeRoute, ValidationError } from "@/lib/server";
+import { authMiddleware } from "@/lib/server/middlewares";
 import { and, eq, inArray } from "drizzle-orm";
-import z from "zod";
+import { z } from "zod";
 
-export const GetChatHistoryQueryParams = z.object({
-  limit: z.number().min(1).max(100).optional(),
+const getQuerySchema = z.object({
+  limit: z.coerce.number().min(1).max(100).optional(),
   starting_after: z.string().optional(),
   ending_before: z.string().optional(),
   search: z.string().optional(),
@@ -17,22 +18,25 @@ export type GetChatHistoryResponse = {
   hasMore: boolean;
 };
 
-// Get filtered chats for a user
-export const GET = api(
-  {
-    auth: true,
-    query: GetChatHistoryQueryParams,
-  },
-  async (_, ctx) => {
+// GET /api/chats - Get filtered chats for a user
+export const GET = createSafeRoute()
+  .methods("GET")
+  .query(getQuerySchema)
+  .use(authMiddleware())
+  .handler(async (req, ctx) => {
+    const { user } = ctx.data;
     const limit = ctx.query.limit ?? 10;
     const startingAfter = ctx.query.starting_after;
     const endingBefore = ctx.query.ending_before;
     const search = ctx.query.search?.trim() || undefined;
 
     if (startingAfter && endingBefore) {
-      throw Errors.badRequest(
-        "Only one of starting_after or ending_before can be provided.",
-      );
+      throw new ValidationError("query", [
+        {
+          message:
+            "Only one of starting_after or ending_before can be provided.",
+        },
+      ]);
     }
 
     const chatsPage = await getChatsByOrgId({
@@ -56,17 +60,18 @@ export const GET = api(
           .where(
             and(
               inArray(chatMember.chatId, chatIds),
-              eq(chatMember.userId, ctx.user.id),
+              eq(chatMember.userId, user.id),
             ),
           )
       : [];
 
     const pinMap = new Map<string, { isPinned: boolean; pinOrder?: number }>();
-    for (const p of pins)
+    for (const p of pins) {
       pinMap.set(p.chatId, {
         isPinned: Boolean(p.isPinned),
         pinOrder: p.pinOrder ?? undefined,
       });
+    }
 
     const enriched = chatsPage.chats.map((c) => ({
       ...c,
@@ -74,12 +79,14 @@ export const GET = api(
       pinOrder: pinMap.get(c.id)?.pinOrder ?? null,
     }));
 
-    return success({ chats: enriched, hasMore: chatsPage.hasMore });
-  },
-);
+    return Response.json({ chats: enriched, hasMore: chatsPage.hasMore });
+  });
 
-// Delete all chats for a user
-export const DELETE = api({ auth: true }, async (req, ctx) => {
-  const result = await deleteAllChatsByUserId({ userId: ctx.user.id });
-  return success(result);
-});
+// DELETE /api/chats - Delete all chats for a user
+export const DELETE = createSafeRoute()
+  .methods("DELETE")
+  .use(authMiddleware())
+  .handler(async (req, ctx) => {
+    const result = await deleteAllChatsByUserId({ userId: ctx.data.user.id });
+    return Response.json(result);
+  });

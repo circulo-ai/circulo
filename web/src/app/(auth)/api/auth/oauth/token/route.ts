@@ -1,7 +1,7 @@
 import {
   getCredential,
   refreshTokenIfNeeded,
-} from "@/app/(auth)/api/oauth/utils";
+} from "@/app/(auth)/api/auth/oauth/utils";
 import { authorizeCredentialUse } from "@/lib/auth/credential-access";
 import { checkHybridAuth } from "@/lib/auth/hybrid";
 import { createLogger } from "@/lib/logs/console/logger";

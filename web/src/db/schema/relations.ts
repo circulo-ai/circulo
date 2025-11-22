@@ -52,14 +52,7 @@ import {
 } from "@/db/schema/environment";
 
 // Billing
-import {
-  invoice,
-  invoiceLineItem,
-  subscription,
-  subscriptionHistory,
-  subscriptionPlan,
-  usageMetric,
-} from "@/db/schema/billing";
+import { subscription } from "@/db/schema/billing";
 
 // ==================== USER RELATIONS ====================
 export const userRelations = relations(user, ({ many, one }) => ({
@@ -89,7 +82,6 @@ export const userRelations = relations(user, ({ many, one }) => ({
 
   // Billing
   subscriptions: many(subscription),
-  invoices: many(invoice),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -97,7 +89,7 @@ export const sessionRelations = relations(session, ({ one }) => ({
 }));
 
 export const accountRelations = relations(account, ({ one }) => ({
-  user: one(user, { fields: [account.userId], references: [user.id] })
+  user: one(user, { fields: [account.userId], references: [user.id] }),
 }));
 
 // ==================== ORGANIZATION RELATIONS ====================
@@ -117,32 +109,32 @@ export const organizationRelations = relations(
     // Environment
     environment: one(organizationEnvironment, {
       fields: [organization.id],
-      references: [organizationEnvironment.organizationId]
-    })
-  })
+      references: [organizationEnvironment.organizationId],
+    }),
+  }),
 );
 
 export const apiKeyRelations = relations(apiKey, ({ one }) => ({
   user: one(user, { fields: [apiKey.userId], references: [user.id] }),
   organization: one(organization, {
     fields: [apiKey.organizationId],
-    references: [organization.id]
-  })
+    references: [organization.id],
+  }),
 }));
 
 export const memberRelations = relations(member, ({ one }) => ({
   user: one(user, { fields: [member.userId], references: [user.id] }),
   organization: one(organization, {
     fields: [member.organizationId],
-    references: [organization.id]
-  })
+    references: [organization.id],
+  }),
 }));
 
 export const invitationRelations = relations(invitation, ({ one }) => ({
   inviter: one(user, { fields: [invitation.inviterId], references: [user.id] }),
   organization: one(organization, {
     fields: [invitation.organizationId],
-    references: [organization.id]
+    references: [organization.id],
   }),
 }));
 
@@ -150,33 +142,33 @@ export const invitationRelations = relations(invitation, ({ one }) => ({
 export const agentRelations = relations(agent, ({ one, many }) => ({
   organization: one(organization, {
     fields: [agent.organizationId],
-    references: [organization.id]
+    references: [organization.id],
   }),
   creator: one(user, { fields: [agent.createdBy], references: [user.id] }),
 
   chatAgents: many(chatAgent),
-  toolConfigs: many(agentToolConfig)
+  toolConfigs: many(agentToolConfig),
 }));
 
 // ==================== TOOL RELATIONS ====================
 export const customToolRelations = relations(customTool, ({ one }) => ({
   organization: one(organization, {
     fields: [customTool.organizationId],
-    references: [organization.id]
+    references: [organization.id],
   }),
-  creator: one(user, { fields: [customTool.userId], references: [user.id] })
+  creator: one(user, { fields: [customTool.userId], references: [user.id] }),
 }));
 
 export const mcpServerRelations = relations(mcpServer, ({ one, many }) => ({
   chat: one(chat, { fields: [mcpServer.chatId], references: [chat.id] }),
   creator: one(user, { fields: [mcpServer.createdBy], references: [user.id] }),
-  tools: many(mcpServerTool)
+  tools: many(mcpServerTool),
 }));
 
 export const mcpServerToolRelations = relations(mcpServerTool, ({ one }) => ({
   server: one(mcpServer, {
     fields: [mcpServerTool.mcpServerId],
-    references: [mcpServer.id]
+    references: [mcpServer.id],
   }),
 }));
 
@@ -185,9 +177,9 @@ export const agentToolConfigRelations = relations(
   ({ one }) => ({
     agent: one(agent, {
       fields: [agentToolConfig.agentId],
-      references: [agent.id]
-    })
-  })
+      references: [agent.id],
+    }),
+  }),
 );
 
 // ==================== KNOWLEDGE RELATIONS ====================
@@ -196,7 +188,7 @@ export const knowledgeBaseRelations = relations(
   ({ one, many }) => ({
     organization: one(organization, {
       fields: [knowledgeBase.organizationId],
-      references: [organization.id]
+      references: [organization.id],
     }),
     creator: one(user, {
       fields: [knowledgeBase.createdBy],
@@ -248,7 +240,7 @@ export const documentProcessingQueueRelations = relations(
 export const chatRelations = relations(chat, ({ one, many }) => ({
   organization: one(organization, {
     fields: [chat.organizationId],
-    references: [organization.id]
+    references: [organization.id],
   }),
   creator: one(user, { fields: [chat.creatorId], references: [user.id] }),
 
@@ -262,13 +254,13 @@ export const chatRelations = relations(chat, ({ one, many }) => ({
 
   environment: one(chatEnvironment, {
     fields: [chat.id],
-    references: [chatEnvironment.chatId]
-  })
+    references: [chatEnvironment.chatId],
+  }),
 }));
 
 export const chatMemberRelations = relations(chatMember, ({ one }) => ({
   chat: one(chat, { fields: [chatMember.chatId], references: [chat.id] }),
-  user: one(user, { fields: [chatMember.userId], references: [user.id] })
+  user: one(user, { fields: [chatMember.userId], references: [user.id] }),
 }));
 
 export const chatInvitationRelations = relations(chatInvitation, ({ one }) => ({
@@ -344,71 +336,7 @@ export const documentRelations = relations(document, ({ one, many }) => ({
 export const suggestionRelations = relations(suggestion, ({ one }) => ({
   document: one(document, {
     fields: [suggestion.documentId],
-    references: [document.id]
+    references: [document.id],
   }),
-  user: one(user, { fields: [suggestion.userId], references: [user.id] })
-}));
-
-// ==================== BILLING RELATIONS ====================
-export const subscriptionPlanRelations = relations(
-  subscriptionPlan,
-  ({ many }) => ({
-    subscriptions: many(subscription),
-    history: many(subscriptionHistory)
-  }),
-);
-
-export const subscriptionRelations = relations(
-  subscription,
-  ({ one, many }) => ({
-    user: one(user, { fields: [subscription.userId], references: [user.id] }),
-    plan: one(subscriptionPlan, {
-      fields: [subscription.planId],
-      references: [subscriptionPlan.id]
-    }),
-    invoices: many(invoice),
-    history: many(subscriptionHistory),
-    usageMetrics: many(usageMetric)
-  })
-);
-
-export const subscriptionHistoryRelations = relations(
-  subscriptionHistory,
-  ({ one }) => ({
-    subscription: one(subscription, {
-      fields: [subscriptionHistory.subscriptionId],
-      references: [subscription.id]
-    }),
-    plan: one(subscriptionPlan, {
-      fields: [subscriptionHistory.planId],
-      references: [subscriptionPlan.id]
-    })
-  })
-);
-
-export const invoiceRelations = relations(invoice, ({ one, many }) => ({
-  user: one(user, { fields: [invoice.userId], references: [user.id] }),
-  subscription: one(subscription, {
-    fields: [invoice.subscriptionId],
-    references: [subscription.id]
-  }),
-  lineItems: many(invoiceLineItem)
-}));
-
-export const invoiceLineItemRelations = relations(
-  invoiceLineItem,
-  ({ one }) => ({
-    invoice: one(invoice, {
-      fields: [invoiceLineItem.invoiceId],
-      references: [invoice.id]
-    })
-  })
-);
-
-export const usageMetricRelations = relations(usageMetric, ({ one }) => ({
-  user: one(user, { fields: [usageMetric.userId], references: [user.id] }),
-  subscription: one(subscription, {
-    fields: [usageMetric.subscriptionId],
-    references: [subscription.id]
-  }),
+  user: one(user, { fields: [suggestion.userId], references: [user.id] }),
 }));

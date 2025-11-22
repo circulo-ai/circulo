@@ -24,7 +24,6 @@ import { sendEmail } from "@/lib/email/mailer";
 import { getFromEmailAddress } from "@/lib/email/utils";
 import { isBillingEnabled } from "@/lib/environment";
 import { createLogger } from "@/lib/logs/console/logger";
-import { Errors } from "@/lib/server";
 import { getBaseUrl } from "@/lib/urls/utils";
 import { stripe } from "@better-auth/stripe";
 import { betterAuth, User } from "better-auth";
@@ -1539,7 +1538,7 @@ export async function getActiveOrganizationId(): Promise<string> {
   const session = await getSession();
   const activeOrgId = (session?.session as any).activeOrganizationId;
   if (!activeOrgId) {
-    throw Errors.notFound("No organization id provided");
+    throw new Error("No organization id provided");
   }
   return activeOrgId;
 }

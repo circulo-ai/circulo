@@ -66,7 +66,7 @@ export async function checkHybridAuth(
           return {
             success: true,
             userId,
-            authType: "internal_jwt,
+            authType: "internal_jwt",
           };
         }
 
@@ -80,21 +80,21 @@ export async function checkHybridAuth(
           if (!chatData) {
             return {
               success: false,
-              error: "Chat not found,
+              error: "Chat not found",
             };
           }
 
           return {
             success: true,
             userId: chatData.userId,
-            authType: "internal_jwt,
+            authType: "internal_jwt",
           };
         }
 
         if (options.requireChatId !== false) {
           return {
             success: false,
-            error: "chatId or userId required for internal JWT calls"
+            error: "chatId or userId required for internal JWT calls",
           };
         }
 
@@ -124,13 +124,13 @@ export async function checkHybridAuth(
         return {
           success: true,
           userId: result.userId!,
-          authType: "api_key"
+          authType: "api_key",
         };
       }
 
       return {
         success: false,
-        error: "Invalid API key"
+        error: "Invalid API key",
       };
     }
 

@@ -8,7 +8,7 @@ import {
   getUserStorageUsage,
 } from "@/lib/billing/storage";
 import { createLogger } from "@/lib/logs/console/logger";
-import { Errors } from "@/lib/server";
+import { UnauthorizedError } from "@/lib/server";
 import { RateLimiter } from "@/services/queue";
 import { type NextRequest, NextResponse } from "next/server";
 
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   try {
     const auth = await checkHybridAuth(request, { requireChatId: false });
     if (!auth.success || !auth.userId) {
-      throw Errors.unauthorized();
+      throw new UnauthorizedError();
     }
     const authenticatedUserId = auth.userId;
 

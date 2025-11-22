@@ -97,7 +97,7 @@ export async function authorizeCredentialUse(
       authType: auth.authType,
       requesterUserId: auth.userId,
       credentialOwnerUserId,
-      organizationId: wf.organizationI,
+      organizationId: wf.organizationId,
     };
   }
 
@@ -121,6 +121,6 @@ export async function authorizeCredentialUse(
     authType: auth.authType,
     requesterUserId: auth.userId,
     credentialOwnerUserId,
-    organizationId: wf.organizationd,
+    organizationId: wf.organizationId,
   };
 }

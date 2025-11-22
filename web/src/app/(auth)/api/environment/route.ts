@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { environment } from "@/db/schema";
+import { userEnvironment as environment } from "@/db/schema";
 import { getSession } from "@/lib/auth";
 import { createLogger } from "@/lib/logs/console/logger";
 import {

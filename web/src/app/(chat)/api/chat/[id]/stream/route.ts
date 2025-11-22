@@ -1,3 +1,4 @@
+import { getStreamContext } from "@/app/(chat)/api/chat/route";
 import {
   getChatById,
   getMessagesByChatId,
@@ -5,73 +6,75 @@ import {
 } from "@/db/queries";
 import type { Chat } from "@/db/schema";
 import { ChatSDKError } from "@/lib/errors";
-import { api, Errors, noContent } from "@/lib/server";
+import { createSafeRoute } from "@/lib/server";
+import { authMiddleware } from "@/lib/server/middlewares";
 import type { ChatMessage } from "@/lib/types";
 import { createUIMessageStream, JsonToSseTransformStream } from "ai";
 import { differenceInSeconds } from "date-fns";
-import z from "zod";
-import { getStreamContext } from "../../route";
+import { z } from "zod";
 
-export const GET = api(
-  {
-    auth: true,
-    params: z.object({
-      id: z.uuid(),
-    }),
-  },
-  async (_, { user, params: { id: chatId } }) => {
+class NotFoundError extends Error {
+  constructor(message = "Not found") {
+    super(message);
+    this.name = "NotFoundError";
+  }
+  toResponse() {
+    return Response.json({ message: this.message }, { status: 404 });
+  }
+}
+
+const paramsSchema = z.object({ id: z.uuid() });
+
+export const GET = createSafeRoute()
+  .methods("GET")
+  .params(paramsSchema)
+  .use(authMiddleware())
+  .handler(async (req, ctx) => {
+    const { id: chatId } = ctx.params;
+    const { user } = ctx.data;
+
     const streamContext = getStreamContext();
     const resumeRequestedAt = new Date();
 
     if (!streamContext) {
-      return noContent();
-    }
-
-    if (!chatId) {
-      throw Errors.badRequest();
+      return new Response(null, { status: 204 });
     }
 
     let chat: Chat | null;
-
     try {
       chat = await getChatById({ id: chatId });
     } catch {
-      return new ChatSDKError("not_found:chat").toResponse();
+      throw new ChatSDKError("not_found:chat");
     }
 
     if (!chat) {
-      return new ChatSDKError("not_found:chat").toResponse();
+      throw new ChatSDKError("not_found:chat");
     }
 
     if (chat.visibility === "private" && chat.creatorId !== user.id) {
-      return new ChatSDKError("forbidden:chat").toResponse();
+      throw new ChatSDKError("forbidden:chat");
     }
 
     const streamIds = await getStreamIdsByChatId({ chatId });
 
     if (!streamIds.length) {
-      throw Errors.notFound();
+      throw new NotFoundError();
     }
 
     const recentStreamId = streamIds.at(-1);
-
     if (!recentStreamId) {
-      throw Errors.notFound();
+      throw new NotFoundError();
     }
 
     const emptyDataStream = createUIMessageStream<ChatMessage>({
-
-      execute: () => { },
+      execute: () => {},
     });
 
     const stream = await streamContext.resumableStream(recentStreamId, () =>
       emptyDataStream.pipeThrough(new JsonToSseTransformStream()),
     );
 
-    /*
-     * For when the generation is streaming during SSR
-     * but the resumable stream has concluded at this point.
-     */
+    // For when generation is streaming during SSR but resumable stream has concluded
     if (!stream) {
       const messages = await getMessagesByChatId({ id: chatId });
       const mostRecentMessage = messages.at(-1);
@@ -107,5 +110,4 @@ export const GET = api(
     }
 
     return new Response(stream, { status: 200 });
-  },
-);
+  });

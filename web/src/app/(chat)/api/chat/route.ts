@@ -10,8 +10,20 @@ import {
 } from "@/db/queries";
 import { agentRepo } from "@/db/repositories/agent-repo";
 import { chatRepo } from "@/db/repositories/chat-repo";
-import { getSession } from "@/lib/auth";
+import {
+  checkResourceLimit,
+  preExecutionCheck,
+  trackChatUsage,
+  UsageLimitError,
+} from "@/lib/billing/circulo";
 import { ChatSDKError } from "@/lib/errors";
+import {
+  createSafeRoute,
+  MethodNotAllowedError,
+  ValidationError,
+} from "@/lib/server";
+import { authMiddleware } from "@/lib/server/middlewares";
+import { RateLimitError } from "@/lib/server/middlewares/rateLimit";
 import {
   convertToUIMessages,
   generateUUID,
@@ -27,27 +39,17 @@ import {
   createResumableStreamContext,
   type ResumableStreamContext,
 } from "resumable-stream/ioredis";
-
-import {
-  checkResourceLimit,
-  preExecutionCheck,
-  RateLimitError,
-  trackChatUsage,
-  UsageLimitError,
-} from "@/lib/billing/circulo";
-
-import { postRequestBodySchema, type PostRequestBody } from "./schema";
+import { deleteQuerySchema, postRequestBodySchema } from "./schema";
 
 export const maxDuration = 60;
 
+// Resumable stream context singleton
 let globalStreamContext: ResumableStreamContext | null = null;
 
 export function getStreamContext() {
   if (!globalStreamContext) {
     try {
-      globalStreamContext = createResumableStreamContext({
-        waitUntil: after,
-      });
+      globalStreamContext = createResumableStreamContext({ waitUntil: after });
     } catch (error: any) {
       if (error.message.includes("REDIS_URL")) {
         console.log(
@@ -61,45 +63,69 @@ export function getStreamContext() {
   return globalStreamContext;
 }
 
-export async function POST(request: Request) {
-  let requestBody: PostRequestBody;
-  try {
-    const json = await request.json();
-    requestBody = postRequestBodySchema.parse(json);
-  } catch (e) {
-    console.log(e);
-    return new ChatSDKError("bad_request:api").toResponse();
+function handleChatError(error: Error): Response {
+  // Validation errors
+  if (error instanceof ValidationError) {
+    return new ChatSDKError("bad_request:api", error.message).toResponse();
   }
 
-  try {
-    const { id, message, selectedVisibilityType, agentIds } = requestBody;
-    const session = await getSession();
-    if (!session?.user) {
-      return new ChatSDKError("unauthorized:chat").toResponse();
-    }
+  // Method not allowed
+  if (error instanceof MethodNotAllowedError) {
+    return new ChatSDKError("bad_request:api", error.message).toResponse();
+  }
 
-    const userId = session.user.id;
-    const activeOrganizationId =
-      (session as any)?.session?.activeOrganizationId ||
-      (session as any)?.activeOrganizationId;
+  // ChatSDK errors pass through
+  if (error instanceof ChatSDKError) {
+    return error.toResponse();
+  }
 
-    if (!activeOrganizationId) {
-      return new ChatSDKError(
-        "bad_request:api",
-        "No active organization",
-      ).toResponse();
-    }
+  // Billing errors
+  if (error instanceof RateLimitError) {
+    return new ChatSDKError(
+      "rate_limit:api",
+      `Rate limited. Retry after ${error.retryAfter} seconds.`,
+    ).toResponse();
+  }
 
-    // ==================== NEW BILLING CHECKS ====================
+  if (error instanceof UsageLimitError) {
+    return new ChatSDKError(
+      "rate_limit:chat",
+      `Usage limit exceeded: ${error.currentUsage.toFixed(2)} of ${error.limit.toFixed(2)}`,
+    ).toResponse();
+  }
+
+  // AI Gateway error
+  if (error.message?.includes("AI Gateway requires a valid credit card")) {
+    return new ChatSDKError("bad_request:activate_gateway").toResponse();
+  }
+
+  console.error("Unhandled error in chat API:", error);
+  return new ChatSDKError("offline:chat").toResponse();
+}
+
+export const POST = createSafeRoute({ handleServerError: handleChatError })
+  .methods("POST")
+  .body(postRequestBodySchema)
+  .use(authMiddleware())
+  .handler(async (request, ctx) => {
+    const { id, message, selectedVisibilityType, agentIds } = ctx.body;
+    const {
+      user: { id: userId },
+      activeOrganizationId,
+    } = ctx.data;
 
     const existingChat = await getChatById({ id });
     let messagesFromDb: any[] = [];
     let createdNewChat = false;
 
+    if (!activeOrganizationId) {
+      throw new ChatSDKError("forbidden:chat");
+    }
+
     if (existingChat) {
-      // Existing chat - check execution permissions
+      // Existing chat - verify ownership
       if (existingChat.creatorId !== userId) {
-        return new ChatSDKError("forbidden:chat").toResponse();
+        throw new ChatSDKError("forbidden:chat");
       }
 
       // Pre-execution check (rate limits + usage limits)
@@ -111,37 +137,36 @@ export async function POST(request: Request) {
       });
 
       if (!executionCheck.allowed) {
-        // Determine error type for appropriate response
         if (
           executionCheck.rateLimitInfo &&
           !executionCheck.rateLimitInfo.allowed
         ) {
-          return new ChatSDKError(
+          throw new ChatSDKError(
             "rate_limit:chat",
             `Rate limit exceeded. Try again in ${executionCheck.rateLimitInfo.retryAfter} seconds.`,
-          ).toResponse();
+          );
         }
-        return new ChatSDKError(
+        throw new ChatSDKError(
           "rate_limit:chat",
           executionCheck.reason || "Usage limit exceeded",
-        ).toResponse();
+        );
       }
 
       messagesFromDb = await getMessagesByChatId({ id });
     } else {
-      // New chat - check resource limit first
+      // New chat - check resource limit
       const chatLimitCheck = await checkResourceLimit(
         activeOrganizationId,
         "chats",
       );
       if (!chatLimitCheck.allowed) {
-        return new ChatSDKError(
+        throw new ChatSDKError(
           "rate_limit:chat",
           chatLimitCheck.reason || "Chat limit reached",
-        ).toResponse();
+        );
       }
 
-      // Then check execution permissions
+      // Check execution permissions
       const executionCheck = await preExecutionCheck({
         organizationId: activeOrganizationId,
         userId,
@@ -153,15 +178,15 @@ export async function POST(request: Request) {
           executionCheck.rateLimitInfo &&
           !executionCheck.rateLimitInfo.allowed
         ) {
-          return new ChatSDKError(
+          throw new ChatSDKError(
             "rate_limit:chat",
             `Rate limit exceeded. Try again in ${executionCheck.rateLimitInfo.retryAfter} seconds.`,
-          ).toResponse();
+          );
         }
-        return new ChatSDKError(
+        throw new ChatSDKError(
           "rate_limit:chat",
           executionCheck.reason || "Usage limit exceeded",
-        ).toResponse();
+        );
       }
 
       // Create the chat
@@ -176,23 +201,23 @@ export async function POST(request: Request) {
       createdNewChat = true;
     }
 
-    // Check agent limits for new chats with agents
-    if (createdNewChat && agentIds && agentIds.length > 0) {
+    // Check agent limits for new chats
+    if (createdNewChat && agentIds?.length) {
       const agentLimitCheck = await checkResourceLimit(
         activeOrganizationId,
         "chatAgents",
-        { chatId: id, additionalCount: agentIds.length },
+        {
+          chatId: id,
+          additionalCount: agentIds.length,
+        },
       );
       if (!agentLimitCheck.allowed) {
-        // Chat was created but can't add all agents - proceed with available slots
         console.warn(
           "Cannot add all requested agents:",
           agentLimitCheck.reason,
         );
       }
     }
-
-    // ==================== END BILLING CHECKS ====================
 
     const uiMessages = [...convertToUIMessages(messagesFromDb), message];
 
@@ -224,10 +249,9 @@ export async function POST(request: Request) {
     await createStreamId({ streamId, chatId: id });
 
     // Resolve agent
-    let firstAgentId = Array.isArray(agentIds)
-      ? agentIds.find((v) => typeof v === "string" && v.length > 0)
-      : undefined;
-
+    let firstAgentId = agentIds?.find(
+      (v) => typeof v === "string" && v.length > 0,
+    );
     let agent: any = null;
 
     if (firstAgentId) {
@@ -236,11 +260,14 @@ export async function POST(request: Request) {
 
     if (!agent) {
       const chatAgents = await chatRepo.findAgentsForChat(id);
-      if (chatAgents && chatAgents.length > 0) {
+      if (chatAgents?.length) {
         agent = chatAgents[0];
         firstAgentId = agent.id;
       }
     }
+
+    // Capture usage for cost tracking
+    let usage: { promptTokens?: number; completionTokens?: number } | undefined;
 
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
@@ -253,13 +280,7 @@ export async function POST(request: Request) {
             messages: convertToModelMessages(uiMessages),
           });
 
-          // Capture usage from the result if available
           result.consumeStream();
-
-          // If your streamAgent returns usage, capture it here
-          // This depends on your AI SDK implementation
-          // result.usage would contain { promptTokens, completionTokens }
-
           dataStream.merge(result.toUIMessageStream({ sendReasoning: true }));
         }
       },
@@ -268,21 +289,16 @@ export async function POST(request: Request) {
         const assistantMessages = messages.filter(
           (m) => m.role === "assistant",
         );
-
-        if (assistantMessages.length === 0) {
-          return;
-        }
+        if (!assistantMessages.length) return;
 
         const authorId = firstAgentId ?? "system_fallback";
         const modelId =
           agent?.model ?? agent?.config?.model ?? "gemini-2.5-flash";
-
-        // Calculate cost from usage
         const inputTokens = usage?.promptTokens ?? 0;
         const outputTokens = usage?.completionTokens ?? 0;
         const cost = calculateModelCost(modelId, inputTokens, outputTokens);
 
-        // ==================== TRACK USAGE ====================
+        // Track usage
         await trackChatUsage({
           chatId: id,
           userId,
@@ -294,36 +310,33 @@ export async function POST(request: Request) {
             outputTokens,
           },
         });
-        // ==================== END TRACK USAGE ====================
 
-        // Map to DB Schema
-        const toSave = assistantMessages.map((m) => ({
-          id: m.id,
-          chatId: id,
-          role: m.role,
-          content: getTextFromMessage(m),
-          parts: m.parts as unknown as any[],
-          attachments: [],
-          authorType: "agent" as const,
-          authorId,
-          createdAt: new Date(),
-          tokenCount: inputTokens + outputTokens,
-          cost: cost.toFixed(6),
-          quotedMessageId: null,
-          isEdited: false,
-          editedAt: null,
-          isDeleted: false,
-          deletedAt: null,
-        }));
-
-        await saveMessages({ messages: toSave });
+        // Save messages
+        await saveMessages({
+          messages: assistantMessages.map((m) => ({
+            id: m.id,
+            chatId: id,
+            role: m.role,
+            content: getTextFromMessage(m),
+            parts: m.parts as any[],
+            attachments: [],
+            authorType: "agent" as const,
+            authorId,
+            createdAt: new Date(),
+            tokenCount: inputTokens + outputTokens,
+            cost: cost.toFixed(6),
+            quotedMessageId: null,
+            isEdited: false,
+            editedAt: null,
+            isDeleted: false,
+            deletedAt: null,
+          })),
+        });
       },
-      onError: () => {
-        return "Oops, an error occurred!";
-      },
+      onError: () => "Oops, an error occurred!",
     });
 
-    // Use resumable stream if available
+    // Return with resumable stream if available
     const streamContext = getStreamContext();
     if (streamContext) {
       return new Response(
@@ -334,67 +347,38 @@ export async function POST(request: Request) {
     }
 
     return new Response(stream.pipeThrough(new JsonToSseTransformStream()));
-  } catch (error) {
-    const vercelId = request.headers.get("x-vercel-id");
+  });
 
-    if (error instanceof ChatSDKError) {
-      return error.toResponse();
+export const DELETE = createSafeRoute({ handleServerError: handleChatError })
+  .methods("DELETE")
+  .query(deleteQuerySchema)
+  .use(authMiddleware())
+  .handler(async (request, ctx) => {
+    const { id } = ctx.query;
+    const {
+      user: { id: userId },
+    } = ctx.data;
+
+    const chat = await getChatById({ id });
+
+    if (!chat) {
+      throw new ChatSDKError("bad_request:api");
     }
 
-    // Handle billing-specific errors
-    if (error instanceof RateLimitError) {
-      return new ChatSDKError(
-        "rate_limit:api",
-        `Rate limited. Retry after ${error.retryAfter} seconds.`,
-      ).toResponse();
+    if (chat.creatorId !== userId) {
+      throw new ChatSDKError("forbidden:chat");
     }
 
-    if (error instanceof UsageLimitError) {
-      return new ChatSDKError(
-        "rate_limit:chat",
-        `Usage limit exceeded: $${error.currentUsage.toFixed(2)} of $${error.limit.toFixed(2)}`,
-      ).toResponse();
-    }
+    const deletedChat = await deleteChatById({ id });
+    return Response.json(deletedChat, { status: 200 });
+  });
 
-    if (
-      error instanceof Error &&
-      error.message?.includes(
-        "AI Gateway requires a valid credit card on file to service requests",
-      )
-    ) {
-      return new ChatSDKError("bad_request:activate_gateway").toResponse();
-    }
-
-    console.error("Unhandled error in chat API:", error, { vercelId });
-    return new ChatSDKError("offline:chat").toResponse();
-  }
-}
-
-export async function DELETE(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const id = searchParams.get("id");
-
-  if (!id) {
-    return new ChatSDKError("bad_request:api").toResponse();
-  }
-
-  const session = await getSession();
-
-  if (!session?.user) {
-    return new ChatSDKError("unauthorized:chat").toResponse();
-  }
-
-  const chat = await getChatById({ id });
-
-  if (!chat) {
-    return new ChatSDKError("bad_request:api").toResponse();
-  }
-
-  if (chat.creatorId !== session.user.id) {
-    return new ChatSDKError("forbidden:chat").toResponse();
-  }
-
-  const deletedChat = await deleteChatById({ id });
-
-  return Response.json(deletedChat, { status: 200 });
+// Helper function (add your actual implementation)
+function calculateModelCost(
+  modelId: string,
+  inputTokens: number,
+  outputTokens: number,
+): number {
+  // Your cost calculation logic here
+  return 0;
 }

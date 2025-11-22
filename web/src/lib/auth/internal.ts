@@ -52,7 +52,7 @@ export async function verifyInternalToken(
     if (payload.type === "internal") {
       return {
         valid: true,
-        userId: typeof payload.userId === "string" ? payload.userId : undefine,
+        userId: typeof payload.userId === "string" ? payload.userId : undefined,
       };
     }
 

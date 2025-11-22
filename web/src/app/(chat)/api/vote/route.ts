@@ -1,76 +1,65 @@
 import { getChatById, getVotesByChatId, voteMessage } from "@/db/queries";
-import { getSession } from "@/lib/auth";
 import { ChatSDKError } from "@/lib/errors";
+import { createSafeRoute } from "@/lib/server";
+import { authMiddleware } from "@/lib/server/middlewares";
+import { z } from "zod";
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const chatId = searchParams.get("chatId");
+const getQuerySchema = z.object({
+  chatId: z.string().min(1, "Parameter chatId is required."),
+});
 
-  if (!chatId) {
-    return new ChatSDKError(
-      "bad_request:api",
-      "Parameter chatId is required.",
-    ).toResponse();
-  }
+const patchBodySchema = z.object({
+  chatId: z.string().min(1),
+  messageId: z.string().min(1),
+  type: z.enum(["up", "down"]),
+});
 
-  const session = await getSession();
+export const GET = createSafeRoute()
+  .methods("GET")
+  .query(getQuerySchema)
+  .use(authMiddleware())
+  .handler(async (req, ctx) => {
+    const { chatId } = ctx.query;
+    const { user } = ctx.data;
 
-  if (!session?.user) {
-    return new ChatSDKError("unauthorized:vote").toResponse();
-  }
+    const chat = await getChatById({ id: chatId });
 
-  const chat = await getChatById({ id: chatId });
+    if (!chat) {
+      throw new ChatSDKError("not_found:chat");
+    }
 
-  if (!chat) {
-    return new ChatSDKError("not_found:chat").toResponse();
-  }
+    if (chat.creatorId !== user.id) {
+      throw new ChatSDKError("forbidden:vote");
+    }
 
-  if (chat.creatorId !== session.user.id) {
-    return new ChatSDKError("forbidden:vote").toResponse();
-  }
-
-  const votes = await getVotesByChatId({ id: chatId });
-
-  return Response.json(votes, { status: 200 });
-}
-
-export async function PATCH(request: Request) {
-  const {
-    chatId,
-    messageId,
-    type,
-  }: { chatId: string; messageId: string; type: "up" | "down" } =
-    await request.json();
-
-  if (!chatId || !messageId || !type) {
-    return new ChatSDKError(
-      "bad_request:api",
-      "Parameters chatId, messageId, and type are required.",
-    ).toResponse();
-  }
-
-  const session = await getSession();
-
-  if (!session?.user) {
-    return new ChatSDKError("unauthorized:vote").toResponse();
-  }
-
-  const chat = await getChatById({ id: chatId });
-
-  if (!chat) {
-    return new ChatSDKError("not_found:vote").toResponse();
-  }
-
-  if (chat.creatorId !== session.user.id) {
-    return new ChatSDKError("forbidden:vote").toResponse();
-  }
-
-  await voteMessage({
-    userId: session.user.id,
-    chatId,
-    messageId,
-    type,
+    const votes = await getVotesByChatId({ id: chatId });
+    return Response.json(votes, { status: 200 });
   });
 
-  return new Response("Message voted", { status: 200 });
-}
+export const PATCH = createSafeRoute()
+  .methods("PATCH")
+  .body(patchBodySchema)
+  .use(authMiddleware())
+  .handler(async (req, ctx) => {
+    const { chatId, messageId, type } = ctx.body;
+    const { user } = ctx.data;
+
+    const chat = await getChatById({ id: chatId });
+
+    if (!chat) {
+      throw new ChatSDKError("not_found:vote");
+    }
+
+    if (chat.creatorId !== user.id) {
+      throw new ChatSDKError("forbidden:vote");
+    }
+
+    await voteMessage({
+      userId: user.id,
+      chatId,
+      messageId,
+      type,
+    });
+
+    return new Response("Message voted", { status: 200 });
+  });

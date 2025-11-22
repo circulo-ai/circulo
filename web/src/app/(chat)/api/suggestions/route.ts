@@ -1,37 +1,32 @@
 import { getSuggestionsByDocumentId } from "@/db/queries";
-import { getSession } from "@/lib/auth";
-import { ChatSDKError } from "@/lib/errors";
+import { createSafeRoute } from "@/lib/server";
+import { ForbiddenError } from "@/lib/server/errors";
+import { authMiddleware } from "@/lib/server/middlewares";
+import { z } from "zod";
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const documentId = searchParams.get("documentId");
+const querySchema = z.object({
+  documentId: z.string().min(1, "Parameter documentId is required."),
+});
 
-  if (!documentId) {
-    return new ChatSDKError(
-      "bad_request:api",
-      "Parameter documentId is required.",
-    ).toResponse();
-  }
+export const GET = createSafeRoute()
+  .methods("GET")
+  .query(querySchema)
+  .use(authMiddleware())
+  .handler(async (req, ctx) => {
+    const { documentId } = ctx.query;
+    const { user } = ctx.data;
 
-  const session = await getSession();
+    const suggestions = await getSuggestionsByDocumentId({ documentId });
 
-  if (!session?.user) {
-    return new ChatSDKError("unauthorized:suggestions").toResponse();
-  }
+    const [suggestion] = suggestions;
 
-  const suggestions = await getSuggestionsByDocumentId({
-    documentId,
+    if (!suggestion) {
+      return Response.json([], { status: 200 });
+    }
+
+    if (suggestion.userId !== user.id) {
+      throw new ForbiddenError();
+    }
+
+    return Response.json(suggestions, { status: 200 });
   });
-
-  const [suggestion] = suggestions;
-
-  if (!suggestion) {
-    return Response.json([], { status: 200 });
-  }
-
-  if (suggestion.userId !== session.user.id) {
-    return new ChatSDKError("forbidden:api").toResponse();
-  }
-
-  return Response.json(suggestions, { status: 200 });
-}

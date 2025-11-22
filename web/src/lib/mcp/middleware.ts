@@ -42,7 +42,7 @@ async function validateMcpAuth(
   const requestId = generateRequestId();
 
   try {
-    const auth = await checkHybridAuth(request, { requireWorkflowId: false });
+    const auth = await checkHybridAuth(request, { requireChatId: false });
     if (!auth.success || !auth.userId) {
       logger.warn(`[${requestId}] Authentication failed: ${auth.error}`);
       return {
