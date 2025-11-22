@@ -37,6 +37,11 @@ export function EnhancedLink({
     [enableLinkStatus, id, children, linkProps, linkClassname],
   );
 
-  if (asButton) return <Button {...buttonProps}>{mainElement}</Button>;
+  if (asButton)
+    return (
+      <Button asChild {...buttonProps}>
+        {mainElement}
+      </Button>
+    );
   else return mainElement;
 }

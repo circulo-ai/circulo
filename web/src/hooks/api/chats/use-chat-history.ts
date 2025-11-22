@@ -48,6 +48,7 @@ export function useChatHistory() {
     currentChatId,
     setCurrentChatId,
     search,
+    debouncedSearch,
     setSearch,
   };
 }

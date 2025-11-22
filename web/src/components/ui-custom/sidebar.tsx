@@ -51,7 +51,12 @@ export function CustomSidebarGroup({
   className,
   ...props
 }: CustomSidebarGroupProps) {
-  return <SidebarGroup className={cn("h-full", className)} {...props} />;
+  return (
+    <SidebarGroup
+      className={cn("h-full overflow-hidden", className)}
+      {...props}
+    />
+  );
 }
 
 interface CustomSidebarInsetProps extends ComponentProps<typeof SidebarInset> {}
@@ -76,13 +81,15 @@ interface CustomSidebarMenuButtonProps
 
 export function CustomSidebarMenuButton({
   className,
+  variant = "secondary",
   ...props
 }: CustomSidebarMenuButtonProps) {
   return (
     <SidebarMenuButton
+      variant={variant}
       className={cn(
         className,
-        "group/sidebar-menu-button h-auto transition-all group-data-[collapsible=icon]:h-auto! group-data-[state=collapsed]:w-9! group-data-[state=collapsed]:rounded-[1.125rem] group-data-[state=collapsed]:p-0! hover:bg-teal-50/5 active:bg-teal-50/10 data-[active=true]:bg-teal-600 data-[active=true]:font-normal",
+        "group/sidebar-menu-button h-auto transition-all group-data-[collapsible=icon]:h-auto! group-data-[state=collapsed]:w-9! group-data-[state=collapsed]:rounded-[1.125rem] group-data-[state=collapsed]:p-0! data-[active=true]:font-normal",
       )}
       {...props}
     />
