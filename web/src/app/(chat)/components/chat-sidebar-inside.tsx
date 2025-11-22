@@ -3,6 +3,7 @@
 import { EnhancedLink } from "@/components/enhanced-link";
 import { WithRipple } from "@/components/ui-custom/ripple";
 import {
+  CustomSidebarContextMenu,
   CustomSidebarGroup,
   CustomSidebarGroupAction,
   CustomSidebarHeader,
@@ -53,48 +54,50 @@ export function ChatSidebarInside() {
 
               {data?.chats.map((item) => (
                 <SidebarMenuItem key={item.id}>
-                  <CustomSidebarMenuButton
-                    isActive={currentChatId === item.id}
-                    asChild
-                  >
-                    <WithRipple
-                      component={EnhancedLink}
-                      componentProps={{
-                        enableLinkStatus: false,
-                        asButton: false,
-                        href: `/chat/${item.id}`,
-                        buttonProps: { variant: "text" },
-                        onClick: () => setCurrentChatId(item.id),
-                      }}
+                  <CustomSidebarContextMenu>
+                    <CustomSidebarMenuButton
+                      isActive={currentChatId === item.id}
+                      asChild
                     >
-                      <CustomSidebarMenuAvatar />
-                      <div className="flex max-h-9 w-full flex-col justify-center">
-                        <div className="flex items-center gap-2">
-                          <div className="line-clamp-1 grow font-medium">
-                            {item.title}
+                      <WithRipple
+                        component={EnhancedLink}
+                        componentProps={{
+                          enableLinkStatus: false,
+                          asButton: false,
+                          href: `/chat/${item.id}`,
+                          buttonProps: { variant: "text" },
+                          onClick: () => setCurrentChatId(item.id),
+                        }}
+                      >
+                        <CustomSidebarMenuAvatar />
+                        <div className="flex max-h-9 w-full flex-col justify-center">
+                          <div className="flex items-center gap-2">
+                            <div className="line-clamp-1 grow font-medium">
+                              {item.title}
+                            </div>
+                            <div className="shrink-0 text-xs opacity-75">
+                              {formatDate(new Date(item.updatedAt))}
+                            </div>
                           </div>
-                          <div className="shrink-0 text-xs opacity-75">
-                            {formatDate(new Date(item.updatedAt))}
+                          <div className="flex items-center gap-2">
+                            <div className="line-clamp-1 grow opacity-75">
+                              {item.description}
+                            </div>
+                            {
+                              /*Boolean(item.messageCount)*/ true && (
+                                <Badge
+                                  className="shrink-0"
+                                  variant="sidebar-menu-badge"
+                                >
+                                  {item.messageCount}
+                                </Badge>
+                              )
+                            }
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <div className="line-clamp-1 grow opacity-75">
-                            {item.description}
-                          </div>
-                          {
-                            /*Boolean(item.messageCount)*/ true && (
-                              <Badge
-                                className="shrink-0"
-                                variant="sidebar-menu-badge"
-                              >
-                                {item.messageCount}
-                              </Badge>
-                            )
-                          }
-                        </div>
-                      </div>
-                    </WithRipple>
-                  </CustomSidebarMenuButton>
+                      </WithRipple>
+                    </CustomSidebarMenuButton>
+                  </CustomSidebarContextMenu>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>

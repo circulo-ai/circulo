@@ -1,4 +1,10 @@
+import {
+  ContextMenu,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { cn } from "@/lib/utils";
+import { Pin } from "lucide-react";
 import { ComponentProps } from "react";
 import {
   Sidebar,
@@ -9,6 +15,10 @@ import {
   SidebarMenuButton,
   SidebarMenuSkeleton,
 } from "../ui/sidebar";
+import {
+  CustomContextMenuContent,
+  CustomContextMenuItem,
+} from "./context-menu";
 import { WithRipple } from "./ripple";
 import { CustomSkeleton } from "./skeleton";
 
@@ -115,7 +125,7 @@ export function CustomSidebarGroupAction({
       component={SidebarGroupAction}
       componentProps={{
         className: cn(
-          "size-12 rounded-full bg-teal-600 transition-all group-data-[collapsible=icon]:flex hover:bg-teal-700",
+          "size-12 rounded-full bg-teal-600 transition-all group-data-[collapsible=icon]:flex hover:bg-teal-500",
           className,
         ),
         ...props,
@@ -140,5 +150,28 @@ export function CustomSidebarMenuAvatar({
       )}
       {...props}
     />
+  );
+}
+
+interface CustomSidebarContextMenuProps
+  extends ComponentProps<typeof ContextMenu> {}
+
+export function CustomSidebarContextMenu({
+  children,
+  ...props
+}: CustomSidebarContextMenuProps) {
+  return (
+    <ContextMenu {...props}>
+      <ContextMenuTrigger>{children}</ContextMenuTrigger>
+      <CustomContextMenuContent>
+        <CustomContextMenuItem>
+          <Pin /> Pin
+        </CustomContextMenuItem>
+        <ContextMenuSeparator />
+        <CustomContextMenuItem disabled inset>
+          More Features Soon...
+        </CustomContextMenuItem>
+      </CustomContextMenuContent>
+    </ContextMenu>
   );
 }
