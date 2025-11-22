@@ -14,7 +14,6 @@ import {
   SidebarContent,
   SidebarGroupContent,
   SidebarMenu,
-  SidebarMenuAction,
   SidebarMenuBadge,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
@@ -66,12 +65,19 @@ export function ChatSidebarInside() {
                         onClick: () => setCurrentChatId(item.id),
                       }}
                     >
-                      <div className="aspect-square w-12 min-w-12 rounded-full bg-foreground transition-all group-data-[state=collapsed]:w-9 group-data-[state=collapsed]:min-w-9" />
-                      <span className="truncate">{item.title}</span>
-                      <SidebarMenuAction className="pointer-events-none">
-                        <EnhancedLinkSpinner />
-                        <span className="sr-only">Add Project</span>
-                      </SidebarMenuAction>
+                      <div className="aspect-square w-12 min-w-12 overflow-hidden rounded-full bg-foreground text-background shadow-[0_0_0_0_inset] shadow-teal-600 transition-all group-data-[state=collapsed]:w-9 group-data-[state=collapsed]:min-w-9 group-data-[state=collapsed]:group-data-[active=true]/sidebar-menu-button:shadow-[0_0_0_4px_inset]">
+                        <div className="flex size-full items-center justify-center bg-background/25 opacity-0 transition-opacity group-data-loading/link:opacity-100">
+                          <EnhancedLinkSpinner className="size-4.5 opacity-100!" />
+                        </div>
+                      </div>
+                      <div className="flex max-h-9 w-full flex-col justify-center">
+                        <span className="truncate font-medium">
+                          {item.title}
+                        </span>
+                        <span className="truncate opacity-75">
+                          {item.description}
+                        </span>
+                      </div>
                     </WithRipple>
                   </CustomSidebarMenuButton>
                   <SidebarMenuBadge>24</SidebarMenuBadge>
