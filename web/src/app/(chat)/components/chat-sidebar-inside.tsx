@@ -5,7 +5,6 @@ import { WithRipple } from "@/components/ui-custom/ripple";
 import {
   CustomSidebarContextMenu,
   CustomSidebarGroup,
-  CustomSidebarGroupAction,
   CustomSidebarHeader,
   CustomSidebarMenuAvatar,
   CustomSidebarMenuButton,
@@ -20,7 +19,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useChatHistory } from "@/hooks/api/chats/use-chat-history";
 import { formatDate } from "@/lib/format-date";
-import { Pencil } from "lucide-react";
+import { ChatSidebarAddAction } from "./chat-sidebar-add-action";
 import { ChatSidebarBurgerMenu } from "./chat-sidebar-burger-menu";
 import { ChatSidebarSearch } from "./chat-sidebar-search";
 
@@ -102,9 +101,7 @@ export function ChatSidebarInside() {
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
-          <CustomSidebarGroupAction title="Add Chat">
-            <Pencil /> <span className="sr-only">Add Chat</span>
-          </CustomSidebarGroupAction>
+          <ChatSidebarAddAction />
         </CustomSidebarGroup>
       </SidebarContent>
     </>

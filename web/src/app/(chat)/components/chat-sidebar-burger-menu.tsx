@@ -13,7 +13,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/ui/user-avatar";
-import { cn } from "@/lib/utils";
 import { useSession } from "@/providers/session-provider";
 import {
   Bot,
@@ -36,7 +35,6 @@ export function ChatSidebarBurgerMenu() {
             variant: "ghost-sidebar",
             rounded: "full",
             size: "icon",
-            className: cn(""),
           }}
         >
           <TextAlignJustify />
