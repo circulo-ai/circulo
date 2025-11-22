@@ -25,7 +25,7 @@ export function EnhancedLink({
   const mainElement = useMemo(
     () => (
       <Link
-        id={enableLinkStatus ? id : undefined}
+        id={id}
         prefetch={true}
         className={cn("group/link", linkClassname)}
         {...linkProps}
