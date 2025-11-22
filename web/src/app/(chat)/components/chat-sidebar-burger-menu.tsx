@@ -12,7 +12,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useSidebar } from "@/components/ui/sidebar";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/providers/session-provider";
@@ -27,7 +26,6 @@ import {
 
 export function ChatSidebarBurgerMenu() {
   const { data, isPending } = useSession();
-  const { open } = useSidebar();
 
   return (
     <DropdownMenu>
@@ -44,11 +42,7 @@ export function ChatSidebarBurgerMenu() {
           <TextAlignJustify />
         </WithRipple>
       </DropdownMenuTrigger>
-      <CustomDropdownMenuContent
-        sideOffset={8}
-        alignOffset={open ? 0 : 8}
-        align="start"
-      >
+      <CustomDropdownMenuContent sideOffset={8} align="start">
         <DropdownMenuGroup>
           <CustomDropdownMenuItem>
             <UserAvatar user={data?.user} isPending={isPending} size="xs" />

@@ -66,7 +66,7 @@ export function ChatSidebarInside() {
                         onClick: () => setCurrentChatId(item.id),
                       }}
                     >
-                      <div className="size-12 rounded-full bg-foreground" />
+                      <div className="aspect-square w-12 min-w-12 rounded-full bg-foreground transition-all group-data-[state=collapsed]:w-9 group-data-[state=collapsed]:min-w-9" />
                       <span className="truncate">{item.title}</span>
                       <SidebarMenuAction className="pointer-events-none">
                         <EnhancedLinkSpinner />

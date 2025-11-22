@@ -44,7 +44,7 @@ export async function ChatSidebar({ children }: { children: ReactNode }) {
           max="384px"
           // isStaticAtRest // TODO can't use but it's a good prop, could make a pr to the library's repo to fix it
           collapsible
-          collapsedSize="64px"
+          collapsedSize="60px"
           collapseAnimation={{
             duration: 150,
             easing: "ease-in-out",

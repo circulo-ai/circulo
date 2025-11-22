@@ -70,7 +70,7 @@ export function CustomSidebarMenuButton({
     <SidebarMenuButton
       className={cn(
         className,
-        "h-auto transition-all hover:bg-teal-50/5 active:bg-teal-50/10 data-[active=true]:bg-teal-600",
+        "h-auto transition-all group-data-[collapsible=icon]:h-auto! group-data-[state=collapsed]:w-9! group-data-[state=collapsed]:rounded-[1.125rem] group-data-[state=collapsed]:p-0! hover:bg-teal-50/5 active:bg-teal-50/10 data-[active=true]:bg-teal-600",
       )}
       {...props}
     />
