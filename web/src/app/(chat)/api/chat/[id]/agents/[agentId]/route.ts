@@ -35,7 +35,7 @@ export const PATCH = api(
       throw Errors.notFound("Agent not found in this chat");
     }
 
-    const updated = await chatRepo.updateAgent(
+    const updated = await chatRepo.updateAgentInChat(
       ctx.params.id,
       ctx.params.agentId,
       ctx.body,
@@ -72,7 +72,7 @@ export const DELETE = api(
       throw Errors.notFound("Agent not found in this chat");
     }
 
-    await chatRepo.removeAgent(ctx.params.id, ctx.params.agentId);
+    await chatRepo.removeAgentFromChat(ctx.params.id, ctx.params.agentId);
 
     return success({ deleted: true });
   },

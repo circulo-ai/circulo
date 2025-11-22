@@ -10,7 +10,6 @@ export const GetChatHistoryQueryParams = z.object({
   starting_after: z.string().optional(),
   ending_before: z.string().optional(),
   search: z.string().optional(),
-  activeOrganizationId: z.string().optional(),
 });
 
 export type GetChatHistoryResponse = {
@@ -37,7 +36,7 @@ export const GET = api(
     }
 
     const chatsPage = await getChatsByOrgId({
-      id: ctx.query.activeOrganizationId ?? (await getActiveOrganizationId()),
+      id: await getActiveOrganizationId(),
       limit,
       startingAfter,
       endingBefore,

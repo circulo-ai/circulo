@@ -50,20 +50,6 @@ export default function TestToolsPage() {
     );
   };
 
-  const updateUserConfig = (
-    toolId: string,
-    paramKey: string,
-    value: string,
-  ) => {
-    setUserConfigs((prev) => ({
-      ...prev,
-      [toolId]: {
-        ...prev[toolId],
-        [paramKey]: value,
-      },
-    }));
-  };
-
   const selectAllTools = () =>
     setSelectedTools(toolRegistry.getAll().map((t) => t.id));
   const clearAllTools = () => setSelectedTools([]);

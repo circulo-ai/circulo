@@ -11,11 +11,7 @@ import {
 import { agentRepo } from "@/db/repositories/agent-repo";
 import { chatRepo } from "@/db/repositories/chat-repo";
 import { getSession } from "@/lib/auth";
-import { UsageRateLimiter } from "@/lib/billing/rate-limiter";
-import { SubscriptionManager } from "@/lib/billing/subscription-manager";
-import { UsageTracker } from "@/lib/billing/usage-tracker";
 import { ChatSDKError } from "@/lib/errors";
-import { calculateCostFromUsage } from "@/lib/server-utils";
 import {
   convertToUIMessages,
   generateUUID,
@@ -26,35 +22,25 @@ import {
   createUIMessageStream,
   JsonToSseTransformStream,
 } from "ai";
-import { unstable_cache as cache } from "next/cache";
 import { after } from "next/server";
 import {
   createResumableStreamContext,
   type ResumableStreamContext,
 } from "resumable-stream/ioredis";
-import type { ModelCatalog } from "tokenlens/core";
-import { fetchModels } from "tokenlens/fetch";
+
+import {
+  checkResourceLimit,
+  preExecutionCheck,
+  RateLimitError,
+  trackChatUsage,
+  UsageLimitError,
+} from "@/lib/billing/circulo";
+
 import { postRequestBodySchema, type PostRequestBody } from "./schema";
 
 export const maxDuration = 60;
 
 let globalStreamContext: ResumableStreamContext | null = null;
-
-const getTokenlensCatalog = cache(
-  async (): Promise<ModelCatalog | undefined> => {
-    try {
-      return await fetchModels();
-    } catch (err) {
-      console.warn(
-        "TokenLens: catalog fetch failed, using default catalog",
-        err,
-      );
-      return; // tokenlens helpers will fall back to defaultCatalog
-    }
-  },
-  ["tokenlens-catalog"],
-  { revalidate: 24 * 60 * 60 }, // 24 hours
-);
 
 export function getStreamContext() {
   if (!globalStreamContext) {
@@ -72,7 +58,6 @@ export function getStreamContext() {
       }
     }
   }
-
   return globalStreamContext;
 }
 
@@ -93,81 +78,121 @@ export async function POST(request: Request) {
       return new ChatSDKError("unauthorized:chat").toResponse();
     }
 
-    // Check subscription limits
-    const subscription = await SubscriptionManager.getActiveSubscription(
-      session.user.id,
-    );
-    if (subscription) {
-      const dailyLimit = subscription.features.maxMessagesPerDay;
-      if (dailyLimit != null) {
-        const now = new Date();
-        const dayStart = new Date(now);
-        dayStart.setHours(0, 0, 0, 0);
-        const chatMessagesToday = await UsageTracker.getUsage(
-          session.user.id,
-          "chat_messages",
-          dayStart,
-          now,
-        );
-        if (chatMessagesToday >= dailyLimit) {
-          return new ChatSDKError("rate_limit:chat").toResponse();
-        }
-      }
+    const userId = session.user.id;
+    const activeOrganizationId =
+      (session as any)?.session?.activeOrganizationId ||
+      (session as any)?.activeOrganizationId;
+
+    if (!activeOrganizationId) {
+      return new ChatSDKError(
+        "bad_request:api",
+        "No active organization",
+      ).toResponse();
     }
 
-    // TODO: Rate limiting
-    // try {
-    //   await UsageRateLimiter.enforce(session.user.id, "api_calls", 1);
-    // } catch (err: any) {
-    //   const msg = String(err?.message || "");
-    //   if (msg.includes("Rate limit exceeded")) {
-    //     return new ChatSDKError("rate_limit:api").toResponse();
-    //   }
-    //   if (msg.includes("No active subscription")) {
-    //     // Gracefully proceed without enforcing per-minute rate limit when no subscription exists
-    //   } else {
-    //     return new ChatSDKError("bad_request:api", msg).toResponse();
-    //   }
-    // }
+    // ==================== NEW BILLING CHECKS ====================
 
     const existingChat = await getChatById({ id });
     let messagesFromDb: any[] = [];
     let createdNewChat = false;
 
     if (existingChat) {
-      if (existingChat.creatorId !== session.user.id) {
+      // Existing chat - check execution permissions
+      if (existingChat.creatorId !== userId) {
         return new ChatSDKError("forbidden:chat").toResponse();
       }
+
+      // Pre-execution check (rate limits + usage limits)
+      const executionCheck = await preExecutionCheck({
+        chatId: id,
+        organizationId: activeOrganizationId,
+        userId,
+        requestType: "syncApi",
+      });
+
+      if (!executionCheck.allowed) {
+        // Determine error type for appropriate response
+        if (
+          executionCheck.rateLimitInfo &&
+          !executionCheck.rateLimitInfo.allowed
+        ) {
+          return new ChatSDKError(
+            "rate_limit:chat",
+            `Rate limit exceeded. Try again in ${executionCheck.rateLimitInfo.retryAfter} seconds.`,
+          ).toResponse();
+        }
+        return new ChatSDKError(
+          "rate_limit:chat",
+          executionCheck.reason || "Usage limit exceeded",
+        ).toResponse();
+      }
+
       messagesFromDb = await getMessagesByChatId({ id });
     } else {
+      // New chat - check resource limit first
+      const chatLimitCheck = await checkResourceLimit(
+        activeOrganizationId,
+        "chats",
+      );
+      if (!chatLimitCheck.allowed) {
+        return new ChatSDKError(
+          "rate_limit:chat",
+          chatLimitCheck.reason || "Chat limit reached",
+        ).toResponse();
+      }
+
+      // Then check execution permissions
+      const executionCheck = await preExecutionCheck({
+        organizationId: activeOrganizationId,
+        userId,
+        requestType: "syncApi",
+      });
+
+      if (!executionCheck.allowed) {
+        if (
+          executionCheck.rateLimitInfo &&
+          !executionCheck.rateLimitInfo.allowed
+        ) {
+          return new ChatSDKError(
+            "rate_limit:chat",
+            `Rate limit exceeded. Try again in ${executionCheck.rateLimitInfo.retryAfter} seconds.`,
+          ).toResponse();
+        }
+        return new ChatSDKError(
+          "rate_limit:chat",
+          executionCheck.reason || "Usage limit exceeded",
+        ).toResponse();
+      }
+
+      // Create the chat
       const title = await generateTitleFromUserMessage({ message });
-      const activeOrganizationId =
-        (session as any)?.session?.activeOrganizationId ||
-        (session as any)?.activeOrganizationId;
       await saveChat({
         id,
-        userId: session.user.id,
+        userId,
         title,
         visibility: selectedVisibilityType as any,
         organizationId: activeOrganizationId,
       });
       createdNewChat = true;
-      await UsageTracker.track(session.user.id, "chats_created", 1);
     }
 
-    // Check agent limits for new chats
+    // Check agent limits for new chats with agents
     if (createdNewChat && agentIds && agentIds.length > 0) {
-      for (const aId of agentIds) {
-        const { allowed } = await UsageRateLimiter.canPerformAction(
-          session.user.id,
-          "add_chat_agent",
-          { chatId: id },
+      const agentLimitCheck = await checkResourceLimit(
+        activeOrganizationId,
+        "chatAgents",
+        { chatId: id, additionalCount: agentIds.length },
+      );
+      if (!agentLimitCheck.allowed) {
+        // Chat was created but can't add all agents - proceed with available slots
+        console.warn(
+          "Cannot add all requested agents:",
+          agentLimitCheck.reason,
         );
-        if (!allowed) {
-          break;
-        }
       }
     }
+
+    // ==================== END BILLING CHECKS ====================
 
     const uiMessages = [...convertToUIMessages(messagesFromDb), message];
 
@@ -183,7 +208,7 @@ export async function POST(request: Request) {
           content: getTextFromMessage(message),
           createdAt: new Date(),
           authorType: "user",
-          authorId: session.user.id,
+          authorId: userId,
           tokenCount: 0,
           cost: "0.000000",
           quotedMessageId: null,
@@ -195,14 +220,10 @@ export async function POST(request: Request) {
       ],
     });
 
-    await UsageTracker.track(session.user.id, "chat_messages", 1);
-
     const streamId = generateUUID();
     await createStreamId({ streamId, chatId: id });
 
-    let finalUsage: any | undefined;
-
-    // 1. specific agent requested
+    // Resolve agent
     let firstAgentId = Array.isArray(agentIds)
       ? agentIds.find((v) => typeof v === "string" && v.length > 0)
       : undefined;
@@ -210,18 +231,12 @@ export async function POST(request: Request) {
     let agent: any = null;
 
     if (firstAgentId) {
-      // Fetch directly from DB
       agent = await agentRepo.findById(firstAgentId);
     }
 
-    // 2. Fallback: If no specific agent, find the first enabled agent for this chat
     if (!agent) {
-      // Use chatRepo to find agents linked to this chat
-      // TODO: Implement agent orchestration
       const chatAgents = await chatRepo.findAgentsForChat(id);
-
       if (chatAgents && chatAgents.length > 0) {
-        // Default to the first agent attached to the chat
         agent = chatAgents[0];
         firstAgentId = agent.id;
       }
@@ -230,18 +245,21 @@ export async function POST(request: Request) {
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
         if (agent && firstAgentId) {
-          const activeOrganizationId =
-            (session as any)?.session?.activeOrganizationId ||
-            (session as any)?.activeOrganizationId ||
-            "";
           const result = await streamAgent({
             agentId: firstAgentId,
             chatId: id,
-            userId: session.user.id,
+            userId,
             organizationId: activeOrganizationId,
             messages: convertToModelMessages(uiMessages),
           });
+
+          // Capture usage from the result if available
           result.consumeStream();
+
+          // If your streamAgent returns usage, capture it here
+          // This depends on your AI SDK implementation
+          // result.usage would contain { promptTokens, completionTokens }
+
           dataStream.merge(result.toUIMessageStream({ sendReasoning: true }));
         }
       },
@@ -255,9 +273,28 @@ export async function POST(request: Request) {
           return;
         }
 
-        // Ensure we have a valid authorId.
-        // If logic permits 'system' or non-agent responses, handle fallback here.
         const authorId = firstAgentId ?? "system_fallback";
+        const modelId =
+          agent?.model ?? agent?.config?.model ?? "gemini-2.5-flash";
+
+        // Calculate cost from usage
+        const inputTokens = usage?.promptTokens ?? 0;
+        const outputTokens = usage?.completionTokens ?? 0;
+        const cost = calculateModelCost(modelId, inputTokens, outputTokens);
+
+        // ==================== TRACK USAGE ====================
+        await trackChatUsage({
+          chatId: id,
+          userId,
+          cost,
+          metadata: {
+            agentId: firstAgentId,
+            modelId,
+            inputTokens,
+            outputTokens,
+          },
+        });
+        // ==================== END TRACK USAGE ====================
 
         // Map to DB Schema
         const toSave = assistantMessages.map((m) => ({
@@ -265,46 +302,20 @@ export async function POST(request: Request) {
           chatId: id,
           role: m.role,
           content: getTextFromMessage(m),
-          // Ensure parts is treated as a JSON-compatible array
           parts: m.parts as unknown as any[],
           attachments: [],
           authorType: "agent" as const,
-          authorId: authorId,
+          authorId,
           createdAt: new Date(),
-
-          // Token/Cost default initialization
-          tokenCount: 0,
-          cost: "0.000000",
-
+          tokenCount: inputTokens + outputTokens,
+          cost: cost.toFixed(6),
           quotedMessageId: null,
           isEdited: false,
           editedAt: null,
-
           isDeleted: false,
           deletedAt: null,
         }));
 
-        // Calculate cost if usage data is available
-        if (finalUsage) {
-          const inputTokens = Number(finalUsage.inputTokens || 0);
-          const outputTokens = Number(finalUsage.outputTokens || 0);
-          const totalTokens = inputTokens + outputTokens;
-          const modelId =
-            agent?.model ?? agent?.config?.model ?? "gemini-2.5-flash";
-
-          const costNum = calculateCostFromUsage(
-            String(modelId),
-            inputTokens,
-            outputTokens,
-          );
-
-          for (const msg of toSave) {
-            msg.tokenCount = totalTokens;
-            msg.cost = String(costNum.toFixed ? costNum.toFixed(6) : costNum);
-          }
-        }
-
-        // Save to DB
         await saveMessages({ messages: toSave });
       },
       onError: () => {
@@ -328,6 +339,21 @@ export async function POST(request: Request) {
 
     if (error instanceof ChatSDKError) {
       return error.toResponse();
+    }
+
+    // Handle billing-specific errors
+    if (error instanceof RateLimitError) {
+      return new ChatSDKError(
+        "rate_limit:api",
+        `Rate limited. Retry after ${error.retryAfter} seconds.`,
+      ).toResponse();
+    }
+
+    if (error instanceof UsageLimitError) {
+      return new ChatSDKError(
+        "rate_limit:chat",
+        `Usage limit exceeded: $${error.currentUsage.toFixed(2)} of $${error.limit.toFixed(2)}`,
+      ).toResponse();
     }
 
     if (
