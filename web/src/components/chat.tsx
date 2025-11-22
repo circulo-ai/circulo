@@ -17,6 +17,7 @@ import {
 import type { Vote } from "@/db/schema";
 import { useArtifactSelector } from "@/hooks/api/chats/use-artifact";
 import { useAutoResume } from "@/hooks/api/chats/use-auto-resume";
+import { useIsChatLoading } from "@/hooks/api/chats/use-chat-history";
 import { useChatVisibility } from "@/hooks/api/chats/use-chat-visibility";
 import { ChatSDKError } from "@/lib/errors";
 import {
@@ -28,7 +29,6 @@ import {
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { generateUUID } from "@/lib/utils";
-import { useChatHistoryStore } from "@/stores/chat-history";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useSearchParams } from "next/navigation";
@@ -59,7 +59,7 @@ export function Chat({
   autoResume: boolean;
   initialLastContext?: AppUsage;
 }) {
-  const { isChatLoading } = useChatHistoryStore();
+  const { isChatLoading } = useIsChatLoading();
 
   const { visibilityType } = useChatVisibility({
     chatId: id,

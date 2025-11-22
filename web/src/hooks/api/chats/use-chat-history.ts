@@ -1,9 +1,20 @@
 import { GetChatHistoryResponse } from "@/app/(chat)/api/history/route";
 import { useDebounce } from "@/hooks/use-debounce";
-import { useChatHistoryStore } from "@/stores/chat-history";
+import { useDebouncedLoading } from "@/hooks/use-debounced-loading";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import useSWR from "swr";
+import { create } from "zustand";
+
+interface ChatHistoryStore {
+  isChatLoading: boolean;
+  setIsChatLoading: (isChatLoading: boolean) => void;
+}
+
+const useChatHistoryStore = create<ChatHistoryStore>()((set) => ({
+  isChatLoading: false,
+  setIsChatLoading: (isChatLoading) => set({ isChatLoading }),
+}));
 
 export function useChatHistory() {
   const { id } = useParams();
@@ -39,6 +50,11 @@ export function useChatHistory() {
     search,
     setSearch,
   };
+}
+
+export function useIsChatLoading() {
+  const { isChatLoading } = useChatHistoryStore();
+  return { isChatLoading: useDebouncedLoading(isChatLoading) };
 }
 
 // TODO useDebouncedLoading?

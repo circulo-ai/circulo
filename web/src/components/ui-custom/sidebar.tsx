@@ -115,7 +115,7 @@ export function CustomSidebarGroupAction({
       component={SidebarGroupAction}
       componentProps={{
         className: cn(
-          "size-12 rounded-full bg-teal-600 transition-colors hover:bg-teal-700",
+          "size-12 rounded-full bg-teal-600 transition-all group-data-[collapsible=icon]:flex hover:bg-teal-700",
           className,
         ),
         ...props,
