@@ -125,3 +125,20 @@ export function CustomSidebarGroupAction({
     </WithRipple>
   );
 }
+
+interface CustomSidebarMenuAvatarProps extends ComponentProps<"div"> {}
+
+export function CustomSidebarMenuAvatar({
+  className,
+  ...props
+}: CustomSidebarMenuAvatarProps) {
+  return (
+    <div
+      className={cn(
+        "aspect-square w-12 min-w-12 rounded-full bg-foreground shadow-[0_0_0_0_inset] shadow-teal-600 transition-all group-data-[state=collapsed]:w-9 group-data-[state=collapsed]:min-w-9 group-data-[state=collapsed]:group-data-[active=true]/sidebar-menu-button:shadow-[0_0_0_4px_inset]",
+        className,
+      )}
+      {...props}
+    />
+  );
+}

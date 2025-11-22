@@ -28,6 +28,7 @@ import {
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { generateUUID } from "@/lib/utils";
+import { useChatHistoryStore } from "@/stores/chat-history";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useSearchParams } from "next/navigation";
@@ -36,6 +37,7 @@ import useSWR, { useSWRConfig } from "swr";
 import { unstable_serialize } from "swr/infinite";
 import { useDataStream } from "./data-stream-provider";
 import { MultimodalInput } from "./multimodal-input";
+import { PageSpinner } from "./page-spinner";
 import { toast } from "./toast";
 import type { VisibilityType } from "./visibility-selector";
 // Response shape: chatAgent rows with nested agent
@@ -57,6 +59,8 @@ export function Chat({
   autoResume: boolean;
   initialLastContext?: AppUsage;
 }) {
+  const { isChatLoading } = useChatHistoryStore();
+
   const { visibilityType } = useChatVisibility({
     chatId: id,
     initialVisibilityType,
@@ -196,6 +200,8 @@ export function Chat({
     }
     return sendMessage(msg, options);
   };
+
+  if (isChatLoading) return <PageSpinner />;
 
   return (
     <>

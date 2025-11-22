@@ -1,23 +1,24 @@
 "use client";
 
 import { EnhancedLink } from "@/components/enhanced-link";
-import { EnhancedLinkSpinner } from "@/components/enhanced-link-spinner";
 import { WithRipple } from "@/components/ui-custom/ripple";
 import {
   CustomSidebarGroup,
   CustomSidebarGroupAction,
   CustomSidebarHeader,
+  CustomSidebarMenuAvatar,
   CustomSidebarMenuButton,
   CustomSidebarMenuSkeleton,
 } from "@/components/ui-custom/sidebar";
+import { Badge } from "@/components/ui/badge";
 import {
   SidebarContent,
   SidebarGroupContent,
   SidebarMenu,
-  SidebarMenuBadge,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { useChatHistory } from "@/hooks/api/chats/use-chat-history";
+import { formatDate } from "@/lib/format-date";
 import { Pencil } from "lucide-react";
 import { ChatSidebarBurgerMenu } from "./chat-sidebar-burger-menu";
 import { ChatSidebarSearch } from "./chat-sidebar-search";
@@ -59,28 +60,41 @@ export function ChatSidebarInside() {
                     <WithRipple
                       component={EnhancedLink}
                       componentProps={{
+                        enableLinkStatus: false,
                         asButton: false,
                         href: `/chat/${item.id}`,
                         buttonProps: { variant: "text" },
                         onClick: () => setCurrentChatId(item.id),
                       }}
                     >
-                      <div className="aspect-square w-12 min-w-12 overflow-hidden rounded-full bg-foreground text-background shadow-[0_0_0_0_inset] shadow-teal-600 transition-all group-data-[state=collapsed]:w-9 group-data-[state=collapsed]:min-w-9 group-data-[state=collapsed]:group-data-[active=true]/sidebar-menu-button:shadow-[0_0_0_4px_inset]">
-                        <div className="flex size-full items-center justify-center bg-background/25 opacity-0 transition-opacity group-data-loading/link:opacity-100">
-                          <EnhancedLinkSpinner className="size-4.5 opacity-100!" />
-                        </div>
-                      </div>
+                      <CustomSidebarMenuAvatar />
                       <div className="flex max-h-9 w-full flex-col justify-center">
-                        <span className="truncate font-medium">
-                          {item.title}
-                        </span>
-                        <span className="truncate opacity-75">
-                          {item.description}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <div className="line-clamp-1 grow font-medium">
+                            {item.title}
+                          </div>
+                          <div className="shrink-0 text-xs opacity-75">
+                            {formatDate(new Date(item.updatedAt))}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="line-clamp-1 grow opacity-75">
+                            {item.description}
+                          </div>
+                          {
+                            /*Boolean(item.messageCount)*/ true && (
+                              <Badge
+                                className="shrink-0"
+                                variant="sidebar-menu-badge"
+                              >
+                                {item.messageCount}
+                              </Badge>
+                            )
+                          }
+                        </div>
                       </div>
                     </WithRipple>
                   </CustomSidebarMenuButton>
-                  <SidebarMenuBadge>24</SidebarMenuBadge>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
