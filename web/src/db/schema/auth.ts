@@ -1,39 +1,37 @@
-import { DEFAULT_FREE_CREDITS } from "@/db/constants";
 import { sql } from "drizzle-orm";
 import {
-  bigint,
   boolean,
   check,
-  decimal,
   index,
-  integer,
-  json,
-  jsonb,
-  pgEnum,
   pgTable,
   text,
   timestamp,
-  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-// ==================== ENUMS ====================
-export const permissionTypeEnum = pgEnum("permission_type", [
-  "admin",
-  "write",
-  "read",
-]);
+import {
+  agent,
+  chat,
+  chatAgent,
+  chatInvitation,
+  chatMember,
+  document,
+  message,
+  suggestion,
+  vote,
+} from "@/db";
+import { relations } from "drizzle-orm";
 
-// ==================== CORE AUTH TABLES ====================
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
-  emailVerified: boolean("email_verified").notNull(),
+  emailVerified: boolean("email_verified").default(false).notNull(),
   image: text("image"),
-  createdAt: timestamp("created_at").notNull(),
-  updatedAt: timestamp("updated_at").notNull(),
-  stripeCustomerId: text("stripe_customer_id"),
-  isSuperUser: boolean("is_super_user").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date())
+    .notNull(),
 });
 
 export const session = pgTable(
@@ -42,182 +40,95 @@ export const session = pgTable(
     id: text("id").primaryKey(),
     expiresAt: timestamp("expires_at").notNull(),
     token: text("token").notNull().unique(),
-    createdAt: timestamp("created_at").notNull(),
-    updatedAt: timestamp("updated_at").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
     ipAddress: text("ip_address"),
     userAgent: text("user_agent"),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    activeOrganizationId: text("active_organization_id").references(
-      () => organization.id,
-      {
-        onDelete: "set null",
-      },
-    ),
+    activeOrganizationId: text("active_organization_id"),
   },
-  (table) => ({
-    userIdIdx: index("session_user_id_idx").on(table.userId),
-    tokenIdx: index("session_token_idx").on(table.token),
-  }),
+  (table) => [index("session_userId_idx").on(table.userId)],
 );
 
-export const account = pgTable("account", {
-  id: text("id").primaryKey(),
-  accountId: text("account_id").notNull(),
-  providerId: text("provider_id").notNull(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-  accessToken: text("access_token"),
-  refreshToken: text("refresh_token"),
-  idToken: text("id_token"),
-  accessTokenExpiresAt: timestamp("access_token_expires_at"),
-  refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
-  scope: text("scope"),
-  password: text("password"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at")
-    .$onUpdate(() => /* @__PURE__ */ new Date())
-    .notNull(),
-});
-
-export const verification = pgTable("verification", {
-  id: text("id").primaryKey(),
-  identifier: text("identifier").notNull(),
-  value: text("value").notNull(),
-  expiresAt: timestamp("expires_at").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at")
-    .defaultNow()
-    .$onUpdate(() => /* @__PURE__ */ new Date())
-    .notNull(),
-});
-
-// ==================== ORGANIZATION ====================
-export const organization = pgTable("organization", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  slug: text("slug").notNull(),
-  logo: text("logo"),
-  metadata: json("metadata"),
-  orgUsageLimit: decimal("org_usage_limit"),
-  storageUsedBytes: bigint("storage_used_bytes", { mode: "number" })
-    .notNull()
-    .default(0), // Storage tracking for team/enterprise
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-export const member = pgTable(
-  "member",
+export const account = pgTable(
+  "account",
   {
     id: text("id").primaryKey(),
+    accountId: text("account_id").notNull(),
+    providerId: text("provider_id").notNull(),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    organizationId: text("organization_id")
-      .notNull()
-      .references(() => organization.id, { onDelete: "cascade" }),
-    role: text("role").notNull(), // 'admin' or 'member' - team-level permissions only
+    accessToken: text("access_token"),
+    refreshToken: text("refresh_token"),
+    idToken: text("id_token"),
+    accessTokenExpiresAt: timestamp("access_token_expires_at"),
+    refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
+    scope: text("scope"),
+    password: text("password"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
   },
-  (table) => ({
-    userIdIdx: index("member_user_id_idx").on(table.userId),
-    organizationIdIdx: index("member_organization_id_idx").on(
-      table.organizationId,
-    ),
-  }),
+  (table) => [index("account_userId_idx").on(table.userId)],
 );
 
-export const invitation = pgTable(
-  "invitation",
+export const verification = pgTable(
+  "verification",
   {
     id: text("id").primaryKey(),
-    email: text("email").notNull(),
-    inviterId: text("inviter_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    organizationId: text("organization_id")
-      .notNull()
-      .references(() => organization.id, { onDelete: "cascade" }),
-    role: text("role").notNull(),
-    status: text("status").notNull(),
+    identifier: text("identifier").notNull(),
+    value: text("value").notNull(),
     expiresAt: timestamp("expires_at").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
   },
-  (table) => ({
-    emailIdx: index("invitation_email_idx").on(table.email),
-    organizationIdIdx: index("invitation_organization_id_idx").on(
-      table.organizationId,
-    ),
-  }),
+  (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
 
-// ==================== USER SETTINGS & STATS ====================
-export const userStats = pgTable("user_stats", {
-  userId: text("user_id")
-    .primaryKey()
-    .references(() => user.id, { onDelete: "cascade" }),
-  totalChatExecutions: integer("total_chat_executions").notNull().default(0),
-  totalTokensUsed: integer("total_tokens_used").notNull().default(0),
-  totalCost: decimal("total_cost", { precision: 12, scale: 6 })
-    .notNull()
-    .default("0"),
-  currentUsageLimit: decimal("current_usage_limit", {
-    precision: 10,
-    scale: 2,
-  }).default(DEFAULT_FREE_CREDITS.toString()),
-  usageLimitUpdatedAt: timestamp("usage_limit_updated_at", {
-    withTimezone: true,
-  }).defaultNow(),
-  currentPeriodCost: decimal("current_period_cost", { precision: 12, scale: 6 })
-    .notNull()
-    .default("0"),
-  lastPeriodCost: decimal("last_period_cost", {
-    precision: 12,
-    scale: 6,
-  }).default("0"),
-  billedOverageThisPeriod: decimal("billed_overage_this_period", {
-    precision: 12,
-    scale: 6,
-  })
-    .notNull()
-    .default("0"),
-  proPeriodCostSnapshot: decimal("pro_period_cost_snapshot", {
-    precision: 12,
-    scale: 6,
-  }).default("0"),
-  storageUsedBytes: bigint("storage_used_bytes", { mode: "number" })
-    .notNull()
-    .default(0),
-  lastActive: timestamp("last_active", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  billingBlocked: boolean("billing_blocked").notNull().default(false),
+export const organization = pgTable("organization", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  logo: text("logo"),
+  createdAt: timestamp("created_at").notNull(),
+  metadata: text("metadata"),
 });
 
-export const settings = pgTable("settings", {
+export const member = pgTable("member", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
   userId: text("user_id")
-    .primaryKey()
+    .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
-  theme: text("theme").notNull().default("system"),
-  telemetryEnabled: boolean("telemetry_enabled").notNull().default(true),
-  emailPreferences: jsonb("email_preferences")
-    .$type<Record<string, boolean>>()
-    .notNull()
-    .default({}),
-  billingUsageNotificationsEnabled: boolean(
-    "billing_usage_notifications_enabled",
-  )
-    .notNull()
-    .default(true),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
+  role: text("role").default("member").notNull(),
+  createdAt: timestamp("created_at").notNull(),
 });
 
-// ==================== API KEYS ====================
+export const invitation = pgTable("invitation", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id")
+    .notNull()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  role: text("role"),
+  status: text("status").default("pending").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  inviterId: text("inviter_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+});
+
 export const apiKey = pgTable(
   "api_key",
   {
@@ -248,47 +159,90 @@ export const apiKey = pgTable(
   }),
 );
 
-export const userRateLimits = pgTable("user_rate_limits", {
-  referenceId: text("reference_id").primaryKey(), // Can be userId or organizationId for pooling
-  syncApiRequests: integer("sync_api_requests").notNull().default(0), // Sync API requests counter
-  asyncApiRequests: integer("async_api_requests").notNull().default(0), // Async API requests counter
-  apiEndpointRequests: integer("api_endpoint_requests").notNull().default(0), // External API endpoint requests counter
-  windowStart: timestamp("window_start").notNull().defaultNow(),
-  lastRequestAt: timestamp("last_request_at").notNull().defaultNow(),
-  isRateLimited: boolean("is_rate_limited").notNull().default(false),
-  rateLimitResetAt: timestamp("rate_limit_reset_at"),
-});
+// Relations
 
-// ==================== PERMISSIONS ====================
-export const permissions = pgTable(
-  "permissions",
-  {
-    id: text("id").primaryKey(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    entityType: text("entity_type").notNull(), // 'organization', 'chat', 'agent', etc.
-    entityId: text("entity_id").notNull(),
-    permissionType: permissionTypeEnum("permission_type").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (t) => ({
-    userEntityIdx: uniqueIndex("permissions_unique").on(
-      t.userId,
-      t.entityType,
-      t.entityId,
-    ),
-    entityIdx: index("permissions_entity_idx").on(t.entityType, t.entityId),
+export const userRelations = relations(user, ({ many }) => ({
+  sessions: many(session),
+  accounts: many(account),
+  members: many(member),
+  invitations: many(invitation),
+  createdAgents: many(agent),
+  createdChats: many(chat),
+  chatMembers: many(chatMember),
+  chatInvitationsSent: many(chatInvitation, { relationName: "inviter" }),
+  chatInvitationsReceived: many(chatInvitation, { relationName: "invitee" }),
+  addedChatAgents: many(chatAgent),
+  messages: many(message),
+  documents: many(document),
+  suggestions: many(suggestion),
+  votes: many(vote),
+  apiKeys: many(apiKey),
+}));
+
+export const apiKeyRelations = relations(apiKey, ({ one }) => ({
+  user: one(user, {
+    fields: [apiKey.userId],
+    references: [user.id],
   }),
-);
+  organization: one(organization, {
+    fields: [apiKey.organizationId],
+    references: [organization.id],
+  }),
+  createdByUser: one(user, {
+    fields: [apiKey.createdBy],
+    references: [user.id],
+    relationName: "apiKeyCreator",
+  }),
+}));
 
-// ==================== TYPES ====================
+export const sessionRelations = relations(session, ({ one }) => ({
+  user: one(user, {
+    fields: [session.userId],
+    references: [user.id],
+  }),
+}));
+
+export const accountRelations = relations(account, ({ one }) => ({
+  user: one(user, {
+    fields: [account.userId],
+    references: [user.id],
+  }),
+}));
+
+export const organizationRelations = relations(organization, ({ many }) => ({
+  members: many(member),
+  invitations: many(invitation),
+  agents: many(agent),
+  chats: many(chat),
+  apiKeys: many(apiKey),
+}));
+
+export const memberRelations = relations(member, ({ one }) => ({
+  organization: one(organization, {
+    fields: [member.organizationId],
+    references: [organization.id],
+  }),
+  user: one(user, {
+    fields: [member.userId],
+    references: [user.id],
+  }),
+}));
+
+export const invitationRelations = relations(invitation, ({ one }) => ({
+  organization: one(organization, {
+    fields: [invitation.organizationId],
+    references: [organization.id],
+  }),
+  user: one(user, {
+    fields: [invitation.inviterId],
+    references: [user.id],
+  }),
+}));
+
+// Types
 export type User = typeof user.$inferSelect;
 export type NewUser = typeof user.$inferInsert;
 export type Organization = typeof organization.$inferSelect;
 export type Member = typeof member.$inferSelect;
 export type Session = typeof session.$inferSelect;
 export type Account = typeof account.$inferSelect;
-export type PermissionType = (typeof permissionTypeEnum.enumValues)[number];
