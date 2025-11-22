@@ -80,10 +80,21 @@ export function CustomSidebarMenuButton({
 interface CustomSidebarMenuSkeletonProps
   extends ComponentProps<typeof SidebarMenuSkeleton> {}
 
-export function CustomSidebarMenuSkeleton(
-  props: CustomSidebarMenuSkeletonProps,
-) {
+export function CustomSidebarMenuSkeleton({
+  className,
+  ...props
+}: CustomSidebarMenuSkeletonProps) {
   return (
-    <SidebarMenuSkeleton showIcon customSkeleton={CustomSkeleton} {...props} />
+    <SidebarMenuSkeleton
+      className={cn(
+        "h-16 w-full transition-all group-data-[state=collapsed]:size-9 group-data-[state=collapsed]:rounded-[1.125rem] group-data-[state=collapsed]:p-0",
+        "[&_*[data-sidebar=menu-skeleton-icon]]:aspect-square [&_*[data-sidebar=menu-skeleton-icon]]:h-auto [&_*[data-sidebar=menu-skeleton-icon]]:w-12 [&_*[data-sidebar=menu-skeleton-icon]]:min-w-12 [&_*[data-sidebar=menu-skeleton-icon]]:rounded-full [&_*[data-sidebar=menu-skeleton-icon]]:transition-all [&_*[data-sidebar=menu-skeleton-icon]]:group-data-[state=collapsed]:w-9 [&_*[data-sidebar=menu-skeleton-icon]]:group-data-[state=collapsed]:min-w-9",
+        className,
+      )}
+      isWrapperSkeleton
+      showIcon
+      customSkeleton={CustomSkeleton}
+      {...props}
+    />
   );
 }
