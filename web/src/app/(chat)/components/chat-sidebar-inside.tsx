@@ -5,13 +5,13 @@ import { EnhancedLinkSpinner } from "@/components/enhanced-link-spinner";
 import { WithRipple } from "@/components/ui-custom/ripple";
 import {
   CustomSidebarGroup,
+  CustomSidebarGroupAction,
   CustomSidebarHeader,
   CustomSidebarMenuButton,
   CustomSidebarMenuSkeleton,
 } from "@/components/ui-custom/sidebar";
 import {
   SidebarContent,
-  SidebarGroupAction,
   SidebarGroupContent,
   SidebarMenu,
   SidebarMenuAction,
@@ -19,7 +19,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { useChatHistory } from "@/hooks/api/chats/use-chat-history";
-import { Plus } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { ChatSidebarBurgerMenu } from "./chat-sidebar-burger-menu";
 import { ChatSidebarSearch } from "./chat-sidebar-search";
 
@@ -79,9 +79,9 @@ export function ChatSidebarInside() {
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
-          <SidebarGroupAction title="Add Project">
-            <Plus /> <span className="sr-only">Add Project</span>
-          </SidebarGroupAction>
+          <CustomSidebarGroupAction title="Add Chat">
+            <Pencil /> <span className="sr-only">Add Chat</span>
+          </CustomSidebarGroupAction>
         </CustomSidebarGroup>
       </SidebarContent>
     </>

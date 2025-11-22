@@ -3,11 +3,13 @@ import { ComponentProps } from "react";
 import {
   Sidebar,
   SidebarGroup,
+  SidebarGroupAction,
   SidebarHeader,
   SidebarInset,
   SidebarMenuButton,
   SidebarMenuSkeleton,
 } from "../ui/sidebar";
+import { WithRipple } from "./ripple";
 import { CustomSkeleton } from "./skeleton";
 
 interface CustomSidebarProps extends ComponentProps<typeof Sidebar> {}
@@ -39,7 +41,7 @@ export function CustomSidebarGroup({
   className,
   ...props
 }: CustomSidebarGroupProps) {
-  return <SidebarGroup className={cn("", className)} {...props} />;
+  return <SidebarGroup className={cn("h-full", className)} {...props} />;
 }
 
 interface CustomSidebarInsetProps extends ComponentProps<typeof SidebarInset> {}
@@ -96,5 +98,30 @@ export function CustomSidebarMenuSkeleton({
       customSkeleton={CustomSkeleton}
       {...props}
     />
+  );
+}
+
+interface CustomSidebarGroupActionProps
+  extends ComponentProps<typeof SidebarGroupAction> {}
+
+export function CustomSidebarGroupAction({
+  className,
+  children,
+  ...props
+}: CustomSidebarGroupActionProps) {
+  return (
+    <WithRipple
+      className="absolute right-2 bottom-2 mt-auto"
+      component={SidebarGroupAction}
+      componentProps={{
+        className: cn(
+          "size-12 rounded-full bg-teal-600 transition-colors hover:bg-teal-700",
+          className,
+        ),
+        ...props,
+      }}
+    >
+      {children}
+    </WithRipple>
   );
 }

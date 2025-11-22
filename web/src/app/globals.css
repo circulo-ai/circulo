@@ -408,7 +408,7 @@
       top: var(--initial-top);
       left: var(--initial-left);
       width: 0;
-      filter: blur(4px);
+      filter: blur(0px);
     }
     50% {
       top: 50%;
@@ -419,7 +419,7 @@
       top: 50%;
       left: 50%;
       width: 100%;
-      filter: blur(8px);
+      filter: blur(4px);
     }
   }
 }
