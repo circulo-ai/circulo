@@ -7,7 +7,7 @@ export function ChatSidebarNoResult() {
       <div className="mb-6 text-sm/relaxed text-muted-foreground">
         Try a different search term
       </div>
-      <DotLottieReact src="duck.lottie" loop autoplay />
+      <DotLottieReact src="/duck.lottie" loop autoplay />
     </div>
   );
 }
