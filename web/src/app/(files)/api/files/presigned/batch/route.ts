@@ -61,11 +61,9 @@ export async function POST(request: NextRequest) {
         ? "knowledge-base"
         : uploadTypeParam === "chat"
           ? "chat"
-          : uploadTypeParam === "copilot"
-            ? "copilot"
-            : uploadTypeParam === "profile-pictures"
-              ? "profile-pictures"
-              : "general";
+          : uploadTypeParam === "profile-pictures"
+            ? "profile-pictures"
+            : "general";
 
     const MAX_FILE_SIZE = 100 * 1024 * 1024;
     for (const file of files) {
@@ -115,13 +113,6 @@ export async function POST(request: NextRequest) {
     }
 
     const sessionUserId = session.user.id;
-
-    if (uploadType === "copilot" && !sessionUserId?.trim()) {
-      return NextResponse.json(
-        { error: "Authenticated user session is required for copilot uploads" },
-        { status: 400 },
-      );
-    }
 
     if (!hasCloudStorage()) {
       logger.info(

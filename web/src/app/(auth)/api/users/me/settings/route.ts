@@ -60,11 +60,8 @@ export async function GET() {
     return NextResponse.json(
       {
         data: {
-          theme: userSettings.theme,
           telemetryEnabled: userSettings.telemetryEnabled,
           emailPreferences: userSettings.emailPreferences ?? {},
-          billingUsageNotificationsEnabled:
-            userSettings.billingUsageNotificationsEnabled ?? true,
         },
       },
       { status: 200 },

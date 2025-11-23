@@ -76,11 +76,9 @@ export async function POST(request: NextRequest) {
         ? "knowledge-base"
         : uploadTypeParam === "chat"
           ? "chat"
-          : uploadTypeParam === "copilot"
-            ? "copilot"
-            : uploadTypeParam === "profile-pictures"
-              ? "profile-pictures"
-              : "general";
+          : uploadTypeParam === "profile-pictures"
+            ? "profile-pictures"
+            : "general";
 
     if (uploadType === "knowledge-base") {
       const fileValidationError = validateFileType(fileName, contentType);

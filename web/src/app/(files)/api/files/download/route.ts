@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { key, name, isExecutionFile, context } = body;
+    const { key, name, context } = body;
 
     if (!key) {
       return createErrorResponse(new Error("File key is required"), 400);
@@ -24,11 +24,6 @@ export async function POST(request: NextRequest) {
     logger.info(`Generating download URL for file: ${name || key}`);
 
     let storageContext: StorageContext = context || "general";
-
-    if (isExecutionFile && !context) {
-      storageContext = "execution";
-      logger.info(`Using execution context for file: ${key}`);
-    }
 
     if (hasCloudStorage()) {
       try {

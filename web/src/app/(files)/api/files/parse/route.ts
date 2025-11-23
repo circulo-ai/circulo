@@ -27,9 +27,7 @@ function inferContextFromKey(key: string): StorageContext {
   if (key.startsWith("kb/")) return "knowledge-base";
 
   const segments = key.split("/");
-  if (segments.length >= 4 && segments[0].match(/^[a-f0-9-]{36}$/))
-    return "execution";
-  if (key.match(/^[a-f0-9-]{36}\/\d+-[a-z0-9]+-/)) return "workspace";
+  if (key.match(/^[a-f0-9-]{36}\/\d+-[a-z0-9]+-/)) return "organization";
 
   return "general";
 }

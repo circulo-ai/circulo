@@ -3,6 +3,8 @@ import {
   boolean,
   check,
   index,
+  integer,
+  json,
   pgTable,
   text,
   timestamp,
@@ -99,8 +101,9 @@ export const organization = pgTable("organization", {
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   logo: text("logo"),
-  createdAt: timestamp("created_at").notNull(),
   metadata: text("metadata"),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
 });
 
 export const member = pgTable("member", {
@@ -158,6 +161,38 @@ export const apiKey = pgTable(
     ),
   }),
 );
+
+export const settings = pgTable("settings", {
+  id: text("id").primaryKey(), // Use the user id as the key
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" })
+    .unique(), // One settings record per user
+
+  // Privacy settings
+  telemetryEnabled: boolean("telemetry_enabled").notNull().default(true),
+
+  // Email preferences
+  emailPreferences: json("email_preferences").notNull().default("{}"),
+
+  // Notification preferences
+  errorNotificationsEnabled: boolean("error_notifications_enabled")
+    .notNull()
+    .default(true),
+
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const userRateLimits = pgTable("user_rate_limits", {
+  referenceId: text("reference_id").primaryKey(), // Can be userId or organizationId for pooling
+  syncApiRequests: integer("sync_api_requests").notNull().default(0), // Sync API requests counter
+  asyncApiRequests: integer("async_api_requests").notNull().default(0), // Async API requests counter
+  apiEndpointRequests: integer("api_endpoint_requests").notNull().default(0), // External API endpoint requests counter
+  windowStart: timestamp("window_start").notNull().defaultNow(),
+  lastRequestAt: timestamp("last_request_at").notNull().defaultNow(),
+  isRateLimited: boolean("is_rate_limited").notNull().default(false),
+  rateLimitResetAt: timestamp("rate_limit_reset_at"),
+});
 
 // Relations
 

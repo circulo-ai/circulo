@@ -1,8 +1,4 @@
 import { chat, db } from "@/db";
-import {
-  authenticateApiKeyFromHeader,
-  updateApiKeyLastUsed,
-} from "@/lib/api-key/service";
 import { getSession } from "@/lib/auth";
 import { verifyInternalToken } from "@/lib/auth/internal";
 import { createLogger } from "@/lib/logs/console/logger";
@@ -22,7 +18,6 @@ export interface AuthResult {
  * Check for authentication using any of the 3 supported methods:
  * 1. Session authentication (cookies)
  * 2. API key authentication (X-API-Key header)
- * 3. Internal JWT authentication (Authorization: Bearer header)
  *
  * For internal JWT calls, requires chatId to determine user context
  */
@@ -112,25 +107,6 @@ export async function checkHybridAuth(
         success: true,
         userId: session.user.id,
         authType: "session",
-      };
-    }
-
-    // 3. Try API key auth
-    const apiKeyHeader = request.headers.get("x-api-key");
-    if (apiKeyHeader) {
-      const result = await authenticateApiKeyFromHeader(apiKeyHeader);
-      if (result.success) {
-        await updateApiKeyLastUsed(result.keyId!);
-        return {
-          success: true,
-          userId: result.userId!,
-          authType: "api_key",
-        };
-      }
-
-      return {
-        success: false,
-        error: "Invalid API key",
       };
     }
 

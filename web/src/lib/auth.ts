@@ -1,31 +1,11 @@
-import {
-  renderInvitationEmail,
-  renderMagicLinkEmail,
-} from "@/components/emails";
+import { renderMagicLinkEmail } from "@/components/emails";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { getBaseURL } from "@/lib/auth-client";
-import { authorizeSubscriptionReference } from "@/lib/billing/authorization";
-import { sendPlanWelcomeEmail } from "@/lib/billing/core/subscription";
-import { handleNewUser } from "@/lib/billing/core/usage";
-import { syncSubscriptionUsageLimits } from "@/lib/billing/organization";
-import { getPlans } from "@/lib/billing/plans";
-import { handleManualEnterpriseSubscription } from "@/lib/billing/webhooks/enterprise";
-import {
-  handleInvoiceFinalized,
-  handleInvoicePaymentFailed,
-  handleInvoicePaymentSucceeded,
-} from "@/lib/billing/webhooks/invoices";
-import {
-  handleSubscriptionCreated,
-  handleSubscriptionDeleted,
-} from "@/lib/billing/webhooks/subscription";
+import { canCreateTeamOrg } from "@/lib/billing/autumn";
 import { sendEmail } from "@/lib/email/mailer";
-import { getFromEmailAddress } from "@/lib/email/utils";
-import { isBillingEnabled } from "@/lib/environment";
 import { createLogger } from "@/lib/logs/console/logger";
-import { getBaseUrl } from "@/lib/urls/utils";
-import { stripe } from "@better-auth/stripe";
+import { autumn } from "autumn-js/better-auth";
 import { betterAuth, User } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
@@ -37,24 +17,13 @@ import {
   openAPI,
   organization,
 } from "better-auth/plugins";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { headers } from "next/headers";
-import Stripe from "stripe";
 import { env } from "./env";
+import { ac, admin, member, owner } from "./permissions";
 
 const logger = createLogger("Auth");
-
-// Only initialize Stripe if the key is provided
-// This allows local development without a Stripe account
-const validStripeKey = env.STRIPE_SECRET_KEY;
-
-let stripeClient = null;
-if (validStripeKey) {
-  stripeClient = new Stripe(env.STRIPE_SECRET_KEY || "", {
-    apiVersion: "2025-10-29.clover",
-  });
-}
 
 const createPersonalOrganization = async (user: User) => {
   try {
@@ -67,23 +36,25 @@ const createPersonalOrganization = async (user: User) => {
     const orgId = nanoid(); // you are using text pk, so nanoid is perfect
     const slug = `personal-${orgId}`; // guaranteed unique
 
-    // 1. Create organization
-    await db.insert(schema.organization).values({
-      id: orgId,
-      name: workspaceName,
-      slug,
-      metadata: { type: "personal", userId: user.id },
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    await db.transaction(async (tx) => {
+      // 1. Create organization
+      await tx.insert(schema.organization).values({
+        id: orgId,
+        name: workspaceName,
+        slug,
+        metadata: JSON.stringify({ type: "personal", userId: user.id }),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
 
-    // 2. Create membership
-    await db.insert(schema.member).values({
-      id: nanoid(), // if your member table uses text PK
-      userId: user.id,
-      organizationId: orgId,
-      role: "owner",
-      createdAt: new Date(),
+      // 2. Create membership
+      await tx.insert(schema.member).values({
+        id: nanoid(), // if your member table uses text PK
+        userId: user.id,
+        organizationId: orgId,
+        role: "owner",
+        createdAt: new Date(),
+      });
     });
 
     logger.info("Created personal workspace for new user", {
@@ -108,18 +79,6 @@ export const auth = betterAuth({
     user: {
       create: {
         after: async (user) => {
-          try {
-            await handleNewUser(user.id);
-          } catch (error) {
-            logger.error(
-              "[databaseHooks.user.create.after] Failed to create subscription",
-              {
-                userId: user.id,
-                error,
-              },
-            );
-          }
-
           try {
             await createPersonalOrganization(user);
           } catch (error) {
@@ -1231,298 +1190,88 @@ export const auth = betterAuth({
         },
       ],
     }),
-    ...(isBillingEnabled && stripeClient
-      ? [
-          stripe({
-            stripeClient,
-            stripeWebhookSecret: env.STRIPE_WEBHOOK_SECRET || "",
-            createCustomerOnSignUp: true,
-            onCustomerCreate: async ({ stripeCustomer, user }) => {
-              logger.info("[onCustomerCreate] Stripe customer created", {
-                stripeCustomerId: stripeCustomer.id,
-                userId: user.id,
-              });
-            },
-            subscription: {
-              enabled: true,
-              plans: getPlans(),
-              authorizeReference: async ({ user, referenceId }) => {
-                return await authorizeSubscriptionReference(
-                  user.id,
-                  referenceId,
-                );
-              },
-              getCheckoutSessionParams: async ({ plan, subscription }) => {
-                if (plan.name === "team") {
-                  return {
-                    params: {
-                      allow_promotion_codes: true,
-                      line_items: [
-                        {
-                          price: plan.priceId,
-                          quantity: subscription?.seats || 1,
-                          adjustable_quantity: {
-                            enabled: true,
-                            minimum: 1,
-                            maximum: 50,
-                          },
-                        },
-                      ],
-                    },
-                  };
-                }
+    autumn({
+      customerScope: "organization",
+    }),
+    organization({
+      ac,
+      roles: {
+        owner,
+        admin,
+        member,
+      },
+      membershipLimit: 50,
+      allowUserToCreateOrganization: async (user) => {
+        try {
+          // Find the user's personal organization
+          const personalOrg = await db
+            .select()
+            .from(schema.organization)
+            .innerJoin(
+              schema.member,
+              eq(schema.member.organizationId, schema.organization.id),
+            )
+            .where(
+              and(
+                eq(schema.member.userId, user.id),
+                eq(schema.member.role, "owner"),
+                // Check for personal org type in metadata
+                sql`${schema.organization.metadata}->>'type' = 'personal'`,
+              ),
+            )
+            .limit(1);
 
-                return {
-                  params: {
-                    allow_promotion_codes: true,
-                  },
-                };
-              },
-              onSubscriptionComplete: async ({
-                subscription,
-              }: {
-                event: Stripe.Event;
-                stripeSubscription: Stripe.Subscription;
-                subscription: any;
-              }) => {
-                logger.info("[onSubscriptionComplete] Subscription created", {
-                  subscriptionId: subscription.id,
-                  referenceId: subscription.referenceId,
-                  plan: subscription.plan,
-                  status: subscription.status,
-                });
+          if (personalOrg.length === 0) {
+            logger.warn("No personal org found for user", { userId: user.id });
+            return false;
+          }
 
-                await handleSubscriptionCreated(subscription);
+          const orgId = personalOrg[0].organization.id;
 
-                await syncSubscriptionUsageLimits(subscription);
+          // Check if user's personal org has pro+ subscription
+          const canCreate = await canCreateTeamOrg(orgId);
 
-                await sendPlanWelcomeEmail(subscription);
-              },
-              onSubscriptionUpdate: async ({
-                subscription,
-              }: {
-                event: Stripe.Event;
-                subscription: any;
-              }) => {
-                logger.info("[onSubscriptionUpdate] Subscription updated", {
-                  subscriptionId: subscription.id,
-                  status: subscription.status,
-                  plan: subscription.plan,
-                });
+          logger.info("Checking if user can create team org", {
+            userId: user.id,
+            personalOrgId: orgId,
+            canCreate,
+          });
 
-                try {
-                  await syncSubscriptionUsageLimits(subscription);
-                } catch (error) {
-                  logger.error(
-                    "[onSubscriptionUpdate] Failed to sync usage limits",
-                    {
-                      subscriptionId: subscription.id,
-                      referenceId: subscription.referenceId,
-                      error,
-                    },
-                  );
-                }
-              },
-              onSubscriptionDeleted: async ({
-                subscription,
-              }: {
-                event: Stripe.Event;
-                stripeSubscription: Stripe.Subscription;
-                subscription: any;
-              }) => {
-                logger.info("[onSubscriptionDeleted] Subscription deleted", {
-                  subscriptionId: subscription.id,
-                  referenceId: subscription.referenceId,
-                });
-
-                try {
-                  await handleSubscriptionDeleted(subscription);
-
-                  // Reset usage limits to free tier
-                  await syncSubscriptionUsageLimits(subscription);
-
-                  logger.info(
-                    "[onSubscriptionDeleted] Reset usage limits to free tier",
-                    {
-                      subscriptionId: subscription.id,
-                      referenceId: subscription.referenceId,
-                    },
-                  );
-                } catch (error) {
-                  logger.error(
-                    "[onSubscriptionDeleted] Failed to handle subscription deletion",
-                    {
-                      subscriptionId: subscription.id,
-                      referenceId: subscription.referenceId,
-                      error,
-                    },
-                  );
-                }
+          return canCreate;
+        } catch (error) {
+          logger.error("Error checking org creation permission", {
+            userId: user.id,
+            error,
+          });
+          return false;
+        }
+      },
+      organizationCreation: {
+        beforeCreate: async ({ organization, user }) => {
+          // Mark new orgs as "team" type (personal orgs are created separately)
+          return {
+            data: {
+              ...organization,
+              metadata: {
+                ...((organization as any).metadata || {}),
+                type: "team",
               },
             },
-            onEvent: async (event: Stripe.Event) => {
-              logger.info("[onEvent] Received Stripe webhook", {
-                eventId: event.id,
-                eventType: event.type,
-              });
+          };
+        },
+        afterCreate: async ({ organization, user }) => {
+          logger.info("[organizationCreation.afterCreate] Team org created", {
+            organizationId: organization.id,
+            creatorId: user.id,
+          });
 
-              try {
-                switch (event.type) {
-                  case "invoice.payment_succeeded": {
-                    await handleInvoicePaymentSucceeded(event);
-                    break;
-                  }
-                  case "invoice.payment_failed": {
-                    await handleInvoicePaymentFailed(event);
-                    break;
-                  }
-                  case "invoice.finalized": {
-                    await handleInvoiceFinalized(event);
-                    break;
-                  }
-                  case "customer.subscription.created": {
-                    await handleManualEnterpriseSubscription(event);
-                    break;
-                  }
-                  // Note: customer.subscription.deleted is handled by better-auth's onSubscriptionDeleted callback above
-                  default:
-                    logger.info(
-                      "[onEvent] Ignoring unsupported webhook event",
-                      {
-                        eventId: event.id,
-                        eventType: event.type,
-                      },
-                    );
-                    break;
-                }
-
-                logger.info("[onEvent] Successfully processed webhook", {
-                  eventId: event.id,
-                  eventType: event.type,
-                });
-              } catch (error) {
-                logger.error("[onEvent] Failed to process webhook", {
-                  eventId: event.id,
-                  eventType: event.type,
-                  error,
-                });
-                throw error;
-              }
-            },
-          }),
-          organization({
-            allowUserToCreateOrganization: async (user) => {
-              const dbSubscriptions = await db
-                .select()
-                .from(schema.subscription)
-                .where(eq(schema.subscription.referenceId, user.id));
-
-              const hasTeamPlan = dbSubscriptions.some(
-                (sub) =>
-                  sub.status === "active" &&
-                  (sub.plan === "team" || sub.plan === "enterprise"),
-              );
-
-              return hasTeamPlan;
-            },
-            // Set a fixed membership limit of 50, but the actual limit will be enforced in the invitation flow
-            membershipLimit: 50,
-            // Validate seat limits before sending invitations
-            beforeInvite: async ({
-              organization,
-            }: {
-              organization: { id: string };
-            }) => {
-              const subscriptions = await db
-                .select()
-                .from(schema.subscription)
-                .where(
-                  and(
-                    eq(schema.subscription.referenceId, organization.id),
-                    eq(schema.subscription.status, "active"),
-                  ),
-                );
-
-              const teamOrEnterpriseSubscription = subscriptions.find(
-                (sub) => sub.plan === "team" || sub.plan === "enterprise",
-              );
-
-              if (!teamOrEnterpriseSubscription) {
-                throw new Error(
-                  "No active team or enterprise subscription for this organization",
-                );
-              }
-
-              const members = await db
-                .select()
-                .from(schema.member)
-                .where(eq(schema.member.organizationId, organization.id));
-
-              const pendingInvites = await db
-                .select()
-                .from(schema.invitation)
-                .where(
-                  and(
-                    eq(schema.invitation.organizationId, organization.id),
-                    eq(schema.invitation.status, "pending"),
-                  ),
-                );
-
-              const totalCount = members.length + pendingInvites.length;
-              const seatLimit = teamOrEnterpriseSubscription.seats || 1;
-
-              if (totalCount >= seatLimit) {
-                throw new Error(
-                  `Organization has reached its seat limit of ${seatLimit}`,
-                );
-              }
-            },
-            sendInvitationEmail: async (data: any) => {
-              try {
-                const { invitation, organization, inviter } = data;
-
-                const inviteUrl = `${getBaseUrl()}/invite/${invitation.id}`;
-                const inviterName = inviter.user?.name || "A team member";
-
-                const html = await renderInvitationEmail(
-                  inviterName,
-                  organization.name,
-                  inviteUrl,
-                  invitation.email,
-                );
-
-                const result = await sendEmail({
-                  to: invitation.email,
-                  subject: `${inviterName} has invited you to join ${organization.name} on Sim`,
-                  html,
-                  from: getFromEmailAddress(),
-                  emailType: "transactional",
-                });
-
-                if (!result.success) {
-                  logger.error(
-                    "Failed to send organization invitation email:",
-                    result.message,
-                  );
-                }
-              } catch (error) {
-                logger.error("Error sending invitation email", { error });
-              }
-            },
-            organizationCreation: {
-              afterCreate: async ({ organization, user }) => {
-                logger.info(
-                  "[organizationCreation.afterCreate] Organization created",
-                  {
-                    organizationId: organization.id,
-                    creatorId: user.id,
-                  },
-                );
-              },
-            },
-          }),
-        ]
-      : []),
+          // Optionally: Initialize the team org with a "team" subscription
+          // This depends on your billing flow - you might want to:
+          // 1. Auto-assign team plan, or
+          // 2. Let users upgrade after creation
+        },
+      },
+    }),
   ],
 });
 

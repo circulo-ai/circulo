@@ -30,7 +30,7 @@ export async function GET(
     logger.info("File serve request:", { path });
 
     const authResult = await checkHybridAuth(request, {
-      requireWorkflowId: false,
+      requireChatId: false,
     });
 
     if (!authResult.success) {
@@ -114,25 +114,10 @@ function inferContextFromKey(key: string): StorageContext {
     return "knowledge-base";
   }
 
-  // Workspace files: UUID-like ID followed by timestamp pattern
+  // Organization files: UUID-like ID followed by timestamp pattern
   // Pattern: {uuid}/{timestamp}-{random}-{filename}
   if (key.match(/^[a-f0-9-]{36}\/\d+-[a-z0-9]+-/)) {
-    return "workspace";
-  }
-
-  // Execution files: three UUID segments (workspace/workflow/execution)
-  // Pattern: {uuid}/{uuid}/{uuid}/{filename}
-  const segments = key.split("/");
-  if (segments.length >= 4 && segments[0].match(/^[a-f0-9-]{36}$/)) {
-    return "execution";
-  }
-
-  // Copilot files: timestamp-random-filename (no path segments)
-  // Pattern: {timestamp}-{random}-{filename}
-  // NOTE: This is ambiguous with other contexts - prefer explicit context parameter
-  if (key.match(/^\d+-[a-z0-9]+-/)) {
-    // Could be copilot, general, or chat - default to general
-    return "general";
+    return "organization";
   }
 
   return "general";
@@ -150,11 +135,6 @@ async function handleCloudProxy(
     if (contextParam) {
       context = contextParam as StorageContext;
       logger.info(`Using explicit context: ${context} for key: ${cloudKey}`);
-    } else if (legacyBucketType === "copilot") {
-      context = "copilot";
-      logger.info(
-        `Using legacy bucket parameter for copilot context: ${cloudKey}`,
-      );
     } else {
       context = inferContextFromKey(cloudKey);
       logger.info(`Inferred context: ${context} from key pattern: ${cloudKey}`);
