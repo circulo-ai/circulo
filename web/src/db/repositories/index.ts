@@ -14,6 +14,10 @@ export { documentRepo } from "./document-repo";
 export { suggestionRepo } from "./suggestion-repo";
 
 // Other repositories
+export {
+  orchestrationLogRepo,
+  type OrchestrationLogFilters,
+} from "./orchestration-repo";
 export { streamRepo } from "./stream-repo";
 export { voteRepo } from "./vote-repo";
 

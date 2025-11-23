@@ -1,5 +1,7 @@
 import { agent } from "@/db/schema/agent";
 import { organization, user } from "@/db/schema/auth";
+import { ChatTools, CustomUIDataTypes } from "@/lib/types";
+import { UIMessagePart } from "ai";
 import { InferSelectModel, relations, sql } from "drizzle-orm";
 import {
   boolean,
@@ -197,7 +199,10 @@ export const message = pgTable(
 
     role: text("role").notNull(), // 'user', 'assistant', 'system'
     content: text("content").notNull(),
-    parts: jsonb("parts").$type<unknown[]>().notNull().default([]),
+    parts: jsonb("parts")
+      .$type<UIMessagePart<CustomUIDataTypes, ChatTools>[]>()
+      .notNull()
+      .default([]),
     attachments: jsonb("attachments").$type<unknown[]>().notNull().default([]),
 
     tokenCount: integer("token_count").notNull().default(0),

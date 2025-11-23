@@ -1,6 +1,7 @@
 import { env, getEnv } from "@/lib/env";
 import { isDev } from "@/lib/environment";
 import type { NextConfig } from "next";
+import { withWorkflow } from "workflow/next";
 
 const nextConfig: NextConfig = {
   devIndicators: false,
@@ -35,34 +36,34 @@ const nextConfig: NextConfig = {
       // Brand logo domain if configured
       ...(getEnv("NEXT_PUBLIC_BRAND_LOGO_URL")
         ? (() => {
-          try {
-            return [
-              {
-                protocol: "https" as const,
-                hostname: new URL(getEnv("NEXT_PUBLIC_BRAND_LOGO_URL")!)
-                  .hostname,
-              },
-            ];
-          } catch {
-            return [];
-          }
-        })()
+            try {
+              return [
+                {
+                  protocol: "https" as const,
+                  hostname: new URL(getEnv("NEXT_PUBLIC_BRAND_LOGO_URL")!)
+                    .hostname,
+                },
+              ];
+            } catch {
+              return [];
+            }
+          })()
         : []),
       // Brand favicon domain if configured
       ...(getEnv("NEXT_PUBLIC_BRAND_FAVICON_URL")
         ? (() => {
-          try {
-            return [
-              {
-                protocol: "https" as const,
-                hostname: new URL(getEnv("NEXT_PUBLIC_BRAND_FAVICON_URL")!)
-                  .hostname,
-              },
-            ];
-          } catch {
-            return [];
-          }
-        })()
+            try {
+              return [
+                {
+                  protocol: "https" as const,
+                  hostname: new URL(getEnv("NEXT_PUBLIC_BRAND_FAVICON_URL")!)
+                    .hostname,
+                },
+              ];
+            } catch {
+              return [];
+            }
+          })()
         : []),
     ],
   },
@@ -77,18 +78,17 @@ const nextConfig: NextConfig = {
     "@t3-oss/env-core",
     "@react-email/components",
     "@react-email/render",
-
   ],
   ...(isDev && {
     allowedDevOrigins: [
       ...(env.NEXT_PUBLIC_APP_URL
         ? (() => {
-          try {
-            return [new URL(env.NEXT_PUBLIC_APP_URL).host];
-          } catch {
-            return [];
-          }
-        })()
+            try {
+              return [new URL(env.NEXT_PUBLIC_APP_URL).host];
+            } catch {
+              return [];
+            }
+          })()
         : []),
       "localhost:3000",
     ],
@@ -130,4 +130,4 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
 };
 
-export default nextConfig;
+export default withWorkflow(nextConfig);
