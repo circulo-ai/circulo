@@ -89,7 +89,7 @@ export function CustomSidebarMenuButton({
       variant={variant}
       className={cn(
         className,
-        "group/sidebar-menu-button h-auto transition-all group-data-[collapsible=icon]:h-auto! group-data-[state=collapsed]:w-9! group-data-[state=collapsed]:rounded-[1.125rem] group-data-[state=collapsed]:p-0! data-[active=true]:font-normal",
+        "group/sidebar-menu-button h-auto transition-all group-data-[collapsible=icon]:h-auto! group-data-[state=collapsed]:w-9! group-data-[state=collapsed]:rounded-[1.125rem] group-data-[state=collapsed]:p-0! data-[active=true]:bg-teal-600 data-[active=true]:font-normal",
       )}
       {...props}
     />
@@ -128,15 +128,14 @@ export function CustomSidebarGroupAction({
 }: CustomSidebarGroupActionProps) {
   return (
     <WithRipple
-      className="absolute right-2 bottom-2 mt-auto"
+      className={cn("absolute right-2 bottom-2 mt-auto", className)}
       component={SidebarGroupAction}
       componentProps={{
         className: cn(
-          "size-12 rounded-full bg-teal-600 transition-all group-data-[collapsible=icon]:flex hover:bg-teal-500",
-          className,
+          "size-12 rounded-full bg-teal-700 transition-all group-data-[collapsible=icon]:flex hover:bg-teal-600 data-[state=open]:bg-teal-600",
         ),
-        ...props,
       }}
+      {...props}
     >
       {children}
     </WithRipple>
