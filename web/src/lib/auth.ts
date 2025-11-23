@@ -17,13 +17,36 @@ import {
   openAPI,
   organization,
 } from "better-auth/plugins";
+import { createAccessControl } from "better-auth/plugins/access";
+import {
+  adminAc,
+  memberAc,
+  ownerAc,
+} from "better-auth/plugins/organization/access";
 import { and, eq, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { headers } from "next/headers";
 import { env } from "./env";
-import { ac, admin, member, owner } from "./permissions";
+import { statement } from "./permissions";
 
 const logger = createLogger("Auth");
+
+export const ac = createAccessControl(statement);
+
+export const ownerRole = ac.newRole({
+  ...ownerAc.statements,
+  chat: ["create", "update", "delete"],
+});
+
+export const adminRole = ac.newRole({
+  ...adminAc.statements,
+  chat: ["create", "update"],
+});
+
+export const memberRole = ac.newRole({
+  ...memberAc.statements,
+  chat: ["create"],
+});
 
 const createPersonalOrganization = async (user: User) => {
   try {
@@ -1196,9 +1219,9 @@ export const auth = betterAuth({
     organization({
       ac,
       roles: {
-        owner,
-        admin,
-        member,
+        owner: ownerRole,
+        admin: adminRole,
+        member: memberRole,
       },
       membershipLimit: 50,
       allowUserToCreateOrganization: async (user) => {

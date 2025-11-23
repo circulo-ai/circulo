@@ -11,21 +11,21 @@ import {
 } from "@/lib/server";
 import { authMiddleware } from "@/lib/server/middlewares";
 import { RateLimitError } from "@/lib/server/middlewares/rateLimit";
+import { ChatMessage, WorkflowStreamEvent } from "@/lib/types";
 import {
   convertToUIMessages,
   generateUUID,
   getTextFromMessage,
 } from "@/lib/utils";
-import {
-  convertToModelMessages,
-  createUIMessageStream,
-  JsonToSseTransformStream,
-} from "ai";
+import { orchestrateWorkflow } from "@/workflows/orchestrate/orchestrate";
+import { OrchestrationInput } from "@/workflows/orchestrate/types";
+import { createUIMessageStream, JsonToSseTransformStream } from "ai";
 import { after } from "next/server";
 import {
   createResumableStreamContext,
   type ResumableStreamContext,
 } from "resumable-stream/ioredis";
+import { start } from "workflow/api";
 import { deleteQuerySchema, postRequestBodySchema } from "./schema";
 
 export const maxDuration = 60;
@@ -299,19 +299,108 @@ export const POST = createSafeRoute({ handleServerError: handleChatError })
     // Capture usage for cost tracking
     let usage: { promptTokens?: number; completionTokens?: number } | undefined;
 
-    const stream = createUIMessageStream({
+    const stream = createUIMessageStream<ChatMessage>({
       execute: async ({ writer: dataStream }) => {
-        if (agent && firstAgentId) {
-          const result = await streamAgent({
-            agentId: firstAgentId,
-            chatId: id,
-            userId,
-            organizationId: activeOrganizationId,
-            messages: convertToModelMessages(uiMessages),
-          });
+        // const orchestrationInput: OrchestrationInput = {
+        //   chatId: id,
+        //   messageId: message.id,
+        //   triggerType: "user_message",
+        // };
+        // const run = await start(orchestrateWorkflow, [orchestrationInput]);
+        // const readable = run.getReadable<WorkflowStreamEvent>();
+        //
+        // const result = await streamAgent({
+        //   agentId: firstAgentId,
+        //   chatId: id,
+        //   userId,
+        //   organizationId: activeOrganizationId,
+        //   messages: convertToModelMessages(uiMessages),
+        // });
+        //
+        // result.consumeStream();
+        // dataStream.merge(result.toUIMessageStream({ sendReasoning: true }));
+        const orchestrationInput: OrchestrationInput = {
+          chatId: id,
+          messageId: message.id,
+          triggerType: "user_message",
+        };
 
-          result.consumeStream();
-          dataStream.merge(result.toUIMessageStream({ sendReasoning: true }));
+        try {
+          // 2. Start the Vercel Workflow
+          const run = await start(orchestrateWorkflow, [orchestrationInput]);
+
+          // 3. Get the readable stream of workflow events
+          const workflowReadable = run.getReadable<WorkflowStreamEvent>();
+          const reader = workflowReadable.getReader();
+
+          // 4. Process events as they arrive
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            if (value) {
+              // Map Workflow Events to your CustomUIDataTypes
+              switch (value.type) {
+                case "workflow-started":
+                  dataStream.write({
+                    ...value,
+                    type: "data-workflowStarted",
+                  });
+                  break;
+                case "workflow-classification":
+                  dataStream.write({
+                    ...value,
+                    type: "data-workflowClassification",
+                  });
+                  break;
+                case "workflow-plan":
+                  dataStream.write({
+                    ...value,
+                    type: "data-workflowPlan",
+                  });
+                  break;
+                case "workflow-agent-started":
+                  dataStream.write({
+                    ...value,
+                    type: "data-workflowAgentStarted",
+                  });
+                  break;
+                case "workflow-agent-progress":
+                  // Optional: Throttle this if it's too chatty
+                  dataStream.write({
+                    ...value,
+                    type: "data-workflowAgentProgress",
+                  });
+                  break;
+                case "workflow-agent-completed":
+                  dataStream.write({
+                    ...value,
+                    type: "data-workflowAgentCompleted",
+                  });
+                  break;
+                case "workflow-aggregated":
+                  break;
+                case "workflow-completed":
+                  dataStream.write({
+                    ...value,
+                    type: "data-workflowCompleted",
+                  });
+                  break;
+                case "workflow-error":
+                  dataStream.write({
+                    ...value,
+                    type: "data-workflowError",
+                  });
+                  break;
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Workflow piping error:", error);
+          dataStream.write({
+            type: "error",
+            errorText: error instanceof Error ? error.message : "Unknown error",
+          });
         }
       },
       generateId: generateUUID,

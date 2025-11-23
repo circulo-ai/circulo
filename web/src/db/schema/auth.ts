@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   boolean,
   check,
@@ -9,9 +9,8 @@ import {
   text,
   timestamp,
 } from "drizzle-orm/pg-core";
-
+import { agent } from "./agent";
 import {
-  agent,
   chat,
   chatAgent,
   chatInvitation,
@@ -20,8 +19,7 @@ import {
   message,
   suggestion,
   vote,
-} from "@/db";
-import { relations } from "drizzle-orm";
+} from "./chat";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),

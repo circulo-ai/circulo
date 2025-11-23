@@ -1,5 +1,3 @@
-import { chatAgent } from "@/db";
-import { organization, user } from "@/db/schema/auth";
 import { relations } from "drizzle-orm";
 import {
   boolean,
@@ -12,6 +10,8 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { organization, user } from "./auth";
+import { chatAgent } from "./chat";
 
 export const agent = pgTable(
   "agents",

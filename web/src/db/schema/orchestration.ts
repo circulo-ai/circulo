@@ -1,4 +1,3 @@
-import { chat, message } from "@/db/schema/chat";
 import { relations } from "drizzle-orm";
 import {
   boolean,
@@ -10,6 +9,7 @@ import {
   timestamp,
   uuid,
 } from "drizzle-orm/pg-core";
+import { chat, message } from "./chat";
 
 export const orchestrationLog = pgTable(
   "orchestration_logs",

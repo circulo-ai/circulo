@@ -1,5 +1,3 @@
-import { agent } from "@/db/schema/agent";
-import { organization, user } from "@/db/schema/auth";
 import { ChatTools, CustomUIDataTypes } from "@/lib/types";
 import { UIMessagePart } from "ai";
 import { InferSelectModel, relations, sql } from "drizzle-orm";
@@ -21,6 +19,8 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+import { agent } from "./agent";
+import { organization, user } from "./auth";
 
 export const chatVisibilityEnum = pgEnum("chat_visibility", [
   "private",

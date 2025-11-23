@@ -1,13 +1,7 @@
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { getSession } from "@/lib/auth";
-import { createAccessControl } from "better-auth/plugins/access";
-import {
-  adminAc,
-  defaultStatements,
-  memberAc,
-  ownerAc,
-} from "better-auth/plugins/organization/access";
+import { defaultStatements } from "better-auth/plugins/organization/access";
 import { and, eq } from "drizzle-orm";
 
 // ============================================================================
@@ -18,23 +12,6 @@ export const statement = {
   ...defaultStatements,
   chat: ["create", "share", "update", "delete"],
 } as const;
-
-export const ac = createAccessControl(statement);
-
-export const owner = ac.newRole({
-  ...ownerAc.statements,
-  chat: ["create", "update", "delete"],
-});
-
-export const admin = ac.newRole({
-  ...adminAc.statements,
-  chat: ["create", "update"],
-});
-
-export const member = ac.newRole({
-  ...memberAc.statements,
-  chat: ["create"],
-});
 
 // ============================================================================
 // Type Definitions
