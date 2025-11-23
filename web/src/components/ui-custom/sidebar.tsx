@@ -175,7 +175,7 @@ export function CustomSidebarContextMenu({
         </CustomContextMenuItem>
         <ContextMenuSeparator />
         <CustomContextMenuItem disabled inset>
-          More Features Soon...
+          More features soon...
         </CustomContextMenuItem>
       </CustomContextMenuContent>
     </ContextMenu>
