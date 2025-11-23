@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { suggestion } from "@/db/schema";
+import { suggestion, Suggestion } from "@/db/schema";
 import { and, desc, eq, sql } from "drizzle-orm";
 
 export const suggestionRepo = {
@@ -10,6 +10,14 @@ export const suggestionRepo = {
   async create(data: typeof suggestion.$inferInsert) {
     const [row] = await db.insert(suggestion).values(data).returning();
     return row;
+  },
+
+  async save({ suggestions }: { suggestions: Suggestion[] }) {
+    try {
+      return await db.insert(suggestion).values(suggestions);
+    } catch (_error) {
+      throw new Error("Failed to save suggestions");
+    }
   },
 
   async update(id: string, data: Partial<typeof suggestion.$inferInsert>) {
@@ -30,6 +38,17 @@ export const suggestionRepo = {
   },
 
   // --- Query Methods ---
+
+  async getByDocumentId({ documentId }: { documentId: string }) {
+    try {
+      return await db
+        .select()
+        .from(suggestion)
+        .where(eq(suggestion.documentId, documentId));
+    } catch (_error) {
+      throw new Error("Failed to get suggestions by document id");
+    }
+  },
 
   async findForDocument(
     documentId: string,

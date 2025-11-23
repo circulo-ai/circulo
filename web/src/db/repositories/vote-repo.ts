@@ -45,6 +45,14 @@ export const voteRepo = {
 
   // --- Query Methods ---
 
+  async getByChatId({ id }: { id: string }) {
+    try {
+      return await db.select().from(vote).where(eq(vote.chatId, id));
+    } catch (_error) {
+      throw new Error("Failed to get votes by chat id");
+    }
+  },
+
   async findForMessage(chatId: string, messageId: string) {
     return db.query.vote.findMany({
       where: and(eq(vote.chatId, chatId), eq(vote.messageId, messageId)),
@@ -70,6 +78,17 @@ export const voteRepo = {
   },
 
   // --- Vote Actions ---
+
+  async vote(
+    userId: string,
+    chatId: string,
+    messageId: string,
+    type: "up" | "down",
+  ) {
+    return type == "up"
+      ? voteRepo.upvote(userId, chatId, messageId)
+      : voteRepo.downvote(userId, chatId, messageId);
+  },
 
   async upvote(userId: string, chatId: string, messageId: string) {
     return this.upsert({ userId, chatId, messageId, isUpvoted: true });

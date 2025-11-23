@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { stream } from "@/db/schema";
-import { and, desc, eq, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, lt, sql } from "drizzle-orm";
 
 export const streamRepo = {
   async findById(id: string) {
@@ -12,12 +12,43 @@ export const streamRepo = {
     return row;
   },
 
+  async createStreamId({
+    streamId,
+    chatId,
+  }: {
+    streamId: string;
+    chatId: string;
+  }) {
+    try {
+      await db
+        .insert(stream)
+        .values({ id: streamId, chatId, createdAt: new Date() });
+    } catch (_error) {
+      throw new Error("Failed to create stream id");
+    }
+  },
+
   async delete(id: string) {
     const [row] = await db.delete(stream).where(eq(stream.id, id)).returning();
     return row;
   },
 
   // --- Query Methods ---
+
+  async getStreamIdsByChatId({ chatId }: { chatId: string }) {
+    try {
+      const streamIds = await db
+        .select({ id: stream.id })
+        .from(stream)
+        .where(eq(stream.chatId, chatId))
+        .orderBy(asc(stream.createdAt))
+        .execute();
+
+      return streamIds.map(({ id }) => id);
+    } catch (_error) {
+      throw new Error("Failed to get stream ids by chat id");
+    }
+  },
 
   async findForChat(chatId: string, opts?: { limit?: number }) {
     return db.query.stream.findMany({

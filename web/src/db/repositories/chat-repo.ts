@@ -1,6 +1,26 @@
 import { db } from "@/db";
-import { Agent, chat, chatAgent, chatMember } from "@/db/schema";
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import {
+  Agent,
+  chat,
+  chatAgent,
+  chatMember,
+  ChatVisibility,
+  message,
+  stream,
+  vote,
+} from "@/db/schema";
+import {
+  and,
+  desc,
+  eq,
+  gt,
+  ilike,
+  inArray,
+  lt,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 
 export interface ChatFilters {
   organizationId?: string;
@@ -12,6 +32,19 @@ export interface ChatFilters {
   limit?: number;
   offset?: number;
 }
+
+export type ConversationSummary = {
+  id: string;
+  name: string;
+  avatar: string;
+  lastMessage: string;
+  timestamp: string;
+  unread?: boolean;
+  verified?: boolean;
+  hasAttachment?: boolean;
+  badges?: string[];
+  type: "channel" | "dm";
+};
 
 export const chatRepo = {
   async findById(id: string) {
@@ -34,6 +67,52 @@ export const chatRepo = {
     return row;
   },
 
+  async save({
+    id,
+    userId,
+    title,
+    visibility,
+    organizationId,
+  }: {
+    id: string;
+    userId: string;
+    title: string;
+    visibility: ChatVisibility;
+    organizationId: string;
+  }) {
+    try {
+      return await db.transaction(async (tx) => {
+        const [chatEntity] = await tx
+          .insert(chat)
+          .values({
+            id,
+            organizationId,
+            creatorId: userId,
+            title,
+            visibility,
+          })
+          .returning({ id: chat.id });
+
+        if (chatEntity) {
+          await tx.insert(chatMember).values({
+            chatId: chatEntity.id,
+            userId: userId,
+            canInvite: true,
+            canManageKnowledge: true,
+            notificationsEnabled: true,
+            role: "owner",
+          });
+        } else {
+          throw new Error("Could not create chat entity!");
+        }
+
+        return chatEntity;
+      });
+    } catch (_error) {
+      throw new Error("Failed to save chat");
+    }
+  },
+
   async update(id: string, data: Partial<typeof chat.$inferInsert>) {
     const [row] = await db
       .update(chat)
@@ -41,6 +120,23 @@ export const chatRepo = {
       .where(eq(chat.id, id))
       .returning();
     return row;
+  },
+
+  async updateVisibilityById({
+    chatId,
+    visibility,
+  }: {
+    chatId: string;
+    visibility: "private" | "public";
+  }) {
+    try {
+      return await db
+        .update(chat)
+        .set({ visibility })
+        .where(eq(chat.id, chatId));
+    } catch (_error) {
+      throw new Error("Failed to update chat visibility by id");
+    }
   },
 
   async softDelete(id: string) {
@@ -64,6 +160,50 @@ export const chatRepo = {
   async hardDelete(id: string) {
     const [row] = await db.delete(chat).where(eq(chat.id, id)).returning();
     return row;
+  },
+
+  async deleteById({ id }: { id: string }) {
+    try {
+      await db.delete(vote).where(eq(vote.chatId, id));
+      await db.delete(message).where(eq(message.chatId, id));
+      await db.delete(stream).where(eq(stream.chatId, id));
+
+      const [chatsDeleted] = await db
+        .delete(chat)
+        .where(eq(chat.id, id))
+        .returning();
+      return chatsDeleted;
+    } catch (_error) {
+      throw new Error("Failed to delete chat by id");
+    }
+  },
+
+  async deleteAllByUserId({ userId }: { userId: string }) {
+    try {
+      const userChats = await db
+        .select({ id: chat.id })
+        .from(chat)
+        .where(eq(chat.creatorId, userId));
+
+      if (userChats.length === 0) {
+        return { deletedCount: 0 };
+      }
+
+      const chatIds = userChats.map((c) => c.id);
+
+      await db.delete(vote).where(inArray(vote.chatId, chatIds));
+      await db.delete(message).where(inArray(message.chatId, chatIds));
+      await db.delete(stream).where(inArray(stream.chatId, chatIds));
+
+      const deletedChats = await db
+        .delete(chat)
+        .where(eq(chat.creatorId, userId))
+        .returning();
+
+      return { deletedCount: deletedChats.length };
+    } catch (_error) {
+      throw new Error("Failed to delete all chats by user id");
+    }
   },
 
   // --- Query Methods ---
@@ -101,6 +241,295 @@ export const chatRepo = {
       limit: filters.limit ?? 50,
       offset: filters.offset ?? 0,
     });
+  },
+
+  async getChatsByUserId({
+    id,
+    limit,
+    startingAfter,
+    endingBefore,
+    search,
+  }: {
+    id: string;
+    limit: number;
+    startingAfter?: string;
+    endingBefore?: string;
+    search?: string;
+  }) {
+    try {
+      const extendedLimit = limit + 1;
+
+      const searchCondition = search
+        ? or(
+            ilike(chat.title, `%${search}%`),
+            ilike(chat.description, `%${search}%`),
+          )
+        : undefined;
+
+      const query = (whereCondition?: SQL<any>) => {
+        const whereClause = searchCondition
+          ? whereCondition
+            ? and(eq(chat.creatorId, id), whereCondition, searchCondition)
+            : and(eq(chat.creatorId, id), searchCondition)
+          : whereCondition
+            ? and(whereCondition, eq(chat.creatorId, id))
+            : eq(chat.creatorId, id);
+
+        return db
+          .select()
+          .from(chat)
+          .where(whereClause)
+          .orderBy(desc(chat.createdAt))
+          .limit(extendedLimit);
+      };
+
+      let filteredChats: (typeof chat.$inferSelect)[] = [];
+
+      if (startingAfter) {
+        const [selectedChat] = await db
+          .select()
+          .from(chat)
+          .where(eq(chat.id, startingAfter))
+          .limit(1);
+
+        if (!selectedChat) {
+          throw new Error(`Chat with id ${startingAfter} not found`);
+        }
+
+        filteredChats = await query(gt(chat.createdAt, selectedChat.createdAt));
+      } else if (endingBefore) {
+        const [selectedChat] = await db
+          .select()
+          .from(chat)
+          .where(eq(chat.id, endingBefore))
+          .limit(1);
+
+        if (!selectedChat) {
+          throw new Error(`Chat with id ${endingBefore} not found`);
+        }
+
+        filteredChats = await query(lt(chat.createdAt, selectedChat.createdAt));
+      } else {
+        filteredChats = await query();
+      }
+
+      const hasMore = filteredChats.length > limit;
+
+      return {
+        chats: hasMore ? filteredChats.slice(0, limit) : filteredChats,
+        hasMore,
+      };
+    } catch (_error) {
+      throw new Error("Failed to get chats by user id");
+    }
+  },
+
+  async getChatsByOrgId({
+    id,
+    limit,
+    startingAfter,
+    endingBefore,
+    search,
+  }: {
+    id: string;
+    limit: number;
+    startingAfter?: string;
+    endingBefore?: string;
+    search?: string;
+  }) {
+    try {
+      const extendedLimit = limit + 1;
+
+      const searchCondition = search
+        ? or(
+            ilike(chat.title, `%${search}%`),
+            ilike(chat.description, `%${search}%`),
+          )
+        : undefined;
+
+      const query = (whereCondition?: SQL<any>) => {
+        const whereClause = searchCondition
+          ? whereCondition
+            ? and(eq(chat.organizationId, id), whereCondition, searchCondition)
+            : and(eq(chat.organizationId, id), searchCondition)
+          : whereCondition
+            ? and(whereCondition, eq(chat.organizationId, id))
+            : eq(chat.organizationId, id);
+
+        return db
+          .select()
+          .from(chat)
+          .where(whereClause)
+          .orderBy(desc(chat.createdAt))
+          .limit(extendedLimit);
+      };
+
+      let filteredChats: (typeof chat.$inferSelect)[] = [];
+
+      if (startingAfter) {
+        const [selectedChat] = await db
+          .select()
+          .from(chat)
+          .where(eq(chat.id, startingAfter))
+          .limit(1);
+
+        if (!selectedChat) {
+          throw new Error(`Chat with id ${startingAfter} not found`);
+        }
+
+        filteredChats = await query(gt(chat.createdAt, selectedChat.createdAt));
+      } else if (endingBefore) {
+        const [selectedChat] = await db
+          .select()
+          .from(chat)
+          .where(eq(chat.id, endingBefore))
+          .limit(1);
+
+        if (!selectedChat) {
+          throw new Error(`Chat with id ${endingBefore} not found`);
+        }
+
+        filteredChats = await query(lt(chat.createdAt, selectedChat.createdAt));
+      } else {
+        filteredChats = await query();
+      }
+
+      const hasMore = filteredChats.length > limit;
+
+      return {
+        chats: hasMore ? filteredChats.slice(0, limit) : filteredChats,
+        hasMore,
+      };
+    } catch (_error) {
+      throw new Error("Failed to get chats by org id");
+    }
+  },
+
+  async getConversationSummariesByUserId({
+    id,
+    limit,
+    startingAfter,
+    endingBefore,
+  }: {
+    id: string;
+    limit: number;
+    startingAfter?: string;
+    endingBefore?: string;
+  }): Promise<{ conversations: ConversationSummary[]; hasMore: boolean }> {
+    try {
+      const extendedLimit = limit + 1;
+
+      const query = (whereCondition?: SQL<any>) =>
+        db
+          .select()
+          .from(chat)
+          .where(
+            whereCondition
+              ? and(whereCondition, eq(chat.creatorId, id))
+              : eq(chat.creatorId, id),
+          )
+          .orderBy(desc(chat.createdAt))
+          .limit(extendedLimit);
+
+      let filteredChats: (typeof chat.$inferSelect)[] = [];
+
+      if (startingAfter) {
+        const [selectedChat] = await db
+          .select()
+          .from(chat)
+          .where(eq(chat.id, startingAfter))
+          .limit(1);
+
+        if (!selectedChat) {
+          throw new Error(`Chat with id ${startingAfter} not found`);
+        }
+
+        filteredChats = await query(gt(chat.createdAt, selectedChat.createdAt));
+      } else if (endingBefore) {
+        const [selectedChat] = await db
+          .select()
+          .from(chat)
+          .where(eq(chat.id, endingBefore))
+          .limit(1);
+
+        if (!selectedChat) {
+          throw new Error(`Chat with id ${endingBefore} not found`);
+        }
+
+        filteredChats = await query(lt(chat.createdAt, selectedChat.createdAt));
+      } else {
+        filteredChats = await query();
+      }
+
+      const hasMore = filteredChats.length > limit;
+      const chatsPage = hasMore ? filteredChats.slice(0, limit) : filteredChats;
+
+      const chatIds = chatsPage.map((c) => c.id);
+
+      // Fetch latest message per chat
+      const latestMessages = await db
+        .select()
+        .from(message)
+        .where(inArray(message.chatId, chatIds))
+        .orderBy(desc(message.createdAt));
+
+      const latestByChat = new Map<string, typeof message.$inferSelect>();
+      for (const m of latestMessages) {
+        if (!latestByChat.has(m.chatId)) {
+          latestByChat.set(m.chatId, m);
+        }
+      }
+
+      // Fetch member unread counts
+      const memberRows = await db
+        .select({
+          chatId: chatMember.chatId,
+          unreadCount: chatMember.unreadCount,
+        })
+        .from(chatMember)
+        .where(
+          and(inArray(chatMember.chatId, chatIds), eq(chatMember.userId, id)),
+        );
+      const unreadByChat = new Map<string, number>();
+      for (const row of memberRows) {
+        unreadByChat.set(row.chatId, row.unreadCount ?? 0);
+      }
+
+      const conversations: ConversationSummary[] = chatsPage.map((c) => {
+        const latest = latestByChat.get(c.id);
+        const lastMessageText = latest?.content ?? "";
+        const ts = latest?.createdAt ?? c.updatedAt ?? c.createdAt;
+        const attachments = latest?.attachments as unknown as
+          | any[]
+          | Record<string, unknown>
+          | undefined;
+        const hasAttachment = Array.isArray(attachments)
+          ? attachments.length > 0
+          : attachments && Object.keys(attachments).length > 0;
+        const unread = (unreadByChat.get(c.id) ?? 0) > 0;
+
+        const badges: string[] = [];
+        if (c.visibility === "public") badges.push("Public");
+        if (c.type === "group") badges.push("Group");
+
+        return {
+          id: c.id,
+          name: c.title,
+          avatar: "",
+          lastMessage: lastMessageText,
+          timestamp: ts ? new Date(ts).toISOString() : new Date().toISOString(),
+          unread,
+          verified: c.visibility === "public",
+          hasAttachment: Boolean(hasAttachment),
+          badges,
+          type: c.type === "group" ? "channel" : "dm",
+        };
+      });
+
+      return { conversations, hasMore };
+    } catch (_error) {
+      throw new Error("Failed to get conversation summaries by user id");
+    }
   },
 
   async findByOrganization(

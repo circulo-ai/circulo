@@ -1,6 +1,7 @@
+import { ArtifactKind } from "@/components/artifacts/artifact";
 import { db } from "@/db";
-import { document } from "@/db/schema";
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { document, suggestion } from "@/db/schema";
+import { and, desc, eq, gt, ilike, or, sql } from "drizzle-orm";
 
 export type DocumentKind = "text" | "code" | "image" | "sheet";
 
@@ -18,6 +19,34 @@ export const documentRepo = {
     return db.query.document.findFirst({ where: eq(document.id, id) });
   },
 
+  async getById({ id }: { id: string }) {
+    try {
+      const documents = await db
+        .select()
+        .from(document)
+        .where(eq(document.id, id))
+        .orderBy(sql`created_at asc`);
+
+      return documents;
+    } catch (_error) {
+      throw new Error("Failed to get documents by id");
+    }
+  },
+
+  async getDocumentById({ id }: { id: string }) {
+    try {
+      const [selectedDocument] = await db
+        .select()
+        .from(document)
+        .where(eq(document.id, id))
+        .orderBy(desc(document.createdAt));
+
+      return selectedDocument;
+    } catch (_error) {
+      throw new Error("Failed to get document by id");
+    }
+  },
+
   async findByIdWithSuggestions(id: string) {
     return db.query.document.findFirst({
       where: eq(document.id, id),
@@ -28,6 +57,36 @@ export const documentRepo = {
   async create(data: typeof document.$inferInsert) {
     const [row] = await db.insert(document).values(data).returning();
     return row;
+  },
+
+  async save({
+    id,
+    title,
+    kind,
+    content,
+    userId,
+  }: {
+    id: string;
+    title: string;
+    kind: ArtifactKind;
+    content: string;
+    userId: string;
+  }) {
+    try {
+      return await db
+        .insert(document)
+        .values({
+          id,
+          title,
+          kind,
+          content,
+          userId,
+          createdAt: new Date(),
+        })
+        .returning();
+    } catch (_error) {
+      throw new Error("Failed to save document");
+    }
   },
 
   async update(id: string, data: Partial<typeof document.$inferInsert>) {
@@ -50,6 +109,32 @@ export const documentRepo = {
       .where(eq(document.id, id))
       .returning();
     return row;
+  },
+
+  async deleteByIdAfterTimestamp({
+    id,
+    timestamp,
+  }: {
+    id: string;
+    timestamp: Date;
+  }) {
+    try {
+      await db
+        .delete(suggestion)
+        .where(
+          and(
+            eq(suggestion.documentId, id),
+            gt(suggestion.createdAt, timestamp),
+          ),
+        );
+
+      return await db
+        .delete(document)
+        .where(and(eq(document.id, id), gt(document.createdAt, timestamp)))
+        .returning();
+    } catch (_error) {
+      throw new Error("Failed to delete documents by id after timestamp");
+    }
   },
 
   // --- Query Methods ---

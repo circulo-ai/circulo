@@ -1,6 +1,17 @@
 import { db } from "@/db";
-import { message } from "@/db/schema";
-import { and, desc, eq, gt, lt, sql } from "drizzle-orm";
+import { chat, message, vote } from "@/db/schema";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gt,
+  gte,
+  inArray,
+  lt,
+  sql,
+} from "drizzle-orm";
 
 export type MessageAuthorType = "user" | "agent" | "system";
 
@@ -20,6 +31,14 @@ export const messageRepo = {
     return db.query.message.findFirst({ where: eq(message.id, id) });
   },
 
+  async getById({ id }: { id: string }) {
+    try {
+      return await db.select().from(message).where(eq(message.id, id));
+    } catch (_error) {
+      throw new Error("Failed to get message by id");
+    }
+  },
+
   async findByIdWithVotes(id: string) {
     return db.query.message.findFirst({
       where: eq(message.id, id),
@@ -35,6 +54,14 @@ export const messageRepo = {
   async createMany(data: (typeof message.$inferInsert)[]) {
     const rows = await db.insert(message).values(data).returning();
     return rows;
+  },
+
+  async save({ messages }: { messages: (typeof message.$inferInsert)[] }) {
+    try {
+      return await db.insert(message).values(messages);
+    } catch (_error) {
+      throw new Error("Failed to save messages");
+    }
   },
 
   async update(id: string, data: Partial<typeof message.$inferInsert>) {
@@ -86,6 +113,18 @@ export const messageRepo = {
   },
 
   // --- Query Methods ---
+
+  async getByChatId({ id }: { id: string }) {
+    try {
+      return await db
+        .select()
+        .from(message)
+        .where(eq(message.chatId, id))
+        .orderBy(asc(message.createdAt));
+    } catch (_error) {
+      throw new Error("Failed to get messages by chat id");
+    }
+  },
 
   async findForChat(chatId: string, limit?: number) {
     return db.query.message.findMany({
@@ -219,6 +258,35 @@ export const messageRepo = {
     return result[0]?.count ?? 0;
   },
 
+  async getCountByUserId({
+    id,
+    differenceInHours,
+  }: {
+    id: string;
+    differenceInHours: number;
+  }) {
+    try {
+      const timeAgo = new Date(Date.now() - differenceInHours * 60 * 60 * 1000);
+
+      const [stats] = await db
+        .select({ count: count(message.id) })
+        .from(message)
+        .innerJoin(chat, eq(message.chatId, chat.id))
+        .where(
+          and(
+            eq(chat.creatorId, id),
+            gte(message.createdAt, timeAgo),
+            eq(message.role, "user"),
+          ),
+        )
+        .execute();
+
+      return stats?.count ?? 0;
+    } catch (_error) {
+      throw new Error("Failed to get message count by user id");
+    }
+  },
+
   async getTotalTokensForChat(chatId: string): Promise<number> {
     const result = await db
       .select({ total: sql<number>`COALESCE(SUM(${message.tokenCount}), 0)` })
@@ -235,6 +303,42 @@ export const messageRepo = {
     return result[0]?.total ?? "0";
   },
 
+  // --- Voting ---
+
+  async vote({
+    userId,
+    chatId,
+    messageId,
+    type,
+  }: {
+    userId: string;
+    chatId: string;
+    messageId: string;
+    type: "up" | "down";
+  }) {
+    try {
+      const [existingVote] = await db
+        .select()
+        .from(vote)
+        .where(and(eq(vote.messageId, messageId)));
+
+      if (existingVote) {
+        return await db
+          .update(vote)
+          .set({ isUpvoted: type === "up" })
+          .where(and(eq(vote.messageId, messageId), eq(vote.chatId, chatId)));
+      }
+      return await db.insert(vote).values({
+        userId,
+        chatId,
+        messageId,
+        isUpvoted: type === "up",
+      });
+    } catch (_error) {
+      throw new Error("Failed to vote message");
+    }
+  },
+
   // --- Cleanup ---
 
   async deleteForChat(chatId: string) {
@@ -243,6 +347,41 @@ export const messageRepo = {
       .where(eq(message.chatId, chatId))
       .returning();
     return result.length;
+  },
+
+  async deleteByChatIdAfterTimestamp({
+    chatId,
+    timestamp,
+  }: {
+    chatId: string;
+    timestamp: Date;
+  }) {
+    try {
+      const messagesToDelete = await db
+        .select({ id: message.id })
+        .from(message)
+        .where(
+          and(eq(message.chatId, chatId), gte(message.createdAt, timestamp)),
+        );
+
+      const messageIds = messagesToDelete.map((m) => m.id);
+
+      if (messageIds.length > 0) {
+        await db
+          .delete(vote)
+          .where(
+            and(eq(vote.chatId, chatId), inArray(vote.messageId, messageIds)),
+          );
+
+        return await db
+          .delete(message)
+          .where(
+            and(eq(message.chatId, chatId), inArray(message.id, messageIds)),
+          );
+      }
+    } catch (_error) {
+      throw new Error("Failed to delete messages by chat id after timestamp");
+    }
   },
 
   async hardDeleteSoftDeleted(olderThanDays = 30) {
