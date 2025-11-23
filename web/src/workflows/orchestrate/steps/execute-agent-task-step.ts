@@ -1,10 +1,10 @@
-// workflows/orchestration/steps/execute-agent-task-step.ts
 import { Message } from "@/db";
+import { WorkflowStreamEvent } from "@/lib/types";
 import { convertToUIMessages } from "@/lib/utils";
 import { ChatContext } from "@/workflows/orchestrate/steps/load-chat-step";
 import { OrchestrationInput } from "@/workflows/orchestrate/types";
 import { google } from "@ai-sdk/google";
-import { convertToModelMessages, generateText } from "ai";
+import { convertToModelMessages, streamText } from "ai";
 import { ExecutionPlan } from "./plan-agent-execution-step";
 
 export interface AgentExecutionResult {
@@ -26,6 +26,7 @@ export async function executeAgentTaskStep(params: {
   context: ChatContext;
   triggerMessage: Message;
   previousResults: AgentExecutionResult[];
+  workflowStream: WritableStream<WorkflowStreamEvent>;
   webhookPayload?: OrchestrationInput["webhookPayload"];
 }): Promise<AgentExecutionResult> {
   "use step";
@@ -36,6 +37,7 @@ export async function executeAgentTaskStep(params: {
     triggerMessage,
     previousResults,
     webhookPayload,
+    workflowStream,
   } = params;
 
   const startTime = new Date();
@@ -58,7 +60,7 @@ export async function executeAgentTaskStep(params: {
   const agent = chatAgent.agent;
 
   try {
-    // Build comprehensive context from previous agent results
+    // Build context from previous results
     let previousContext = "";
     if (previousResults.length > 0) {
       previousContext =
@@ -86,7 +88,7 @@ Data: ${JSON.stringify(webhookPayload.data, null, 2)}
 ---`;
     }
 
-    // Build dependency context if this agent depends on specific previous agents
+    // Build dependency context
     let dependencyContext = "";
     if (agentPlan.dependsOn && agentPlan.dependsOn.length > 0) {
       const dependencyResults = previousResults.filter((r) =>
@@ -106,7 +108,7 @@ ${r.output}`,
       }
     }
 
-    // Get conversation history (last 20 messages)
+    // Get conversation history
     const conversationHistory = context.messages.slice(-20);
 
     // Use custom instructions if available
@@ -139,8 +141,14 @@ ${webhookContext}${previousContext}${dependencyContext}
 
 Provide a focused response for YOUR specific task. Be concise but complete.`;
 
-    // Execute the agent with full context
-    const result = await generateText({
+    // Get writer for progress updates
+    const writer = workflowStream.getWriter();
+
+    let fullText = "";
+    let usage: any = undefined;
+
+    // Use streamText with callbacks
+    const result = streamText({
       model: google(agent.model || "gemini-2.0-flash-exp"),
       temperature,
       maxOutputTokens: agent.maxTokens || 2000,
@@ -148,7 +156,40 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
         ...convertToModelMessages(convertToUIMessages(conversationHistory)),
       ],
       system: systemPrompt,
+      onChunk: async ({ chunk }) => {
+        // Emit progress for text deltas
+        if (chunk.type === "text-delta") {
+          try {
+            await writer.write({
+              type: "workflow-agent-progress",
+              data: {
+                agentId: agent.id,
+                progress: chunk.text,
+              },
+            });
+          } catch (e) {
+            // Writer might be locked by another operation, ignore
+            console.warn("Failed to write progress:", e);
+          }
+        }
+      },
+      onFinish: async ({ text, usage: finalUsage }) => {
+        fullText = text;
+        usage = finalUsage;
+      },
     });
+
+    // Wait for the stream to complete
+    // Option 1: Consume the text stream
+    await result.text; // This is a Promise<string>
+
+    // OR Option 2: Consume the full stream
+    // for await (const chunk of result.textStream) {
+    //   // Process chunks if needed
+    // }
+
+    // Release writer lock
+    writer.releaseLock();
 
     const endTime = new Date();
 
@@ -157,14 +198,22 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
       agentName: agent.name,
       task: agentPlan.task,
       success: true,
-      output: result.text,
+      output: fullText || (await result.text), // Use fullText from onFinish or await result.text
       startTime,
       endTime,
       durationMs: endTime.getTime() - startTime.getTime(),
-      tokenCount: result.usage?.totalTokens,
+      tokenCount: usage?.totalTokens,
     };
   } catch (error) {
     const endTime = new Date();
+
+    // Try to release writer if we have it
+    try {
+      const writer = workflowStream.getWriter();
+      writer.releaseLock();
+    } catch (e) {
+      // Already released or locked
+    }
 
     return {
       agentId: agent.id,

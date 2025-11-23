@@ -38,7 +38,6 @@ import { useDataStream } from "./data-stream-provider";
 import { MultimodalInput } from "./multimodal-input";
 import { toast } from "./toast";
 import type { VisibilityType } from "./visibility-selector";
-// Response shape: chatAgent rows with nested agent
 
 export function Chat({
   id,
