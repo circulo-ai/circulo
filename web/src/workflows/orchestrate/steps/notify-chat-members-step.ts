@@ -20,7 +20,7 @@ export async function notifyChatMembersStep(params: {
     (m) => m.userId !== excludeUserId && m.notificationsEnabled,
   );
 
-  // In a real implementation, you would send notifications via:
+  // In a production implementation, you would send notifications via:
   // - Email
   // - Push notifications
   // - WebSocket events

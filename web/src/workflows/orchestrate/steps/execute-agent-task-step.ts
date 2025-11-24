@@ -26,7 +26,7 @@ export async function executeAgentTaskStep(params: {
   context: ChatContext;
   triggerMessage: Message;
   previousResults: AgentExecutionResult[];
-  workflowStream: WritableStream<WorkflowStreamEvent>;
+  emitProgress: (event: WorkflowStreamEvent) => Promise<void>;
   webhookPayload?: OrchestrationInput["webhookPayload"];
 }): Promise<AgentExecutionResult> {
   "use step";
@@ -37,7 +37,7 @@ export async function executeAgentTaskStep(params: {
     triggerMessage,
     previousResults,
     webhookPayload,
-    workflowStream,
+    emitProgress,
   } = params;
 
   const startTime = new Date();
@@ -108,7 +108,7 @@ ${r.output}`,
       }
     }
 
-    // Get conversation history
+    // Get conversation history (last 20 messages)
     const conversationHistory = context.messages.slice(-20);
 
     // Use custom instructions if available
@@ -141,9 +141,6 @@ ${webhookContext}${previousContext}${dependencyContext}
 
 Provide a focused response for YOUR specific task. Be concise but complete.`;
 
-    // Get writer for progress updates
-    const writer = workflowStream.getWriter();
-
     let fullText = "";
     let usage: any = undefined;
 
@@ -157,10 +154,10 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
       ],
       system: systemPrompt,
       onChunk: async ({ chunk }) => {
-        // Emit progress for text deltas
+        // Emit progress for text deltas using the provided helper
         if (chunk.type === "text-delta") {
           try {
-            await writer.write({
+            await emitProgress({
               type: "workflow-agent-progress",
               data: {
                 agentId: agent.id,
@@ -168,8 +165,8 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
               },
             });
           } catch (e) {
-            // Writer might be locked by another operation, ignore
-            console.warn("Failed to write progress:", e);
+            // Log but don't fail the agent execution
+            console.warn("Failed to emit progress:", e);
           }
         }
       },
@@ -180,17 +177,7 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
     });
 
     // Wait for the stream to complete
-    // Option 1: Consume the text stream
-    await result.text; // This is a Promise<string>
-
-    // OR Option 2: Consume the full stream
-    // for await (const chunk of result.textStream) {
-    //   // Process chunks if needed
-    // }
-
-    // Release writer lock
-    writer.releaseLock();
-
+    const finalText = await result.text;
     const endTime = new Date();
 
     return {
@@ -198,7 +185,7 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
       agentName: agent.name,
       task: agentPlan.task,
       success: true,
-      output: fullText || (await result.text), // Use fullText from onFinish or await result.text
+      output: fullText || finalText,
       startTime,
       endTime,
       durationMs: endTime.getTime() - startTime.getTime(),
@@ -206,14 +193,6 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
     };
   } catch (error) {
     const endTime = new Date();
-
-    // Try to release writer if we have it
-    try {
-      const writer = workflowStream.getWriter();
-      writer.releaseLock();
-    } catch (e) {
-      // Already released or locked
-    }
 
     return {
       agentId: agent.id,
