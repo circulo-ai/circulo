@@ -149,7 +149,7 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
 
     // Use streamText with callbacks
     const result = streamText({
-      model: google(agent.model || "gemini-2.0-flash-exp"),
+      model: google(agent.model || "gemini-2.5-flash"),
       temperature,
       maxOutputTokens: agent.maxTokens || 2000,
       messages: [

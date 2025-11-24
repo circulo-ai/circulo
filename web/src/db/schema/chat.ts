@@ -299,7 +299,7 @@ export const suggestion = pgTable(
 );
 
 export const stream = pgTable(
-  "Stream",
+  "Stream", // TODO: rename this table
   {
     id: uuid("id").notNull().defaultRandom(),
     chatId: uuid("chatId").notNull(),

@@ -20,6 +20,7 @@ import {
 import { createAccessControl } from "better-auth/plugins/access";
 import {
   adminAc,
+  defaultStatements,
   memberAc,
   ownerAc,
 } from "better-auth/plugins/organization/access";
@@ -27,23 +28,27 @@ import { and, eq, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { headers } from "next/headers";
 import { env } from "./env";
-import { statement } from "./permissions";
 
 const logger = createLogger("Auth");
 
-export const ac = createAccessControl(statement);
+export const statement = {
+  ...defaultStatements,
+  chat: ["create", "share", "update", "delete"],
+} as const;
 
-export const ownerRole = ac.newRole({
+const ac = createAccessControl(statement);
+
+const ownerRole = ac.newRole({
   ...ownerAc.statements,
   chat: ["create", "update", "delete"],
 });
 
-export const adminRole = ac.newRole({
+const adminRole = ac.newRole({
   ...adminAc.statements,
   chat: ["create", "update"],
 });
 
-export const memberRole = ac.newRole({
+const memberRole = ac.newRole({
   ...memberAc.statements,
   chat: ["create"],
 });

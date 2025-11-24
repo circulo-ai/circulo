@@ -1,21 +1,7 @@
 import { db } from "@/db";
 import * as schema from "@/db/schema";
-import { getSession } from "@/lib/auth";
-import { defaultStatements } from "better-auth/plugins/organization/access";
+import { getSession, statement } from "@/lib/auth";
 import { and, eq } from "drizzle-orm";
-
-// ============================================================================
-// Access Control Setup
-// ============================================================================
-
-export const statement = {
-  ...defaultStatements,
-  chat: ["create", "share", "update", "delete"],
-} as const;
-
-// ============================================================================
-// Type Definitions
-// ============================================================================
 
 export type Resource = keyof typeof statement;
 export type Action<R extends Resource> = (typeof statement)[R][number];

@@ -1,4 +1,5 @@
 import { generateTitleFromUserMessage } from "@/app/(chat)/actions";
+import { streamRepo } from "@/db/repositories";
 import { agentRepo } from "@/db/repositories/agent-repo";
 import { chatRepo } from "@/db/repositories/chat-repo";
 import { messageRepo } from "@/db/repositories/message-repo";
@@ -12,11 +13,7 @@ import {
 import { authMiddleware } from "@/lib/server/middlewares";
 import { RateLimitError } from "@/lib/server/middlewares/rateLimit";
 import { ChatMessage, WorkflowStreamEvent } from "@/lib/types";
-import {
-  convertToUIMessages,
-  generateUUID,
-  getTextFromMessage,
-} from "@/lib/utils";
+import { generateUUID, getTextFromMessage } from "@/lib/utils";
 import { orchestrateWorkflow } from "@/workflows/orchestrate/orchestrate";
 import { OrchestrationInput } from "@/workflows/orchestrate/types";
 import { createUIMessageStream, JsonToSseTransformStream } from "ai";
@@ -240,8 +237,6 @@ export const POST = createSafeRoute({ handleServerError: handleChatError })
       }
     }
 
-    const uiMessages = [...convertToUIMessages(messagesFromDb), message];
-
     // Save user message
     await messageRepo.create({
       chatId: id,
@@ -262,9 +257,9 @@ export const POST = createSafeRoute({ handleServerError: handleChatError })
       deletedAt: null,
     });
 
-    const streamId = generateUUID();
     // Create stream ID if you have this functionality
-    // await createStreamId({ streamId, chatId: id });
+    const streamId = generateUUID();
+    await streamRepo.createStreamId({ streamId, chatId: id });
 
     // Resolve agent
     let firstAgentId = agentIds?.find(
@@ -301,24 +296,6 @@ export const POST = createSafeRoute({ handleServerError: handleChatError })
 
     const stream = createUIMessageStream<ChatMessage>({
       execute: async ({ writer: dataStream }) => {
-        // const orchestrationInput: OrchestrationInput = {
-        //   chatId: id,
-        //   messageId: message.id,
-        //   triggerType: "user_message",
-        // };
-        // const run = await start(orchestrateWorkflow, [orchestrationInput]);
-        // const readable = run.getReadable<WorkflowStreamEvent>();
-        //
-        // const result = await streamAgent({
-        //   agentId: firstAgentId,
-        //   chatId: id,
-        //   userId,
-        //   organizationId: activeOrganizationId,
-        //   messages: convertToModelMessages(uiMessages),
-        // });
-        //
-        // result.consumeStream();
-        // dataStream.merge(result.toUIMessageStream({ sendReasoning: true }));
         const orchestrationInput: OrchestrationInput = {
           chatId: id,
           messageId: message.id,

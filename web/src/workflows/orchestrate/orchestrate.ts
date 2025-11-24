@@ -20,6 +20,8 @@ import { OrchestrationInput } from "@/workflows/orchestrate/types";
 import { FatalError, fetch, getWritable } from "workflow";
 import { classifyRequestStep } from "./steps/classify-request-step";
 
+const logger = console;
+
 async function emitEventStep(
   stream: WritableStream<WorkflowStreamEvent>,
   event: WorkflowStreamEvent,
@@ -51,6 +53,7 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
   const startTime = Date.now();
 
   try {
+    logger.info("Workflow Started");
     await emitEventStep(workflowStream, {
       type: "workflow-started",
       data: {
@@ -62,6 +65,7 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
 
     // Step 1: Load chat context (messages, agents, members)
     const context = await loadChatContextStep(input.chatId);
+    logger.info("Context Loaded", context);
 
     // Step 2: Verify orchestration is enabled
     if (!context.chat.orchestrationEnabled) {
@@ -78,6 +82,12 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
     if (!triggerMessage) {
       throw new FatalError("Could not find trigger message!");
     }
+
+    logger.info(
+      "Trigger Message Retrieved",
+      triggerMessage.content,
+      triggerMessage.id,
+    );
 
     // Step 4: Check if we have suitable agents
     if (context.agents.length === 0) {
@@ -99,6 +109,8 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
       webhookPayload: input.webhookPayload,
     });
 
+    logger.info("Classified", classification);
+
     await emitEventStep(workflowStream, {
       type: "workflow-classification",
       data: classification,
@@ -111,6 +123,8 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
       triggerMessage,
       webhookPayload: input.webhookPayload,
     });
+
+    logger.info("Execution Planned", executionPlan);
 
     await emitEventStep(workflowStream, {
       type: "workflow-plan",
@@ -135,6 +149,8 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
       workflowStream,
       webhookPayload: input.webhookPayload,
     });
+
+    logger.info("Agent Results according to strategy", agentResults);
 
     // Step 9: Aggregate and synthesize results
     const finalResult = await aggregateResultsStep({

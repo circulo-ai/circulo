@@ -77,7 +77,7 @@ This is an automated trigger, not a direct user request.`;
   }
 
   const { object } = await generateObject({
-    model: google("gemini-2.0-flash-exp"),
+    model: google("gemini-2.5-flash"),
     schema: executionPlanSchema,
     system: `You are an expert orchestration planner for a multi-agent AI system.
 

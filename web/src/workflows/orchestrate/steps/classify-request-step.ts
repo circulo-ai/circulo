@@ -63,7 +63,7 @@ User Message: ${message.content}`;
   }));
 
   const { object } = await generateObject({
-    model: google("gemini-2.0-flash-exp"),
+    model: google("gemini-2.5-flash"),
     schema: classificationSchema,
     system: `You are an intelligent request classifier for a multi-agent orchestration system.
 

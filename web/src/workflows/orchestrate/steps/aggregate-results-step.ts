@@ -56,7 +56,7 @@ Duration: ${r.durationMs}ms`,
     .join("\n\n---\n\n");
 
   const { object } = await generateObject({
-    model: google("gemini-2.0-flash-exp"),
+    model: google("gemini-2.5-flash"),
     schema: aggregatedResultSchema,
     system: `You are synthesizing the outputs from multiple AI agents into a coherent final response.
 
