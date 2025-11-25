@@ -14,7 +14,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { authClient } from "@/lib/auth-client";
-import { useOrganizationsHooks, useSession } from "@/providers/session-provider";
+import {
+  useOrganizationsHooks,
+  useSession,
+} from "@/providers/session-provider";
 import { CreateOrganizationDialog } from "@daveyplate/better-auth-ui";
 import {
   Bot,
