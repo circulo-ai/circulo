@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { ComponentProps } from "react";
-import { InputGroup, InputGroupInput } from "../ui/input-group";
+import { InputGroup, InputGroupInput } from "@/components/ui/input-group";
 import { CustomInput } from "./input";
 
 interface CustomInputGroupProps extends ComponentProps<typeof InputGroup> {}
@@ -22,7 +22,7 @@ export function CustomInputGroupInput({
   return (
     <InputGroupInput
       as={CustomInput}
-      className={cn(className, "")}
+      className={cn(className)}
       {...props}
     />
   );

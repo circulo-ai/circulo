@@ -72,7 +72,6 @@ export function Chat({
   const [usage, setUsage] = useState<AppUsage | undefined>(initialLastContext);
   const [showCreditCardAlert, setShowCreditCardAlert] = useState(false);
   const [currentModelId, setCurrentModelId] = useState(initialChatModel);
-  const [visibilityType, setVisibilityType] = useState(initialVisibilityType);
 
   // Workflow orchestration state
   const [workflowStatus, setWorkflowStatus] = useState<{
@@ -287,32 +286,6 @@ export function Chat({
 
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const isArtifactVisible = useArtifactSelector((state) => state.isVisible);
-
-  useAutoResume({
-    autoResume,
-    initialMessages,
-    resumeStream,
-    setMessages,
-  });
-
-  // Use original sendMessage; server enforces agent requirement
-
-  const sendMessageWithPrechecks = (
-    msg?: Parameters<typeof sendMessage>[0],
-    options?: Parameters<typeof sendMessage>[1],
-  ): ReturnType<typeof sendMessage> => {
-    const enabledAgentCount = Array.isArray(agentsResponse?.data?.agents)
-      ? agentsResponse.data.agents.length
-      : 0;
-    if (messages.length === 0 && enabledAgentCount === 0) {
-      toast({
-        type: "error",
-        description: "Add at least one agent to start this chat",
-      });
-      return Promise.resolve();
-    }
-    return sendMessage(msg, options);
-  };
 
   if (isChatLoading) return <PageSpinner />;
 
