@@ -9,7 +9,6 @@ import {
 } from "@/components/icons/icons";
 import type { Document } from "@/db/schema";
 import { useArtifact } from "@/hooks/api/chats/use-artifact";
-import { fetcher } from "@/lib/swr";
 import { cn } from "@/lib/utils";
 import equal from "fast-deep-equal";
 import {
@@ -43,7 +42,7 @@ export function DocumentPreview({
 
   const { data: documents, isLoading: isDocumentsFetching } = useSWR<
     Document[]
-  >(result ? `/api/document?id=${result.id}` : null, fetcher);
+  >(result ? `/api/document?id=${result.id}` : null);
 
   const previewDocument = useMemo(() => documents?.[0], [documents]);
   const hitboxRef = useRef<HTMLDivElement>(null);

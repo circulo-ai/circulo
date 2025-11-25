@@ -7,7 +7,14 @@ export function ChatSidebarNoResult() {
       <div className="mb-6 text-sm/relaxed text-muted-foreground">
         Try a different search term
       </div>
-      <DotLottieReact src="/duck.lottie" loop autoplay />
+      <DotLottieReact
+        className="mx-auto max-w-64"
+        src="/duck.lottie"
+        loop
+        autoplay
+      />
     </div>
   );
 }
+
+// TODO fade when the sidebar is collapsed

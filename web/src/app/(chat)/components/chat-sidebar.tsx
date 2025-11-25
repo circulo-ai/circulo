@@ -70,3 +70,5 @@ export async function ChatSidebar({ children }: { children: ReactNode }) {
 // TODO fix the bg-chat when the svg has not loaded yet
 // TODO the suspense state flickers
 // TODO the first page spinner shows up late
+// TODO use scroll area component in sidebar for chats
+// TODO use animated list in sidebar for chats

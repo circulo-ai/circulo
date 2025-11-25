@@ -25,7 +25,7 @@ export function ChatSidebarSearch({
     <CustomInputGroup className="min-w-47">
       <InputGroupInput
         disabled={open ? undefined : true}
-        placeholder="Search..."
+        placeholder=" Search..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
@@ -35,3 +35,5 @@ export function ChatSidebarSearch({
     </CustomInputGroup>
   );
 }
+
+// TODO save search state when sidebar collapses and use it when it extends

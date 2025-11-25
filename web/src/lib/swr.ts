@@ -1,16 +1,43 @@
 import { toast } from "@/components/toast";
 import { mutate as globalMutate, mutate, SWRConfiguration } from "swr";
-import { getRequest } from "./api/client";
+import {
+  deleteRequest,
+  getRequest,
+  patchRequest,
+  postRequest,
+  putRequest,
+} from "./api/client";
 import { ChatSDKError, ErrorCode } from "./errors";
 import { ApiError } from "./server/types";
 import { toQueryString } from "./utils";
 
-export const fetcher = async <T>(
-  url: [string, Record<string, unknown>] | string,
-): Promise<T> => {
-  if (typeof url === "string") return getRequest<T>(url);
-  const [path, queryParams] = url;
-  return getRequest<T>(path + toQueryString(queryParams));
+type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+
+export const getFetcher = (method: Method = "GET", options?: RequestInit) => {
+  const requests = {
+    GET: { fn: getRequest, hasBody: false as const },
+    POST: { fn: postRequest, hasBody: true as const },
+    PUT: { fn: putRequest, hasBody: true as const },
+    PATCH: { fn: patchRequest, hasBody: true as const },
+    DELETE: { fn: deleteRequest, hasBody: false as const },
+  };
+
+  const { fn, hasBody } = requests[method];
+
+  return async <T>(
+    url: [string, Record<string, unknown>] | string,
+    body?: { arg?: unknown },
+  ): Promise<T> => {
+    const normalUrl = normalizeUrl(url);
+    if (hasBody) return fn<T>(normalUrl, body?.arg, options);
+    return fn<T>(normalUrl, options);
+  };
+
+  function normalizeUrl(url: [string, Record<string, unknown>] | string) {
+    if (typeof url === "string") return url;
+    const [path, queryParams] = url;
+    return path + toQueryString(queryParams);
+  }
 };
 
 export const swrConfig: SWRConfiguration = {
@@ -32,7 +59,7 @@ export const swrConfig: SWRConfiguration = {
   //   // We still use the map for write & read for performance.
   //   return map as Cache<any>;
   // },
-  fetcher,
+  fetcher: getFetcher(),
   shouldRetryOnError: (error) => {
     // Don't retry on client errors (4xx)
     if (error instanceof ApiError) {

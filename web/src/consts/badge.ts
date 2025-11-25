@@ -14,7 +14,7 @@ export const badgeVariants = cva(
         outline:
           "text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         "sidebar-menu-badge":
-          "bg-teal-600 text-foreground transition-all group-data-[active=true]/sidebar-menu-button:bg-foreground group-data-[active=true]/sidebar-menu-button:text-background",
+          "bg-teal-600 py-0 text-foreground transition-all group-data-[active=true]/sidebar-menu-button:bg-foreground group-data-[active=true]/sidebar-menu-button:text-background",
       },
     },
     defaultVariants: {

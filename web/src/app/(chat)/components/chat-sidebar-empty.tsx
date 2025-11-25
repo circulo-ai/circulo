@@ -33,15 +33,15 @@ export function ChatSidebarEmpty({
           <EmptyMedia>
             <div className="flex -space-x-2 *:data-[slot=avatar]:size-12 *:data-[slot=avatar]:ring-2 *:data-[slot=avatar]:ring-background *:data-[slot=avatar]:grayscale">
               <Avatar>
-                <AvatarImage src="steve-jobs.jpg" alt="Steve Jobs" />
+                <AvatarImage src="/steve-jobs.jpg" alt="Steve Jobs" />
                 <AvatarFallback>SJ</AvatarFallback>
               </Avatar>
               <Avatar>
-                <AvatarImage src="elon-musk.jpg" alt="Elon Musk" />
+                <AvatarImage src="/elon-musk.jpg" alt="Elon Musk" />
                 <AvatarFallback>EM</AvatarFallback>
               </Avatar>
               <Avatar>
-                <AvatarImage src="bill-gates.jpg" alt="Bill Gates" />
+                <AvatarImage src="/bill-gates.jpg" alt="Bill Gates" />
                 <AvatarFallback>BG</AvatarFallback>
               </Avatar>
             </div>
@@ -50,7 +50,7 @@ export function ChatSidebarEmpty({
             "One chat to rule them all"
           </EmptyTitle>
           <EmptyDescription>
-            Create a chat to start orchestrating your AI agents.
+            Create a chat to start orchestrating your AI agents
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>

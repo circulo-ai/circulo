@@ -160,9 +160,12 @@ export function CustomSidebarMenuAvatar({
 }
 
 interface CustomSidebarContextMenuProps
-  extends ComponentProps<typeof ContextMenu> {}
+  extends ComponentProps<typeof ContextMenu> {
+  onPin: () => {};
+}
 
 export function CustomSidebarContextMenu({
+  onPin,
   children,
   ...props
 }: CustomSidebarContextMenuProps) {
@@ -170,7 +173,7 @@ export function CustomSidebarContextMenu({
     <ContextMenu {...props}>
       <ContextMenuTrigger>{children}</ContextMenuTrigger>
       <CustomContextMenuContent>
-        <CustomContextMenuItem>
+        <CustomContextMenuItem onClick={onPin}>
           <Pin /> Pin
         </CustomContextMenuItem>
         <ContextMenuSeparator />

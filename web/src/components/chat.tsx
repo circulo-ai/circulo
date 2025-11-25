@@ -1,7 +1,6 @@
 "use client";
 
 import { Artifact } from "@/components/artifacts/artifact";
-import { ChatHeader } from "@/components/chat-header";
 import { Messages } from "@/components/messages/messages";
 import { getChatHistoryPaginationKey } from "@/components/sidebar/sidebar-history";
 import {
@@ -22,7 +21,6 @@ import { useChatVisibility } from "@/hooks/api/chats/use-chat-visibility";
 import { ChatSDKError } from "@/lib/errors";
 import {
   clearCachePattern,
-  fetcher,
   fetchWithErrorHandlers,
   globalMutate,
 } from "@/lib/swr";
@@ -169,7 +167,6 @@ export function Chat({
 
   const { data: votes } = useSWR<Vote[]>(
     messages.length >= 2 ? `/api/vote?chatId=${id}` : null,
-    fetcher,
   );
 
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -206,12 +203,6 @@ export function Chat({
   return (
     <>
       <div className="overscroll-behavior-contain flex h-dvh min-w-0 touch-pan-y flex-col">
-        <ChatHeader
-          chatId={id}
-          isReadonly={isReadonly}
-          selectedVisibilityType={initialVisibilityType}
-        />
-
         <Messages
           chatId={id}
           isArtifactVisible={isArtifactVisible}
