@@ -1,8 +1,8 @@
 "use server";
 
-import { getSuggestionsByDocumentId } from "@/db/queries";
+import { suggestionRepo } from "@/db/repositories";
 
 export async function getSuggestions({ documentId }: { documentId: string }) {
-  const suggestions = await getSuggestionsByDocumentId({ documentId });
+  const suggestions = await suggestionRepo.findForDocument(documentId);
   return suggestions ?? [];
 }

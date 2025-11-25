@@ -1,6 +1,7 @@
 import { db } from "@/db";
-import { account } from "@/db/schema";
+import { account, chat } from "@/db/schema";
 import { checkHybridAuth } from "@/lib/auth/hybrid";
+import { isMemberOf } from "@/lib/permissions";
 import { eq } from "drizzle-orm";
 import type { NextRequest } from "next/server";
 
@@ -10,6 +11,7 @@ export interface CredentialAccessResult {
   authType?: "session" | "api_key" | "internal_jwt";
   requesterUserId?: string;
   credentialOwnerUserId?: string;
+  organizationId?: string;
 }
 
 /**
@@ -17,21 +19,25 @@ export interface CredentialAccessResult {
  * - Uses checkHybridAuth to authenticate the caller
  * - Fetches credential owner
  * - Authorization rules:
- *   - session/api_key: allow if requester owns the credential; otherwise require workflowId and
- *     verify BOTH requester and owner have access to the workflow's workspace
- *   - internal_jwt: require workflowId (by default) and verify credential owner has access to the
- *     workflow's workspace (requester identity is the system/workflow)
+ *   - session/api_key: allow if requester owns the credential; otherwise require chatId and
+ *     verify BOTH requester and owner have access to the chat's organization
+ *   - internal_jwt: require chatId (by default) and verify credential owner has access to the
+ *     chat's organization (requester identity is the system/chat)
  */
 export async function authorizeCredentialUse(
   request: NextRequest,
   params: {
     credentialId: string;
+    chatId?: string;
+    requireChatIdForInternal?: boolean;
   },
 ): Promise<CredentialAccessResult> {
-  const { credentialId } = params;
+  const { credentialId, chatId, requireChatIdForInternal = true } = params;
 
-  const auth = await checkHybridAuth(request);
-  if (!auth.success) {
+  const auth = await checkHybridAuth(request, {
+    requireChatId: requireChatIdForInternal,
+  });
+  if (!auth.success || !auth.userId) {
     return { ok: false, error: auth.error || "Authentication required" };
   }
 
@@ -61,14 +67,60 @@ export async function authorizeCredentialUse(
     };
   }
 
+  // For collaboration paths, chatId is required to scope to an organization
+  if (!chatId) {
+    return { ok: false, error: "chatId is required" };
+  }
+
+  const [chatRow] = await db
+    .select({ organizationId: chat.organizationId })
+    .from(chat)
+    .where(eq(chat.id, chatId))
+    .limit(1);
+
+  if (!chatRow || !chatRow.organizationId) {
+    return { ok: false, error: "Chat not found" };
+  }
+
   if (auth.authType === "internal_jwt") {
+    // Internal calls: verify credential owner belongs to the chat's organization
+    const ownerIsMember = await isMemberOf(
+      credentialOwnerUserId,
+      chatRow.organizationId,
+    );
+
+    if (!ownerIsMember) {
+      return { ok: false, error: "Unauthorized" };
+    }
+
     return {
       ok: true,
       authType: auth.authType,
       requesterUserId: auth.userId,
       credentialOwnerUserId,
+      organizationId: chatRow.organizationId,
     };
   }
 
-  return { ok: false, error: "Unauthorized" };
+  // Session/API key: verify BOTH requester and owner belong to the chat's organization
+  const requesterIsMember = await isMemberOf(
+    auth.userId,
+    chatRow.organizationId,
+  );
+  const ownerIsMember = await isMemberOf(
+    credentialOwnerUserId,
+    chatRow.organizationId,
+  );
+
+  if (!requesterIsMember || !ownerIsMember) {
+    return { ok: false, error: "Unauthorized" };
+  }
+
+  return {
+    ok: true,
+    authType: auth.authType,
+    requesterUserId: auth.userId,
+    credentialOwnerUserId,
+    organizationId: chatRow.organizationId,
+  };
 }

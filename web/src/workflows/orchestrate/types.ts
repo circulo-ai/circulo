@@ -1,0 +1,10 @@
+export interface OrchestrationInput {
+  messageId: string;
+  chatId: string;
+  triggerType: "user_message" | "webhook_event";
+  webhookPayload?: {
+    source: "github" | "telegram" | "slack" | "custom";
+    event: string;
+    data: Record<string, unknown>;
+  };
+}

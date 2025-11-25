@@ -13,21 +13,32 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/ui/user-avatar";
-import { useSession } from "@/providers/session-provider";
+import { useUser } from "@/hooks/api/chats/use-user";
+import { authClient } from "@/lib/auth-client";
+import { useOrganizationsHooks } from "@/providers/session-provider";
+import { CreateOrganizationDialog } from "@daveyplate/better-auth-ui";
 import {
   Bot,
   CreditCard,
   LibraryBig,
   LogOut,
+  Plus,
   Settings,
   TextAlignJustify,
 } from "lucide-react";
+import { useState } from "react";
 
 export function ChatSidebarBurgerMenu() {
-  const { data, isPending } = useSession();
+  const { user, isLoading } = useUser();
+  const { useActiveOrganization, useListOrganizations } =
+    useOrganizationsHooks();
+  const { data: activeOrganization } = useActiveOrganization();
+  const { data: organizations } = useListOrganizations();
+  const [open, setOpen] = useState(false);
 
   return (
     <DropdownMenu>
+      <CreateOrganizationDialog open={open} onOpenChange={setOpen} />
       <DropdownMenuTrigger asChild>
         <WithRipple
           component={Button}
@@ -43,8 +54,31 @@ export function ChatSidebarBurgerMenu() {
       <CustomDropdownMenuContent sideOffset={8} align="start">
         <DropdownMenuGroup>
           <CustomDropdownMenuItem>
-            <UserAvatar user={data?.user} isPending={isPending} size="xs" />
-            {data?.user?.name ?? "Loading..."}
+            <UserAvatar user={user} isPending={isLoading} size="xs" />
+            {activeOrganization?.name}
+          </CustomDropdownMenuItem>
+          {organizations &&
+            organizations
+              .filter((e) => e.id != activeOrganization?.id)
+              .map((e) => (
+                <CustomDropdownMenuItem
+                  key={`org-${e.id}`}
+                  onClick={async () => {
+                    await authClient.organization.setActive({
+                      organizationId: e.id,
+                    });
+                  }}
+                >
+                  {e?.name}
+                </CustomDropdownMenuItem>
+              ))}
+          <CustomDropdownMenuItem
+            onClick={() => {
+              setOpen(true);
+            }}
+          >
+            <Plus />
+            New Workspace
           </CustomDropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />

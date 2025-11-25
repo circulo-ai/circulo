@@ -164,6 +164,30 @@ const PurePreviewMessage = ({
               }
             }
 
+            if (type == "data-workflowStarted") {
+              return <span>Workflow started</span>;
+            }
+
+            if (type == "data-workflowAggregated") {
+              return <span>Workflow aggregated</span>;
+            }
+
+            if (type == "data-workflowCompleted") {
+              return <span>Workflow completed</span>;
+            }
+
+            if (type == "data-workflowClassification") {
+              const { data: classification } = part;
+              return (
+                <span>Workflow classified {classification.complexity}</span>
+              );
+            }
+
+            if (type == "data-workflowPlan") {
+              const { data: plan } = part;
+              return <span>Workflow plan {plan.strategy}</span>;
+            }
+
             if (type === "tool-createDocument") {
               const { toolCallId } = part;
 
