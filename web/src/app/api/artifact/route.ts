@@ -1,14 +1,12 @@
 import { artifactRepo } from "@/db/repositories";
-import { getSession } from "@/lib/auth";
-import { ChatSDKError } from "@/lib/errors";
 import { isMemberOf } from "@/lib/permissions";
 import {
   authMiddleware,
+  BadRequestError,
   createSafeRoute,
   ForbiddenError,
   NotFoundError,
 } from "@/lib/server";
-import { NextRequest } from "next/server";
 import z from "zod";
 
 const querySchema = z.object({
@@ -33,7 +31,7 @@ export const GET = createSafeRoute()
     const document = await artifactRepo.findByIdWithSuggestions(id);
 
     if (!document) {
-      return new ChatSDKError("not_found:document").toResponse();
+      throw new NotFoundError();
     }
 
     // Check if user owns the document
@@ -43,7 +41,7 @@ export const GET = createSafeRoute()
 
     // If user doesn't own it, check if they're in the same organization via chat
     if (!document.chatId) {
-      return new ForbiddenError("You don't have access to this artifact!");
+      throw new ForbiddenError("You don't have access to this artifact!");
     }
 
     // Get chat to find organization
@@ -51,14 +49,14 @@ export const GET = createSafeRoute()
     const chat = await chatRepo.findById(document.chatId);
 
     if (!chat || !chat.organizationId) {
-      return new ForbiddenError("No access!");
+      throw new ForbiddenError("No access!");
     }
 
     // Check if user is a member of the chat's organization
     const isOrgMember = await isMemberOf(ctx.data.user.id, chat.organizationId);
 
     if (!isOrgMember) {
-      return new ForbiddenError("You don't have access to this artifact!");
+      throw new ForbiddenError("You don't have access to this artifact!");
     }
 
     return Response.json([document], { status: 200 });
@@ -66,7 +64,7 @@ export const GET = createSafeRoute()
 
 /**
  * POST /api/artifact?id=xxx
- * Create or update a document
+ * Create or update a artifact
  */
 export const POST = createSafeRoute()
   .use(authMiddleware())
@@ -81,31 +79,31 @@ export const POST = createSafeRoute()
   )
   .handler(
     async (
-      request,
+      _,
       { query: { id }, body: { content, title, kind, chatId }, data: { user } },
     ) => {
-      // Check if document exists
+      // Check if artifact exists
       const existingDoc = await artifactRepo.findById(id);
 
       if (existingDoc) {
-        // Update existing document
+        // Update existing artifact
         if (existingDoc.userId !== user.id) {
           // Check organization membership if not owner
           if (!existingDoc.chatId) {
-            return new ChatSDKError("forbidden:document").toResponse();
+            throw new ForbiddenError();
           }
 
           const { chatRepo } = await import("@/db/repositories/chat-repo");
           const chat = await chatRepo.findById(existingDoc.chatId);
 
           if (!chat || !chat.organizationId) {
-            return new ChatSDKError("forbidden:document").toResponse();
+            throw new ForbiddenError();
           }
 
           const isOrgMember = await isMemberOf(user.id, chat.organizationId);
 
           if (!isOrgMember) {
-            return new ChatSDKError("forbidden:document").toResponse();
+            throw new ForbiddenError();
           }
         }
 
@@ -136,37 +134,28 @@ export const POST = createSafeRoute()
 
 /**
  * DELETE /api/artifact?id=xxx
- * Delete a document
+ * Delete an artifact
  */
-export async function DELETE(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const id = searchParams.get("id");
+export const DELETE = createSafeRoute()
+  .use(authMiddleware())
+  .query(querySchema)
+  .handler(async (request, { query: { id }, data: { user } }) => {
+    if (!id) {
+      throw new BadRequestError();
+    }
 
-  if (!id) {
-    return new ChatSDKError(
-      "bad_request:api",
-      "Parameter id is required.",
-    ).toResponse();
-  }
+    const document = await artifactRepo.findById(id);
 
-  const session = await getSession();
+    if (!document) {
+      throw new NotFoundError();
+    }
 
-  if (!session?.user) {
-    return new ChatSDKError("unauthorized:document").toResponse();
-  }
+    // Only document owner can delete
+    if (document.userId !== user.id) {
+      throw new ForbiddenError();
+    }
 
-  const document = await artifactRepo.findById(id);
+    const deletedDoc = await artifactRepo.delete(id);
 
-  if (!document) {
-    return new ChatSDKError("not_found:document").toResponse();
-  }
-
-  // Only document owner can delete
-  if (document.userId !== session.user.id) {
-    return new ChatSDKError("forbidden:document").toResponse();
-  }
-
-  const deletedDoc = await artifactRepo.delete(id);
-
-  return Response.json(deletedDoc, { status: 200 });
-}
+    return Response.json(deletedDoc, { status: 200 });
+  });
