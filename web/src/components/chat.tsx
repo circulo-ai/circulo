@@ -29,7 +29,7 @@ import { generateUUID } from "@/lib/utils";
 import { useChat } from "@ai-sdk/react";
 import { WorkflowChatTransport } from "@workflow/ai"; // THE KEY IMPORT!
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { unstable_serialize } from "swr/infinite";
 import { useDataStream } from "./data-stream-provider";
@@ -61,16 +61,36 @@ export function Chat({
   const [currentModelId, setCurrentModelId] = useState(initialChatModel);
   const [visibilityType, setVisibilityType] = useState(initialVisibilityType);
 
+  const activeWorkflowRunId = useMemo(() => {
+    if (typeof window === "undefined") return;
+    return localStorage.getItem("active-workflow-run-id") ?? undefined;
+  }, []);
+
   const { messages, setMessages, sendMessage, status, stop, regenerate } =
     useChat<ChatMessage>({
+      resume: !!activeWorkflowRunId,
       id,
       messages: initialMessages,
       generateId: generateUUID,
 
-      // USE WORKFLOW TRANSPORT - This handles ALL streaming/resumption automatically!
+      // This handles ALL streaming/resumption automatically!
       transport: new WorkflowChatTransport({
         api: "/api/chat",
         fetch: fetchWithErrorHandlers,
+
+        maxConsecutiveErrors: 5,
+
+        onChatSendMessage: (response) => {
+          // We'll store the workflow run ID in `localStorage` to allow the client
+          // to resume the chat session after a page refresh or network interruption
+          const workflowRunId = response.headers.get("x-workflow-run-id");
+          if (!workflowRunId) {
+            throw new Error(
+              'Workflow run ID not found in "x-workflow-run-id" response header',
+            );
+          }
+          localStorage.setItem("active-workflow-run-id", workflowRunId);
+        },
 
         // Prepare the request body
         prepareSendMessagesRequest: (config) => {
@@ -86,9 +106,24 @@ export function Chat({
           };
         },
 
-        // Optional: Track when chat completes
+        prepareReconnectToStreamRequest: ({ id, api, ...rest }) => {
+          console.log("prepareReconnectToStreamRequest", id);
+          const workflowRunId = localStorage.getItem("active-workflow-run-id");
+          if (!workflowRunId) {
+            throw new Error("No active workflow run ID found");
+          }
+          // Use the workflow run ID instead of the chat ID for reconnection
+          return {
+            ...rest,
+            api: `/api/chat/${encodeURIComponent(workflowRunId)}/stream`,
+          };
+        },
+
         onChatEnd: ({ chatId, chunkIndex }) => {
-          console.log(`Chat ${chatId} completed with ${chunkIndex} chunks`);
+          console.log("onChatEnd", chatId, chunkIndex);
+
+          // Once the chat stream ends, we can remove the workflow run ID from `localStorage`
+          localStorage.removeItem("active-workflow-run-id");
         },
       }),
 

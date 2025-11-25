@@ -1,20 +1,24 @@
+import { createUIMessageStreamResponse } from "ai";
 import { getRun } from "workflow/api";
+
+// Uncomment to simulate a long running Vercel Function timing
+// out due to a long running agent. The client-side will
+// automatically reconnect to the stream.
+//export const maxDuration = 5;
 
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ runId: string }> },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const { runId } = await params;
+  const { id } = await params;
   const { searchParams } = new URL(request.url);
-  // Client provides the last chunk index they received
   const startIndexParam = searchParams.get("startIndex");
-  const startIndex = startIndexParam
-    ? parseInt(startIndexParam, 10)
-    : undefined;
-  const run = getRun(runId);
+  const startIndex =
+    startIndexParam !== null ? parseInt(startIndexParam, 10) : undefined;
+  const run = getRun(id);
   const stream = run.getReadable({ startIndex });
 
-  return new Response(stream, {
-    headers: { "Content-Type": "text/plain" },
+  return createUIMessageStreamResponse({
+    stream,
   });
 }

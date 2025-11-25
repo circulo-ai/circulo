@@ -1,11 +1,11 @@
 import { Message } from "@/db";
-import { ChatTools, CustomUIDataTypes, WorkflowStreamEvent } from "@/lib/types";
+import { CustomUIMessageChunk } from "@/lib/types";
 import { convertToUIMessages } from "@/lib/utils";
 import { ChatContext } from "@/workflows/orchestrate/steps/load-chat-step";
 import { OrchestrationInput } from "@/workflows/orchestrate/types";
 import { google } from "@ai-sdk/google";
-import { convertToModelMessages, streamText, UIMessagePart } from "ai";
-import { FatalError } from "workflow";
+import { DurableAgent } from "@workflow/ai/agent";
+import { convertToModelMessages } from "ai";
 import { ExecutionPlan } from "./plan-agent-execution-step";
 
 export interface AgentExecutionResult {
@@ -13,28 +13,26 @@ export interface AgentExecutionResult {
   agentName: string;
   task: string;
   success: boolean;
-  parts: UIMessagePart<CustomUIDataTypes, ChatTools>[];
-  output: string;
   error?: string;
   startTime: Date;
   endTime: Date;
   durationMs: number;
-  tokenCount?: number;
   cost?: number;
 }
 
-export async function executeAgentTaskStep(params: {
-  agentPlan: ExecutionPlan["selectedAgents"][0];
-  context: ChatContext;
-  triggerMessage: Message;
-  previousResults: AgentExecutionResult[];
-  emitProgress: (event: WorkflowStreamEvent) => Promise<void>;
-  webhookPayload?: OrchestrationInput["webhookPayload"];
-}): Promise<AgentExecutionResult> {
+export async function executeAgentTaskStep(
+  writable: WritableStream<CustomUIMessageChunk>,
+  params: {
+    agentPlan: ExecutionPlan["selectedAgents"][0];
+    context: ChatContext;
+    triggerMessage: Message;
+    previousResults: AgentExecutionResult[];
+    webhookPayload?: OrchestrationInput["webhookPayload"];
+  },
+): Promise<AgentExecutionResult> {
   "use step";
 
-  const { agentPlan, context, previousResults, webhookPayload, emitProgress } =
-    params;
+  const { agentPlan, context, previousResults, webhookPayload } = params;
 
   const startTime = new Date();
   const chatAgent = context.agents.find((a) => a.agentId === agentPlan.agentId);
@@ -45,8 +43,6 @@ export async function executeAgentTaskStep(params: {
       agentName: "Unknown Agent",
       task: agentPlan.task,
       success: false,
-      parts: [],
-      output: "",
       error: "Agent not found in chat",
       startTime,
       endTime: new Date(),
@@ -68,7 +64,10 @@ export async function executeAgentTaskStep(params: {
             const status = r.success ? "✓ SUCCESS" : "✗ FAILED";
             return `[Agent ${idx + 1}] ${r.agentName} (${status})
 Task: ${r.task}
-Output: ${r.output}
+Output: ${
+              "hi"
+              // TODO: r.output
+            }
 ${r.error ? `Error: ${r.error}` : ""}
 ---`;
           })
@@ -86,26 +85,26 @@ Data: ${JSON.stringify(webhookPayload.data, null, 2)}
     }
 
     // Build dependency context
-    let dependencyContext = "";
-    if (agentPlan.dependsOn && agentPlan.dependsOn.length > 0) {
-      const dependencyResults = previousResults.filter((r) =>
-        agentPlan.dependsOn!.includes(r.agentId),
-      );
+    //     let dependencyContext = "";
+    //     if (agentPlan.dependsOn && agentPlan.dependsOn.length > 0) {
+    //       const dependencyResults = previousResults.filter((r) =>
+    //         agentPlan.dependsOn!.includes(r.agentId),
+    //       );
 
-      if (dependencyResults.length > 0) {
-        dependencyContext =
-          `\n\n=== REQUIRED INPUTS FROM DEPENDENCIES ===
-Your task depends on the following agent outputs. Pay special attention to these:\n\n` +
-          dependencyResults
-            .map(
-              (r) => `${r.agentName}:
-${r.output}`,
-            )
-            .join("\n\n---\n\n");
+    //       if (dependencyResults.length > 0) {
+    //         dependencyContext =
+    //           `\n\n=== REQUIRED INPUTS FROM DEPENDENCIES ===
+    // Your task depends on the following agent outputs. Pay special attention to these:\n\n` +
+    //           dependencyResults
+    //             .map(
+    //               (r) => `${r.agentName}:
+    // ${r.output}`,
+    //             )
+    //             .join("\n\n---\n\n");
 
-        dependencyContext += `\n\nIMPORTANT: If any dependency output appears incomplete or truncated, note this in your response and work with what's available, or request a re-run.`;
-      }
-    }
+    //         dependencyContext += `\n\nIMPORTANT: If any dependency output appears incomplete or truncated, note this in your response and work with what's available, or request a re-run.`;
+    //       }
+    //     }
 
     // Get conversation history (last 20 messages)
     const conversationHistory = context.messages.slice(-20);
@@ -133,102 +132,30 @@ ${agentPlan.dependsOn && agentPlan.dependsOn.length > 0 ? `\nYour work depends o
 === INSTRUCTIONS ===
 1. Review the original user request carefully
 2. ${previousResults.length > 0 ? "Consider the outputs from previous agents - build upon their work, don't duplicate it" : "Start fresh with the user's request"}
-3. ${dependencyContext ? "Pay special attention to the dependency outputs - they contain inputs you need" : ""}
 4. Focus specifically on your assigned task: "${agentPlan.task}"
 5. Provide clear, actionable output that the user can understand
 6. If you're building on previous work, reference it explicitly
 7. If previous agents made mistakes, acknowledge and correct them
-${webhookContext}${previousContext}${dependencyContext}
+${webhookContext}${previousContext}
 
 Provide a focused response for YOUR specific task. Be concise but complete.`;
 
-    // Variables to capture stream results
-    let finalText = "";
-    let finalParts: UIMessagePart<CustomUIDataTypes, ChatTools>[] = [];
-    let finalUsage: any = undefined;
-    let finalFinishReason: string | undefined;
+    // 3. ${dependencyContext ? "Pay special attention to the dependency outputs - they contain inputs you need" : ""}
 
     // Create a promise that resolves when onFinish is called
-    const finishPromise = new Promise<ReturnType<typeof streamText>>(
-      (resolve) => {
-        const result = streamText({
-          model: google(agent.model || "gemini-2.5-flash"),
-          temperature,
-          maxOutputTokens: maxTokens,
-          messages: [
-            ...convertToModelMessages(convertToUIMessages(conversationHistory)),
-          ],
-          system: systemPrompt,
-          onChunk: async ({ chunk }) => {
-            // Emit progress for text deltas using the provided helper
-            if (chunk.type === "text-delta") {
-              try {
-                await emitProgress({
-                  type: "workflow-agent-progress",
-                  data: {
-                    agentId: agent.id,
-                    progress: chunk.text,
-                  },
-                });
-              } catch (e) {
-                // Log but don't fail the agent execution
-                console.warn("Failed to emit progress:", e);
-              }
-            }
-          },
-          onFinish: ({ text, usage, finishReason, providerMetadata }) => {
-            finalText = text;
-            finalUsage = usage;
-            finalFinishReason = finishReason;
+    const durableAgent = new DurableAgent({
+      model: async () => google(agent.model || "gemini-2.5-flash"),
+      system: systemPrompt,
+    });
 
-            // Build parts array from the response
-            finalParts = [
-              {
-                type: "text",
-                text: text,
-              },
-            ];
+    // TODO: maxOutputTokens: maxTokens,
 
-            // Add any additional parts from provider metadata
-            // (for artifacts, images, etc. if your model returns them)
-            // if (providerMetadata?.parts) {
-            //   finalParts.push(...(providerMetadata.parts as any[]));
-            // }
-
-            resolve(result);
-          },
-        });
-
-        // Start consuming the stream to trigger callbacks
-        result.text.catch((error) => {
-          console.error("Stream error:", error);
-          resolve(result); // Resolve even on error so we don't hang
-        });
-      },
-    );
-
-    // Wait for the stream to complete
-    await finishPromise;
-
-    const output = finalText;
-
-    console.log("=== AGENT EXECUTION DEBUG ===");
-    console.log("Agent:", agent.name);
-    console.log("output length:", output?.length || 0);
-    console.log("parts count:", finalParts.length);
-    console.log("usage:", finalUsage);
-    console.log("finishReason:", finalFinishReason);
-    console.log("output preview:", output?.substring(0, 100));
-    console.log("==============================");
-
-    // Validate we got content
-    if (!output || output.trim().length === 0) {
-      throw new FatalError(
-        `Agent produced no output. ` +
-          `finishReason: ${finalFinishReason}, ` +
-          `tokens: ${finalUsage?.totalTokens || 0}`,
-      );
-    }
+    const result = await durableAgent.stream({
+      messages: [
+        ...convertToModelMessages(convertToUIMessages(conversationHistory)),
+      ],
+      writable,
+    });
 
     const endTime = new Date();
 
@@ -237,12 +164,9 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
       agentName: agent.name,
       task: agentPlan.task,
       success: true,
-      parts: finalParts,
-      output: output.trim(),
       startTime,
       endTime,
       durationMs: endTime.getTime() - startTime.getTime(),
-      tokenCount: finalUsage?.totalTokens,
     };
   } catch (error) {
     const endTime = new Date();
@@ -252,8 +176,6 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
       agentName: agent.name,
       task: agentPlan.task,
       success: false,
-      parts: [],
-      output: "",
       error: error instanceof Error ? error.message : String(error),
       startTime,
       endTime,

@@ -1,6 +1,7 @@
 import { generateTitleFromUserMessage } from "@/app/(chat)/actions";
 import { chatRepo } from "@/db/repositories/chat-repo";
 import { messageRepo } from "@/db/repositories/message-repo";
+import { getActiveOrganizationId } from "@/lib/auth";
 import { ChatSDKError } from "@/lib/errors";
 import { hasPermission, isMemberOf } from "@/lib/permissions";
 import {
@@ -13,8 +14,9 @@ import { RateLimitError } from "@/lib/server/middlewares/rateLimit";
 import { getTextFromMessage } from "@/lib/utils";
 import { orchestrateWorkflow } from "@/workflows/orchestrate/orchestrate";
 import { OrchestrationInput } from "@/workflows/orchestrate/types";
+import { createUIMessageStreamResponse } from "ai";
 import { start } from "workflow/api";
-import { deleteQuerySchema, postRequestBodySchema } from "./schema";
+import { deleteQuerySchema } from "./schema";
 
 export const maxDuration = 60;
 
@@ -48,18 +50,15 @@ function handleChatError(error: Error): Response {
 
 export const POST = createSafeRoute({ handleServerError: handleChatError })
   .methods("POST")
-  .body(postRequestBodySchema)
   .use(authMiddleware())
   .handler(async (request, ctx) => {
-    const { id, message, selectedVisibilityType, agentIds } = ctx.body;
+    console.log(ctx.body);
+    const { id, messages, message, selectedVisibilityType } = ctx.body as any;
     const {
       user: { id: userId },
-      activeOrganizationId,
     } = ctx.data;
 
-    if (!activeOrganizationId) {
-      throw new ChatSDKError("forbidden:chat", "No active organization");
-    }
+    const activeOrganizationId = await getActiveOrganizationId();
 
     // Verify user is member of the organization
     const isOrgMember = await isMemberOf(userId, activeOrganizationId);
@@ -95,30 +94,6 @@ export const POST = createSafeRoute({ handleServerError: handleChatError })
           );
         }
       }
-
-      // Pre-execution checks (rate limits, etc.)
-      const executionCheck = await preExecutionCheck({
-        chatId: id,
-        organizationId: activeOrganizationId,
-        userId,
-        requestType: "syncApi",
-      });
-
-      if (!executionCheck.allowed) {
-        if (
-          executionCheck.rateLimitInfo &&
-          !executionCheck.rateLimitInfo.allowed
-        ) {
-          throw new ChatSDKError(
-            "rate_limit:chat",
-            `Rate limit exceeded. Try again in ${executionCheck.rateLimitInfo.retryAfter} seconds.`,
-          );
-        }
-        throw new ChatSDKError(
-          "rate_limit:chat",
-          executionCheck.reason || "Usage limit exceeded",
-        );
-      }
     } else {
       // New chat - check permission to create
       const canCreate = await hasPermission(
@@ -133,40 +108,6 @@ export const POST = createSafeRoute({ handleServerError: handleChatError })
         );
       }
 
-      // Check resource limits
-      const chatLimitCheck = await checkResourceLimit(
-        activeOrganizationId,
-        "chats",
-      );
-      if (!chatLimitCheck.allowed) {
-        throw new ChatSDKError(
-          "rate_limit:chat",
-          chatLimitCheck.reason || "Chat limit reached",
-        );
-      }
-
-      const executionCheck = await preExecutionCheck({
-        organizationId: activeOrganizationId,
-        userId,
-        requestType: "syncApi",
-      });
-
-      if (!executionCheck.allowed) {
-        if (
-          executionCheck.rateLimitInfo &&
-          !executionCheck.rateLimitInfo.allowed
-        ) {
-          throw new ChatSDKError(
-            "rate_limit:chat",
-            `Rate limit exceeded. Try again in ${executionCheck.rateLimitInfo.retryAfter} seconds.`,
-          );
-        }
-        throw new ChatSDKError(
-          "rate_limit:chat",
-          executionCheck.reason || "Usage limit exceeded",
-        );
-      }
-
       // Create the chat
       const title = await generateTitleFromUserMessage({ message });
       await chatRepo.create({
@@ -177,24 +118,6 @@ export const POST = createSafeRoute({ handleServerError: handleChatError })
         organizationId: activeOrganizationId,
       });
       createdNewChat = true;
-    }
-
-    // Check agent limits for new chats
-    if (createdNewChat && agentIds?.length) {
-      const agentLimitCheck = await checkResourceLimit(
-        activeOrganizationId,
-        "chatAgents",
-        {
-          chatId: id,
-          additionalCount: agentIds.length,
-        },
-      );
-      if (!agentLimitCheck.allowed) {
-        console.warn(
-          "Cannot add all requested agents:",
-          agentLimitCheck.reason,
-        );
-      }
     }
 
     // Save user message
@@ -217,7 +140,7 @@ export const POST = createSafeRoute({ handleServerError: handleChatError })
       deletedAt: null,
     });
 
-    // Start the workflow - IT HANDLES STREAMING AUTOMATICALLY!
+    // Start the workflow
     const orchestrationInput: OrchestrationInput = {
       chatId: id,
       messageId: message.id,
@@ -225,14 +148,11 @@ export const POST = createSafeRoute({ handleServerError: handleChatError })
     };
 
     const run = await start(orchestrateWorkflow, [orchestrationInput]);
+    const workflowStream = run.readable;
 
-    // CRITICAL: Return the workflow stream with the x-workflow-run-id header
-    // This enables WorkflowChatTransport to automatically reconnect
-    return new Response(run.getReadable({ namespace: id }), {
+    return createUIMessageStreamResponse({
+      stream: workflowStream,
       headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
         "x-workflow-run-id": run.runId,
       },
     });
@@ -283,16 +203,3 @@ export const DELETE = createSafeRoute({ handleServerError: handleChatError })
     const deletedChat = await chatRepo.softDelete(id);
     return Response.json(deletedChat, { status: 200 });
   });
-
-// Placeholder functions
-async function preExecutionCheck(params: any): Promise<any> {
-  return { allowed: true };
-}
-
-async function checkResourceLimit(
-  organizationId: string,
-  resourceType: string,
-  options?: any,
-): Promise<any> {
-  return { allowed: true };
-}

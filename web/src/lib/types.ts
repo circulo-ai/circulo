@@ -4,43 +4,9 @@ import { AggregatedResult } from "@/workflows/orchestrate/steps/aggregate-result
 import { RequestClassification } from "@/workflows/orchestrate/steps/classify-request-step";
 import { AgentExecutionResult } from "@/workflows/orchestrate/steps/execute-agent-task-step";
 import { ExecutionPlan } from "@/workflows/orchestrate/steps/plan-agent-execution-step";
-import type { UIMessage } from "ai";
+import type { UIMessage, UIMessageChunk } from "ai";
 import { z } from "zod";
 import type { AppUsage } from "./usage";
-
-export type WorkflowStreamEvent =
-  | {
-      type: "workflow-started";
-      data: { workflowId: string; chatId: string; messageId: string };
-    }
-  | { type: "workflow-classification"; data: RequestClassification }
-  | { type: "workflow-plan"; data: ExecutionPlan }
-  | {
-      type: "workflow-agent-started";
-      data: { agentId: string; agentName: string; task: string };
-    }
-  | {
-      type: "workflow-agent-progress";
-      data: { agentId: string; progress: string };
-    }
-  | { type: "workflow-agent-completed"; data: AgentExecutionResult }
-  | { type: "workflow-aggregated"; data: AggregatedResult }
-  | {
-      type: "workflow-final-result";
-      data: {
-        success: boolean;
-        classification: RequestClassification;
-        executionPlan: ExecutionPlan;
-        agentResults: AgentExecutionResult[];
-        finalResult: AggregatedResult;
-        executionTimeMs: number;
-      };
-    }
-  | {
-      type: "workflow-completed";
-      data: { success: boolean; executionTimeMs: number };
-    }
-  | { type: "workflow-error"; data: { error: string; agentId?: string } };
 
 export type DataPart = { type: "append-message"; message: string };
 
@@ -96,3 +62,5 @@ export type Attachment = {
   url: string;
   contentType: string;
 };
+
+export type CustomUIMessageChunk = UIMessageChunk<MessageMetadata, CustomUIDataTypes>;
