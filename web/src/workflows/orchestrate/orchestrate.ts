@@ -16,13 +16,13 @@ import {
   ExecutionPlan,
   planAgentExecutionStep,
 } from "@/workflows/orchestrate/steps/plan-agent-execution-step";
+import { saveWorkflowProgressStep } from "@/workflows/orchestrate/steps/save-progress-step";
 import { OrchestrationInput } from "@/workflows/orchestrate/types";
 import { FatalError, fetch, getWritable, sleep } from "workflow";
 import { classifyRequestStep } from "./steps/classify-request-step";
 
 const logger = console;
 
-// Helper to safely emit events with proper lock management
 async function emitEventStep(
   stream: WritableStream<WorkflowStreamEvent>,
   event: WorkflowStreamEvent,
@@ -39,10 +39,14 @@ async function emitEventStep(
 
 async function closeStreamStep(stream: WritableStream<WorkflowStreamEvent>) {
   "use step";
-  await stream.close();
+
+  try {
+    await stream.close();
+  } catch (error) {
+    console.error("Error closing stream:", error);
+  }
 }
 
-// Validate execution plan for circular dependencies
 function detectCircularDependencies(
   agents: ExecutionPlan["selectedAgents"],
 ): string | null {
@@ -88,7 +92,6 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
   // Enable AI SDK calls as workflow steps
   globalThis.fetch = fetch;
 
-  // Getting writable stream ONCE at workflow level
   const workflowStream = getWritable<WorkflowStreamEvent>();
 
   const startTime = Date.now();
@@ -105,12 +108,24 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
       },
     });
 
+    // Track workflow started
+    await saveWorkflowProgressStep({
+      chatId: input.chatId,
+      messageId: input.messageId,
+      status: "started",
+      completedAgents: [],
+      totalAgents: 0,
+      progress: 0,
+      lastUpdate: new Date(),
+    });
+
     // Step 1: Load chat context (messages, agents, members)
     const context = await loadChatContextStep(input.chatId);
     logger.info("Context Loaded", context);
 
     // Step 2: Verify orchestration is enabled
     if (!context.chat.orchestrationEnabled) {
+      await closeStreamStep(workflowStream);
       return {
         success: false,
         reason: "Orchestration is disabled for this chat",
@@ -137,6 +152,7 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
         type: "workflow-error",
         data: { error: "No agents available" },
       });
+      await closeStreamStep(workflowStream);
       return {
         success: false,
         reason: "No agents available in this chat",
@@ -144,6 +160,16 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
     }
 
     // Step 5: Classify the request (understand intent, complexity, domains)
+    await saveWorkflowProgressStep({
+      chatId: input.chatId,
+      messageId: input.messageId,
+      status: "classifying",
+      completedAgents: [],
+      totalAgents: 0,
+      progress: 10,
+      lastUpdate: new Date(),
+    });
+
     const classification = await classifyRequestStep({
       message: triggerMessage,
       messages: context.messages,
@@ -159,6 +185,16 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
     });
 
     // Step 6: Plan agent execution (select agents, determine order/parallelism)
+    await saveWorkflowProgressStep({
+      chatId: input.chatId,
+      messageId: input.messageId,
+      status: "planning",
+      completedAgents: [],
+      totalAgents: 0,
+      progress: 20,
+      lastUpdate: new Date(),
+    });
+
     const executionPlan = await planAgentExecutionStep({
       classification,
       agents: context.agents,
@@ -189,6 +225,7 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
         error: "No suitable agents found for this request",
       });
 
+      await closeStreamStep(workflowStream);
       return {
         success: false,
         reason: "No suitable agents found for this request",
@@ -207,6 +244,16 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
       }
     }
 
+    await saveWorkflowProgressStep({
+      chatId: input.chatId,
+      messageId: input.messageId,
+      status: "executing",
+      completedAgents: [],
+      totalAgents: executionPlan.selectedAgents.length,
+      progress: 30,
+      lastUpdate: new Date(),
+    });
+
     // Step 8: Execute agents according to strategy (with timeout)
     const timeoutPromise = (async () => {
       await sleep(`${executionPlan.timeoutMinutes}m`);
@@ -219,6 +266,8 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
       triggerMessage,
       workflowStream,
       webhookPayload: input.webhookPayload,
+      chatId: input.chatId,
+      messageId: input.messageId,
     });
 
     const agentResults = await Promise.race([executionPromise, timeoutPromise]);
@@ -252,6 +301,18 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
     }
 
     // Step 10: Aggregate and synthesize results
+    await saveWorkflowProgressStep({
+      chatId: input.chatId,
+      messageId: input.messageId,
+      status: "aggregating",
+      completedAgents: finalAgentResults
+        .filter((r) => r.success)
+        .map((r) => r.agentId),
+      totalAgents: executionPlan.selectedAgents.length,
+      progress: 90,
+      lastUpdate: new Date(),
+    });
+
     const finalResult = await aggregateResultsStep({
       agentResults: finalAgentResults,
       plan: executionPlan,
@@ -278,12 +339,35 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
       success: true,
     });
 
+    // Emit complete workflow result before completion event
+    await emitEventStep(workflowStream, {
+      type: "workflow-final-result" as any,
+      data: {
+        success: true,
+        classification,
+        executionPlan,
+        agentResults: finalAgentResults,
+        finalResult,
+        executionTimeMs: Date.now() - startTime,
+      } as any,
+    });
+
     await emitEventStep(workflowStream, {
       type: "workflow-completed",
       data: { success: true, executionTimeMs: Date.now() - startTime },
     });
 
-    await closeStreamStep(workflowStream);
+    await saveWorkflowProgressStep({
+      chatId: input.chatId,
+      messageId: input.messageId,
+      status: "completed",
+      completedAgents: finalAgentResults
+        .filter((r) => r.success)
+        .map((r) => r.agentId),
+      totalAgents: executionPlan.selectedAgents.length,
+      progress: 100,
+      lastUpdate: new Date(),
+    });
 
     // Step 12: Notify chat members if needed
     if (classification.notifyMembers) {
@@ -298,6 +382,8 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
       });
     }
 
+    await closeStreamStep(workflowStream);
+
     return {
       success: true,
       classification,
@@ -311,6 +397,16 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
     if (error instanceof Error) {
       errorStack = error.stack;
     }
+
+    await saveWorkflowProgressStep({
+      chatId: input.chatId,
+      messageId: input.messageId,
+      status: "failed",
+      completedAgents: [],
+      totalAgents: 0,
+      progress: 0,
+      lastUpdate: new Date(),
+    });
 
     // Log failed orchestration
     await createOrchestrationLogStep({
@@ -346,9 +442,18 @@ async function executeAgentsAccordingToStrategy(params: {
   triggerMessage: Message;
   workflowStream: WritableStream<WorkflowStreamEvent>;
   webhookPayload?: OrchestrationInput["webhookPayload"];
+  chatId: string;
+  messageId: string;
 }) {
-  const { plan, context, triggerMessage, workflowStream, webhookPayload } =
-    params;
+  const {
+    plan,
+    context,
+    triggerMessage,
+    workflowStream,
+    webhookPayload,
+    chatId,
+    messageId,
+  } = params;
 
   switch (plan.strategy) {
     case "sequential":
@@ -358,6 +463,8 @@ async function executeAgentsAccordingToStrategy(params: {
         triggerMessage,
         workflowStream,
         webhookPayload,
+        chatId,
+        messageId,
       });
 
     case "parallel":
@@ -367,6 +474,8 @@ async function executeAgentsAccordingToStrategy(params: {
         triggerMessage,
         workflowStream,
         webhookPayload,
+        chatId,
+        messageId,
       );
 
     case "conditional":
@@ -376,6 +485,8 @@ async function executeAgentsAccordingToStrategy(params: {
         triggerMessage,
         workflowStream,
         webhookPayload,
+        chatId,
+        messageId,
       );
 
     case "single":
@@ -385,6 +496,8 @@ async function executeAgentsAccordingToStrategy(params: {
         triggerMessage,
         workflowStream,
         webhookPayload,
+        chatId,
+        messageId,
       );
 
     default:
@@ -398,11 +511,20 @@ async function executeSequential(params: {
   triggerMessage: Message;
   workflowStream: WritableStream<WorkflowStreamEvent>;
   webhookPayload?: OrchestrationInput["webhookPayload"];
+  chatId: string;
+  messageId: string;
 }): Promise<AgentExecutionResult[]> {
   "use step";
 
-  const { plan, context, triggerMessage, webhookPayload, workflowStream } =
-    params;
+  const {
+    plan,
+    context,
+    triggerMessage,
+    webhookPayload,
+    workflowStream,
+    chatId,
+    messageId,
+  } = params;
   const results: AgentExecutionResult[] = [];
 
   const sortedAgents = [...plan.selectedAgents].sort(
@@ -442,6 +564,22 @@ async function executeSequential(params: {
 
     results.push(result);
 
+    const progressPercent =
+      30 + Math.floor((60 / sortedAgents.length) * (i + 1));
+    await saveWorkflowProgressStep({
+      chatId,
+      messageId,
+      status: "executing",
+      currentAgent:
+        result.success && i + 1 < sortedAgents.length
+          ? sortedAgents[i + 1].agentId
+          : undefined,
+      completedAgents: results.filter((r) => r.success).map((r) => r.agentId),
+      totalAgents: sortedAgents.length,
+      progress: progressPercent,
+      lastUpdate: new Date(),
+    });
+
     if (!result.success && plan.stopOnError) {
       // Mark remaining agents as skipped
       for (let j = i + 1; j < sortedAgents.length; j++) {
@@ -454,6 +592,7 @@ async function executeSequential(params: {
           agentName: skippedChatAgent?.agent.name || "Unknown Agent",
           task: skippedAgent.task,
           success: false,
+          parts: [], // Add empty parts array
           output: "",
           error: "Skipped due to previous agent failure",
           startTime: new Date(),
@@ -468,46 +607,14 @@ async function executeSequential(params: {
   return results;
 }
 
-// Mutex for coordinating parallel writes
-class StreamMutex {
-  private locked = false;
-  private queue: Array<() => void> = [];
-
-  async acquire(): Promise<void> {
-    if (!this.locked) {
-      this.locked = true;
-      return;
-    }
-    return new Promise((resolve) => {
-      this.queue.push(resolve);
-    });
-  }
-
-  release(): void {
-    if (this.queue.length > 0) {
-      const next = this.queue.shift();
-      next?.();
-    } else {
-      this.locked = false;
-    }
-  }
-
-  async execute<T>(fn: () => Promise<T>): Promise<T> {
-    await this.acquire();
-    try {
-      return await fn();
-    } finally {
-      this.release();
-    }
-  }
-}
-
 async function executeParallel(
   plan: ExecutionPlan,
   context: ChatContext,
   triggerMessage: Message,
   workflowStream: WritableStream<WorkflowStreamEvent>,
   webhookPayload?: OrchestrationInput["webhookPayload"],
+  chatId?: string,
+  messageId?: string,
 ): Promise<AgentExecutionResult[]> {
   // Group agents by parallel group
   const groups = new Map<number, typeof plan.selectedAgents>();
@@ -521,12 +628,12 @@ async function executeParallel(
   }
 
   const results: AgentExecutionResult[] = [];
-  const mutex = new StreamMutex();
 
   // Execute groups in order (agents within each group run in parallel)
   const sortedGroupIds = Array.from(groups.keys()).sort((a, b) => a - b);
 
-  for (const groupId of sortedGroupIds) {
+  for (let groupIdx = 0; groupIdx < sortedGroupIds.length; groupIdx++) {
+    const groupId = sortedGroupIds[groupIdx];
     const groupAgents = groups.get(groupId)!;
 
     const groupResults = await Promise.all(
@@ -536,14 +643,27 @@ async function executeParallel(
           context,
           triggerMessage,
           previousResults: results,
-          emitProgress: (event) =>
-            mutex.execute(() => emitEventStep(workflowStream, event)),
+          emitProgress: (event) => emitEventStep(workflowStream, event),
           webhookPayload,
         }),
       ),
     );
 
     results.push(...groupResults);
+
+    if (chatId && messageId) {
+      const progressPercent =
+        30 + Math.floor((60 / sortedGroupIds.length) * (groupIdx + 1));
+      await saveWorkflowProgressStep({
+        chatId,
+        messageId,
+        status: "executing",
+        completedAgents: results.filter((r) => r.success).map((r) => r.agentId),
+        totalAgents: plan.selectedAgents.length,
+        progress: progressPercent,
+        lastUpdate: new Date(),
+      });
+    }
 
     // Check for failures
     if (plan.stopOnError && groupResults.some((r) => !r.success)) {
@@ -560,29 +680,26 @@ async function executeConditional(
   triggerMessage: Message,
   workflowStream: WritableStream<WorkflowStreamEvent>,
   webhookPayload: OrchestrationInput["webhookPayload"] | undefined,
+  chatId?: string,
+  messageId?: string,
 ): Promise<AgentExecutionResult[]> {
   const results: AgentExecutionResult[] = [];
   const executed = new Set<string>();
   const agentMap = new Map(plan.selectedAgents.map((a) => [a.agentId, a]));
   const resultMap = new Map<string, AgentExecutionResult>();
-  const mutex = new StreamMutex();
 
-  // Maximum iterations to prevent infinite loops
   const maxIterations = plan.selectedAgents.length * 2;
   let iterations = 0;
 
-  // Execute agents based on dependencies
   while (
     executed.size < plan.selectedAgents.length &&
     iterations < maxIterations
   ) {
     iterations++;
 
-    // Find agents ready to execute (all dependencies satisfied)
     const ready = plan.selectedAgents.filter((agent) => {
       if (executed.has(agent.agentId)) return false;
 
-      // Check if all dependencies are satisfied
       const dependencies = agent.dependsOn || [];
       const dependenciesMet = dependencies.every((depId) => {
         const isExecuted = executed.has(depId);
@@ -594,7 +711,6 @@ async function executeConditional(
     });
 
     if (ready.length === 0) {
-      // No more agents can execute
       const unexecuted = plan.selectedAgents.filter(
         (a) => !executed.has(a.agentId),
       );
@@ -604,7 +720,6 @@ async function executeConditional(
           `Cannot execute remaining agents due to unmet dependencies or failures`,
         );
 
-        // Add failed results for unexecuted agents
         for (const agent of unexecuted) {
           const chatAgent = context.agents.find(
             (ca) => ca.agentId === agent.agentId,
@@ -614,6 +729,7 @@ async function executeConditional(
             agentName: chatAgent?.agent.name || "Unknown",
             task: agent.task,
             success: false,
+            parts: [], // Add empty parts array
             output: "",
             error: "Dependencies not met or previous agent failed",
             startTime: new Date(),
@@ -627,7 +743,6 @@ async function executeConditional(
       break;
     }
 
-    // Execute ready agents in parallel
     const batchResults = await Promise.all(
       ready.map((agentPlan) =>
         executeAgentTaskStep({
@@ -635,25 +750,36 @@ async function executeConditional(
           context,
           triggerMessage,
           previousResults: results,
-          emitProgress: (event) =>
-            mutex.execute(() => emitEventStep(workflowStream, event)),
+          emitProgress: (event) => emitEventStep(workflowStream, event),
           webhookPayload,
         }),
       ),
     );
 
-    // Store results
     for (const result of batchResults) {
       results.push(result);
       resultMap.set(result.agentId, result);
       executed.add(result.agentId);
     }
 
-    // Check for failures with stop-on-error
+    // Track progress after each batch
+    if (chatId && messageId) {
+      const progressPercent =
+        30 + Math.floor((60 / plan.selectedAgents.length) * executed.size);
+      await saveWorkflowProgressStep({
+        chatId,
+        messageId,
+        status: "executing",
+        completedAgents: results.filter((r) => r.success).map((r) => r.agentId),
+        totalAgents: plan.selectedAgents.length,
+        progress: progressPercent,
+        lastUpdate: new Date(),
+      });
+    }
+
     if (plan.stopOnError && batchResults.some((r) => !r.success)) {
       console.log("Stopping execution due to agent failure (stopOnError=true)");
 
-      // Mark remaining agents as skipped
       const remaining = plan.selectedAgents.filter(
         (a) => !executed.has(a.agentId),
       );
@@ -666,6 +792,7 @@ async function executeConditional(
           agentName: chatAgent?.agent.name || "Unknown",
           task: agent.task,
           success: false,
+          parts: [], // Add empty parts array
           output: "",
           error: "Execution stopped due to previous agent failure",
           startTime: new Date(),
@@ -692,6 +819,8 @@ async function executeSingle(
   triggerMessage: Message,
   workflowStream: WritableStream<WorkflowStreamEvent>,
   webhookPayload?: OrchestrationInput["webhookPayload"],
+  chatId?: string,
+  messageId?: string,
 ): Promise<AgentExecutionResult[]> {
   const agentPlan = plan.selectedAgents[0];
 
@@ -703,6 +832,19 @@ async function executeSingle(
     emitProgress: (event) => emitEventStep(workflowStream, event),
     webhookPayload,
   });
+
+  // Track single agent execution
+  if (chatId && messageId) {
+    await saveWorkflowProgressStep({
+      chatId,
+      messageId,
+      status: "executing",
+      completedAgents: result.success ? [result.agentId] : [],
+      totalAgents: 1,
+      progress: 90,
+      lastUpdate: new Date(),
+    });
+  }
 
   return [result];
 }

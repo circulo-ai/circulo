@@ -16,8 +16,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { Vote } from "@/db/schema";
 import { useArtifactSelector } from "@/hooks/api/chats/use-artifact";
-import { useAutoResume } from "@/hooks/api/chats/use-auto-resume";
-import { useChatVisibility } from "@/hooks/api/chats/use-chat-visibility";
 import { ChatSDKError } from "@/lib/errors";
 import {
   clearCachePattern,
@@ -29,9 +27,9 @@ import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { generateUUID } from "@/lib/utils";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { WorkflowChatTransport } from "@workflow/ai"; // THE KEY IMPORT!
 import { useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { unstable_serialize } from "swr/infinite";
 import { useDataStream } from "./data-stream-provider";
@@ -45,7 +43,6 @@ export function Chat({
   initialChatModel = "gemini-2.5-flash",
   initialVisibilityType,
   isReadonly,
-  autoResume,
   initialLastContext,
 }: {
   id: string;
@@ -53,14 +50,8 @@ export function Chat({
   initialChatModel?: string;
   initialVisibilityType: VisibilityType;
   isReadonly: boolean;
-  autoResume: boolean;
   initialLastContext?: AppUsage;
 }) {
-  const { visibilityType } = useChatVisibility({
-    chatId: id,
-    initialVisibilityType,
-  });
-
   const { mutate } = useSWRConfig();
   const { setDataStream } = useDataStream();
 
@@ -68,86 +59,74 @@ export function Chat({
   const [usage, setUsage] = useState<AppUsage | undefined>(initialLastContext);
   const [showCreditCardAlert, setShowCreditCardAlert] = useState(false);
   const [currentModelId, setCurrentModelId] = useState(initialChatModel);
-  const currentModelIdRef = useRef(currentModelId);
+  const [visibilityType, setVisibilityType] = useState(initialVisibilityType);
 
-  useEffect(() => {
-    currentModelIdRef.current = currentModelId;
-  }, [currentModelId]);
+  const { messages, setMessages, sendMessage, status, stop, regenerate } =
+    useChat<ChatMessage>({
+      id,
+      messages: initialMessages,
+      generateId: generateUUID,
 
-  // const { data: agentsResponse } = useSWR<any>(
-  //   `/api/chat/${id}/agents`,
-  //   fetcher,
-  // );
-  const agentsResponse: any = undefined;
-  // TODO I did this so it would stop throwing api errors
+      // USE WORKFLOW TRANSPORT - This handles ALL streaming/resumption automatically!
+      transport: new WorkflowChatTransport({
+        api: "/api/chat",
+        fetch: fetchWithErrorHandlers,
 
-  const {
-    messages,
-    setMessages,
-    sendMessage,
-    status,
-    stop,
-    regenerate,
-    resumeStream,
-  } = useChat<ChatMessage>({
-    id,
-    messages: initialMessages,
-    experimental_throttle: 100,
-    generateId: generateUUID,
-    transport: new DefaultChatTransport({
-      api: "/api/chat",
-      fetch: fetchWithErrorHandlers,
-      prepareSendMessagesRequest(request) {
-        return {
-          body: {
-            id: request.id,
-            message: request.messages.at(-1),
-            selectedChatModel: currentModelIdRef.current,
-            selectedVisibilityType: visibilityType,
-            agentIds: Array.isArray(agentsResponse?.data?.agents)
-              ? agentsResponse.data.agents
-                  .map((a: any) => a?.agent?.id)
-                  .filter((v: any) => typeof v === "string" && v.length > 0)
-              : [],
-            ...request.body,
-          },
-        };
-      },
-    }),
-    onData: (dataPart) => {
-      setDataStream((ds) => (ds ? [...ds, dataPart] : []));
-      if (dataPart.type === "data-usage") {
-        setUsage(dataPart.data);
-      }
-    },
-    onFinish: async () => {
-      mutate(unstable_serialize(getChatHistoryPaginationKey));
-      await clearCachePattern(/\/api\/conversations.*/);
-      await globalMutate(
-        (key) =>
-          typeof key === "string" && key.startsWith("/api/conversations"),
-      );
-    },
-    onError: (error) => {
-      if (error instanceof ChatSDKError) {
-        // Check if it's a credit card error
-        if (
-          error.message?.includes("AI Gateway requires a valid credit card")
-        ) {
-          setShowCreditCardAlert(true);
-        } else {
-          toast({
-            type: "error",
-            description: error.message,
-          });
+        // Prepare the request body
+        prepareSendMessagesRequest: (config) => {
+          return {
+            ...config,
+            body: {
+              id,
+              message: config.messages.at(-1),
+              selectedChatModel: currentModelId,
+              selectedVisibilityType: visibilityType,
+              agentIds: [], // Get from your agent selector
+            },
+          };
+        },
+
+        // Optional: Track when chat completes
+        onChatEnd: ({ chatId, chunkIndex }) => {
+          console.log(`Chat ${chatId} completed with ${chunkIndex} chunks`);
+        },
+      }),
+
+      // Handle data stream events
+      onData: (dataPart) => {
+        setDataStream((ds) => (ds ? [...ds, dataPart] : []));
+        if (dataPart.type === "data-usage") {
+          setUsage(dataPart.data);
         }
-      }
-    },
-  });
+      },
+
+      onFinish: async () => {
+        mutate(unstable_serialize(getChatHistoryPaginationKey));
+        await clearCachePattern(/\/api\/conversations.*/);
+        await globalMutate(
+          (key) =>
+            typeof key === "string" && key.startsWith("/api/conversations"),
+        );
+      },
+
+      onError: (error) => {
+        if (error instanceof ChatSDKError) {
+          if (
+            error.message?.includes("AI Gateway requires a valid credit card")
+          ) {
+            setShowCreditCardAlert(true);
+          } else {
+            toast({
+              type: "error",
+              description: error.message,
+            });
+          }
+        }
+      },
+    });
 
   const searchParams = useSearchParams();
   const query = searchParams.get("query");
-
   const [hasAppendedQuery, setHasAppendedQuery] = useState(false);
 
   useEffect(() => {
@@ -169,22 +148,6 @@ export function Chat({
 
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const isArtifactVisible = useArtifactSelector((state) => state.isVisible);
-
-  useAutoResume({
-    autoResume,
-    initialMessages,
-    resumeStream,
-    setMessages,
-  });
-
-  // Use original sendMessage; server enforces agent requirement
-
-  const sendMessageWithPrechecks = (
-    msg?: Parameters<typeof sendMessage>[0],
-    options?: Parameters<typeof sendMessage>[1],
-  ): ReturnType<typeof sendMessage> => {
-    return sendMessage(msg, options);
-  };
 
   return (
     <>
@@ -217,7 +180,7 @@ export function Chat({
               onModelChange={setCurrentModelId}
               selectedModelId={currentModelId}
               selectedVisibilityType={visibilityType}
-              sendMessage={sendMessageWithPrechecks}
+              sendMessage={sendMessage}
               setAttachments={setAttachments}
               setInput={setInput}
               setMessages={setMessages}
@@ -238,7 +201,7 @@ export function Chat({
         regenerate={regenerate}
         selectedModelId={currentModelId}
         selectedVisibilityType={visibilityType}
-        sendMessage={sendMessageWithPrechecks}
+        sendMessage={sendMessage}
         setAttachments={setAttachments}
         setInput={setInput}
         setMessages={setMessages}

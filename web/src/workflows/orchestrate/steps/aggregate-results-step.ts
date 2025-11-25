@@ -1,4 +1,3 @@
-// workflows/orchestration/steps/aggregate-results-step.ts
 import { Message } from "@/db";
 import { google } from "@ai-sdk/google";
 import { generateObject } from "ai";

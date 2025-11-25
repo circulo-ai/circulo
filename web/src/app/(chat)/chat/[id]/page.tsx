@@ -43,7 +43,6 @@ export default async function Page(props: { params: Promise<{ id: string }> }) {
     return (
       <>
         <Chat
-          autoResume={true}
           id={chat.id}
           initialMessages={uiMessages}
           initialVisibilityType={chat.visibility}
@@ -57,7 +56,6 @@ export default async function Page(props: { params: Promise<{ id: string }> }) {
   return (
     <>
       <Chat
-        autoResume={true}
         id={chat.id}
         initialChatModel={chatModelFromCookie.value}
         initialMessages={uiMessages}

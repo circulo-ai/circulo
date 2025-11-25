@@ -8,6 +8,13 @@
       "when": 1763940652828,
       "tag": "0000_happy_captain_cross",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1764046260943,
+      "tag": "0001_first_storm",
+      "breakpoints": true
     }
   ]
 }

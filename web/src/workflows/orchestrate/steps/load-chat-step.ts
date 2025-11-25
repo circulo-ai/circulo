@@ -1,10 +1,7 @@
-import { Agent, Chat, ChatAgent, ChatMember, Message } from "@/db";
-import {
-  chatAgentRepo,
-  chatMemberRepo,
-  chatRepo,
-  messageRepo,
-} from "@/db/repositories";
+import { Agent, Chat, ChatAgent, ChatMember, db, Message } from "@/db";
+import { chatMemberRepo, chatRepo, messageRepo } from "@/db/repositories";
+import { chatAgent } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
 import { FatalError } from "workflow";
 
 export interface ChatContext {
@@ -27,9 +24,13 @@ export async function loadChatContextStep(
   }
 
   const messages = await messageRepo.findForChat(chatId, 100); // Last 100 messages
-  const chatAgents = await chatAgentRepo.findForChat(chatId, {
-    includeDisabled: false,
+
+  // Use the correct method to get ChatAgent objects with agent relations
+  const chatAgents = await db.query.chatAgent.findMany({
+    where: and(eq(chatAgent.chatId, chatId), eq(chatAgent.isEnabled, true)),
+    with: { agent: true },
   });
+
   const members = await chatMemberRepo.findForChat(chatId);
 
   if (!chatAgents || chatAgents.length === 0) {

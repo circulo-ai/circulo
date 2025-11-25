@@ -1,10 +1,11 @@
 import { Message } from "@/db";
-import { WorkflowStreamEvent } from "@/lib/types";
+import { ChatTools, CustomUIDataTypes, WorkflowStreamEvent } from "@/lib/types";
 import { convertToUIMessages } from "@/lib/utils";
 import { ChatContext } from "@/workflows/orchestrate/steps/load-chat-step";
 import { OrchestrationInput } from "@/workflows/orchestrate/types";
 import { google } from "@ai-sdk/google";
-import { convertToModelMessages, streamText } from "ai";
+import { convertToModelMessages, streamText, UIMessagePart } from "ai";
+import { FatalError } from "workflow";
 import { ExecutionPlan } from "./plan-agent-execution-step";
 
 export interface AgentExecutionResult {
@@ -12,6 +13,7 @@ export interface AgentExecutionResult {
   agentName: string;
   task: string;
   success: boolean;
+  parts: UIMessagePart<CustomUIDataTypes, ChatTools>[];
   output: string;
   error?: string;
   startTime: Date;
@@ -31,14 +33,8 @@ export async function executeAgentTaskStep(params: {
 }): Promise<AgentExecutionResult> {
   "use step";
 
-  const {
-    agentPlan,
-    context,
-    triggerMessage,
-    previousResults,
-    webhookPayload,
-    emitProgress,
-  } = params;
+  const { agentPlan, context, previousResults, webhookPayload, emitProgress } =
+    params;
 
   const startTime = new Date();
   const chatAgent = context.agents.find((a) => a.agentId === agentPlan.agentId);
@@ -49,6 +45,7 @@ export async function executeAgentTaskStep(params: {
       agentName: "Unknown Agent",
       task: agentPlan.task,
       success: false,
+      parts: [],
       output: "",
       error: "Agent not found in chat",
       startTime,
@@ -105,6 +102,8 @@ Your task depends on the following agent outputs. Pay special attention to these
 ${r.output}`,
             )
             .join("\n\n---\n\n");
+
+        dependencyContext += `\n\nIMPORTANT: If any dependency output appears incomplete or truncated, note this in your response and work with what's available, or request a re-run.`;
       }
     }
 
@@ -116,6 +115,8 @@ ${r.output}`,
     const temperature = chatAgent.customTemperature
       ? parseInt(chatAgent.customTemperature, 10) / 100
       : (agent.temperature || 70) / 100;
+
+    const maxTokens = agent.maxTokens || 2000;
 
     // Build the context-aware system prompt
     const systemPrompt = `${instructions}
@@ -141,43 +142,94 @@ ${webhookContext}${previousContext}${dependencyContext}
 
 Provide a focused response for YOUR specific task. Be concise but complete.`;
 
-    let fullText = "";
-    let usage: any = undefined;
+    // Variables to capture stream results
+    let finalText = "";
+    let finalParts: UIMessagePart<CustomUIDataTypes, ChatTools>[] = [];
+    let finalUsage: any = undefined;
+    let finalFinishReason: string | undefined;
 
-    // Use streamText with callbacks
-    const result = streamText({
-      model: google(agent.model || "gemini-2.5-flash"),
-      temperature,
-      maxOutputTokens: agent.maxTokens || 2000,
-      messages: [
-        ...convertToModelMessages(convertToUIMessages(conversationHistory)),
-      ],
-      system: systemPrompt,
-      onChunk: async ({ chunk }) => {
-        // Emit progress for text deltas using the provided helper
-        if (chunk.type === "text-delta") {
-          try {
-            await emitProgress({
-              type: "workflow-agent-progress",
-              data: {
-                agentId: agent.id,
-                progress: chunk.text,
+    // Create a promise that resolves when onFinish is called
+    const finishPromise = new Promise<ReturnType<typeof streamText>>(
+      (resolve) => {
+        const result = streamText({
+          model: google(agent.model || "gemini-2.5-flash"),
+          temperature,
+          maxOutputTokens: maxTokens,
+          messages: [
+            ...convertToModelMessages(convertToUIMessages(conversationHistory)),
+          ],
+          system: systemPrompt,
+          onChunk: async ({ chunk }) => {
+            // Emit progress for text deltas using the provided helper
+            if (chunk.type === "text-delta") {
+              try {
+                await emitProgress({
+                  type: "workflow-agent-progress",
+                  data: {
+                    agentId: agent.id,
+                    progress: chunk.text,
+                  },
+                });
+              } catch (e) {
+                // Log but don't fail the agent execution
+                console.warn("Failed to emit progress:", e);
+              }
+            }
+          },
+          onFinish: ({ text, usage, finishReason, providerMetadata }) => {
+            finalText = text;
+            finalUsage = usage;
+            finalFinishReason = finishReason;
+
+            // Build parts array from the response
+            finalParts = [
+              {
+                type: "text",
+                text: text,
               },
-            });
-          } catch (e) {
-            // Log but don't fail the agent execution
-            console.warn("Failed to emit progress:", e);
-          }
-        }
+            ];
+
+            // Add any additional parts from provider metadata
+            // (for artifacts, images, etc. if your model returns them)
+            // if (providerMetadata?.parts) {
+            //   finalParts.push(...(providerMetadata.parts as any[]));
+            // }
+
+            resolve(result);
+          },
+        });
+
+        // Start consuming the stream to trigger callbacks
+        result.text.catch((error) => {
+          console.error("Stream error:", error);
+          resolve(result); // Resolve even on error so we don't hang
+        });
       },
-      onFinish: async ({ text, usage: finalUsage }) => {
-        fullText = text;
-        usage = finalUsage;
-      },
-    });
+    );
 
     // Wait for the stream to complete
-    const finalText = await result.text;
+    await finishPromise;
+
+    const output = finalText;
+
+    console.log("=== AGENT EXECUTION DEBUG ===");
+    console.log("Agent:", agent.name);
+    console.log("output length:", output?.length || 0);
+    console.log("parts count:", finalParts.length);
+    console.log("usage:", finalUsage);
+    console.log("finishReason:", finalFinishReason);
+    console.log("output preview:", output?.substring(0, 100));
+    console.log("==============================");
+
+    // Validate we got content
+    if (!output || output.trim().length === 0) {
+      throw new FatalError(
+        `Agent produced no output. ` +
+          `finishReason: ${finalFinishReason}, ` +
+          `tokens: ${finalUsage?.totalTokens || 0}`,
+      );
+    }
+
     const endTime = new Date();
 
     return {
@@ -185,11 +237,12 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
       agentName: agent.name,
       task: agentPlan.task,
       success: true,
-      output: fullText || finalText,
+      parts: finalParts,
+      output: output.trim(),
       startTime,
       endTime,
       durationMs: endTime.getTime() - startTime.getTime(),
-      tokenCount: usage?.totalTokens,
+      tokenCount: finalUsage?.totalTokens,
     };
   } catch (error) {
     const endTime = new Date();
@@ -199,6 +252,7 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
       agentName: agent.name,
       task: agentPlan.task,
       success: false,
+      parts: [],
       output: "",
       error: error instanceof Error ? error.message : String(error),
       startTime,

@@ -26,6 +26,17 @@ export type WorkflowStreamEvent =
   | { type: "workflow-agent-completed"; data: AgentExecutionResult }
   | { type: "workflow-aggregated"; data: AggregatedResult }
   | {
+      type: "workflow-final-result";
+      data: {
+        success: boolean;
+        classification: RequestClassification;
+        executionPlan: ExecutionPlan;
+        agentResults: AgentExecutionResult[];
+        finalResult: AggregatedResult;
+        executionTimeMs: number;
+      };
+    }
+  | {
       type: "workflow-completed";
       data: { success: boolean; executionTimeMs: number };
     }
@@ -62,6 +73,14 @@ export type CustomUIDataTypes = {
   workflowAgentProgress: { agentId: string; progress: string };
   workflowAgentCompleted: AgentExecutionResult;
   workflowAggregated: AggregatedResult;
+  workflowFinalResult: {
+    success: boolean;
+    classification: RequestClassification;
+    executionPlan: ExecutionPlan;
+    agentResults: AgentExecutionResult[];
+    finalResult: AggregatedResult;
+    executionTimeMs: number;
+  };
   workflowCompleted: { success: boolean; executionTimeMs: number };
   workflowError: { error: string; agentId?: string };
 };

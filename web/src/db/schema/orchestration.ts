@@ -5,9 +5,11 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uuid,
+  varchar,
 } from "drizzle-orm/pg-core";
 import { chat, message } from "./chat";
 
@@ -102,6 +104,26 @@ export const orchestrationLog = pgTable(
     index("orchestration_logs_strategy_idx").on(t.strategy),
     index("orchestration_logs_trigger_idx").on(t.triggerType),
   ],
+);
+
+export const workflowProgress = pgTable(
+  "workflow_progress",
+  {
+    chatId: uuid("chat_id").notNull(),
+    messageId: uuid("message_id").notNull(),
+    status: varchar("status", { length: 50 }).notNull(),
+    currentAgent: varchar("current_agent", { length: 255 }),
+    completedAgents: jsonb("completed_agents").notNull().default([]),
+    totalAgents: integer("total_agents").notNull(),
+    progress: integer("progress").notNull(),
+    estimatedTimeRemaining: integer("estimated_time_remaining"),
+    lastUpdate: timestamp("last_update", { withTimezone: false }).notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.chatId, table.messageId] }),
+    idxChat: index("idx_workflow_progress_chat").on(table.chatId),
+    idxUpdated: index("idx_workflow_progress_updated").on(table.lastUpdate),
+  }),
 );
 
 export const orchestrationLogRelations = relations(
