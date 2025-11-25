@@ -1,32 +1,24 @@
-import { organization, user } from "@/db/schema/auth";
+import { relations } from "drizzle-orm";
 import {
   boolean,
   index,
   integer,
   jsonb,
-  pgEnum,
   pgTable,
   text,
   timestamp,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { organization, user } from "./auth";
+import { chatAgent } from "./chat";
 
-// ==================== ENUMS ====================
-export const agentVisibilityEnum = pgEnum("agent_visibility", [
-  "private", // Only creator can use
-  "team", // Organization members can use
-  "public", // Anyone can use (future marketplace)
-]);
-
-// ==================== AGENTS ====================
-// Agents belong to organizations (workspaces) for proper scope management
 export const agent = pgTable(
   "agents",
   {
     id: uuid("id").defaultRandom().primaryKey(),
 
-    // Ownership: Organization is primary owner, userId tracks creator
+    // Ownership: Organization is primary owner, createdBy tracks creator
     organizationId: text("organization_id")
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
@@ -45,8 +37,7 @@ export const agent = pgTable(
     maxTokens: integer("max_tokens").default(1000),
     temperature: integer("temperature").default(70), // 0-100 scale
 
-    // Visibility & status
-    visibility: agentVisibilityEnum("visibility").notNull().default("team"),
+    // status
     isArchived: boolean("is_archived").notNull().default(false),
 
     // Default attachments (IDs of tools, knowledge bases, etc.)
@@ -66,15 +57,24 @@ export const agent = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
-  (t) => ({
-    orgIdx: index("agents_org_idx").on(t.organizationId),
-    creatorIdx: index("agents_creator_idx").on(t.createdBy),
-    visibilityIdx: index("agents_visibility_idx").on(t.visibility),
-    orgNameIdx: uniqueIndex("agents_org_name_idx").on(t.organizationId, t.name),
-  }),
+  (t) => [
+    index("agents_org_idx").on(t.organizationId),
+    index("agents_creator_idx").on(t.createdBy),
+    uniqueIndex("agents_org_name_idx").on(t.organizationId, t.name),
+  ],
 );
 
-// ==================== TYPES ====================
+export const agentRelations = relations(agent, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [agent.organizationId],
+    references: [organization.id],
+  }),
+  creator: one(user, {
+    fields: [agent.createdBy],
+    references: [user.id],
+  }),
+  chatAgents: many(chatAgent),
+}));
+
 export type Agent = typeof agent.$inferSelect;
 export type NewAgent = typeof agent.$inferInsert;
-export type AgentVisibility = (typeof agentVisibilityEnum.enumValues)[number];

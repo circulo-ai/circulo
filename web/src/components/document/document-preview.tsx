@@ -1,6 +1,6 @@
 "use client";
 
-import type { ArtifactKind, UIArtifact } from "@/components/artifacts/artifact";
+import { ArtifactKind, UIArtifact } from "@/components/artifacts/artifact";
 import {
   FileIcon,
   FullscreenIcon,
@@ -41,9 +41,10 @@ export function DocumentPreview({
 }: DocumentPreviewProps) {
   const { artifact, setArtifact } = useArtifact();
 
+  // Fetch document using the new API structure
   const { data: documents, isLoading: isDocumentsFetching } = useSWR<
     Document[]
-  >(result ? `/api/document?id=${result.id}` : null, fetcher);
+  >(result?.id ? `/api/artifact?id=${result.id}` : null, fetcher);
 
   const previewDocument = useMemo(() => documents?.[0], [documents]);
   const hitboxRef = useRef<HTMLDivElement>(null);
@@ -87,20 +88,22 @@ export function DocumentPreview({
   }
 
   if (isDocumentsFetching) {
-    return <LoadingSkeleton artifactKind={result.kind ?? args.kind} />;
+    return <LoadingSkeleton artifactKind={result?.kind ?? args?.kind} />;
   }
 
   const document: Document | null = previewDocument
     ? previewDocument
     : artifact.status === "streaming"
       ? {
+          id: artifact.documentId ?? "temp",
           title: artifact.title,
           kind: artifact.kind,
           content: artifact.content ?? null,
-          id: artifact.documentId,
-          createdAt: new Date(),
-          userId: "noop",
+          userId: "streaming", // Placeholder for streaming
           chatId: null,
+          version: 1,
+          createdAt: new Date(),
+          updatedAt: new Date(),
         }
       : null;
 

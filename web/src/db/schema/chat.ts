@@ -1,7 +1,6 @@
-import { agent } from "@/db/schema/agent";
-import { organization, user } from "@/db/schema/auth";
-import { knowledgeBase } from "@/db/schema/knowledge";
-import { InferSelectModel, sql } from "drizzle-orm";
+import { ChatTools, CustomUIDataTypes } from "@/lib/types";
+import { UIMessagePart } from "ai";
+import { InferSelectModel, relations, sql } from "drizzle-orm";
 import {
   boolean,
   check,
@@ -20,8 +19,9 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+import { agent } from "./agent";
+import { organization, user } from "./auth";
 
-// ==================== ENUMS ====================
 export const chatVisibilityEnum = pgEnum("chat_visibility", [
   "private",
   "public",
@@ -39,7 +39,6 @@ export const messageAuthorTypeEnum = pgEnum("message_author_type", [
   "system",
 ]);
 
-// ==================== CHAT ====================
 export const chat = pgTable(
   "chats",
   {
@@ -72,17 +71,13 @@ export const chat = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
-  (t) => ({
-    orgIdx: index("chats_org_idx").on(t.organizationId),
-    creatorIdx: index("chats_creator_idx").on(t.creatorId),
-    orgCreatedIdx: index("chats_org_created_idx").on(
-      t.organizationId,
-      t.createdAt,
-    ),
-  }),
+  (t) => [
+    index("chats_org_idx").on(t.organizationId),
+    index("chats_creator_idx").on(t.creatorId),
+    index("chats_org_created_idx").on(t.organizationId, t.createdAt),
+  ],
 );
 
-// ==================== CHAT MEMBERS ====================
 export const chatMember = pgTable(
   "chat_members",
   {
@@ -116,24 +111,14 @@ export const chatMember = pgTable(
       .defaultNow(),
     leftAt: timestamp("left_at", { withTimezone: true }),
   },
-  (t) => ({
-    chatUserIdx: uniqueIndex("chat_members_chat_user_idx").on(
-      t.chatId,
-      t.userId,
-    ),
-    userIdx: index("chat_members_user_idx").on(t.userId),
-    userPinnedIdx: index("chat_members_user_pinned_idx").on(
-      t.userId,
-      t.isPinned,
-    ),
-    unreadCheck: check(
-      "chat_members_unread_check",
-      sql`unread_count >= 0`,
-    ),
-  }),
+  (t) => [
+    uniqueIndex("chat_members_chat_user_idx").on(t.chatId, t.userId),
+    index("chat_members_user_idx").on(t.userId),
+    index("chat_members_user_pinned_idx").on(t.userId, t.isPinned),
+    check("chat_members_unread_check", sql`unread_count >= 0`),
+  ],
 );
 
-// ==================== CHAT INVITATIONS ====================
 export const chatInvitation = pgTable(
   "chat_invitations",
   {
@@ -161,14 +146,13 @@ export const chatInvitation = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => ({
-    chatIdx: index("chat_invitations_chat_idx").on(t.chatId),
-    emailIdx: index("chat_invitations_email_idx").on(t.email),
-    tokenIdx: index("chat_invitations_token_idx").on(t.token),
-  }),
+  (t) => [
+    index("chat_invitations_chat_idx").on(t.chatId),
+    index("chat_invitations_email_idx").on(t.email),
+    index("chat_invitations_token_idx").on(t.token),
+  ],
 );
 
-// ==================== CHAT AGENTS (Agent instances in chat) ====================
 export const chatAgent = pgTable(
   "chat_agents",
   {
@@ -196,46 +180,12 @@ export const chatAgent = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => ({
-    chatAgentIdx: uniqueIndex("chat_agents_chat_agent_idx").on(
-      t.chatId,
-      t.agentId,
-    ),
-    chatIdx: index("chat_agents_chat_idx").on(t.chatId),
-  }),
+  (t) => [
+    uniqueIndex("chat_agents_chat_agent_idx").on(t.chatId, t.agentId),
+    index("chat_agents_chat_idx").on(t.chatId),
+  ],
 );
 
-// ==================== CHAT KNOWLEDGE BASES ====================
-export const chatKnowledgeBase = pgTable(
-  "chat_knowledge_bases",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    chatId: uuid("chat_id")
-      .notNull()
-      .references(() => chat.id, { onDelete: "cascade" }),
-    knowledgeBaseId: uuid("knowledge_base_id")
-      .notNull()
-      .references(() => knowledgeBase.id, { onDelete: "cascade" }),
-    addedBy: text("added_by")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-
-    isEnabled: boolean("is_enabled").notNull().default(true),
-
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (t) => ({
-    chatKbIdx: uniqueIndex("chat_kb_chat_kb_idx").on(
-      t.chatId,
-      t.knowledgeBaseId,
-    ),
-    chatIdx: index("chat_kb_chat_idx").on(t.chatId),
-  }),
-);
-
-// ==================== MESSAGES ====================
 export const message = pgTable(
   "messages",
   {
@@ -249,7 +199,10 @@ export const message = pgTable(
 
     role: text("role").notNull(), // 'user', 'assistant', 'system'
     content: text("content").notNull(),
-    parts: jsonb("parts").$type<unknown[]>().notNull().default([]),
+    parts: jsonb("parts")
+      .$type<UIMessagePart<CustomUIDataTypes, ChatTools>[]>()
+      .notNull()
+      .default([]),
     attachments: jsonb("attachments").$type<unknown[]>().notNull().default([]),
 
     tokenCount: integer("token_count").notNull().default(0),
@@ -266,47 +219,14 @@ export const message = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => ({
-    chatCreatedIdx: index("messages_chat_created_idx").on(
-      t.chatId,
-      t.createdAt,
-    ),
-    authorIdx: index("messages_author_idx").on(t.authorType, t.authorId),
-    quotedIdx: index("messages_quoted_idx").on(t.quotedMessageId),
-    costsCheck: check(
-      "messages_costs_check",
-      sql`token_count >= 0 AND cost >= 0`,
-    ),
-  }),
+  (t) => [
+    index("messages_chat_created_idx").on(t.chatId, t.createdAt),
+    index("messages_author_idx").on(t.authorType, t.authorId),
+    index("messages_quoted_idx").on(t.quotedMessageId),
+    check("messages_costs_check", sql`token_count >= 0 AND cost >= 0`),
+  ],
 );
 
-// ==================== MESSAGE REACTIONS ====================
-export const messageReaction = pgTable(
-  "message_reactions",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    messageId: uuid("message_id")
-      .notNull()
-      .references(() => message.id, { onDelete: "cascade" }),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    emoji: text("emoji").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (t) => ({
-    userMessageEmojiIdx: uniqueIndex("message_reactions_unique").on(
-      t.userId,
-      t.messageId,
-      t.emoji,
-    ),
-    messageIdx: index("message_reactions_message_idx").on(t.messageId),
-  }),
-);
-
-// ==================== VOTES ====================
 export const vote = pgTable(
   "votes",
   {
@@ -321,14 +241,11 @@ export const vote = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     isUpvoted: boolean("is_upvoted").notNull(),
   },
-  (t) => ({
-    pk: primaryKey({ columns: [t.chatId, t.messageId, t.userId] }),
-  }),
+  (t) => [primaryKey({ columns: [t.chatId, t.messageId, t.userId] })],
 );
 
-// ==================== DOCUMENTS (Artifacts) ====================
-export const document = pgTable(
-  "documents",
+export const artifact = pgTable(
+  "artifacts",
   {
     id: uuid("id").defaultRandom().primaryKey(),
     chatId: uuid("chat_id").references(() => chat.id, { onDelete: "cascade" }),
@@ -352,20 +269,19 @@ export const document = pgTable(
       .defaultNow()
       .$onUpdate(() => new Date()),
   },
-  (t) => ({
-    chatIdx: index("documents_chat_idx").on(t.chatId),
-    userIdx: index("documents_user_idx").on(t.userId),
-  }),
+  (t) => [
+    index("artifacts_chat_idx").on(t.chatId),
+    index("artifacts_user_idx").on(t.userId),
+  ],
 );
 
-// ==================== SUGGESTIONS ====================
 export const suggestion = pgTable(
   "suggestions",
   {
     id: uuid("id").defaultRandom().primaryKey(),
     documentId: uuid("document_id")
       .notNull()
-      .references(() => document.id, { onDelete: "cascade" }),
+      .references(() => artifact.id, { onDelete: "cascade" }),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
@@ -379,38 +295,154 @@ export const suggestion = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => ({
-    documentIdx: index("suggestions_document_idx").on(t.documentId),
-  }),
+  (t) => [index("suggestions_document_idx").on(t.documentId)],
 );
 
-// ==================== TYPES ====================
+export const stream = pgTable(
+  "stream",
+  {
+    id: uuid("id").notNull().defaultRandom(),
+    chatId: uuid("chatId").notNull(),
+    createdAt: timestamp("createdAt").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.id] }),
+    foreignKey({
+      columns: [table.chatId],
+      foreignColumns: [chat.id],
+    }),
+  ],
+);
+
+export const chatRelations = relations(chat, ({ one, many }) => ({
+  organization: one(organization, {
+    fields: [chat.organizationId],
+    references: [organization.id],
+  }),
+  creator: one(user, {
+    fields: [chat.creatorId],
+    references: [user.id],
+  }),
+  members: many(chatMember),
+  invitations: many(chatInvitation),
+  agents: many(chatAgent),
+  messages: many(message),
+  artifacts: many(artifact),
+  votes: many(vote),
+  streams: many(stream),
+}));
+
+export const chatMemberRelations = relations(chatMember, ({ one }) => ({
+  chat: one(chat, {
+    fields: [chatMember.chatId],
+    references: [chat.id],
+  }),
+  user: one(user, {
+    fields: [chatMember.userId],
+    references: [user.id],
+  }),
+}));
+
+export const chatInvitationRelations = relations(chatInvitation, ({ one }) => ({
+  chat: one(chat, {
+    fields: [chatInvitation.chatId],
+    references: [chat.id],
+  }),
+  inviter: one(user, {
+    fields: [chatInvitation.inviterId],
+    references: [user.id],
+    relationName: "inviter",
+  }),
+  invitee: one(user, {
+    fields: [chatInvitation.inviteeId],
+    references: [user.id],
+    relationName: "invitee",
+  }),
+}));
+
+export const chatAgentRelations = relations(chatAgent, ({ one }) => ({
+  chat: one(chat, {
+    fields: [chatAgent.chatId],
+    references: [chat.id],
+  }),
+  agent: one(agent, {
+    fields: [chatAgent.agentId],
+    references: [agent.id],
+  }),
+  addedByUser: one(user, {
+    fields: [chatAgent.addedBy],
+    references: [user.id],
+  }),
+}));
+
+export const messageRelations = relations(message, ({ one, many }) => ({
+  chat: one(chat, {
+    fields: [message.chatId],
+    references: [chat.id],
+  }),
+  quotedMessage: one(message, {
+    fields: [message.quotedMessageId],
+    references: [message.id],
+    relationName: "quotedMessages",
+  }),
+  replies: many(message, { relationName: "quotedMessages" }),
+  votes: many(vote),
+}));
+
+export const voteRelations = relations(vote, ({ one }) => ({
+  chat: one(chat, {
+    fields: [vote.chatId],
+    references: [chat.id],
+  }),
+  message: one(message, {
+    fields: [vote.messageId],
+    references: [message.id],
+  }),
+  user: one(user, {
+    fields: [vote.userId],
+    references: [user.id],
+  }),
+}));
+
+export const documentRelations = relations(artifact, ({ one, many }) => ({
+  chat: one(chat, {
+    fields: [artifact.chatId],
+    references: [chat.id],
+  }),
+  user: one(user, {
+    fields: [artifact.userId],
+    references: [user.id],
+  }),
+  suggestions: many(suggestion),
+}));
+
+export const suggestionRelations = relations(suggestion, ({ one }) => ({
+  document: one(artifact, {
+    fields: [suggestion.documentId],
+    references: [artifact.id],
+  }),
+  user: one(user, {
+    fields: [suggestion.userId],
+    references: [user.id],
+  }),
+}));
+
+export const streamRelations = relations(stream, ({ one }) => ({
+  chat: one(chat, {
+    fields: [stream.chatId],
+    references: [chat.id],
+  }),
+}));
+
+export type Stream = InferSelectModel<typeof stream>;
 export type Chat = typeof chat.$inferSelect;
 export type NewChat = typeof chat.$inferInsert;
 export type ChatMember = typeof chatMember.$inferSelect;
 export type ChatAgent = typeof chatAgent.$inferSelect;
 export type Message = typeof message.$inferSelect;
 export type NewMessage = typeof message.$inferInsert;
-export type Document = typeof document.$inferSelect;
+export type Document = typeof artifact.$inferSelect;
 export type ChatVisibility = (typeof chatVisibilityEnum.enumValues)[number];
 export type ChatType = (typeof chatTypeEnum.enumValues)[number];
 export type Suggestion = InferSelectModel<typeof suggestion>;
 export type Vote = InferSelectModel<typeof vote>;
-
-export const stream = pgTable(
-  "Stream",
-  {
-    id: uuid("id").notNull().defaultRandom(),
-    chatId: uuid("chatId").notNull(),
-    createdAt: timestamp("createdAt").notNull(),
-  },
-  (table) => ({
-    pk: primaryKey({ columns: [table.id] }),
-    chatRef: foreignKey({
-      columns: [table.chatId],
-      foreignColumns: [chat.id],
-    }),
-  }),
-);
-
-export type Stream = InferSelectModel<typeof stream>;

@@ -1,5 +1,3 @@
-import { getSubscriptionPlans } from "@/app/(billing)/actions/get-plans";
-import { PlanFeatures } from "@/db/schema/billing";
 import { generateRandomPath, Step } from "@/lib/border-walk";
 import { Icon } from "@/types/icon";
 import {
@@ -53,7 +51,7 @@ export function PricingSection() {
 async function Plans() {
   const plans = await getCachedPlans();
   // needs refactoring, from here
-  const featureTranslations: Record<keyof PlanFeatures, string> = {
+  const featureTranslations: Record<string, string> = {
     customBilling: "Custom billing",
     dedicatedSupport: "Dedicated support",
     kbSlots: "Knowledge base slots",
@@ -65,7 +63,7 @@ async function Plans() {
     maxMessagesPerDay: "Max messages per day",
   };
 
-  const featureIcons: Record<keyof PlanFeatures, Icon> = {
+  const featureIcons: Record<string, Icon> = {
     customBilling: ReceiptText,
     dedicatedSupport: Headphones,
     kbSlots: LibraryBig,
@@ -80,10 +78,8 @@ async function Plans() {
   return (
     <div className="absolute inset-0 grid grid-cols-12 grid-rows-8 gap-0.5">
       <div className="col-span-1 row-span-1 row-start-2"></div>
-      {plans.map((plan) => {
-        const featureNames = Object.keys(
-          plan.features ?? {},
-        ) as (keyof PlanFeatures)[];
+      {plans.map((plan: any) => {
+        const featureNames = Object.keys(plan.features ?? {}) as [];
         return (
           <article
             key={plan.id}
@@ -120,8 +116,7 @@ async function Plans() {
   // to here
 }
 
-const getCachedPlans = unstable_cache(
-  async () => getSubscriptionPlans(),
-  ["plans"],
-  { tags: ["plans"], revalidate: 60 * 60 * 24 },
-);
+const getCachedPlans = unstable_cache(async () => [], ["plans"], {
+  tags: ["plans"],
+  revalidate: 60 * 60 * 24,
+});

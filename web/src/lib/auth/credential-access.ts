@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { account, chat } from "@/db/schema";
 import { checkHybridAuth } from "@/lib/auth/hybrid";
-import { getUserEntityPermissions } from "@/lib/permissions/utils";
+import { isMemberOf } from "@/lib/permissions";
 import { eq } from "drizzle-orm";
 import type { NextRequest } from "next/server";
 
@@ -67,52 +67,52 @@ export async function authorizeCredentialUse(
     };
   }
 
-  // For collaboration paths, chatId is required to scope to a organization
+  // For collaboration paths, chatId is required to scope to an organization
   if (!chatId) {
     return { ok: false, error: "chatId is required" };
   }
 
-  const [wf] = await db
+  const [chatRow] = await db
     .select({ organizationId: chat.organizationId })
     .from(chat)
     .where(eq(chat.id, chatId))
     .limit(1);
 
-  if (!wf || !wf.organizationId) {
+  if (!chatRow || !chatRow.organizationId) {
     return { ok: false, error: "Chat not found" };
   }
 
   if (auth.authType === "internal_jwt") {
     // Internal calls: verify credential owner belongs to the chat's organization
-    const ownerPerm = await getUserEntityPermissions(
+    const ownerIsMember = await isMemberOf(
       credentialOwnerUserId,
-      "organization",
-      wf.organizationId,
+      chatRow.organizationId,
     );
-    if (ownerPerm === null) {
+
+    if (!ownerIsMember) {
       return { ok: false, error: "Unauthorized" };
     }
+
     return {
       ok: true,
       authType: auth.authType,
       requesterUserId: auth.userId,
       credentialOwnerUserId,
-      organizationId: wf.organizationI,
+      organizationId: chatRow.organizationId,
     };
   }
 
   // Session/API key: verify BOTH requester and owner belong to the chat's organization
-  const requesterPerm = await getUserEntityPermissions(
+  const requesterIsMember = await isMemberOf(
     auth.userId,
-    "organization",
-    wf.organizationId,
+    chatRow.organizationId,
   );
-  const ownerPerm = await getUserEntityPermissions(
+  const ownerIsMember = await isMemberOf(
     credentialOwnerUserId,
-    "organization",
-    wf.organizationId,
+    chatRow.organizationId,
   );
-  if (requesterPerm === null || ownerPerm === null) {
+
+  if (!requesterIsMember || !ownerIsMember) {
     return { ok: false, error: "Unauthorized" };
   }
 
@@ -121,6 +121,6 @@ export async function authorizeCredentialUse(
     authType: auth.authType,
     requesterUserId: auth.userId,
     credentialOwnerUserId,
-    organizationId: wf.organizationd,
+    organizationId: chatRow.organizationId,
   };
 }

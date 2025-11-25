@@ -2,7 +2,7 @@ import { codeDocumentHandler } from "@/artifacts/code/server";
 import { sheetDocumentHandler } from "@/artifacts/sheet/server";
 import { textDocumentHandler } from "@/artifacts/text/server";
 import type { ArtifactKind } from "@/components/artifacts/artifact";
-import { saveDocument } from "@/db/queries";
+import { artifactRepo } from "@/db/repositories";
 import type { Document } from "@/db/schema";
 import { Session } from "@/lib/auth";
 import type { UIMessageStreamWriter } from "ai";
@@ -52,7 +52,7 @@ export function createDocumentHandler<T extends ArtifactKind>(config: {
       });
 
       if (args.session?.user?.id) {
-        await saveDocument({
+        await artifactRepo.save({
           id: args.id,
           title: args.title,
           content: draftContent,
@@ -72,7 +72,7 @@ export function createDocumentHandler<T extends ArtifactKind>(config: {
       });
 
       if (args.session?.user?.id) {
-        await saveDocument({
+        await artifactRepo.save({
           id: args.document.id,
           title: args.document.title,
           content: draftContent,

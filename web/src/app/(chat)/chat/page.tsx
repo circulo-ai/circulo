@@ -21,7 +21,6 @@ export default async function Page() {
     return (
       <>
         <Chat
-          autoResume={false}
           id={id}
           initialMessages={[]}
           initialVisibilityType="private"
@@ -37,7 +36,6 @@ export default async function Page() {
     <>
       {/* Show a telegram style empty chat page with a beautiful bacjground pattern */}
       <Chat
-        autoResume={false}
         id={id}
         initialMessages={[]}
         initialVisibilityType="private"

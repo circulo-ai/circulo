@@ -1,14 +1,10 @@
 import {
   BLOB_CHAT_CONFIG,
   BLOB_CONFIG,
-  BLOB_COPILOT_CONFIG,
-  BLOB_EXECUTION_FILES_CONFIG,
   BLOB_KB_CONFIG,
   BLOB_PROFILE_PICTURES_CONFIG,
   S3_CHAT_CONFIG,
   S3_CONFIG,
-  S3_COPILOT_CONFIG,
-  S3_EXECUTION_FILES_CONFIG,
   S3_KB_CONFIG,
   S3_PROFILE_PICTURES_CONFIG,
   USE_BLOB_STORAGE,
@@ -18,10 +14,9 @@ import {
 export type StorageContext =
   | "general"
   | "knowledge-base"
+  | "organization"
   | "chat"
-  | "copilot"
-  | "execution"
-  | "workspace"
+  | "logs"
   | "profile-pictures";
 
 export interface StorageConfig {
@@ -67,17 +62,7 @@ function getS3Config(context: StorageContext): StorageConfig {
         bucket: S3_CHAT_CONFIG.bucket,
         region: S3_CHAT_CONFIG.region,
       };
-    case "copilot":
-      return {
-        bucket: S3_COPILOT_CONFIG.bucket,
-        region: S3_COPILOT_CONFIG.region,
-      };
-    case "execution":
-      return {
-        bucket: S3_EXECUTION_FILES_CONFIG.bucket,
-        region: S3_EXECUTION_FILES_CONFIG.region,
-      };
-    case "workspace":
+    case "organization":
       // Workspace files use general bucket but with custom key structure
       return {
         bucket: S3_CONFIG.bucket,
@@ -115,22 +100,8 @@ function getBlobConfig(context: StorageContext): StorageConfig {
         connectionString: BLOB_CHAT_CONFIG.connectionString,
         containerName: BLOB_CHAT_CONFIG.containerName,
       };
-    case "copilot":
-      return {
-        accountName: BLOB_COPILOT_CONFIG.accountName,
-        accountKey: BLOB_COPILOT_CONFIG.accountKey,
-        connectionString: BLOB_COPILOT_CONFIG.connectionString,
-        containerName: BLOB_COPILOT_CONFIG.containerName,
-      };
-    case "execution":
-      return {
-        accountName: BLOB_EXECUTION_FILES_CONFIG.accountName,
-        accountKey: BLOB_EXECUTION_FILES_CONFIG.accountKey,
-        connectionString: BLOB_EXECUTION_FILES_CONFIG.connectionString,
-        containerName: BLOB_EXECUTION_FILES_CONFIG.containerName,
-      };
-    case "workspace":
-      // Workspace files use general container but with custom key structure
+    case "organization":
+      // Organization files use general container but with custom key structure
       return {
         accountName: BLOB_CONFIG.accountName,
         accountKey: BLOB_CONFIG.accountKey,

@@ -63,3 +63,5 @@ next-env.d.ts
 .idea
 
 uploads
+
+.workflow-data

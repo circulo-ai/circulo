@@ -1,6 +1,6 @@
-import type { UserFile } from "@/executor/types";
 import type { Logger } from "@/lib/logs/console/logger";
 import type { StorageContext } from "@/lib/uploads";
+import { UserFile } from "@/lib/uploads/types";
 import { ACCEPTED_FILE_TYPES } from "./validation";
 
 export interface FileAttachment {
@@ -89,7 +89,7 @@ export const MIME_TYPE_MAPPING: Record<
  * Get the content type for a given MIME type
  */
 export function getContentType(
-  mimeType: strin,
+  mimeType: string,
 ): "image" | "document" | "audio" | "video" | null {
   return MIME_TYPE_MAPPING[mimeType.toLowerCase()] || null;
 }
@@ -235,7 +235,7 @@ export function getMimeTypeFromExtension(extension: string): string {
  */
 export function formatFileSize(
   bytes: number,
-  options?: { includeBytes?: boolean; precision?: number ,
+  options?: { includeBytes?: boolean; precision?: number },
 ): string {
   if (bytes === 0) return "0 Bytes";
 
@@ -322,14 +322,12 @@ export function inferContextFromKey(key: string): StorageContext {
 
   if (key.startsWith("kb/")) return "knowledge-base";
   if (key.startsWith("chat/")) return "chat";
-  if (key.startsWith("copilot/")) return "copilot";
-  if (key.startsWith("execution/")) return "execution";
   if (key.startsWith("organization/")) return "organization";
   if (key.startsWith("profile-pictures/")) return "profile-pictures";
   if (key.startsWith("logs/")) return "logs";
 
   throw new Error(
-    `File key must start with a context prefix (kb/, chat/, copilot/, execution/, organization/, profile-pictures/, or logs/). Got: ${key}`
+    `File key must start with a context prefix (kb/, chat/, copilot/, execution/, organization/, profile-pictures/, or logs/). Got: ${key}`,
   );
 }
 
@@ -349,7 +347,7 @@ export function parseInternalFileUrl(fileUrl: string): {
   }
 
   const url = new URL(
-    fileUrl.startsWith("http") ? fileUrl : `http://localhost${fileUrl}`
+    fileUrl.startsWith("http") ? fileUrl : `http://localhost${fileUrl}`,
   );
   const contextParam = url.searchParams.get("context");
 
@@ -402,7 +400,7 @@ function isCompleteUserFile(file: RawFileInput): file is UserFile {
 export function processSingleFileToUserFile(
   file: RawFileInput,
   requestId: string,
-  logger: Logger
+  logger: Logger,
 ): UserFile {
   if (isCompleteUserFile(file)) {
     return file;
@@ -413,7 +411,7 @@ export function processSingleFileToUserFile(
 
   if (!storageKey) {
     logger.warn(
-      `[${requestId}] File has no storage key: ${file.name || "unknown"}`
+      `[${requestId}] File has no storage key: ${file.name || "unknown"}`,
     );
     throw new Error(`File has no storage key: ${file.name || "unknown"}`);
   }
@@ -424,11 +422,11 @@ export function processSingleFileToUserFile(
     url: file.url || file.path || "",
     size: file.size,
     type: file.type || "application/octet-stream",
-    key: storageKey
+    key: storageKey,
   };
 
   logger.info(
-    `[${requestId}] Converted file to UserFile: ${userFile.name} (key: ${userFile.key})`
+    `[${requestId}] Converted file to UserFile: ${userFile.name} (key: ${userFile.key})`,
   );
   return userFile;
 }
@@ -443,7 +441,7 @@ export function processSingleFileToUserFile(
 export function processFilesToUserFiles(
   files: RawFileInput[],
   requestId: string,
-  logger: Logger
+  logger: Logger,
 ): UserFile[] {
   const userFiles: UserFile[] = [];
 
@@ -453,7 +451,7 @@ export function processFilesToUserFiles(
       userFiles.push(userFile);
     } catch (error) {
       logger.warn(
-        `[${requestId}] Skipping file: ${error instanceof Error ? error.message : "Unknown error"}`
+        `[${requestId}] Skipping file: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
     }
   }
@@ -491,7 +489,7 @@ export function sanitizeFilenameForMetadata(filename: string): string {
  */
 export function sanitizeStorageMetadata(
   metadata: Record<string, string>,
-  maxLength: number
+  maxLength: number,
 ): Record<string, string> {
   const sanitized: Record<string, string> = {};
   for (const [key, value] of Object.entries(metadata)) {
@@ -517,7 +515,7 @@ export function sanitizeStorageMetadata(
 export function sanitizeFileKey(key: string): string {
   if (!key.includes("/")) {
     throw new Error(
-      "File key must include a context prefix (e.g., kb/, organization/, execution/)"
+      "File key must include a context prefix (e.g., kb/, organization/, execution/)",
     );
   }
 
@@ -550,7 +548,7 @@ export function extractCleanFilename(urlOrPath: string): string {
     const url = new URL(
       withoutQuery.startsWith("http")
         ? withoutQuery
-        : `http://localhost${withoutQuery}`
+        : `http://localhost${withoutQuery}`,
     );
     const pathname = url.pathname;
     const filename = pathname.split("/").pop() || "unknown";
@@ -568,7 +566,7 @@ export function extractCleanFilename(urlOrPath: string): string {
  * @returns organizationId if key matches execution file pattern, null otherwise
  */
 export function extractOrganizationIdFromExecutionKey(
-  key: string
+  key: string,
 ): string | null {
   const segments = key.split("/");
 
@@ -594,7 +592,7 @@ export function extractOrganizationIdFromExecutionKey(
  */
 export function getViewerUrl(
   fileKey: string,
-  organizationId?: string
+  organizationId?: string,
 ): string | null {
   const resolvedOrganizationId =
     organizationId || extractOrganizationIdFromExecutionKey(fileKey);
