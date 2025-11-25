@@ -1,6 +1,6 @@
 "use client";
 
-import { GetChatHistoryResponse } from "@/app/(chat)/api/history/route";
+import { GetChatHistoryResponse } from "@/app/api/history/route";
 import { LoaderIcon } from "@/components/icons/icons";
 import {
   AlertDialog,
@@ -19,7 +19,6 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import type { Chat } from "@/db/schema";
-import { fetcher } from "@/lib/swr";
 import { User } from "@/providers/session-provider";
 import { isToday, isYesterday, subMonths, subWeeks } from "date-fns";
 import { motion } from "framer-motion";
@@ -103,13 +102,9 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     isValidating,
     isLoading,
     mutate,
-  } = useSWRInfinite<GetChatHistoryResponse>(
-    getChatHistoryPaginationKey,
-    fetcher,
-    {
-      fallbackData: [],
-    },
-  );
+  } = useSWRInfinite<GetChatHistoryResponse>(getChatHistoryPaginationKey, {
+    fallbackData: [],
+  });
 
   const router = useRouter();
   const [deleteId, setDeleteId] = useState<string | null>(null);

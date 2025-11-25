@@ -24,6 +24,11 @@ import {
 } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import {
+  SidebarContext,
+  SidebarContextProps,
+  useSidebar,
+} from "@/providers/sidebar";
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
@@ -31,27 +36,6 @@ const SIDEBAR_WIDTH = "16rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
-
-type SidebarContextProps = {
-  state: "expanded" | "collapsed";
-  open: boolean;
-  setOpen: (open: boolean) => void;
-  openMobile: boolean;
-  setOpenMobile: (open: boolean) => void;
-  isMobile: boolean;
-  toggleSidebar: () => void;
-};
-
-const SidebarContext = React.createContext<SidebarContextProps | null>(null);
-
-function useSidebar() {
-  const context = React.useContext(SidebarContext);
-  if (!context) {
-    throw new Error("useSidebar must be used within a SidebarProvider.");
-  }
-
-  return context;
-}
 
 function SidebarProvider({
   defaultOpen = true,
@@ -481,6 +465,9 @@ const sidebarMenuButtonVariants = cva(
         default: "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         outline:
           "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
+        primary:
+          "bg-foreground text-background hover:bg-foreground/75 active:bg-foreground/75",
+        secondary: "hover:bg-teal-50/5 active:bg-teal-50/10",
       },
       size: {
         default: "h-8 text-sm",
@@ -602,29 +589,40 @@ function SidebarMenuBadge({
 function SidebarMenuSkeleton({
   className,
   showIcon = false,
+  customSkeleton,
+  isWrapperSkeleton,
   ...props
 }: React.ComponentProps<"div"> & {
   showIcon?: boolean;
+  customSkeleton?: (props: React.ComponentProps<"div">) => React.JSX.Element;
+  isWrapperSkeleton?: boolean;
 }) {
   // Random width between 50 to 90%.
   const width = React.useMemo(() => {
     return `${Math.floor(Math.random() * 40) + 50}%`;
   }, []);
 
+  const FinalSkeleton = React.useMemo(
+    () => customSkeleton ?? Skeleton,
+    [customSkeleton],
+  );
+
+  const Wrapper = isWrapperSkeleton ? FinalSkeleton : "div";
+
   return (
-    <div
+    <Wrapper
       data-slot="sidebar-menu-skeleton"
       data-sidebar="menu-skeleton"
       className={cn("flex h-8 items-center gap-2 rounded-md px-2", className)}
       {...props}
     >
       {showIcon && (
-        <Skeleton
+        <FinalSkeleton
           className="size-4 rounded-md"
           data-sidebar="menu-skeleton-icon"
         />
       )}
-      <Skeleton
+      <FinalSkeleton
         className="h-4 max-w-(--skeleton-width) flex-1"
         data-sidebar="menu-skeleton-text"
         style={
@@ -633,7 +631,7 @@ function SidebarMenuSkeleton({
           } as React.CSSProperties
         }
       />
-    </div>
+    </Wrapper>
   );
 }
 

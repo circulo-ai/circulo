@@ -9,7 +9,6 @@ import { VersionFooter } from "@/components/version-footer";
 import type { VisibilityType } from "@/components/visibility-selector";
 import type { Document, Vote } from "@/db/schema";
 import { useArtifact } from "@/hooks/api/chats/use-artifact";
-import { fetcher } from "@/lib/swr";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import { formatDistance } from "date-fns";
@@ -93,9 +92,8 @@ function PureArtifact({
     mutate: mutateDocuments,
   } = useSWR<Document[]>(
     artifact.documentId !== "init" && artifact.status !== "streaming"
-      ? `/api/document?id=${artifact.documentId}`
+      ? `/api/artifact?id=${artifact.documentId}`
       : null,
-    fetcher,
   );
 
   const [mode, setMode] = useState<"edit" | "diff">("edit");
@@ -133,7 +131,7 @@ function PureArtifact({
       }
 
       mutate<Document[]>(
-        `/api/document?id=${artifact.documentId}`,
+        `/api/artifact?id=${artifact.documentId}`,
         async (currentDocuments) => {
           if (!currentDocuments) {
             return [];
@@ -147,7 +145,7 @@ function PureArtifact({
           }
 
           if (currentDocument.content !== updatedContent) {
-            await fetch(`/api/document?id=${artifact.documentId}`, {
+            await fetch(`/api/artifact?id=${artifact.documentId}`, {
               method: "POST",
               body: JSON.stringify({
                 title: artifact.title,

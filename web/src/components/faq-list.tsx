@@ -59,3 +59,5 @@ export function FaqList(props: ComponentProps<typeof ScrollArea>) {
     </ScrollArea>
   );
 }
+
+// TODO fix style

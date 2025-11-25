@@ -1,6 +1,7 @@
 import { env, getEnv } from "@/lib/env";
 import { isDev } from "@/lib/environment";
 import type { NextConfig } from "next";
+import { withWorkflow } from "workflow/next";
 
 const nextConfig: NextConfig = {
   devIndicators: false,
@@ -77,7 +78,6 @@ const nextConfig: NextConfig = {
     "@t3-oss/env-core",
     "@react-email/components",
     "@react-email/render",
-    "@ton/ton",
   ],
   ...(isDev && {
     allowedDevOrigins: [
@@ -130,4 +130,4 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
 };
 
-export default nextConfig;
+export default withWorkflow(nextConfig);

@@ -1,77 +1,77 @@
 "use client";
 
-import { EnhancedLink } from "@/components/enhanced-link";
-import { EnhancedLinkSpinner } from "@/components/enhanced-link-spinner";
+import {
+  CustomSidebarGroup,
+  CustomSidebarHeader,
+  CustomSidebarMenuSkeleton,
+} from "@/components/ui-custom/sidebar";
 import {
   SidebarContent,
-  SidebarGroup,
-  SidebarGroupAction,
   SidebarGroupContent,
-  SidebarHeader,
   SidebarMenu,
-  SidebarMenuAction,
-  SidebarMenuBadge,
-  SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSkeleton,
 } from "@/components/ui/sidebar";
 import { useChatHistory } from "@/hooks/api/chats/use-chat-history";
-import { Home, Plus } from "lucide-react";
+import { ChatSidebarAddAction } from "./chat-sidebar-add-action";
 import { ChatSidebarBurgerMenu } from "./chat-sidebar-burger-menu";
+import { ChatSidebarEmpty } from "./chat-sidebar-empty";
+import { ChatSidebarItem } from "./chat-sidebar-item";
+import { ChatSidebarNoResult } from "./chat-sidebar-no-result";
 import { ChatSidebarSearch } from "./chat-sidebar-search";
 
 export function ChatSidebarInside() {
-  const { data, currentChatId, isLoading, search, setSearch } =
-    useChatHistory();
+  const {
+    data,
+    isLoading,
+    search,
+    debouncedSearch,
+    setSearch,
+    currentChatId,
+    setCurrentChatId,
+  } = useChatHistory();
 
   return (
     <>
-      <SidebarHeader className="flex-row">
+      <CustomSidebarHeader>
         {/* TODO add chat tabs + sidebar separator */}
         <ChatSidebarBurgerMenu />
         <ChatSidebarSearch search={search} setSearch={setSearch} />
-      </SidebarHeader>
+      </CustomSidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
+        <CustomSidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
               {isLoading &&
                 Array.from({ length: 5 }).map((_, index) => (
                   <SidebarMenuItem key={index}>
-                    <SidebarMenuSkeleton />
+                    <CustomSidebarMenuSkeleton />
                   </SidebarMenuItem>
                 ))}
 
               {!isLoading &&
+                data?.chats.length === 0 &&
+                debouncedSearch.length === 0 && <ChatSidebarEmpty />}
+
+              {!isLoading &&
+                data?.chats.length === 0 &&
+                debouncedSearch.length !== 0 && <ChatSidebarNoResult />}
+
+              {!isLoading &&
                 data?.chats.map((item) => (
-                  <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
-                      isActive={currentChatId === item.id}
-                      asChild
-                    >
-                      <EnhancedLink
-                        asButton={false}
-                        href={`/chat/${item.id}`}
-                        buttonProps={{ variant: "text" }}
-                      >
-                        <Home />
-                        <span className="truncate">{item.title}</span>
-                        <SidebarMenuAction className="pointer-events-none">
-                          <EnhancedLinkSpinner />
-                          <span className="sr-only">Add Project</span>
-                        </SidebarMenuAction>
-                      </EnhancedLink>
-                    </SidebarMenuButton>
-                    <SidebarMenuBadge>24</SidebarMenuBadge>
-                  </SidebarMenuItem>
+                  <ChatSidebarItem
+                    key={item.id}
+                    item={item}
+                    currentChatId={currentChatId}
+                    setCurrentChatId={setCurrentChatId}
+                  />
                 ))}
             </SidebarMenu>
           </SidebarGroupContent>
-          <SidebarGroupAction title="Add Project">
-            <Plus /> <span className="sr-only">Add Project</span>
-          </SidebarGroupAction>
-        </SidebarGroup>
+          <ChatSidebarAddAction />
+        </CustomSidebarGroup>
       </SidebarContent>
     </>
   );
 }
+
+// TODO add the controlled input from the Toco project

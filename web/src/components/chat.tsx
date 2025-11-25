@@ -1,7 +1,6 @@
 "use client";
 
 import { Artifact } from "@/components/artifacts/artifact";
-import { ChatHeader } from "@/components/chat-header";
 import { Messages } from "@/components/messages/messages";
 import { getChatHistoryPaginationKey } from "@/components/sidebar/sidebar-history";
 import {
@@ -17,11 +16,11 @@ import {
 import type { Vote } from "@/db/schema";
 import { useArtifactSelector } from "@/hooks/api/chats/use-artifact";
 import { useAutoResume } from "@/hooks/api/chats/use-auto-resume";
+import { useIsChatLoading } from "@/hooks/api/chats/use-chat-history";
 import { useChatVisibility } from "@/hooks/api/chats/use-chat-visibility";
 import { ChatSDKError } from "@/lib/errors";
 import {
   clearCachePattern,
-  fetcher,
   fetchWithErrorHandlers,
   globalMutate,
 } from "@/lib/swr";
@@ -29,34 +28,36 @@ import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { generateUUID } from "@/lib/utils";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { WorkflowChatTransport } from "@workflow/ai";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { unstable_serialize } from "swr/infinite";
 import { useDataStream } from "./data-stream-provider";
 import { MultimodalInput } from "./multimodal-input";
+import { PageSpinner } from "./page-spinner";
 import { toast } from "./toast";
 import type { VisibilityType } from "./visibility-selector";
-// Response shape: chatAgent rows with nested agent
+
+const WORKFLOW_RUN_ID_KEY = "active-workflow-run-id";
 
 export function Chat({
   id,
   initialMessages,
-  initialChatModel,
+  initialChatModel = "gemini-2.5-flash",
   initialVisibilityType,
   isReadonly,
-  autoResume,
   initialLastContext,
 }: {
   id: string;
   initialMessages: ChatMessage[];
-  initialChatModel: string;
+  initialChatModel?: string;
   initialVisibilityType: VisibilityType;
   isReadonly: boolean;
-  autoResume: boolean;
   initialLastContext?: AppUsage;
 }) {
+  const { isChatLoading } = useIsChatLoading();
+
   const { visibilityType } = useChatVisibility({
     chatId: id,
     initialVisibilityType,
@@ -69,86 +70,200 @@ export function Chat({
   const [usage, setUsage] = useState<AppUsage | undefined>(initialLastContext);
   const [showCreditCardAlert, setShowCreditCardAlert] = useState(false);
   const [currentModelId, setCurrentModelId] = useState(initialChatModel);
-  const currentModelIdRef = useRef(currentModelId);
+  const [visibilityType, setVisibilityType] = useState(initialVisibilityType);
 
-  useEffect(() => {
-    currentModelIdRef.current = currentModelId;
-  }, [currentModelId]);
+  // Workflow orchestration state
+  const [workflowStatus, setWorkflowStatus] = useState<{
+    isRunning: boolean;
+    currentPhase?: string;
+    progress?: number;
+  }>({ isRunning: false });
 
-  // const { data: agentsResponse } = useSWR<any>(
-  //   `/api/chat/${id}/agents`,
-  //   fetcher,
-  // );
-  const agentsResponse: any = undefined;
-  // TODO I did this so it would stop throwing api errors
+  const activeWorkflowRunId = useMemo(() => {
+    if (typeof window === "undefined") return;
+    return localStorage.getItem(WORKFLOW_RUN_ID_KEY) ?? undefined;
+  }, []);
 
-  const {
-    messages,
-    setMessages,
-    sendMessage,
-    status,
-    stop,
-    regenerate,
-    resumeStream,
-  } = useChat<ChatMessage>({
-    id,
-    messages: initialMessages,
-    experimental_throttle: 100,
-    generateId: generateUUID,
-    transport: new DefaultChatTransport({
-      api: "/api/chat",
-      fetch: fetchWithErrorHandlers,
-      prepareSendMessagesRequest(request) {
-        return {
-          body: {
-            id: request.id,
-            message: request.messages.at(-1),
-            selectedChatModel: currentModelIdRef.current,
-            selectedVisibilityType: visibilityType,
-            agentIds: Array.isArray(agentsResponse?.data?.agents)
-              ? agentsResponse.data.agents
-                  .map((a: any) => a?.agent?.id)
-                  .filter((v: any) => typeof v === "string" && v.length > 0)
-              : [],
-            ...request.body,
-          },
-        };
+  const handleChatEnd = useCallback(() => {
+    localStorage.removeItem(WORKFLOW_RUN_ID_KEY);
+    setWorkflowStatus({ isRunning: false });
+  }, []);
+
+  const { messages, setMessages, sendMessage, status, stop, regenerate } =
+    useChat<ChatMessage>({
+      resume: !!activeWorkflowRunId,
+      id,
+      messages: initialMessages,
+      generateId: generateUUID,
+
+      transport: new WorkflowChatTransport({
+        api: "/api/chat",
+        fetch: fetchWithErrorHandlers,
+        maxConsecutiveErrors: 5,
+
+        onChatSendMessage: (response) => {
+          const workflowRunId = response.headers.get("x-workflow-run-id");
+          if (!workflowRunId) {
+            throw new Error(
+              'Workflow run ID not found in "x-workflow-run-id" response header',
+            );
+          }
+          localStorage.setItem(WORKFLOW_RUN_ID_KEY, workflowRunId);
+          setWorkflowStatus({ isRunning: true, currentPhase: "starting" });
+        },
+
+        prepareSendMessagesRequest: (config) => {
+          return {
+            ...config,
+            body: {
+              id,
+              message: config.messages.at(-1),
+              selectedChatModel: currentModelId,
+              selectedVisibilityType: visibilityType,
+              agentIds: [],
+            },
+          };
+        },
+
+        prepareReconnectToStreamRequest: ({ api, ...rest }) => {
+          const workflowRunId = localStorage.getItem(WORKFLOW_RUN_ID_KEY);
+          if (!workflowRunId) {
+            throw new Error("No active workflow run ID found");
+          }
+          return {
+            ...rest,
+            api: `/api/chat/${encodeURIComponent(workflowRunId)}/stream`,
+          };
+        },
+
+        onChatEnd: ({ chatId, chunkIndex }) => {
+          console.log("Chat stream ended", { chatId, chunkIndex });
+          handleChatEnd();
+        },
+      }),
+
+      onData: (dataPart) => {
+        // Store data parts for components that need them
+        setDataStream((ds) => (ds ? [...ds, dataPart] : []));
+
+        // Handle different data types
+        switch (dataPart.type) {
+          case "data-usage":
+            setUsage(dataPart.data);
+            break;
+
+          case "data-workflowStarted":
+            setWorkflowStatus({
+              isRunning: true,
+              currentPhase: "started",
+              progress: 0,
+            });
+            console.log("Workflow started:", dataPart.data);
+            break;
+
+          case "data-workflowClassification":
+            setWorkflowStatus((prev) => ({
+              ...prev,
+              currentPhase: "classified",
+              progress: 15,
+            }));
+            console.log("Request classified:", dataPart.data);
+            break;
+
+          case "data-workflowPlan":
+            setWorkflowStatus((prev) => ({
+              ...prev,
+              currentPhase: "planned",
+              progress: 25,
+            }));
+            console.log("Execution plan:", dataPart.data);
+            break;
+
+          case "data-workflowAgentStarted":
+            setWorkflowStatus((prev) => ({
+              ...prev,
+              currentPhase: `executing:${dataPart.data.agentName}`,
+            }));
+            console.log("Agent started:", dataPart.data);
+            break;
+
+          case "data-workflowAgentProgress":
+            console.log("Agent progress:", dataPart.data);
+            break;
+
+          case "data-workflowAgentCompleted":
+            console.log("Agent completed:", dataPart.data);
+            break;
+
+          case "data-workflowAggregated":
+            setWorkflowStatus((prev) => ({
+              ...prev,
+              currentPhase: "aggregated",
+              progress: 95,
+            }));
+            console.log("Results aggregated:", dataPart.data);
+            break;
+
+          case "data-workflowCompleted":
+            setWorkflowStatus({
+              isRunning: false,
+              currentPhase: "completed",
+              progress: 100,
+            });
+            console.log("Workflow completed:", dataPart.data);
+            handleChatEnd();
+            break;
+
+          case "data-workflowError":
+            setWorkflowStatus({
+              isRunning: false,
+              currentPhase: "error",
+            });
+            console.error("Workflow error:", dataPart.data);
+            toast({
+              type: "error",
+              description: dataPart.data.error,
+            });
+            handleChatEnd();
+            break;
+        }
       },
-    }),
-    onData: (dataPart) => {
-      setDataStream((ds) => (ds ? [...ds, dataPart] : []));
-      if (dataPart.type === "data-usage") {
-        setUsage(dataPart.data);
-      }
-    },
-    onFinish: async () => {
-      mutate(unstable_serialize(getChatHistoryPaginationKey));
-      await clearCachePattern(/\/api\/conversations.*/);
-      await globalMutate(
-        (key) =>
-          typeof key === "string" && key.startsWith("/api/conversations"),
-      );
-    },
-    onError: (error) => {
-      if (error instanceof ChatSDKError) {
-        // Check if it's a credit card error
-        if (
-          error.message?.includes("AI Gateway requires a valid credit card")
-        ) {
-          setShowCreditCardAlert(true);
+
+      onFinish: async () => {
+        mutate(unstable_serialize(getChatHistoryPaginationKey));
+        await clearCachePattern(/\/api\/conversations.*/);
+        await globalMutate(
+          (key) =>
+            typeof key === "string" && key.startsWith("/api/conversations"),
+        );
+      },
+
+      onError: (error) => {
+        console.error("Chat error:", error);
+        handleChatEnd();
+
+        if (error instanceof ChatSDKError) {
+          if (
+            error.message?.includes("AI Gateway requires a valid credit card")
+          ) {
+            setShowCreditCardAlert(true);
+          } else {
+            toast({
+              type: "error",
+              description: error.message,
+            });
+          }
         } else {
           toast({
             type: "error",
-            description: error.message,
+            description: "An unexpected error occurred",
           });
         }
-      }
-    },
-  });
+      },
+    });
 
   const searchParams = useSearchParams();
   const query = searchParams.get("query");
-
   const [hasAppendedQuery, setHasAppendedQuery] = useState(false);
 
   useEffect(() => {
@@ -165,7 +280,6 @@ export function Chat({
 
   const { data: votes } = useSWR<Vote[]>(
     messages.length >= 2 ? `/api/vote?chatId=${id}` : null,
-    fetcher,
   );
 
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -197,15 +311,11 @@ export function Chat({
     return sendMessage(msg, options);
   };
 
+  if (isChatLoading) return <PageSpinner />;
+
   return (
     <>
       <div className="overscroll-behavior-contain flex h-dvh min-w-0 touch-pan-y flex-col">
-        <ChatHeader
-          chatId={id}
-          isReadonly={isReadonly}
-          selectedVisibilityType={initialVisibilityType}
-        />
-
         <Messages
           chatId={id}
           isArtifactVisible={isArtifactVisible}
@@ -228,7 +338,7 @@ export function Chat({
               onModelChange={setCurrentModelId}
               selectedModelId={currentModelId}
               selectedVisibilityType={visibilityType}
-              sendMessage={sendMessageWithPrechecks}
+              sendMessage={sendMessage}
               setAttachments={setAttachments}
               setInput={setInput}
               setMessages={setMessages}
@@ -249,7 +359,7 @@ export function Chat({
         regenerate={regenerate}
         selectedModelId={currentModelId}
         selectedVisibilityType={visibilityType}
-        sendMessage={sendMessageWithPrechecks}
+        sendMessage={sendMessage}
         setAttachments={setAttachments}
         setInput={setInput}
         setMessages={setMessages}

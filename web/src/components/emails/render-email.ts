@@ -3,12 +3,12 @@ import {
   InvitationEmail,
   MagicLinkEmail,
   OTPVerificationEmail,
-  PlanWelcomeEmail,
   ResetPasswordEmail,
-  SizpayRenewalEmail,
   UsageThresholdEmail,
 } from "@/components/emails";
-import EnterpriseSubscriptionEmail from "@/components/emails/enterprise-subscription-email";
+import EnterpriseSubscriptionEmail from "@/components/emails/billing/enterprise-subscription-email";
+import FreeTierUpgradeEmail from "@/components/emails/billing/free-tier-upgrade-email";
+import PlanWelcomeEmail from "@/components/emails/billing/plan-welcome-email";
 import { getBrandConfig } from "@/lib/branding/branding";
 import { getBaseUrl } from "@/lib/urls/utils";
 import { render } from "@react-email/components";
@@ -136,9 +136,9 @@ export function getEmailSubject(
     | "help-confirmation"
     | "enterprise-subscription"
     | "usage-threshold"
+    | "free-tier-upgrade"
     | "plan-welcome-pro"
-    | "plan-welcome-team"
-    | "sizpay-renewal",
+    | "plan-welcome-team",
 ): string {
   const brandName = getBrandConfig().name;
 
@@ -161,12 +161,12 @@ export function getEmailSubject(
       return `Your Enterprise Plan is now active on ${brandName}`;
     case "usage-threshold":
       return `You're nearing your monthly budget on ${brandName}`;
+    case "free-tier-upgrade":
+      return `You're at 90% of your free credits on ${brandName}`;
     case "plan-welcome-pro":
       return `Your Pro plan is now active on ${brandName}`;
     case "plan-welcome-team":
       return `Your Team plan is now active on ${brandName}`;
-    case "sizpay-renewal":
-      return `Your subscription is due for renewal on ${brandName}`;
     default:
       return brandName;
   }
@@ -187,18 +187,21 @@ export async function renderPlanWelcomeEmail(params: {
   );
 }
 
-export async function renderSizpayRenewalEmail(params: {
-  planName: "Pro" | "Team";
-  userName?: string | null;
-  periodEnd: Date;
-  renewLink: string;
+export async function renderFreeTierUpgradeEmail(params: {
+  userName?: string;
+  percentUsed: number;
+  currentUsage: number;
+  limit: number;
+  upgradeLink: string;
 }): Promise<string> {
   return await render(
-    SizpayRenewalEmail({
-      planName: params.planName,
+    FreeTierUpgradeEmail({
       userName: params.userName,
-      periodEnd: params.periodEnd,
-      renewLink: params.renewLink,
+      percentUsed: params.percentUsed,
+      currentUsage: params.currentUsage,
+      limit: params.limit,
+      upgradeLink: params.upgradeLink,
+      updatedDate: new Date(),
     }),
   );
 }

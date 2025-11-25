@@ -8,7 +8,5 @@ export interface UserFile {
   size: number;
   type: string;
   key: string;
-  uploadedAt: string;
-  expiresAt: string;
   context?: string;
 }

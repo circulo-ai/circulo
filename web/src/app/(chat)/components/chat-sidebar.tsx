@@ -1,10 +1,13 @@
-import { CustomSidebarInset } from "@/components/ui-custom/sidebar";
+import {
+  CustomSidebar,
+  CustomSidebarInset,
+} from "@/components/ui-custom/sidebar";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Sidebar, SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { cookies } from "next/headers";
 import { ReactNode } from "react";
 import { ChatSidebarInside } from "./chat-sidebar-inside";
@@ -39,17 +42,17 @@ export async function ChatSidebar({ children }: { children: ReactNode }) {
           min="256px"
           default="256px"
           max="384px"
-          // isStaticAtRest // TODO can't use but it's a good prop, could make a or to the library's repo to fix it
+          // isStaticAtRest // TODO can't use but it's a good prop, could make a pr to the library's repo to fix it
           collapsible
-          collapsedSize="64px"
+          collapsedSize="60px"
           collapseAnimation={{
             duration: 150,
             easing: "ease-in-out",
           }}
         >
-          <Sidebar className="static w-full" collapsible="icon" variant="inset">
+          <CustomSidebar>
             <ChatSidebarInside />
-          </Sidebar>
+          </CustomSidebar>
         </ChatSidebarResizablePanel>
         <ResizableHandle
           size="8px"
@@ -63,3 +66,9 @@ export async function ChatSidebar({ children }: { children: ReactNode }) {
     </SidebarProvider>
   );
 }
+
+// TODO fix the bg-chat when the svg has not loaded yet
+// TODO the suspense state flickers
+// TODO the first page spinner shows up late
+// TODO use scroll area component in sidebar for chats
+// TODO use animated list in sidebar for chats

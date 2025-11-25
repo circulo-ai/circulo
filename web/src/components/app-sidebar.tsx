@@ -15,7 +15,6 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { fetcher } from "@/lib/swr";
 import { User } from "@/providers/session-provider";
 import { UserButton } from "@daveyplate/better-auth-ui";
 import { useParams, useRouter } from "next/navigation";
@@ -69,7 +68,7 @@ export function AppSidebar({ user }: { user: User }) {
     isValidating,
     isLoading,
     mutate: mutateConversations,
-  } = useSWRInfinite<ConversationPage>(getConversationsPaginationKey, fetcher, {
+  } = useSWRInfinite<ConversationPage>(getConversationsPaginationKey, {
     fallbackData: [],
   });
 
