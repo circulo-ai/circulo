@@ -122,8 +122,8 @@ export type PromptInputTextareaProps = Omit<
   debounceMs?: number;
   value?: string;
   onChange?:
-  | ((event: React.ChangeEvent<HTMLTextAreaElement>) => void)
-  | ((value: string) => void);
+    | ((event: React.ChangeEvent<HTMLTextAreaElement>) => void)
+    | ((value: string) => void);
   onValueChange?: (value: string) => void;
   placeholder?: string;
   name?: string;
