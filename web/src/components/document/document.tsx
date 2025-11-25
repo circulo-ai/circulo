@@ -40,37 +40,38 @@ function PureDocumentToolResult({
 }: DocumentToolResultProps) {
   const { setArtifact } = useArtifact();
 
+  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (isReadonly) {
+      toast.error("Viewing files in shared chats is currently not supported.");
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+
+    const boundingBox = {
+      top: rect.top,
+      left: rect.left,
+      width: rect.width,
+      height: rect.height,
+    };
+
+    setArtifact((currentArtifact) => ({
+      documentId: result.id,
+      kind: result.kind,
+      content: currentArtifact.content,
+      title: result.title,
+      isVisible: true,
+      status: "idle",
+      boundingBox,
+    }));
+  };
+
   return (
     <button
-      className="flex w-fit cursor-pointer flex-row items-start gap-3 rounded-xl border bg-background px-3 py-2"
-      onClick={(event) => {
-        if (isReadonly) {
-          toast.error(
-            "Viewing files in shared chats is currently not supported.",
-          );
-          return;
-        }
-
-        const rect = event.currentTarget.getBoundingClientRect();
-
-        const boundingBox = {
-          top: rect.top,
-          left: rect.left,
-          width: rect.width,
-          height: rect.height,
-        };
-
-        setArtifact((currentArtifact) => ({
-          documentId: result.id,
-          kind: result.kind,
-          content: currentArtifact.content,
-          title: result.title,
-          isVisible: true,
-          status: "idle",
-          boundingBox,
-        }));
-      }}
+      className="flex w-fit cursor-pointer flex-row items-start gap-3 rounded-xl border bg-background px-3 py-2 transition-colors hover:bg-muted"
+      onClick={handleClick}
       type="button"
+      disabled={isReadonly}
     >
       <div className="mt-1 text-muted-foreground">
         {type === "create" ? (
@@ -106,33 +107,47 @@ function PureDocumentToolCall({
 }: DocumentToolCallProps) {
   const { setArtifact } = useArtifact();
 
+  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (isReadonly) {
+      toast.error("Viewing files in shared chats is currently not supported.");
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+
+    const boundingBox = {
+      top: rect.top,
+      left: rect.left,
+      width: rect.width,
+      height: rect.height,
+    };
+
+    setArtifact((currentArtifact) => ({
+      ...currentArtifact,
+      isVisible: true,
+      boundingBox,
+    }));
+  };
+
+  const getDisplayText = () => {
+    if (type === "create" && "title" in args && args.title) {
+      return `"${args.title}"`;
+    }
+    if (type === "update" && "description" in args) {
+      return `"${args.description}"`;
+    }
+    if (type === "request-suggestions") {
+      return "for document";
+    }
+    return "";
+  };
+
   return (
     <button
-      className="cursor pointer flex w-fit flex-row items-start justify-between gap-3 rounded-xl border px-3 py-2"
-      onClick={(event) => {
-        if (isReadonly) {
-          toast.error(
-            "Viewing files in shared chats is currently not supported.",
-          );
-          return;
-        }
-
-        const rect = event.currentTarget.getBoundingClientRect();
-
-        const boundingBox = {
-          top: rect.top,
-          left: rect.left,
-          width: rect.width,
-          height: rect.height,
-        };
-
-        setArtifact((currentArtifact) => ({
-          ...currentArtifact,
-          isVisible: true,
-          boundingBox,
-        }));
-      }}
+      className="flex w-fit cursor-pointer flex-row items-start justify-between gap-3 rounded-xl border px-3 py-2 transition-colors hover:bg-muted"
+      onClick={handleClick}
       type="button"
+      disabled={isReadonly}
     >
       <div className="flex flex-row items-start gap-3">
         <div className="mt-1 text-zinc-500">
@@ -146,19 +161,13 @@ function PureDocumentToolCall({
         </div>
 
         <div className="text-left">
-          {`${getActionText(type, "present")} ${
-            type === "create" && "title" in args && args.title
-              ? `"${args.title}"`
-              : type === "update" && "description" in args
-                ? `"${args.description}"`
-                : type === "request-suggestions"
-                  ? "for document"
-                  : ""
-          }`}
+          {`${getActionText(type, "present")} ${getDisplayText()}`}
         </div>
       </div>
 
-      <div className="mt-1 animate-spin">{<LoaderIcon />}</div>
+      <div className="mt-1 animate-spin">
+        <LoaderIcon />
+      </div>
     </button>
   );
 }

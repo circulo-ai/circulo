@@ -2,9 +2,11 @@ import { renderMagicLinkEmail } from "@/components/emails";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { getBaseURL } from "@/lib/auth-client";
+import { canCreateTeamOrg } from "@/lib/billing/autumn";
 import { sendEmail } from "@/lib/email/mailer";
 import { createLogger } from "@/lib/logs/console/logger";
-import { betterAuth } from "better-auth";
+import { autumn } from "autumn-js/better-auth";
+import { betterAuth, User } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import {
@@ -12,44 +14,86 @@ import {
   genericOAuth,
   magicLink,
   oneTimeToken,
+  openAPI,
+  organization,
 } from "better-auth/plugins";
-import { eq } from "drizzle-orm";
+import { createAccessControl } from "better-auth/plugins/access";
+import {
+  adminAc,
+  defaultStatements,
+  memberAc,
+  ownerAc,
+} from "better-auth/plugins/organization/access";
+import { and, eq, sql } from "drizzle-orm";
+import { nanoid } from "nanoid";
 import { headers } from "next/headers";
 import { env } from "./env";
 
 const logger = createLogger("Auth");
 
-const handleNewUser = async (userId: string) => {
+export const statement = {
+  ...defaultStatements,
+  chat: ["create", "share", "update", "delete"],
+} as const;
+
+const ac = createAccessControl(statement);
+
+const ownerRole = ac.newRole({
+  ...ownerAc.statements,
+  chat: ["create", "update", "delete"],
+});
+
+const adminRole = ac.newRole({
+  ...adminAc.statements,
+  chat: ["create", "update"],
+});
+
+const memberRole = ac.newRole({
+  ...memberAc.statements,
+  chat: ["create"],
+});
+
+const createPersonalOrganization = async (user: User) => {
   try {
-    // Get the free tier plan (you'll need to ensure this exists in your database)
-    const freePlan = await db
-      .select()
-      .from(schema.subscriptionPlans)
-      .where(eq(schema.subscriptionPlans.slug, "free"))
-      .limit(1);
+    const firstName = user.name?.trim()?.split(" ")[0] ?? null;
 
-    if (!freePlan[0]) {
-      logger.error("Free tier plan not found in database");
-      throw new Error("Free tier plan not configured");
-    }
+    const workspaceName = firstName
+      ? `${firstName}'s Workspace`
+      : "Personal Workspace";
 
-    // Create subscription for new user
-    await db.insert(schema.subscriptions).values({
-      userId: userId,
-      planId: freePlan[0].id,
-      status: "active",
-      startDate: new Date(),
-      endDate: null, // Free tier never expires
-      autoRenew: true, // Should be handled explicitly to renew free tiers every month
+    const orgId = nanoid(); // you are using text pk, so nanoid is perfect
+    const slug = `personal-${orgId}`; // guaranteed unique
+
+    await db.transaction(async (tx) => {
+      // 1. Create organization
+      await tx.insert(schema.organization).values({
+        id: orgId,
+        name: workspaceName,
+        slug,
+        metadata: JSON.stringify({ type: "personal", userId: user.id }),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      // 2. Create membership
+      await tx.insert(schema.member).values({
+        id: nanoid(), // if your member table uses text PK
+        userId: user.id,
+        organizationId: orgId,
+        role: "owner",
+        createdAt: new Date(),
+      });
     });
 
-    logger.info("Free tier subscription created for new user", {
-      userId,
-      planId: freePlan[0].id,
+    logger.info("Created personal workspace for new user", {
+      userId: user.id,
+      organizationId: orgId,
     });
+
+    return orgId;
   } catch (error) {
-    logger.error("Failed to create subscription for new user", {
-      userId,
+    logger.error("Failed to create personal organization", {
+      userId: user.id,
       error,
     });
     throw error;
@@ -64,10 +108,10 @@ export const auth = betterAuth({
       create: {
         after: async (user) => {
           try {
-            await handleNewUser(user.id);
+            await createPersonalOrganization(user);
           } catch (error) {
             logger.error(
-              "[databaseHooks.user.create.after] Failed to initialize user stats",
+              "[databaseHooks.user.create.after] Failed to create personal organization",
               {
                 userId: user.id,
                 error,
@@ -191,6 +235,7 @@ export const auth = betterAuth({
     freshAge: 60 * 60, // 1 hour (or set to 0 to disable completely)
   },
   plugins: [
+    openAPI(),
     magicLink({
       sendMagicLink: async ({ email, token, url }, request) => {
         await sendEmail({
@@ -1173,6 +1218,88 @@ export const auth = betterAuth({
         },
       ],
     }),
+    autumn({
+      customerScope: "organization",
+    }),
+    organization({
+      ac,
+      roles: {
+        owner: ownerRole,
+        admin: adminRole,
+        member: memberRole,
+      },
+      membershipLimit: 50,
+      allowUserToCreateOrganization: async (user) => {
+        try {
+          // Find the user's personal organization
+          const personalOrg = await db
+            .select()
+            .from(schema.organization)
+            .innerJoin(
+              schema.member,
+              eq(schema.member.organizationId, schema.organization.id),
+            )
+            .where(
+              and(
+                eq(schema.member.userId, user.id),
+                eq(schema.member.role, "owner"),
+                // Check for personal org type in metadata
+                sql`${schema.organization.metadata}->>'type' = 'personal'`,
+              ),
+            )
+            .limit(1);
+
+          if (personalOrg.length === 0) {
+            logger.warn("No personal org found for user", { userId: user.id });
+            return false;
+          }
+
+          const orgId = personalOrg[0].organization.id;
+
+          // Check if user's personal org has pro+ subscription
+          const canCreate = await canCreateTeamOrg(orgId);
+
+          logger.info("Checking if user can create team org", {
+            userId: user.id,
+            personalOrgId: orgId,
+            canCreate,
+          });
+
+          return canCreate;
+        } catch (error) {
+          logger.error("Error checking org creation permission", {
+            userId: user.id,
+            error,
+          });
+          return false;
+        }
+      },
+      organizationCreation: {
+        beforeCreate: async ({ organization, user }) => {
+          // Mark new orgs as "team" type (personal orgs are created separately)
+          return {
+            data: {
+              ...organization,
+              metadata: {
+                ...((organization as any).metadata || {}),
+                type: "team",
+              },
+            },
+          };
+        },
+        afterCreate: async ({ organization, user }) => {
+          logger.info("[organizationCreation.afterCreate] Team org created", {
+            organizationId: organization.id,
+            creatorId: user.id,
+          });
+
+          // Optionally: Initialize the team org with a "team" subscription
+          // This depends on your billing flow - you might want to:
+          // 1. Auto-assign team plan, or
+          // 2. Let users upgrade after creation
+        },
+      },
+    }),
   ],
 });
 
@@ -1182,4 +1309,13 @@ export type Session = NonNullable<SessionResponse>;
 // Server-side auth helpers
 export async function getSession(): Promise<SessionResponse> {
   return await auth.api.getSession({ headers: await headers() });
+}
+
+export async function getActiveOrganizationId(): Promise<string> {
+  const session = await getSession();
+  const activeOrgId = (session?.session as any).activeOrganizationId;
+  if (!activeOrgId) {
+    throw new Error("No organization id provided");
+  }
+  return activeOrgId;
 }

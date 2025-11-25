@@ -1,6 +1,7 @@
 import { toast } from "@/components/toast";
 import { mutate as globalMutate, mutate, SWRConfiguration } from "swr";
 import {
+  ApiRequestError,
   deleteRequest,
   getRequest,
   patchRequest,
@@ -8,7 +9,6 @@ import {
   putRequest,
 } from "./api/client";
 import { ChatSDKError, ErrorCode } from "./errors";
-import { ApiError } from "./server/types";
 import { toQueryString } from "./utils";
 
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -62,24 +62,16 @@ export const swrConfig: SWRConfiguration = {
   fetcher: getFetcher(),
   shouldRetryOnError: (error) => {
     // Don't retry on client errors (4xx)
-    if (error instanceof ApiError) {
-      if (error.statusCode >= 400 && error.statusCode < 500) {
-        return false;
-      }
-
-      if (error.isClientError()) {
+    if (error instanceof ApiRequestError) {
+      if (error.status >= 400 && error.status < 500) {
         return false;
       }
     }
-
     return true;
   },
   errorRetryCount: 3,
   onError: (error, key) => {
-    // Skip internal/non-API keys
-    if (shouldIgnoreKey(key)) {
-      return;
-    }
+    if (shouldIgnoreKey(key)) return;
 
     console.error("SWR Error:", {
       key,
@@ -95,48 +87,11 @@ export const swrConfig: SWRConfiguration = {
   },
 
   onSuccess: (data, key) => {
-    // Skip internal keys
-    if (shouldIgnoreKey(key)) {
-      return;
-    }
-
-    // Handle envelope format with explicit messages
-    if (data && typeof data === "object" && "message" in data) {
-      const message = (data as any).message;
-      const success = (data as any).success !== false;
-
-      if (message) {
-        toast({
-          type: success ? "success" : "error",
-          description: message,
-        });
-      }
-    }
-
-    // Handle envelope errors (success: false)
-    if (data && typeof data === "object" && "success" in data) {
-      const success = (data as any).success;
-      const error = (data as any).error;
-
-      if (success === false && error) {
-        console.error("SWR Response Error:", { key, error });
-
-        // Don't show toast here if already shown via message
-        if (!(data as any).message) {
-          toast({
-            type: "error",
-            description: error,
-          });
-        }
-      }
-    }
+    if (shouldIgnoreKey(key)) return;
   },
 
-  // Optional: Global loading handler
   onLoadingSlow: (key) => {
-    if (shouldIgnoreKey(key)) {
-      return;
-    }
+    if (shouldIgnoreKey(key)) return;
 
     console.warn("SWR: Slow request", {
       key,
@@ -149,7 +104,6 @@ export const swrConfig: SWRConfiguration = {
 function shouldIgnoreKey(key: any): boolean {
   if (typeof key !== "string") return true;
 
-  // Internal state keys that should be ignored
   const internalPatterns = [
     ":should-",
     "artifact",
@@ -159,35 +113,28 @@ function shouldIgnoreKey(key: any): boolean {
     ":local:",
   ];
 
-  // Check if key matches any internal pattern
   if (internalPatterns.some((pattern) => key.includes(pattern))) {
     return true;
   }
 
-  // Only process API endpoints (start with / or http)
   return !key.startsWith("/") && !key.startsWith("http");
 }
 
 function getErrorMessage(error: unknown): string {
-  if (!(error instanceof ApiError)) {
-    return error instanceof Error
-      ? error.message
-      : "An unexpected error occurred";
+  // Handle our custom Client Error from api/client.ts
+  if (error instanceof ApiRequestError) {
+    // If validation errors exist, showing the first one is often helpful
+    if (Array.isArray(error.details) && error.details.length > 0) {
+      return error.details[0].message;
+    }
+    return error.message;
   }
 
-  // Map error codes to user-friendly messages
-  const errorMessages: Record<string, string> = {
-    UNAUTHORIZED: "You need to be logged in to perform this action",
-    FORBIDDEN: "You don't have permission to perform this action",
-    NOT_FOUND: "The requested resource was not found",
-    VALIDATION_ERROR: "Please check your input and try again",
-    TOO_MANY_REQUESTS: "Too many requests. Please try again later",
-    NETWORK_ERROR: "Network error. Please check your connection",
-    CONFLICT: "This action conflicts with existing data",
-    BAD_REQUEST: "Invalid request. Please check your input",
-  };
+  if (error instanceof Error) {
+    return error.message;
+  }
 
-  return errorMessages[error.code] || error.message || "An error occurred";
+  return "An unexpected error occurred";
 }
 
 export async function fetchWithErrorHandlers(
@@ -198,7 +145,19 @@ export async function fetchWithErrorHandlers(
     const response = await fetch(input, init);
 
     if (!response.ok) {
-      const { code, cause } = await response.json();
+      // Updated to match standard backend error shape if possible,
+      // otherwise keep generic handling
+      let code = "UNKNOWN_ERROR";
+      let cause = undefined;
+
+      try {
+        const data = await response.json();
+        code = data.message || response.statusText;
+        cause = data.errors;
+      } catch (e) {
+        // response was not JSON
+      }
+
       throw new ChatSDKError(code as ErrorCode, cause);
     }
 
@@ -231,10 +190,8 @@ export async function clearCachePattern(pattern: RegExp) {
   );
 }
 
-// Batch mutations
 export async function batchMutate(keys: string[]) {
   await Promise.all(keys.map((key) => mutate(key)));
 }
 
-// convenient re-exports
 export { globalMutate };

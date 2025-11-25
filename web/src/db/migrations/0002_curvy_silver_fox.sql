@@ -1,1 +1,0 @@
-ALTER TABLE "tool" ALTER COLUMN "mcp_server_id" SET DATA TYPE text;

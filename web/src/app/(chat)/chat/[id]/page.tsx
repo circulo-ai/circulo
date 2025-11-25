@@ -3,15 +3,14 @@ import { notFound, redirect } from "next/navigation";
 
 import { Chat } from "@/components/chat";
 import { DataStreamHandler } from "@/components/data-stream-handler";
-import { getChatById, getMessagesByChatId } from "@/db/queries";
-import { DEFAULT_CHAT_MODEL } from "@/lib/ai/models";
+import { chatRepo, messageRepo } from "@/db/repositories";
 import { getSession } from "@/lib/auth";
 import { convertToUIMessages } from "@/lib/utils";
 
 export default async function Page(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const { id } = params;
-  const chat = await getChatById({ id });
+  const chat = await chatRepo.findById(id);
 
   if (!chat) {
     notFound();
@@ -33,9 +32,7 @@ export default async function Page(props: { params: Promise<{ id: string }> }) {
     }
   }
 
-  const messagesFromDb = await getMessagesByChatId({
-    id,
-  });
+  const messagesFromDb = await messageRepo.findForChat(id);
 
   const uiMessages = convertToUIMessages(messagesFromDb);
 
@@ -46,9 +43,7 @@ export default async function Page(props: { params: Promise<{ id: string }> }) {
     return (
       <>
         <Chat
-          autoResume={true}
           id={chat.id}
-          initialChatModel={DEFAULT_CHAT_MODEL}
           initialMessages={uiMessages}
           initialVisibilityType={chat.visibility}
           isReadonly={session?.user?.id !== chat.creatorId}
@@ -61,7 +56,6 @@ export default async function Page(props: { params: Promise<{ id: string }> }) {
   return (
     <>
       <Chat
-        autoResume={true}
         id={chat.id}
         initialChatModel={chatModelFromCookie.value}
         initialMessages={uiMessages}

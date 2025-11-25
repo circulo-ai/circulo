@@ -56,7 +56,7 @@ export const EmailFooter = ({
                   </td>
                   <td align="center" style={{ padding: "0 8px" }}>
                     <Link
-                      href="https://github.com/simstudioai/sim"
+                      href="https://github.com/circulo-ai"
                       rel="noopener noreferrer"
                     >
                       <Img

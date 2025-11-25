@@ -1,8 +1,7 @@
-import { Message as DBMessage, Document } from "@/db/schema";
-import { ChatMessage, ChatTools, CustomUIDataTypes } from "@/lib/types";
-import { UIMessage, UIMessagePart } from "ai";
+import { Document, Message } from "@/db/schema";
+import { ChatMessage } from "@/lib/types";
+import { UIMessage } from "ai";
 import { clsx, type ClassValue } from "clsx";
-import { formatISO } from "date-fns";
 import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
@@ -15,6 +14,10 @@ export function generateUUID(): string {
     const v = c === "x" ? r : (r & 0x3) | 0x8;
     return v.toString(16);
   });
+}
+
+export function generateRequestId(): string {
+  return generateUUID();
 }
 
 export function getTextFromMessage(message: ChatMessage | UIMessage): string {
@@ -42,15 +45,25 @@ export function getDocumentTimestampByIndex(
   return documents[index].createdAt;
 }
 
-export function convertToUIMessages(messages: DBMessage[]): ChatMessage[] {
-  return messages.map((message) => ({
-    id: message.id,
-    role: message.role as "user" | "assistant" | "system",
-    parts: message.parts as UIMessagePart<CustomUIDataTypes, ChatTools>[],
-    metadata: {
-      createdAt: formatISO(message.createdAt),
-    },
-  }));
+export function convertToUIMessages(messages: Message[]): ChatMessage[] {
+  return messages
+    .filter((msg) => !msg.isDeleted)
+    .map((msg) => ({
+      id: msg.id,
+      role: msg.role as "user" | "assistant" | "system",
+      parts:
+        Array.isArray(msg.parts) && msg.parts.length > 0
+          ? msg.parts
+          : [
+              {
+                type: "text" as const,
+                text: msg.content,
+              },
+            ],
+      metadata: {
+        createdAt: msg.createdAt.toISOString(),
+      },
+    }));
 }
 
 export function toQueryString<T extends Record<string, unknown>>(

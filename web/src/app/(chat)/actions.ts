@@ -1,11 +1,7 @@
 "use server";
 
 import type { VisibilityType } from "@/components/visibility-selector";
-import {
-  deleteMessagesByChatIdAfterTimestamp,
-  getMessageById,
-  updateChatVisibilityById,
-} from "@/db/queries";
+import { chatRepo, messageRepo } from "@/db/repositories";
 import { titlePrompt } from "@/lib/ai/prompts";
 import { myProvider } from "@/lib/ai/providers";
 import { getTextFromMessage } from "@/lib/utils";
@@ -32,9 +28,13 @@ export async function generateTitleFromUserMessage({
 }
 
 export async function deleteTrailingMessages({ id }: { id: string }) {
-  const [message] = await getMessageById({ id });
+  const message = await messageRepo.findById(id);
 
-  await deleteMessagesByChatIdAfterTimestamp({
+  if (!message) {
+    return;
+  }
+
+  await messageRepo.deleteByChatIdAfterTimestamp({
     chatId: message.chatId,
     timestamp: message.createdAt,
   });
@@ -47,5 +47,5 @@ export async function updateChatVisibility({
   chatId: string;
   visibility: VisibilityType;
 }) {
-  await updateChatVisibilityById({ chatId, visibility });
+  await chatRepo.updateVisibilityById({ chatId, visibility });
 }

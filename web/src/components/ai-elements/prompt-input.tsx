@@ -122,8 +122,8 @@ export type PromptInputTextareaProps = Omit<
   debounceMs?: number;
   value?: string;
   onChange?:
-    | ((event: React.ChangeEvent<HTMLTextAreaElement>) => void)
-    | ((value: string) => void);
+  | ((event: React.ChangeEvent<HTMLTextAreaElement>) => void)
+  | ((value: string) => void);
   onValueChange?: (value: string) => void;
   placeholder?: string;
   name?: string;
@@ -165,7 +165,7 @@ export const PromptInputTextarea = forwardRef<
     );
     const [loading, setLoading] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(0);
-    const fetchTimeoutRef = useRef<NodeJS.Timeout>();
+    const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     useImperativeHandle(ref, () => textareaRef.current!);
 
