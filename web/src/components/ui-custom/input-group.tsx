@@ -21,7 +21,7 @@ export function CustomInputGroupInput({
 }: CustomInputGroupInputProps) {
   return (
     <InputGroupInput
-      as={CustomInput as any}
+      as={CustomInput}
       className={cn(className, "")}
       {...props}
     />

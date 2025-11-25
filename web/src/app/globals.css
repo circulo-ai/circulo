@@ -399,3 +399,27 @@
       transparent
     );
 }
+
+@theme {
+  --animate-ripple: ripple 1s forwards;
+
+  @keyframes ripple {
+    0% {
+      top: var(--initial-top);
+      left: var(--initial-left);
+      width: 0;
+      filter: blur(0px);
+    }
+    50% {
+      top: 50%;
+      left: 50%;
+      width: 100%;
+    }
+    100% {
+      top: 50%;
+      left: 50%;
+      width: 100%;
+      filter: blur(4px);
+    }
+  }
+}

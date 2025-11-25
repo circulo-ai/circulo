@@ -1,77 +1,121 @@
 "use client";
 
 import { EnhancedLink } from "@/components/enhanced-link";
-import { EnhancedLinkSpinner } from "@/components/enhanced-link-spinner";
+import { WithRipple } from "@/components/ui-custom/ripple";
+import {
+  CustomSidebarContextMenu,
+  CustomSidebarGroup,
+  CustomSidebarHeader,
+  CustomSidebarMenuAvatar,
+  CustomSidebarMenuButton,
+  CustomSidebarMenuSkeleton,
+} from "@/components/ui-custom/sidebar";
+import { Badge } from "@/components/ui/badge";
 import {
   SidebarContent,
-  SidebarGroup,
-  SidebarGroupAction,
   SidebarGroupContent,
-  SidebarHeader,
   SidebarMenu,
-  SidebarMenuAction,
-  SidebarMenuBadge,
-  SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSkeleton,
 } from "@/components/ui/sidebar";
 import { useChatHistory } from "@/hooks/api/chats/use-chat-history";
-import { Home, Plus } from "lucide-react";
+import { formatDate } from "@/lib/format-date";
+import { ChatSidebarAddAction } from "./chat-sidebar-add-action";
 import { ChatSidebarBurgerMenu } from "./chat-sidebar-burger-menu";
+import { ChatSidebarEmpty } from "./chat-sidebar-empty";
+import { ChatSidebarNoResult } from "./chat-sidebar-no-result";
 import { ChatSidebarSearch } from "./chat-sidebar-search";
 
 export function ChatSidebarInside() {
-  const { data, currentChatId, isLoading, search, setSearch } =
-    useChatHistory();
+  const {
+    data,
+    isLoading,
+    search,
+    debouncedSearch,
+    setSearch,
+    currentChatId,
+    setCurrentChatId,
+  } = useChatHistory();
 
   return (
     <>
-      <SidebarHeader className="flex-row">
+      <CustomSidebarHeader>
         {/* TODO add chat tabs + sidebar separator */}
         <ChatSidebarBurgerMenu />
         <ChatSidebarSearch search={search} setSearch={setSearch} />
-      </SidebarHeader>
+      </CustomSidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
+        <CustomSidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
               {isLoading &&
                 Array.from({ length: 5 }).map((_, index) => (
                   <SidebarMenuItem key={index}>
-                    <SidebarMenuSkeleton />
+                    <CustomSidebarMenuSkeleton />
                   </SidebarMenuItem>
                 ))}
 
-              {!isLoading &&
-                data?.chats.map((item) => (
-                  <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
+              {data?.chats.length === 0 && debouncedSearch.length === 0 && (
+                <ChatSidebarEmpty />
+              )}
+
+              {data?.chats.length === 0 && debouncedSearch.length !== 0 && (
+                <ChatSidebarNoResult />
+              )}
+
+              {data?.chats.map((item: any) => (
+                <SidebarMenuItem key={item.id}>
+                  <CustomSidebarContextMenu>
+                    <CustomSidebarMenuButton
                       isActive={currentChatId === item.id}
                       asChild
                     >
-                      <EnhancedLink
-                        asButton={false}
-                        href={`/chat/${item.id}`}
-                        buttonProps={{ variant: "text" }}
+                      <WithRipple
+                        component={EnhancedLink}
+                        componentProps={{
+                          enableLinkStatus: false,
+                          asButton: false,
+                          href: `/chat/${item.id}`,
+                          onClick: () => setCurrentChatId(item.id),
+                        }}
                       >
-                        <Home />
-                        <span className="truncate">{item.title}</span>
-                        <SidebarMenuAction className="pointer-events-none">
-                          <EnhancedLinkSpinner />
-                          <span className="sr-only">Add Project</span>
-                        </SidebarMenuAction>
-                      </EnhancedLink>
-                    </SidebarMenuButton>
-                    <SidebarMenuBadge>24</SidebarMenuBadge>
-                  </SidebarMenuItem>
-                ))}
+                        <CustomSidebarMenuAvatar />
+                        <div className="flex max-h-9 w-full flex-col justify-center">
+                          <div className="flex items-center gap-2">
+                            <div className="line-clamp-1 grow font-medium">
+                              {item.title}
+                            </div>
+                            <div className="shrink-0 text-xs opacity-75">
+                              {formatDate(new Date(item.updatedAt))}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="line-clamp-1 grow opacity-75">
+                              {item.description}
+                            </div>
+                            {
+                              /*Boolean(item.messageCount)*/ true && (
+                                <Badge
+                                  className="shrink-0"
+                                  variant="sidebar-menu-badge"
+                                >
+                                  {item.messageCount}
+                                </Badge>
+                              )
+                            }
+                          </div>
+                        </div>
+                      </WithRipple>
+                    </CustomSidebarMenuButton>
+                  </CustomSidebarContextMenu>
+                </SidebarMenuItem>
+              ))}
             </SidebarMenu>
           </SidebarGroupContent>
-          <SidebarGroupAction title="Add Project">
-            <Plus /> <span className="sr-only">Add Project</span>
-          </SidebarGroupAction>
-        </SidebarGroup>
+          <ChatSidebarAddAction />
+        </CustomSidebarGroup>
       </SidebarContent>
     </>
   );
 }
+
+// TODO add the controlled input from the Toco project

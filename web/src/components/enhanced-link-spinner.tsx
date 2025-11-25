@@ -18,7 +18,10 @@ export function EnhancedLinkSpinner({
 
   return (
     <Comp
-      className={cn("hidden group-data-loading/link:block", className)}
+      className={cn(
+        "pointer-events-none opacity-0 transition-opacity group-data-loading/link:pointer-events-auto group-data-loading/link:opacity-100",
+        className,
+      )}
       {...props}
     />
   );

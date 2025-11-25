@@ -135,7 +135,7 @@ function InputGroupInput({
 }: React.ComponentProps<"input"> & {
   as?: (props: React.ComponentProps<"input">) => React.JSX.Element;
 }) {
-  const Comp = as ?? Input;
+  const Comp = React.useMemo(() => as ?? Input, [as]);
 
   return (
     <Comp

@@ -46,6 +46,7 @@
     "@e2b/code-interpreter": "^2.2.0",
     "@hello-pangea/dnd": "^18.0.1",
     "@hookform/resolvers": "^5.2.2",
+    "@lottiefiles/dotlottie-react": "^0.17.8",
     "@mhbdev/bdk": "^1.0.8",
     "@modelcontextprotocol/sdk": "^1.22.0",
     "@noble/hashes": "^2.0.1",

@@ -16,6 +16,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { Vote } from "@/db/schema";
 import { useArtifactSelector } from "@/hooks/api/chats/use-artifact";
+import { useAutoResume } from "@/hooks/api/chats/use-auto-resume";
+import { useIsChatLoading } from "@/hooks/api/chats/use-chat-history";
+import { useChatVisibility } from "@/hooks/api/chats/use-chat-visibility";
 import { ChatSDKError } from "@/lib/errors";
 import {
   clearCachePattern,
@@ -34,6 +37,7 @@ import useSWR, { useSWRConfig } from "swr";
 import { unstable_serialize } from "swr/infinite";
 import { useDataStream } from "./data-stream-provider";
 import { MultimodalInput } from "./multimodal-input";
+import { PageSpinner } from "./page-spinner";
 import { toast } from "./toast";
 import type { VisibilityType } from "./visibility-selector";
 
@@ -54,6 +58,13 @@ export function Chat({
   isReadonly: boolean;
   initialLastContext?: AppUsage;
 }) {
+  const { isChatLoading } = useIsChatLoading();
+
+  const { visibilityType } = useChatVisibility({
+    chatId: id,
+    initialVisibilityType,
+  });
+
   const { mutate } = useSWRConfig();
   const { setDataStream } = useDataStream();
 
@@ -276,6 +287,34 @@ export function Chat({
 
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const isArtifactVisible = useArtifactSelector((state) => state.isVisible);
+
+  useAutoResume({
+    autoResume,
+    initialMessages,
+    resumeStream,
+    setMessages,
+  });
+
+  // Use original sendMessage; server enforces agent requirement
+
+  const sendMessageWithPrechecks = (
+    msg?: Parameters<typeof sendMessage>[0],
+    options?: Parameters<typeof sendMessage>[1],
+  ): ReturnType<typeof sendMessage> => {
+    const enabledAgentCount = Array.isArray(agentsResponse?.data?.agents)
+      ? agentsResponse.data.agents.length
+      : 0;
+    if (messages.length === 0 && enabledAgentCount === 0) {
+      toast({
+        type: "error",
+        description: "Add at least one agent to start this chat",
+      });
+      return Promise.resolve();
+    }
+    return sendMessage(msg, options);
+  };
+
+  if (isChatLoading) return <PageSpinner />;
 
   return (
     <>
