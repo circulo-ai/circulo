@@ -1,12 +1,12 @@
 import type { ArtifactKind } from "@/components/artifacts/artifact";
-import { documentRepo } from "@/db/repositories";
+import { artifactRepo } from "@/db/repositories";
 import { getSession } from "@/lib/auth";
 import { ChatSDKError } from "@/lib/errors";
 import { isMemberOf } from "@/lib/permissions";
 import { NextRequest } from "next/server";
 
 /**
- * GET /api/document?id=xxx
+ * GET /api/artifact?id=xxx
  * Fetch a document by ID with permission checks
  */
 export async function GET(request: NextRequest) {
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Fetch the document
-  const document = await documentRepo.findByIdWithSuggestions(id);
+  const document = await artifactRepo.findByIdWithSuggestions(id);
 
   if (!document) {
     return new ChatSDKError("not_found:document").toResponse();
@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * POST /api/document?id=xxx
+ * POST /api/artifact?id=xxx
  * Create or update a document
  */
 export async function POST(request: NextRequest) {
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
   } = await request.json();
 
   // Check if document exists
-  const existingDoc = await documentRepo.findById(id);
+  const existingDoc = await artifactRepo.findById(id);
 
   if (existingDoc) {
     // Update existing document
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update the document
-    const updatedDoc = await documentRepo.update(id, {
+    const updatedDoc = await artifactRepo.update(id, {
       content,
       title,
       kind,
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Create new document
-  const newDoc = await documentRepo.create({
+  const newDoc = await artifactRepo.create({
     id,
     content,
     title,
@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * DELETE /api/document?id=xxx
+ * DELETE /api/artifact?id=xxx
  * Delete a document
  */
 export async function DELETE(request: NextRequest) {
@@ -167,7 +167,7 @@ export async function DELETE(request: NextRequest) {
     return new ChatSDKError("unauthorized:document").toResponse();
   }
 
-  const document = await documentRepo.findById(id);
+  const document = await artifactRepo.findById(id);
 
   if (!document) {
     return new ChatSDKError("not_found:document").toResponse();
@@ -178,7 +178,7 @@ export async function DELETE(request: NextRequest) {
     return new ChatSDKError("forbidden:document").toResponse();
   }
 
-  const deletedDoc = await documentRepo.delete(id);
+  const deletedDoc = await artifactRepo.delete(id);
 
   return Response.json(deletedDoc, { status: 200 });
 }

@@ -1,30 +1,28 @@
 import { ArtifactKind } from "@/components/artifacts/artifact";
 import { db } from "@/db";
-import { document, suggestion } from "@/db/schema";
+import { artifact, suggestion } from "@/db/schema";
 import { and, desc, eq, gt, ilike, or, sql } from "drizzle-orm";
 
-export type DocumentKind = "text" | "code" | "image" | "sheet";
-
-export interface DocumentFilters {
+export interface ArtifactFilters {
   chatId?: string;
   userId?: string;
-  kind?: DocumentKind;
+  kind?: ArtifactKind;
   search?: string;
   limit?: number;
   offset?: number;
 }
 
-export const documentRepo = {
+export const artifactRepo = {
   async findById(id: string) {
-    return db.query.document.findFirst({ where: eq(document.id, id) });
+    return db.query.artifact.findFirst({ where: eq(artifact.id, id) });
   },
 
   async getById({ id }: { id: string }) {
     try {
       const documents = await db
         .select()
-        .from(document)
-        .where(eq(document.id, id))
+        .from(artifact)
+        .where(eq(artifact.id, id))
         .orderBy(sql`created_at asc`);
 
       return documents;
@@ -37,9 +35,9 @@ export const documentRepo = {
     try {
       const [selectedDocument] = await db
         .select()
-        .from(document)
-        .where(eq(document.id, id))
-        .orderBy(desc(document.createdAt));
+        .from(artifact)
+        .where(eq(artifact.id, id))
+        .orderBy(desc(artifact.createdAt));
 
       return selectedDocument;
     } catch (_error) {
@@ -48,14 +46,14 @@ export const documentRepo = {
   },
 
   async findByIdWithSuggestions(id: string) {
-    return db.query.document.findFirst({
-      where: eq(document.id, id),
+    return db.query.artifact.findFirst({
+      where: eq(artifact.id, id),
       with: { suggestions: true },
     });
   },
 
-  async create(data: typeof document.$inferInsert) {
-    const [row] = await db.insert(document).values(data).returning();
+  async create(data: typeof artifact.$inferInsert) {
+    const [row] = await db.insert(artifact).values(data).returning();
     return row;
   },
 
@@ -74,7 +72,7 @@ export const documentRepo = {
   }) {
     try {
       return await db
-        .insert(document)
+        .insert(artifact)
         .values({
           id,
           title,
@@ -89,24 +87,24 @@ export const documentRepo = {
     }
   },
 
-  async update(id: string, data: Partial<typeof document.$inferInsert>) {
+  async update(id: string, data: Partial<typeof artifact.$inferInsert>) {
     const current = await this.findById(id);
     const [row] = await db
-      .update(document)
+      .update(artifact)
       .set({
         ...data,
         version: (current?.version ?? 0) + 1,
         updatedAt: new Date(),
       })
-      .where(eq(document.id, id))
+      .where(eq(artifact.id, id))
       .returning();
     return row;
   },
 
   async delete(id: string) {
     const [row] = await db
-      .delete(document)
-      .where(eq(document.id, id))
+      .delete(artifact)
+      .where(eq(artifact.id, id))
       .returning();
     return row;
   },
@@ -129,8 +127,8 @@ export const documentRepo = {
         );
 
       return await db
-        .delete(document)
-        .where(and(eq(document.id, id), gt(document.createdAt, timestamp)))
+        .delete(artifact)
+        .where(and(eq(artifact.id, id), gt(artifact.createdAt, timestamp)))
         .returning();
     } catch (_error) {
       throw new Error("Failed to delete documents by id after timestamp");
@@ -139,30 +137,30 @@ export const documentRepo = {
 
   // --- Query Methods ---
 
-  async findMany(filters: DocumentFilters) {
+  async findMany(filters: ArtifactFilters) {
     const conditions = [];
 
     if (filters.chatId) {
-      conditions.push(eq(document.chatId, filters.chatId));
+      conditions.push(eq(artifact.chatId, filters.chatId));
     }
     if (filters.userId) {
-      conditions.push(eq(document.userId, filters.userId));
+      conditions.push(eq(artifact.userId, filters.userId));
     }
     if (filters.kind) {
-      conditions.push(eq(document.kind, filters.kind));
+      conditions.push(eq(artifact.kind, filters.kind));
     }
     if (filters.search) {
       conditions.push(
         or(
-          ilike(document.title, `%${filters.search}%`),
-          ilike(document.content, `%${filters.search}%`),
+          ilike(artifact.title, `%${filters.search}%`),
+          ilike(artifact.content, `%${filters.search}%`),
         )!,
       );
     }
 
-    return db.query.document.findMany({
+    return db.query.artifact.findMany({
       where: conditions.length > 0 ? and(...conditions) : undefined,
-      orderBy: desc(document.updatedAt),
+      orderBy: desc(artifact.updatedAt),
       limit: filters.limit ?? 50,
       offset: filters.offset ?? 0,
     });
@@ -170,32 +168,32 @@ export const documentRepo = {
 
   async findForChat(
     chatId: string,
-    opts?: { kind?: DocumentKind; limit?: number },
+    opts?: { kind?: ArtifactKind; limit?: number },
   ) {
-    const conditions = [eq(document.chatId, chatId)];
+    const conditions = [eq(artifact.chatId, chatId)];
     if (opts?.kind) {
-      conditions.push(eq(document.kind, opts.kind));
+      conditions.push(eq(artifact.kind, opts.kind));
     }
 
-    return db.query.document.findMany({
+    return db.query.artifact.findMany({
       where: and(...conditions),
-      orderBy: desc(document.updatedAt),
+      orderBy: desc(artifact.updatedAt),
       limit: opts?.limit ?? 50,
     });
   },
 
   async findForUser(
     userId: string,
-    opts?: { kind?: DocumentKind; limit?: number },
+    opts?: { kind?: ArtifactKind; limit?: number },
   ) {
-    const conditions = [eq(document.userId, userId)];
+    const conditions = [eq(artifact.userId, userId)];
     if (opts?.kind) {
-      conditions.push(eq(document.kind, opts.kind));
+      conditions.push(eq(artifact.kind, opts.kind));
     }
 
-    return db.query.document.findMany({
+    return db.query.artifact.findMany({
       where: and(...conditions),
-      orderBy: desc(document.updatedAt),
+      orderBy: desc(artifact.updatedAt),
       limit: opts?.limit ?? 50,
     });
   },
@@ -203,16 +201,16 @@ export const documentRepo = {
   async countByChat(chatId: string): Promise<number> {
     const result = await db
       .select({ count: sql<number>`count(*)` })
-      .from(document)
-      .where(eq(document.chatId, chatId));
+      .from(artifact)
+      .where(eq(artifact.chatId, chatId));
     return result[0]?.count ?? 0;
   },
 
   async countByUser(userId: string): Promise<number> {
     const result = await db
       .select({ count: sql<number>`count(*)` })
-      .from(document)
-      .where(eq(document.userId, userId));
+      .from(artifact)
+      .where(eq(artifact.userId, userId));
     return result[0]?.count ?? 0;
   },
 

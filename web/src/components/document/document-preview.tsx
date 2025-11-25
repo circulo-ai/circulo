@@ -44,7 +44,7 @@ export function DocumentPreview({
   // Fetch document using the new API structure
   const { data: documents, isLoading: isDocumentsFetching } = useSWR<
     Document[]
-  >(result?.id ? `/api/document?id=${result.id}` : null, fetcher);
+  >(result?.id ? `/api/artifact?id=${result.id}` : null, fetcher);
 
   const previewDocument = useMemo(() => documents?.[0], [documents]);
   const hitboxRef = useRef<HTMLDivElement>(null);

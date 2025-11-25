@@ -49,7 +49,7 @@ export async function aggregateResultsStep(params: {
   const agentOutputs = agentResults
     .map(
       (r) => `${r.agentName} (${r.success ? "✓" : "✗"}):
-${r.success ? r.output : `ERROR: ${r.error}`}
+${r.success ? r.output || "Completed" : `ERROR: ${r.error}`}
 Duration: ${r.durationMs}ms`,
     )
     .join("\n\n---\n\n");

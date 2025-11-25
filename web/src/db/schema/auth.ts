@@ -11,11 +11,11 @@ import {
 } from "drizzle-orm/pg-core";
 import { agent } from "./agent";
 import {
+  artifact,
   chat,
   chatAgent,
   chatInvitation,
   chatMember,
-  document,
   message,
   suggestion,
   vote,
@@ -206,7 +206,7 @@ export const userRelations = relations(user, ({ many }) => ({
   chatInvitationsReceived: many(chatInvitation, { relationName: "invitee" }),
   addedChatAgents: many(chatAgent),
   messages: many(message),
-  documents: many(document),
+  documents: many(artifact),
   suggestions: many(suggestion),
   votes: many(vote),
   apiKeys: many(apiKey),

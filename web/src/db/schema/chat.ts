@@ -244,8 +244,8 @@ export const vote = pgTable(
   (t) => [primaryKey({ columns: [t.chatId, t.messageId, t.userId] })],
 );
 
-export const document = pgTable(
-  "documents",
+export const artifact = pgTable(
+  "artifacts",
   {
     id: uuid("id").defaultRandom().primaryKey(),
     chatId: uuid("chat_id").references(() => chat.id, { onDelete: "cascade" }),
@@ -270,8 +270,8 @@ export const document = pgTable(
       .$onUpdate(() => new Date()),
   },
   (t) => [
-    index("documents_chat_idx").on(t.chatId),
-    index("documents_user_idx").on(t.userId),
+    index("artifacts_chat_idx").on(t.chatId),
+    index("artifacts_user_idx").on(t.userId),
   ],
 );
 
@@ -281,7 +281,7 @@ export const suggestion = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     documentId: uuid("document_id")
       .notNull()
-      .references(() => document.id, { onDelete: "cascade" }),
+      .references(() => artifact.id, { onDelete: "cascade" }),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
@@ -299,7 +299,7 @@ export const suggestion = pgTable(
 );
 
 export const stream = pgTable(
-  "Stream", // TODO: rename this table
+  "stream",
   {
     id: uuid("id").notNull().defaultRandom(),
     chatId: uuid("chatId").notNull(),
@@ -327,7 +327,7 @@ export const chatRelations = relations(chat, ({ one, many }) => ({
   invitations: many(chatInvitation),
   agents: many(chatAgent),
   messages: many(message),
-  documents: many(document),
+  artifacts: many(artifact),
   votes: many(vote),
   streams: many(stream),
 }));
@@ -404,22 +404,22 @@ export const voteRelations = relations(vote, ({ one }) => ({
   }),
 }));
 
-export const documentRelations = relations(document, ({ one, many }) => ({
+export const documentRelations = relations(artifact, ({ one, many }) => ({
   chat: one(chat, {
-    fields: [document.chatId],
+    fields: [artifact.chatId],
     references: [chat.id],
   }),
   user: one(user, {
-    fields: [document.userId],
+    fields: [artifact.userId],
     references: [user.id],
   }),
   suggestions: many(suggestion),
 }));
 
 export const suggestionRelations = relations(suggestion, ({ one }) => ({
-  document: one(document, {
+  document: one(artifact, {
     fields: [suggestion.documentId],
-    references: [document.id],
+    references: [artifact.id],
   }),
   user: one(user, {
     fields: [suggestion.userId],
@@ -441,7 +441,7 @@ export type ChatMember = typeof chatMember.$inferSelect;
 export type ChatAgent = typeof chatAgent.$inferSelect;
 export type Message = typeof message.$inferSelect;
 export type NewMessage = typeof message.$inferInsert;
-export type Document = typeof document.$inferSelect;
+export type Document = typeof artifact.$inferSelect;
 export type ChatVisibility = (typeof chatVisibilityEnum.enumValues)[number];
 export type ChatType = (typeof chatTypeEnum.enumValues)[number];
 export type Suggestion = InferSelectModel<typeof suggestion>;

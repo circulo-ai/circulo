@@ -6,6 +6,7 @@ import { OrchestrationInput } from "@/workflows/orchestrate/types";
 import { google } from "@ai-sdk/google";
 import { DurableAgent } from "@workflow/ai/agent";
 import { convertToModelMessages } from "ai";
+import { getWritable } from "workflow";
 import { ExecutionPlan } from "./plan-agent-execution-step";
 
 export interface AgentExecutionResult {
@@ -13,11 +14,26 @@ export interface AgentExecutionResult {
   agentName: string;
   task: string;
   success: boolean;
+  output?: string;
   error?: string;
   startTime: Date;
   endTime: Date;
   durationMs: number;
+  tokenCount?: number;
   cost?: number;
+}
+
+async function writeAgentEvent(
+  writable: WritableStream<CustomUIMessageChunk>,
+  event: CustomUIMessageChunk,
+) {
+  "use step";
+  const writer = writable.getWriter();
+  try {
+    await writer.write(event);
+  } finally {
+    writer.releaseLock();
+  }
 }
 
 export async function executeAgentTaskStep(
@@ -32,7 +48,7 @@ export async function executeAgentTaskStep(
 ): Promise<AgentExecutionResult> {
   "use step";
 
-  const { agentPlan, context, previousResults, webhookPayload } = params;
+  const { agentPlan, context, previousResults, webhookPayload, triggerMessage } = params;
 
   const startTime = new Date();
   const chatAgent = context.agents.find((a) => a.agentId === agentPlan.agentId);
@@ -52,6 +68,16 @@ export async function executeAgentTaskStep(
 
   const agent = chatAgent.agent;
 
+  // Notify that agent is starting
+  await writeAgentEvent(writable, {
+    type: "data-workflowAgentStarted",
+    data: {
+      agentId: agent.id,
+      agentName: agent.name,
+      task: agentPlan.task,
+    },
+  });
+
   try {
     // Build context from previous results
     let previousContext = "";
@@ -64,10 +90,7 @@ export async function executeAgentTaskStep(
             const status = r.success ? "✓ SUCCESS" : "✗ FAILED";
             return `[Agent ${idx + 1}] ${r.agentName} (${status})
 Task: ${r.task}
-Output: ${
-              "hi"
-              // TODO: r.output
-            }
+Output: ${r.output || "No output"}
 ${r.error ? `Error: ${r.error}` : ""}
 ---`;
           })
@@ -84,29 +107,7 @@ Data: ${JSON.stringify(webhookPayload.data, null, 2)}
 ---`;
     }
 
-    // Build dependency context
-    //     let dependencyContext = "";
-    //     if (agentPlan.dependsOn && agentPlan.dependsOn.length > 0) {
-    //       const dependencyResults = previousResults.filter((r) =>
-    //         agentPlan.dependsOn!.includes(r.agentId),
-    //       );
-
-    //       if (dependencyResults.length > 0) {
-    //         dependencyContext =
-    //           `\n\n=== REQUIRED INPUTS FROM DEPENDENCIES ===
-    // Your task depends on the following agent outputs. Pay special attention to these:\n\n` +
-    //           dependencyResults
-    //             .map(
-    //               (r) => `${r.agentName}:
-    // ${r.output}`,
-    //             )
-    //             .join("\n\n---\n\n");
-
-    //         dependencyContext += `\n\nIMPORTANT: If any dependency output appears incomplete or truncated, note this in your response and work with what's available, or request a re-run.`;
-    //       }
-    //     }
-
-    // Get conversation history (last 20 messages)
+    // Get conversation history
     const conversationHistory = context.messages.slice(-20);
 
     // Use custom instructions if available
@@ -115,9 +116,7 @@ Data: ${JSON.stringify(webhookPayload.data, null, 2)}
       ? parseInt(chatAgent.customTemperature, 10) / 100
       : (agent.temperature || 70) / 100;
 
-    const maxTokens = agent.maxTokens || 2000;
-
-    // Build the context-aware system prompt
+    // Build system prompt
     const systemPrompt = `${instructions}
 
 === YOUR ASSIGNED TASK ===
@@ -132,46 +131,60 @@ ${agentPlan.dependsOn && agentPlan.dependsOn.length > 0 ? `\nYour work depends o
 === INSTRUCTIONS ===
 1. Review the original user request carefully
 2. ${previousResults.length > 0 ? "Consider the outputs from previous agents - build upon their work, don't duplicate it" : "Start fresh with the user's request"}
-4. Focus specifically on your assigned task: "${agentPlan.task}"
-5. Provide clear, actionable output that the user can understand
-6. If you're building on previous work, reference it explicitly
-7. If previous agents made mistakes, acknowledge and correct them
+3. Focus specifically on your assigned task: "${agentPlan.task}"
+4. Provide clear, actionable output that the user can understand
+5. If you're building on previous work, reference it explicitly
+6. If previous agents made mistakes, acknowledge and correct them
 ${webhookContext}${previousContext}
 
 Provide a focused response for YOUR specific task. Be concise but complete.`;
 
-    // 3. ${dependencyContext ? "Pay special attention to the dependency outputs - they contain inputs you need" : ""}
-
-    // Create a promise that resolves when onFinish is called
+    // Create DurableAgent with streaming to the writable
     const durableAgent = new DurableAgent({
       model: async () => google(agent.model || "gemini-2.5-flash"),
       system: systemPrompt,
     });
 
-    // TODO: maxOutputTokens: maxTokens,
+    // Stream with the agent
+    const messages = convertToModelMessages(convertToUIMessages(conversationHistory));
 
-    const result = await durableAgent.stream({
-      messages: [
-        ...convertToModelMessages(convertToUIMessages(conversationHistory)),
-      ],
+    // Add the trigger message if not in history
+    if (!messages.find(m => m.content === triggerMessage.content)) {
+      messages.push({
+        role: "user",
+        content: triggerMessage.content,
+      });
+    }
+
+    await durableAgent.stream({
+      messages,
       writable,
     });
 
     const endTime = new Date();
 
-    return {
+    // Notify completion
+    const result: AgentExecutionResult = {
       agentId: agent.id,
       agentName: agent.name,
       task: agentPlan.task,
       success: true,
+      output: "Agent completed successfully", // The actual output is streamed
       startTime,
       endTime,
       durationMs: endTime.getTime() - startTime.getTime(),
     };
+
+    await writeAgentEvent(writable, {
+      type: "data-workflowAgentCompleted",
+      data: result,
+    });
+
+    return result;
   } catch (error) {
     const endTime = new Date();
 
-    return {
+    const result: AgentExecutionResult = {
       agentId: agent.id,
       agentName: agent.name,
       task: agentPlan.task,
@@ -181,5 +194,12 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
       endTime,
       durationMs: endTime.getTime() - startTime.getTime(),
     };
+
+    await writeAgentEvent(writable, {
+      type: "data-workflowAgentCompleted",
+      data: result,
+    });
+
+    return result;
   }
 }

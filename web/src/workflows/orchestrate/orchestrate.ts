@@ -37,7 +37,7 @@ async function sendEvent(
   try {
     await writer.write(event);
   } finally {
-    writer.releaseLock(); // Always release
+    writer.releaseLock();
   }
 }
 
@@ -104,7 +104,6 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
       },
     });
 
-    // Track workflow started
     await saveWorkflowProgressStep({
       chatId: input.chatId,
       messageId: input.messageId,
@@ -115,12 +114,16 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
       lastUpdate: new Date(),
     });
 
-    // Step 1: Load chat context (messages, agents, members)
+    // Step 1: Load chat context
     const context = await loadChatContextStep(input.chatId);
     logger.info("Context Loaded", context);
 
     // Step 2: Verify orchestration is enabled
     if (!context.chat.orchestrationEnabled) {
+      await sendEvent(writable, {
+        type: "data-workflowError",
+        data: { error: "Orchestration is disabled for this chat" },
+      });
       return {
         success: false,
         reason: "Orchestration is disabled for this chat",
@@ -135,21 +138,21 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
       throw new FatalError("Could not find trigger message!");
     }
 
-    logger.info(
-      "Trigger Message Retrieved",
-      triggerMessage.content,
-      triggerMessage.id,
-    );
+    logger.info("Trigger Message Retrieved", triggerMessage.id);
 
     // Step 4: Check if we have suitable agents
     if (context.agents.length === 0) {
+      await sendEvent(writable, {
+        type: "data-workflowError",
+        data: { error: "No agents available in this chat" },
+      });
       return {
         success: false,
         reason: "No agents available in this chat",
       };
     }
 
-    // Step 5: Classify the request (understand intent, complexity, domains)
+    // Step 5: Classify the request
     await saveWorkflowProgressStep({
       chatId: input.chatId,
       messageId: input.messageId,
@@ -173,7 +176,7 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
       data: classification,
     });
 
-    // Step 6: Plan agent execution (select agents, determine order/parallelism)
+    // Step 6: Plan agent execution
     await saveWorkflowProgressStep({
       chatId: input.chatId,
       messageId: input.messageId,
@@ -214,6 +217,11 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
         error: "No suitable agents found for this request",
       });
 
+      await sendEvent(writable, {
+        type: "data-workflowError",
+        data: { error: "No suitable agents found for this request" },
+      });
+
       return {
         success: false,
         reason: "No suitable agents found for this request",
@@ -242,7 +250,7 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
       lastUpdate: new Date(),
     });
 
-    // Step 8: Execute agents according to strategy (with timeout)
+    // Step 8: Execute agents with timeout
     const timeoutPromise = (async () => {
       await sleep(`${executionPlan.timeoutMinutes}m`);
       throw new Error("Workflow execution timeout");
@@ -259,9 +267,9 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
 
     const agentResults = await Promise.race([executionPromise, timeoutPromise]);
 
-    logger.info("Agent Results according to strategy", agentResults);
+    logger.info("Agent Results", agentResults);
 
-    // Step 9: Check if we should try fallback agent
+    // Step 9: Try fallback agent if all failed
     let finalAgentResults = agentResults;
     if (
       executionPlan.fallbackAgentId &&
@@ -308,10 +316,10 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
 
     await sendEvent(writable, {
       type: "data-workflowAggregated",
-      data: finalResult
+      data: finalResult,
     });
 
-    // Step 11: Log orchestration for analytics
+    // Step 11: Log orchestration
     await createOrchestrationLogStep({
       chatId: input.chatId,
       messageId: input.messageId,
@@ -350,6 +358,14 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
       });
     }
 
+    await sendEvent(writable, {
+      type: "data-workflowCompleted",
+      data: {
+        success: true,
+        executionTimeMs: Date.now() - startTime,
+      },
+    });
+
     return {
       success: true,
       classification,
@@ -359,7 +375,6 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
       executionTimeMs: Date.now() - startTime,
     };
   } catch (error) {
-    // Capture error stack
     if (error instanceof Error) {
       errorStack = error.stack;
     }
@@ -374,7 +389,13 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
       lastUpdate: new Date(),
     });
 
-    // Log failed orchestration
+    await sendEvent(writable, {
+      type: "data-workflowError",
+      data: {
+        error: error instanceof Error ? error.message : String(error),
+      },
+    });
+
     await createOrchestrationLogStep({
       chatId: input.chatId,
       messageId: input.messageId,
@@ -394,7 +415,6 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
   }
 }
 
-// Execute agents based on strategy (sequential, parallel, conditional)
 async function executeAgentsAccordingToStrategy(
   writable: WritableStream<CustomUIMessageChunk>,
   params: {
@@ -406,55 +426,21 @@ async function executeAgentsAccordingToStrategy(
     messageId: string;
   },
 ) {
-  const { plan, context, triggerMessage, webhookPayload, chatId, messageId } =
-    params;
+  "use step";
+
+  const { plan } = params;
 
   switch (plan.strategy) {
     case "sequential":
-      return await executeSequential(writable, {
-        plan,
-        context,
-        triggerMessage,
-        webhookPayload,
-        chatId,
-        messageId,
-      });
-
+      return await executeSequential(writable, params);
     case "parallel":
-      return await executeParallel(
-        writable,
-        plan,
-        context,
-        triggerMessage,
-        webhookPayload,
-        chatId,
-        messageId,
-      );
-
+      return await executeParallel(writable, params);
     case "conditional":
-      return await executeConditional(
-        writable,
-        plan,
-        context,
-        triggerMessage,
-        webhookPayload,
-        chatId,
-        messageId,
-      );
-
+      return await executeConditional(writable, params);
     case "single":
-      return await executeSingle(
-        writable,
-        plan,
-        context,
-        triggerMessage,
-        webhookPayload,
-        chatId,
-        messageId,
-      );
-
+      return await executeSingle(writable, params);
     default:
-      throw new Error(`Unknown execution strategy: ${plan.strategy}`);
+      throw new FatalError(`Unknown execution strategy: ${plan.strategy}`);
   }
 }
 
@@ -481,9 +467,6 @@ async function executeSequential(
 
   for (let i = 0; i < sortedAgents.length; i++) {
     const agentPlan = sortedAgents[i];
-    const chatAgent = context.agents.find(
-      (a) => a.agentId === agentPlan.agentId,
-    );
 
     const result = await executeAgentTaskStep(writable, {
       agentPlan,
@@ -512,7 +495,6 @@ async function executeSequential(
     });
 
     if (!result.success && plan.stopOnError) {
-      // Mark remaining agents as skipped
       for (let j = i + 1; j < sortedAgents.length; j++) {
         const skippedAgent = sortedAgents[j];
         const skippedChatAgent = context.agents.find(
@@ -538,14 +520,20 @@ async function executeSequential(
 
 async function executeParallel(
   writable: WritableStream<CustomUIMessageChunk>,
-  plan: ExecutionPlan,
-  context: ChatContext,
-  triggerMessage: Message,
-  webhookPayload?: OrchestrationInput["webhookPayload"],
-  chatId?: string,
-  messageId?: string,
+  params: {
+    plan: ExecutionPlan;
+    context: ChatContext;
+    triggerMessage: Message;
+    webhookPayload?: OrchestrationInput["webhookPayload"];
+    chatId: string;
+    messageId: string;
+  },
 ): Promise<AgentExecutionResult[]> {
-  // Group agents by parallel group
+  "use step";
+
+  const { plan, context, triggerMessage, webhookPayload, chatId, messageId } =
+    params;
+
   const groups = new Map<number, typeof plan.selectedAgents>();
 
   for (const agent of plan.selectedAgents) {
@@ -557,8 +545,6 @@ async function executeParallel(
   }
 
   const results: AgentExecutionResult[] = [];
-
-  // Execute groups in order (agents within each group run in parallel)
   const sortedGroupIds = Array.from(groups.keys()).sort((a, b) => a - b);
 
   for (let groupIdx = 0; groupIdx < sortedGroupIds.length; groupIdx++) {
@@ -579,21 +565,18 @@ async function executeParallel(
 
     results.push(...groupResults);
 
-    if (chatId && messageId) {
-      const progressPercent =
-        30 + Math.floor((60 / sortedGroupIds.length) * (groupIdx + 1));
-      await saveWorkflowProgressStep({
-        chatId,
-        messageId,
-        status: "executing",
-        completedAgents: results.filter((r) => r.success).map((r) => r.agentId),
-        totalAgents: plan.selectedAgents.length,
-        progress: progressPercent,
-        lastUpdate: new Date(),
-      });
-    }
+    const progressPercent =
+      30 + Math.floor((60 / sortedGroupIds.length) * (groupIdx + 1));
+    await saveWorkflowProgressStep({
+      chatId,
+      messageId,
+      status: "executing",
+      completedAgents: results.filter((r) => r.success).map((r) => r.agentId),
+      totalAgents: plan.selectedAgents.length,
+      progress: progressPercent,
+      lastUpdate: new Date(),
+    });
 
-    // Check for failures
     if (plan.stopOnError && groupResults.some((r) => !r.success)) {
       break;
     }
@@ -604,16 +587,22 @@ async function executeParallel(
 
 async function executeConditional(
   writable: WritableStream<CustomUIMessageChunk>,
-  plan: ExecutionPlan,
-  context: ChatContext,
-  triggerMessage: Message,
-  webhookPayload: OrchestrationInput["webhookPayload"] | undefined,
-  chatId?: string,
-  messageId?: string,
+  params: {
+    plan: ExecutionPlan;
+    context: ChatContext;
+    triggerMessage: Message;
+    webhookPayload?: OrchestrationInput["webhookPayload"];
+    chatId: string;
+    messageId: string;
+  },
 ): Promise<AgentExecutionResult[]> {
+  "use step";
+
+  const { plan, context, triggerMessage, webhookPayload, chatId, messageId } =
+    params;
+
   const results: AgentExecutionResult[] = [];
   const executed = new Set<string>();
-  const agentMap = new Map(plan.selectedAgents.map((a) => [a.agentId, a]));
   const resultMap = new Map<string, AgentExecutionResult>();
 
   const maxIterations = plan.selectedAgents.length * 2;
@@ -644,8 +633,8 @@ async function executeConditional(
       );
 
       if (unexecuted.length > 0) {
-        console.warn(
-          `Cannot execute remaining agents due to unmet dependencies or failures`,
+        logger.warn(
+          "Cannot execute remaining agents due to unmet dependencies",
         );
 
         for (const agent of unexecuted) {
@@ -687,23 +676,20 @@ async function executeConditional(
       executed.add(result.agentId);
     }
 
-    // Track progress after each batch
-    if (chatId && messageId) {
-      const progressPercent =
-        30 + Math.floor((60 / plan.selectedAgents.length) * executed.size);
-      await saveWorkflowProgressStep({
-        chatId,
-        messageId,
-        status: "executing",
-        completedAgents: results.filter((r) => r.success).map((r) => r.agentId),
-        totalAgents: plan.selectedAgents.length,
-        progress: progressPercent,
-        lastUpdate: new Date(),
-      });
-    }
+    const progressPercent =
+      30 + Math.floor((60 / plan.selectedAgents.length) * executed.size);
+    await saveWorkflowProgressStep({
+      chatId,
+      messageId,
+      status: "executing",
+      completedAgents: results.filter((r) => r.success).map((r) => r.agentId),
+      totalAgents: plan.selectedAgents.length,
+      progress: progressPercent,
+      lastUpdate: new Date(),
+    });
 
     if (plan.stopOnError && batchResults.some((r) => !r.success)) {
-      console.log("Stopping execution due to agent failure (stopOnError=true)");
+      logger.info("Stopping execution due to agent failure");
 
       const remaining = plan.selectedAgents.filter(
         (a) => !executed.has(a.agentId),
@@ -730,7 +716,7 @@ async function executeConditional(
   }
 
   if (iterations >= maxIterations) {
-    console.error("Maximum iterations reached - possible circular dependency");
+    logger.error("Maximum iterations reached - possible circular dependency");
   }
 
   return results;
@@ -738,13 +724,20 @@ async function executeConditional(
 
 async function executeSingle(
   writable: WritableStream<CustomUIMessageChunk>,
-  plan: ExecutionPlan,
-  context: ChatContext,
-  triggerMessage: Message,
-  webhookPayload?: OrchestrationInput["webhookPayload"],
-  chatId?: string,
-  messageId?: string,
+  params: {
+    plan: ExecutionPlan;
+    context: ChatContext;
+    triggerMessage: Message;
+    webhookPayload?: OrchestrationInput["webhookPayload"];
+    chatId: string;
+    messageId: string;
+  },
 ): Promise<AgentExecutionResult[]> {
+  "use step";
+
+  const { plan, context, triggerMessage, webhookPayload, chatId, messageId } =
+    params;
+
   const agentPlan = plan.selectedAgents[0];
 
   const result = await executeAgentTaskStep(writable, {
@@ -755,18 +748,15 @@ async function executeSingle(
     webhookPayload,
   });
 
-  // Track single agent execution
-  if (chatId && messageId) {
-    await saveWorkflowProgressStep({
-      chatId,
-      messageId,
-      status: "executing",
-      completedAgents: result.success ? [result.agentId] : [],
-      totalAgents: 1,
-      progress: 90,
-      lastUpdate: new Date(),
-    });
-  }
+  await saveWorkflowProgressStep({
+    chatId,
+    messageId,
+    status: "executing",
+    completedAgents: result.success ? [result.agentId] : [],
+    totalAgents: 1,
+    progress: 90,
+    lastUpdate: new Date(),
+  });
 
   return [result];
 }

@@ -27,15 +27,17 @@ import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { generateUUID } from "@/lib/utils";
 import { useChat } from "@ai-sdk/react";
-import { WorkflowChatTransport } from "@workflow/ai"; // THE KEY IMPORT!
+import { WorkflowChatTransport } from "@workflow/ai";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { unstable_serialize } from "swr/infinite";
 import { useDataStream } from "./data-stream-provider";
 import { MultimodalInput } from "./multimodal-input";
 import { toast } from "./toast";
 import type { VisibilityType } from "./visibility-selector";
+
+const WORKFLOW_RUN_ID_KEY = "active-workflow-run-id";
 
 export function Chat({
   id,
@@ -61,9 +63,21 @@ export function Chat({
   const [currentModelId, setCurrentModelId] = useState(initialChatModel);
   const [visibilityType, setVisibilityType] = useState(initialVisibilityType);
 
+  // Workflow orchestration state
+  const [workflowStatus, setWorkflowStatus] = useState<{
+    isRunning: boolean;
+    currentPhase?: string;
+    progress?: number;
+  }>({ isRunning: false });
+
   const activeWorkflowRunId = useMemo(() => {
     if (typeof window === "undefined") return;
-    return localStorage.getItem("active-workflow-run-id") ?? undefined;
+    return localStorage.getItem(WORKFLOW_RUN_ID_KEY) ?? undefined;
+  }, []);
+
+  const handleChatEnd = useCallback(() => {
+    localStorage.removeItem(WORKFLOW_RUN_ID_KEY);
+    setWorkflowStatus({ isRunning: false });
   }, []);
 
   const { messages, setMessages, sendMessage, status, stop, regenerate } =
@@ -73,26 +87,22 @@ export function Chat({
       messages: initialMessages,
       generateId: generateUUID,
 
-      // This handles ALL streaming/resumption automatically!
       transport: new WorkflowChatTransport({
         api: "/api/chat",
         fetch: fetchWithErrorHandlers,
-
         maxConsecutiveErrors: 5,
 
         onChatSendMessage: (response) => {
-          // We'll store the workflow run ID in `localStorage` to allow the client
-          // to resume the chat session after a page refresh or network interruption
           const workflowRunId = response.headers.get("x-workflow-run-id");
           if (!workflowRunId) {
             throw new Error(
               'Workflow run ID not found in "x-workflow-run-id" response header',
             );
           }
-          localStorage.setItem("active-workflow-run-id", workflowRunId);
+          localStorage.setItem(WORKFLOW_RUN_ID_KEY, workflowRunId);
+          setWorkflowStatus({ isRunning: true, currentPhase: "starting" });
         },
 
-        // Prepare the request body
         prepareSendMessagesRequest: (config) => {
           return {
             ...config,
@@ -101,18 +111,16 @@ export function Chat({
               message: config.messages.at(-1),
               selectedChatModel: currentModelId,
               selectedVisibilityType: visibilityType,
-              agentIds: [], // Get from your agent selector
+              agentIds: [],
             },
           };
         },
 
-        prepareReconnectToStreamRequest: ({ id, api, ...rest }) => {
-          console.log("prepareReconnectToStreamRequest", id);
-          const workflowRunId = localStorage.getItem("active-workflow-run-id");
+        prepareReconnectToStreamRequest: ({ api, ...rest }) => {
+          const workflowRunId = localStorage.getItem(WORKFLOW_RUN_ID_KEY);
           if (!workflowRunId) {
             throw new Error("No active workflow run ID found");
           }
-          // Use the workflow run ID instead of the chat ID for reconnection
           return {
             ...rest,
             api: `/api/chat/${encodeURIComponent(workflowRunId)}/stream`,
@@ -120,18 +128,95 @@ export function Chat({
         },
 
         onChatEnd: ({ chatId, chunkIndex }) => {
-          console.log("onChatEnd", chatId, chunkIndex);
-
-          // Once the chat stream ends, we can remove the workflow run ID from `localStorage`
-          localStorage.removeItem("active-workflow-run-id");
+          console.log("Chat stream ended", { chatId, chunkIndex });
+          handleChatEnd();
         },
       }),
 
-      // Handle data stream events
       onData: (dataPart) => {
+        // Store data parts for components that need them
         setDataStream((ds) => (ds ? [...ds, dataPart] : []));
-        if (dataPart.type === "data-usage") {
-          setUsage(dataPart.data);
+
+        // Handle different data types
+        switch (dataPart.type) {
+          case "data-usage":
+            setUsage(dataPart.data);
+            break;
+
+          case "data-workflowStarted":
+            setWorkflowStatus({
+              isRunning: true,
+              currentPhase: "started",
+              progress: 0,
+            });
+            console.log("Workflow started:", dataPart.data);
+            break;
+
+          case "data-workflowClassification":
+            setWorkflowStatus((prev) => ({
+              ...prev,
+              currentPhase: "classified",
+              progress: 15,
+            }));
+            console.log("Request classified:", dataPart.data);
+            break;
+
+          case "data-workflowPlan":
+            setWorkflowStatus((prev) => ({
+              ...prev,
+              currentPhase: "planned",
+              progress: 25,
+            }));
+            console.log("Execution plan:", dataPart.data);
+            break;
+
+          case "data-workflowAgentStarted":
+            setWorkflowStatus((prev) => ({
+              ...prev,
+              currentPhase: `executing:${dataPart.data.agentName}`,
+            }));
+            console.log("Agent started:", dataPart.data);
+            break;
+
+          case "data-workflowAgentProgress":
+            console.log("Agent progress:", dataPart.data);
+            break;
+
+          case "data-workflowAgentCompleted":
+            console.log("Agent completed:", dataPart.data);
+            break;
+
+          case "data-workflowAggregated":
+            setWorkflowStatus((prev) => ({
+              ...prev,
+              currentPhase: "aggregated",
+              progress: 95,
+            }));
+            console.log("Results aggregated:", dataPart.data);
+            break;
+
+          case "data-workflowCompleted":
+            setWorkflowStatus({
+              isRunning: false,
+              currentPhase: "completed",
+              progress: 100,
+            });
+            console.log("Workflow completed:", dataPart.data);
+            handleChatEnd();
+            break;
+
+          case "data-workflowError":
+            setWorkflowStatus({
+              isRunning: false,
+              currentPhase: "error",
+            });
+            console.error("Workflow error:", dataPart.data);
+            toast({
+              type: "error",
+              description: dataPart.data.error,
+            });
+            handleChatEnd();
+            break;
         }
       },
 
@@ -145,6 +230,9 @@ export function Chat({
       },
 
       onError: (error) => {
+        console.error("Chat error:", error);
+        handleChatEnd();
+
         if (error instanceof ChatSDKError) {
           if (
             error.message?.includes("AI Gateway requires a valid credit card")
@@ -156,6 +244,11 @@ export function Chat({
               description: error.message,
             });
           }
+        } else {
+          toast({
+            type: "error",
+            description: "An unexpected error occurred",
+          });
         }
       },
     });
