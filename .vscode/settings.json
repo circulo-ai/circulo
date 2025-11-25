@@ -2,5 +2,6 @@
   "files.eol": "\n",
   "files.insertFinalNewline": true,
   "files.trimTrailingWhitespace": true,
-  "chatgpt.commentCodeLensEnabled": true
+  "chatgpt.commentCodeLensEnabled": true,
+  "terminal.integrated.cwd": "web"
 }
