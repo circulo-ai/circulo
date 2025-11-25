@@ -63,4 +63,7 @@ export type Attachment = {
   contentType: string;
 };
 
-export type CustomUIMessageChunk = UIMessageChunk<MessageMetadata, CustomUIDataTypes>;
+export type CustomUIMessageChunk = UIMessageChunk<
+  MessageMetadata,
+  CustomUIDataTypes
+>;

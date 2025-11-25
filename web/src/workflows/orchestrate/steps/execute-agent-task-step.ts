@@ -6,7 +6,6 @@ import { OrchestrationInput } from "@/workflows/orchestrate/types";
 import { google } from "@ai-sdk/google";
 import { DurableAgent } from "@workflow/ai/agent";
 import { convertToModelMessages } from "ai";
-import { getWritable } from "workflow";
 import { ExecutionPlan } from "./plan-agent-execution-step";
 
 export interface AgentExecutionResult {
@@ -48,7 +47,13 @@ export async function executeAgentTaskStep(
 ): Promise<AgentExecutionResult> {
   "use step";
 
-  const { agentPlan, context, previousResults, webhookPayload, triggerMessage } = params;
+  const {
+    agentPlan,
+    context,
+    previousResults,
+    webhookPayload,
+    triggerMessage,
+  } = params;
 
   const startTime = new Date();
   const chatAgent = context.agents.find((a) => a.agentId === agentPlan.agentId);
@@ -146,10 +151,12 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
     });
 
     // Stream with the agent
-    const messages = convertToModelMessages(convertToUIMessages(conversationHistory));
+    const messages = convertToModelMessages(
+      convertToUIMessages(conversationHistory),
+    );
 
     // Add the trigger message if not in history
-    if (!messages.find(m => m.content === triggerMessage.content)) {
+    if (!messages.find((m) => m.content === triggerMessage.content)) {
       messages.push({
         role: "user",
         content: triggerMessage.content,

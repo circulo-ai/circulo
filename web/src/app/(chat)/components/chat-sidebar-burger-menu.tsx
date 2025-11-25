@@ -13,9 +13,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/ui/user-avatar";
-import { useUser } from "@/hooks/api/chats/use-user";
 import { authClient } from "@/lib/auth-client";
-import { useOrganizationsHooks } from "@/providers/session-provider";
+import { useOrganizationsHooks, useSession } from "@/providers/session-provider";
 import { CreateOrganizationDialog } from "@daveyplate/better-auth-ui";
 import {
   Bot,
@@ -29,7 +28,7 @@ import {
 import { useState } from "react";
 
 export function ChatSidebarBurgerMenu() {
-  const { user, isLoading } = useUser();
+  const { data: session, isPending: isLoading } = useSession();
   const { useActiveOrganization, useListOrganizations } =
     useOrganizationsHooks();
   const { data: activeOrganization } = useActiveOrganization();
@@ -54,7 +53,7 @@ export function ChatSidebarBurgerMenu() {
       <CustomDropdownMenuContent sideOffset={8} align="start">
         <DropdownMenuGroup>
           <CustomDropdownMenuItem>
-            <UserAvatar user={user} isPending={isLoading} size="xs" />
+            <UserAvatar user={session?.user} isPending={isLoading} size="xs" />
             {activeOrganization?.name}
           </CustomDropdownMenuItem>
           {organizations &&

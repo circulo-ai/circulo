@@ -155,8 +155,8 @@ export function Console({ consoleOutputs, setConsoleOutputs }: ConsoleProps) {
                       ? "Initializing..."
                       : consoleOutput.status === "loading_packages"
                         ? consoleOutput.contents.map((content) =>
-                          content.type === "text" ? content.value : null,
-                        )
+                            content.type === "text" ? content.value : null,
+                          )
                         : null}
                   </div>
                 </div>
@@ -165,7 +165,6 @@ export function Console({ consoleOutputs, setConsoleOutputs }: ConsoleProps) {
                   {consoleOutput.contents.map((content, contentIndex) =>
                     content.type === "image" ? (
                       <picture key={`${consoleOutput.id}-${contentIndex}`}>
-
                         <img
                           alt="output"
                           className="w-full max-w-(--breakpoint-toast-mobile) rounded-md"
