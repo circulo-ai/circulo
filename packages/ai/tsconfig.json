@@ -22,13 +22,15 @@
     },
     "include": [
         "src/core/**/*",
+        "src/core/**/*",
         "src/orchestration/**/*",
-        "src/storage/**/*",
         "src/plugins/**/*",
+        "src/runtime/**/*",
         "src/types/**/*",
         "src/errors/**/*",
-        "src/client.ts",
-        "src/index.ts"
+        "src/index.ts",
+        "src/index.node.ts",
+        "src/index.edge.ts"
     ],
     "exclude": [
         "node_modules",
