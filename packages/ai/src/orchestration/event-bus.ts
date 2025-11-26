@@ -3,8 +3,9 @@
  */
 
 import EventEmitter from 'eventemitter3';
+import { Event, EventFilter, EventHandler, EventSubscription, EventBus } from '../core/event';
 import { ID, Priority } from '../types/common';
-import { Event, EventBus, EventFilter, EventHandler, EventSubscription, EventType } from '../core/event';
+import { logger } from '../utils/logger';
 
 /**
  * In-memory event bus implementation
@@ -54,7 +55,11 @@ export class InMemoryEventBus extends EventEmitter implements EventBus {
             try {
                 await subscription.handler(fullEvent);
             } catch (error) {
-                console.error(`Error in event handler for subscription ${subscription.id}:`, error);
+                logger.error(
+                    `Error in event handler for subscription ${subscription.id}`,
+                    error instanceof Error ? error : undefined,
+                    { subscriptionId: subscription.id, eventType: fullEvent.type }
+                );
                 this.emit('error', { subscription, event: fullEvent, error });
             }
         }
