@@ -1,3 +1,4 @@
+import { GetChatHistoryResponse } from "@/app/api/history/route";
 import { EnhancedLink } from "@/components/enhanced-link";
 import { WithRipple } from "@/components/ui-custom/ripple";
 import {
@@ -7,14 +8,13 @@ import {
 } from "@/components/ui-custom/sidebar";
 import { Badge } from "@/components/ui/badge";
 import { SidebarMenuItem } from "@/components/ui/sidebar";
+import { useOptimisticSWRMutation } from "@/hooks/use-optimistic-swr-mutation";
 import { formatDate } from "@/lib/format-date";
 import { getFetcher } from "@/lib/swr";
 import { cn } from "@/lib/utils";
 import { Pin } from "lucide-react";
-import { Dispatch, SetStateAction } from "react";
-import { Key } from "swr";
-import useSWRMutation from "swr/mutation";
-import { GetChatHistoryResponse } from "../api/history/route";
+import { Dispatch, SetStateAction, useCallback } from "react";
+import { Arguments, Key } from "swr";
 
 interface ChatSidebarItemProps {
   item: GetChatHistoryResponse["chats"][0];
@@ -27,14 +27,52 @@ export function ChatSidebarItem({
   currentChatId,
   setCurrentChatId,
 }: ChatSidebarItemProps) {
-  const { trigger } = useSWRMutation<unknown, unknown, Key, {}>(
-    `/api/chat/${item.id}/pin`,
-    getFetcher("POST"),
+  const isHistoryKey = useCallback(
+    (key?: Arguments) =>
+      (Array.isArray(key) && key[0] === "/api/history") ||
+      (typeof key === "string" && key.startsWith("/api/history")),
+    [],
   );
+
+  const { trigger: handlePinChange } = useOptimisticSWRMutation<
+    GetChatHistoryResponse,
+    boolean,
+    unknown,
+    unknown,
+    Key,
+    {}
+  >({
+    mutationKey: `/api/chat/${item.id}/pin`,
+    mutationFetcher: getFetcher("POST"),
+    matchMutateKey: isHistoryKey,
+    mapOptimisticToMutationArg: () => ({}),
+    deriveOptimisticData: (current, nextIsPinned) => {
+      if (!current) return current;
+
+      const target = current.chats.find((chat) => chat.id === item.id);
+      if (!target || target.isPinned === nextIsPinned) return current;
+
+      return {
+        ...current,
+        chats: current.chats.map((chat) =>
+          chat.id === item.id
+            ? {
+                ...chat,
+                isPinned: nextIsPinned,
+                pinOrder: nextIsPinned ? (chat.pinOrder ?? 0) : undefined,
+              }
+            : chat,
+        ),
+      };
+    },
+  });
 
   return (
     <SidebarMenuItem>
-      <CustomSidebarContextMenu onPin={() => trigger({}, {})}>
+      <CustomSidebarContextMenu
+        isPinned={item.isPinned}
+        onPinChange={handlePinChange}
+      >
         <CustomSidebarMenuButton isActive={currentChatId === item.id} asChild>
           <WithRipple
             component={EnhancedLink}
@@ -63,17 +101,17 @@ export function ChatSidebarItem({
                   <Pin
                     className={cn(
                       "size-4 opacity-0 transition-opacity",
-                      /*item.isPinned*/ true && "opacity-75",
+                      item.isPinned && "opacity-75",
                     )}
                   />
                   <Badge
                     variant="sidebar-menu-badge"
                     className={cn(
                       "absolute opacity-0",
-                      /*Boolean(item.messageCount)*/ false && "opacity-100",
+                      Boolean(0) && "opacity-100",
                     )}
                   >
-                    {item.messageCount}
+                    12
                   </Badge>
                 </div>
               </div>

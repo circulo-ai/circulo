@@ -4,7 +4,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { cn } from "@/lib/utils";
-import { Pin } from "lucide-react";
+import { Pin, PinOff } from "lucide-react";
 import { ComponentProps } from "react";
 import {
   Sidebar,
@@ -161,11 +161,13 @@ export function CustomSidebarMenuAvatar({
 
 interface CustomSidebarContextMenuProps
   extends ComponentProps<typeof ContextMenu> {
-  onPin: () => {};
+  isPinned: boolean;
+  onPinChange: (isPinned: boolean) => void;
 }
 
 export function CustomSidebarContextMenu({
-  onPin,
+  isPinned,
+  onPinChange,
   children,
   ...props
 }: CustomSidebarContextMenuProps) {
@@ -173,8 +175,16 @@ export function CustomSidebarContextMenu({
     <ContextMenu {...props}>
       <ContextMenuTrigger>{children}</ContextMenuTrigger>
       <CustomContextMenuContent>
-        <CustomContextMenuItem onClick={onPin}>
-          <Pin /> Pin
+        <CustomContextMenuItem onClick={() => onPinChange(!isPinned)}>
+          {isPinned ? (
+            <>
+              <PinOff /> Unpin
+            </>
+          ) : (
+            <>
+              <Pin /> Pin
+            </>
+          )}
         </CustomContextMenuItem>
         <ContextMenuSeparator />
         <CustomContextMenuItem disabled inset>
