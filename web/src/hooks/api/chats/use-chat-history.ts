@@ -50,7 +50,7 @@ export function useChatHistory() {
     const pinnedChats = data.chats.filter((c) => c.isPinned);
     const unPinnedChats = data.chats.filter((c) => !c.isPinned);
     const sortedPinnedChats = pinnedChats.sort(
-      (a, b) => (a.pinOrder ?? 0) - (b.pinOrder ?? 0),
+      (a, b) => (a.pinOrder ?? 0) - (b.pinOrder ?? 0), // TODO check if this is fine (the nullish coalescing operators)
     );
 
     return {
@@ -78,3 +78,4 @@ export function useIsChatLoading() {
 }
 
 // TODO useDebouncedLoading for the isLoading state of the history?
+// TODO implement drag and drop for the pinned chats

@@ -34,7 +34,6 @@ export function AnimatedList<T extends string | number>(props: {
 
   const MotionItem = useMemo(() => motion.create(itemElement), [itemElement]);
 
-  // TODO partition
   return (
     <motion.ul
       layout
@@ -156,3 +155,5 @@ export default function Demo() {
     </div>
   );
 }
+
+// TODO make this component partitioned like the Shadcn components so the sidebar's gap would work
