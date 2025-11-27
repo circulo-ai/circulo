@@ -14,10 +14,12 @@ import { Pin } from "lucide-react";
 import { Dispatch, SetStateAction } from "react";
 import { Key } from "swr";
 import useSWRMutation from "swr/mutation";
-import { GetChatHistoryResponse } from "../api/history/route";
+import { GetChatHistoryResponse } from "../../api/history/route";
+
+type ChatListItem = GetChatHistoryResponse["chats"][0] & { messageCount?: number };
 
 interface ChatSidebarItemProps {
-  item: GetChatHistoryResponse["chats"][0];
+  item: ChatListItem;
   currentChatId: string | undefined;
   setCurrentChatId: Dispatch<SetStateAction<string | undefined>>;
 }
