@@ -17,12 +17,12 @@ import type { Vote } from "@/db/schema";
 import { useArtifactSelector } from "@/hooks/api/chats/use-artifact";
 import { useIsChatLoading } from "@/hooks/api/chats/use-chat-history";
 import { useChatVisibility } from "@/hooks/api/chats/use-chat-visibility";
+import { ApiRequestError } from "@/lib/api/client";
 import {
   clearCachePattern,
   fetchWithErrorHandlers,
   globalMutate,
 } from "@/lib/swr";
-import { ApiRequestError } from "@/lib/api/client";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { generateUUID } from "@/lib/utils";
