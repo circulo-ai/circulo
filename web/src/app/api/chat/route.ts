@@ -2,15 +2,16 @@ import { generateTitleFromUserMessage } from "@/app/(chat)/actions";
 import { chatRepo } from "@/db/repositories/chat-repo";
 import { messageRepo } from "@/db/repositories/message-repo";
 import { getActiveOrganizationId } from "@/lib/auth";
-import { ChatSDKError } from "@/lib/errors";
 import { hasPermission, isMemberOf } from "@/lib/permissions";
 import {
+  BadRequestError,
+  ForbiddenError,
+  NotFoundError,
+  RateLimitError,
+  createErrorHandler,
   createSafeRoute,
-  MethodNotAllowedError,
-  ValidationError,
 } from "@/lib/server";
 import { authMiddleware } from "@/lib/server/middlewares";
-import { RateLimitError } from "@/lib/server/middlewares/rateLimit";
 import { getTextFromMessage } from "@/lib/utils";
 import { orchestrateWorkflow } from "@/workflows/orchestrate/orchestrate";
 import { OrchestrationInput } from "@/workflows/orchestrate/types";
@@ -20,40 +21,21 @@ import { deleteQuerySchema } from "./schema";
 
 export const maxDuration = 60;
 
-function handleChatError(error: Error): Response {
-  if (error instanceof ValidationError) {
-    return new ChatSDKError("bad_request:api", error.message).toResponse();
-  }
-
-  if (error instanceof MethodNotAllowedError) {
-    return new ChatSDKError("bad_request:api", error.message).toResponse();
-  }
-
-  if (error instanceof ChatSDKError) {
-    return error.toResponse();
-  }
-
-  if (error instanceof RateLimitError) {
-    return new ChatSDKError(
-      "rate_limit:api",
-      `Rate limited. Retry after ${error.retryAfter} seconds.`,
-    ).toResponse();
-  }
-
+const handleChatError = createErrorHandler((error) => {
+  if (error instanceof RateLimitError) return error.toResponse();
   if (error.message?.includes("AI Gateway requires a valid credit card")) {
-    return new ChatSDKError("bad_request:activate_gateway").toResponse();
+    return new BadRequestError("AI Gateway requires a valid credit card")
+      .toResponse();
   }
-
-  console.error("Unhandled error in chat API:", error);
-  return new ChatSDKError("offline:chat").toResponse();
-}
+  return null;
+});
 
 export const POST = createSafeRoute({ handleServerError: handleChatError })
   .methods("POST")
   .use(authMiddleware())
   .handler(async (request, ctx) => {
     console.log(ctx.body);
-    const { id, messages, message, selectedVisibilityType } = ctx.body as any;
+    const { id, message, selectedVisibilityType } = ctx.body as any;
     const {
       user: { id: userId },
     } = ctx.data;
@@ -63,23 +45,16 @@ export const POST = createSafeRoute({ handleServerError: handleChatError })
     // Verify user is member of the organization
     const isOrgMember = await isMemberOf(userId, activeOrganizationId);
     if (!isOrgMember) {
-      throw new ChatSDKError(
-        "forbidden:chat",
-        "You are not a member of this organization",
-      );
+      throw new ForbiddenError("You are not a member of this organization");
     }
 
     const existingChat = await chatRepo.findById(id);
-    let createdNewChat = false;
 
     if (existingChat) {
       // Existing chat - verify access
       if (existingChat.creatorId !== userId) {
         if (existingChat.organizationId !== activeOrganizationId) {
-          throw new ChatSDKError(
-            "forbidden:chat",
-            "You don't have access to this chat",
-          );
+          throw new ForbiddenError("You don't have access to this chat");
         }
 
         const canUpdate = await hasPermission(
@@ -88,8 +63,7 @@ export const POST = createSafeRoute({ handleServerError: handleChatError })
           activeOrganizationId,
         );
         if (!canUpdate) {
-          throw new ChatSDKError(
-            "forbidden:chat",
+          throw new ForbiddenError(
             "You don't have permission to update chats in this organization",
           );
         }
@@ -102,8 +76,7 @@ export const POST = createSafeRoute({ handleServerError: handleChatError })
         activeOrganizationId,
       );
       if (!canCreate) {
-        throw new ChatSDKError(
-          "forbidden:chat",
+        throw new ForbiddenError(
           "You don't have permission to create chats in this organization",
         );
       }
@@ -117,7 +90,6 @@ export const POST = createSafeRoute({ handleServerError: handleChatError })
         visibility: selectedVisibilityType as any,
         organizationId: activeOrganizationId,
       });
-      createdNewChat = true;
     }
 
     // Save user message
@@ -170,20 +142,17 @@ export const DELETE = createSafeRoute({ handleServerError: handleChatError })
     } = ctx.data;
 
     if (!activeOrganizationId) {
-      throw new ChatSDKError("forbidden:chat", "No active organization");
+      throw new ForbiddenError("No active organization");
     }
 
     const chat = await chatRepo.findById(id);
 
     if (!chat) {
-      throw new ChatSDKError("not_found:chat", "Chat not found");
+      throw new NotFoundError("Chat not found");
     }
 
     if (chat.organizationId !== activeOrganizationId) {
-      throw new ChatSDKError(
-        "forbidden:chat",
-        "Chat does not belong to your organization",
-      );
+      throw new ForbiddenError("Chat does not belong to your organization");
     }
 
     if (chat.creatorId !== userId) {
@@ -193,8 +162,7 @@ export const DELETE = createSafeRoute({ handleServerError: handleChatError })
         activeOrganizationId,
       );
       if (!canDelete) {
-        throw new ChatSDKError(
-          "forbidden:chat",
+        throw new ForbiddenError(
           "You don't have permission to delete this chat",
         );
       }

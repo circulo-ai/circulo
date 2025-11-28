@@ -1,13 +1,13 @@
 "use client";
 
-import { useProfilePictureUpload } from "@/components/sidebar/settings-modal/components/account/hooks/use-profile-picture-upload";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { UploadDropzone } from "@/components/uploads";
 import { signOut } from "@/lib/auth-client";
 import { useBrandConfig } from "@/lib/branding/branding";
 import { createLogger } from "@/lib/logs/console/logger";
+import { useUploadManager } from "@/lib/uploads";
 import { useSession } from "@/providers/session-provider";
 import { clearUserData } from "@/stores";
 import { Camera, UserIcon } from "lucide-react";
@@ -39,36 +39,26 @@ export function Account(_props: AccountProps) {
 
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  const {
-    previewUrl: profilePictureUrl,
-    fileInputRef: profilePictureInputRef,
-    handleThumbnailClick: handleProfilePictureClick,
-    handleFileChange: handleProfilePictureChange,
-    isUploading: isUploadingProfilePicture,
-  } = useProfilePictureUpload({
-    currentImage: userImage,
-    onUpload: async (url) => {
-      if (url) {
+  const uploadManager = useUploadManager({
+    defaultContext: "profile-pictures",
+    onItemFinish: async (item) => {
+      if (item.status === "success") {
         try {
-          await updateUserImage(url);
+          await updateUserImage(item.url || null);
           setUploadError(null);
-        } catch (error) {
+        } catch (_err) {
           setUploadError("Failed to update profile picture");
         }
-      } else {
-        try {
-          await updateUserImage(null);
-          setUploadError(null);
-        } catch (error) {
-          setUploadError("Failed to remove profile picture");
-        }
+      } else if (item.status === "error") {
+        setUploadError(item.error || "Failed to upload profile picture");
       }
     },
-    onError: (error) => {
-      setUploadError(error);
-      setTimeout(() => setUploadError(null), 5000);
-    },
   });
+
+  const activeProfileImage =
+    uploadManager.items.find((i) => i.status === "success")?.url ||
+    uploadManager.items.find((i) => i.status === "uploading")?.url ||
+    userImage;
 
   const updateUserImage = async (imageUrl: string | null) => {
     try {
@@ -226,7 +216,7 @@ export function Account(_props: AccountProps) {
 
             {/* Sign Out Button Skeleton */}
             <div>
-              <Skeleton className="h-8 w-[71px] rounded-[8px]" />
+              <Skeleton className="h-8 w-[71px] rounded-xl" />
             </div>
           </>
         ) : (
@@ -235,54 +225,55 @@ export function Account(_props: AccountProps) {
             <div className="flex items-center gap-4">
               {/* Profile Picture Upload */}
               <div className="relative">
-                <div
-                  className="group relative flex h-12 w-12 flex-shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-[#802FFF] transition-all hover:opacity-80"
-                  onClick={handleProfilePictureClick}
-                >
-                  {(() => {
-                    const imageUrl =
-                      profilePictureUrl || userImage || brandConfig.logoUrl;
-                    return imageUrl ? (
-                      <Image
-                        src={imageUrl}
-                        alt={name || "User"}
-                        width={48}
-                        height={48}
-                        className={`h-full w-full object-cover transition-opacity duration-300 ${
-                          isUploadingProfilePicture
-                            ? "opacity-50"
-                            : "opacity-100"
+                <UploadDropzone
+                  className="h-12 w-12 rounded-full!"
+                  accept={["image/png", "image/jpeg", "image/jpg"]}
+                  maxSizeMb={5}
+                  multiple={false}
+                  disabled={uploadManager.isUploading}
+                  onFiles={(files) => {
+                    uploadManager.clear();
+                    uploadManager.addFiles(files, "profile-pictures");
+                  }}
+                  renderContent={({ isDragging }) => (
+                    <div className="group relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#802FFF] transition-all hover:opacity-80">
+                      {(() => {
+                        const imageUrl =
+                          activeProfileImage || brandConfig.logoUrl;
+                        return imageUrl ? (
+                          <Image
+                            src={imageUrl}
+                            alt={name || "User"}
+                            width={48}
+                            height={48}
+                            loader={({ src }) => src}
+                            unoptimized
+                            className={`h-full w-full object-cover transition-opacity duration-300 ${
+                              uploadManager.isUploading
+                                ? "opacity-50"
+                                : "opacity-100"
+                            }`}
+                          />
+                        ) : (
+                          <UserIcon className="h-6 w-6 text-white" />
+                        );
+                      })()}
+
+                      <div
+                        className={`absolute inset-0 flex items-center justify-center rounded-full bg-black/50 transition-opacity ${
+                          uploadManager.isUploading || isDragging
+                            ? "opacity-100"
+                            : "opacity-0 group-hover:opacity-100"
                         }`}
-                      />
-                    ) : (
-                      <UserIcon className="h-6 w-6 text-white" />
-                    );
-                  })()}
-
-                  {/* Upload overlay */}
-                  <div
-                    className={`absolute inset-0 flex items-center justify-center rounded-full bg-black/50 transition-opacity ${
-                      isUploadingProfilePicture
-                        ? "opacity-100"
-                        : "opacity-0 group-hover:opacity-100"
-                    }`}
-                  >
-                    {isUploadingProfilePicture ? (
-                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    ) : (
-                      <Camera className="h-5 w-5 text-white" />
-                    )}
-                  </div>
-                </div>
-
-                {/* Hidden file input */}
-                <Input
-                  type="file"
-                  accept="image/png,image/jpeg,image/jpg"
-                  className="hidden"
-                  ref={profilePictureInputRef}
-                  onChange={handleProfilePictureChange}
-                  disabled={isUploadingProfilePicture}
+                      >
+                        {uploadManager.isUploading ? (
+                          <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        ) : (
+                          <Camera className="h-5 w-5 text-white" />
+                        )}
+                      </div>
+                    </div>
+                  )}
                 />
               </div>
 
@@ -297,6 +288,21 @@ export function Account(_props: AccountProps) {
                 )}
               </div>
             </div>
+
+            {/* {uploadManager.items.length > 0 && (
+              <UploadList
+                items={uploadManager.items}
+                onCancel={uploadManager.cancel}
+                onRetry={uploadManager.retry}
+                onRemove={(id) => {
+                  uploadManager.remove(id);
+                  if (uploadManager.items.length === 0) {
+                    void updateUserImage(null);
+                  }
+                }}
+                hideProgress={false}
+              />
+            )} */}
 
             {/* Name Field */}
             <div className="flex flex-col gap-2">
@@ -349,7 +355,7 @@ export function Account(_props: AccountProps) {
               <Button
                 onClick={handleSignOut}
                 variant="destructive"
-                className="h-8 rounded-[8px] bg-red-500 text-white transition-all duration-200 hover:bg-red-600"
+                className="h-8 rounded-xl bg-red-500 text-white transition-all duration-200 hover:bg-red-600"
               >
                 Sign Out
               </Button>

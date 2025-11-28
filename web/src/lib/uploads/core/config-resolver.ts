@@ -16,7 +16,6 @@ export type StorageContext =
   | "knowledge-base"
   | "organization"
   | "chat"
-  | "logs"
   | "profile-pictures";
 
 export interface StorageConfig {
@@ -63,7 +62,7 @@ function getS3Config(context: StorageContext): StorageConfig {
         region: S3_CHAT_CONFIG.region,
       };
     case "organization":
-      // Workspace files use general bucket but with custom key structure
+      // Organization files use general bucket but with custom key structure
       return {
         bucket: S3_CONFIG.bucket,
         region: S3_CONFIG.region,

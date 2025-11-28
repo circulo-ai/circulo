@@ -79,12 +79,17 @@ export const env = createEnv({
     AWS_ACCESS_KEY_ID: z.string().optional(), // AWS access key ID
     AWS_SECRET_ACCESS_KEY: z.string().optional(), // AWS secret access key
     S3_BUCKET_NAME: z.string().optional(), // S3 bucket for general file storage
-    S3_LOGS_BUCKET_NAME: z.string().optional(), // S3 bucket for storing logs
     S3_KB_BUCKET_NAME: z.string().optional(), // S3 bucket for knowledge base files
-    S3_EXECUTION_FILES_BUCKET_NAME: z.string().optional(), // S3 bucket for workflow execution files
     S3_CHAT_BUCKET_NAME: z.string().optional(), // S3 bucket for chat logos
-    S3_COPILOT_BUCKET_NAME: z.string().optional(), // S3 bucket for copilot files
     S3_PROFILE_PICTURES_BUCKET_NAME: z.string().optional(), // S3 bucket for profile pictures
+    // Cloud Storage - MinIO (S3-compatible)
+    MINIO_ENDPOINT: z.string().optional(), // MinIO server host (e.g., localhost or minio.local)
+    MINIO_PORT: z.string().optional(), // MinIO server port
+    MINIO_REGION: z.string().optional(), // Optional MinIO region (defaults to us-east-1)
+    MINIO_USE_SSL: z.boolean().optional(), // Use HTTPS when connecting to MinIO
+    MINIO_FORCE_PATH_STYLE: z.boolean().optional(), // Force path-style URLs (recommended for MinIO)
+    MINIO_ACCESS_KEY: z.string().optional(), // MinIO access key
+    MINIO_SECRET_ACCESS_KEY: z.string().optional(), // MinIO secret key
 
     // Cloud Storage - Azure Blob
     AZURE_ACCOUNT_NAME: z.string().optional(), // Azure storage account name

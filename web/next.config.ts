@@ -66,6 +66,12 @@ const nextConfig: NextConfig = {
           })()
         : []),
     ],
+    // Allow images served from our API routes (includes query strings like ?context=)
+    localPatterns: [
+      {
+        pathname: "/api/files/serve/**",
+      },
+    ],
   },
   /* config options here */
   turbopack: {
@@ -78,6 +84,7 @@ const nextConfig: NextConfig = {
     "@t3-oss/env-core",
     "@react-email/components",
     "@react-email/render",
+    "@circulo-ai/ai",
   ],
   ...(isDev && {
     allowedDevOrigins: [

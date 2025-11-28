@@ -15,10 +15,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { Vote } from "@/db/schema";
 import { useArtifactSelector } from "@/hooks/api/chats/use-artifact";
-import { useAutoResume } from "@/hooks/api/chats/use-auto-resume";
 import { useIsChatLoading } from "@/hooks/api/chats/use-chat-history";
 import { useChatVisibility } from "@/hooks/api/chats/use-chat-visibility";
-import { ChatSDKError } from "@/lib/errors";
+import { ApiRequestError } from "@/lib/api/client";
 import {
   clearCachePattern,
   fetchWithErrorHandlers,
@@ -241,23 +240,21 @@ export function Chat({
         console.error("Chat error:", error);
         handleChatEnd();
 
-        if (error instanceof ChatSDKError) {
-          if (
-            error.message?.includes("AI Gateway requires a valid credit card")
-          ) {
-            setShowCreditCardAlert(true);
-          } else {
-            toast({
-              type: "error",
-              description: error.message,
-            });
-          }
-        } else {
-          toast({
-            type: "error",
-            description: "An unexpected error occurred",
-          });
+        if (
+          error instanceof ApiRequestError &&
+          error.message?.includes("AI Gateway requires a valid credit card")
+        ) {
+          setShowCreditCardAlert(true);
+          return;
         }
+
+        toast({
+          type: "error",
+          description:
+            error instanceof ApiRequestError
+              ? error.message
+              : "An unexpected error occurred",
+        });
       },
     });
 
