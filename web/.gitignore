@@ -62,6 +62,6 @@ next-env.d.ts
 !.vscode/settings.json
 .idea
 
-uploads
+/uploads
 
 .workflow-data

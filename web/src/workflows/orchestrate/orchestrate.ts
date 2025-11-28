@@ -28,16 +28,17 @@ import { classifyRequestStep } from "./steps/classify-request-step";
 
 const logger = console;
 
-async function sendEvent(
-  writable: WritableStream<CustomUIMessageChunk>,
-  event: CustomUIMessageChunk,
-) {
+async function sendEvent(event: CustomUIMessageChunk) {
+  "use step";
+
+  const writable = getWritable<CustomUIMessageChunk>();
   const writer = writable.getWriter();
   try {
     await writer.write(event);
   } finally {
     writer.releaseLock();
   }
+  writer.releaseLock();
 }
 
 function detectCircularDependencies(
@@ -87,14 +88,12 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
 
   const startTime = Date.now();
   let errorStack: string | undefined;
-  const writable = getWritable<CustomUIMessageChunk>();
-
   try {
     logger.info("Workflow Started");
 
     const ctx = getWorkflowMetadata();
 
-    await sendEvent(writable, {
+    await sendEvent({
       type: "data-workflowStarted",
       data: {
         workflowId: ctx.workflowRunId,
@@ -167,7 +166,7 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
     });
 
     logger.info("Classified", classification);
-    await sendEvent(writable, {
+    await sendEvent({
       type: "data-workflowClassification",
       data: classification,
     });
@@ -190,7 +189,7 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
       webhookPayload: input.webhookPayload,
     });
 
-    await sendEvent(writable, {
+    await sendEvent({
       type: "data-workflowPlan",
       data: executionPlan,
     });
@@ -247,7 +246,7 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
       throw new Error("Workflow execution timeout");
     })();
 
-    const executionPromise = executeAgentsAccordingToStrategy(writable, {
+    const executionPromise = executeAgentsAccordingToStrategy({
       plan: executionPlan,
       context,
       triggerMessage,
@@ -273,7 +272,7 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
       );
 
       if (fallbackAgent) {
-        const fallbackResult = await executeAgentTaskStep(writable, {
+        const fallbackResult = await executeAgentTaskStep({
           agentPlan: fallbackAgent,
           context,
           triggerMessage,
@@ -305,7 +304,7 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
       triggerMessage,
     });
 
-    await sendEvent(writable, {
+    await sendEvent({
       type: "data-workflowAggregated",
       data: finalResult,
     });
@@ -392,23 +391,20 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
 }
 
 // NOT a step - orchestration logic
-async function executeAgentsAccordingToStrategy(
-  writable: WritableStream<CustomUIMessageChunk>,
-  params: {
-    plan: ExecutionPlan;
-    context: ChatContext;
-    triggerMessage: Message;
-    webhookPayload?: OrchestrationInput["webhookPayload"];
-    chatId: string;
-    messageId: string;
-  },
-) {
+async function executeAgentsAccordingToStrategy(params: {
+  plan: ExecutionPlan;
+  context: ChatContext;
+  triggerMessage: Message;
+  webhookPayload?: OrchestrationInput["webhookPayload"];
+  chatId: string;
+  messageId: string;
+}) {
   const { plan, context, triggerMessage, webhookPayload, chatId, messageId } =
     params;
 
   switch (plan.strategy) {
     case "sequential":
-      return await executeSequential(writable, {
+      return await executeSequential({
         plan,
         context,
         triggerMessage,
@@ -419,7 +415,6 @@ async function executeAgentsAccordingToStrategy(
 
     case "parallel":
       return await executeParallel(
-        writable,
         plan,
         context,
         triggerMessage,
@@ -430,7 +425,6 @@ async function executeAgentsAccordingToStrategy(
 
     case "conditional":
       return await executeConditional(
-        writable,
         plan,
         context,
         triggerMessage,
@@ -441,7 +435,6 @@ async function executeAgentsAccordingToStrategy(
 
     case "single":
       return await executeSingle(
-        writable,
         plan,
         context,
         triggerMessage,
@@ -456,17 +449,14 @@ async function executeAgentsAccordingToStrategy(
 }
 
 // NOT a step - orchestration logic
-async function executeSequential(
-  writable: WritableStream<CustomUIMessageChunk>,
-  params: {
-    plan: ExecutionPlan;
-    context: ChatContext;
-    triggerMessage: Message;
-    webhookPayload?: OrchestrationInput["webhookPayload"];
-    chatId: string;
-    messageId: string;
-  },
-): Promise<AgentExecutionResult[]> {
+async function executeSequential(params: {
+  plan: ExecutionPlan;
+  context: ChatContext;
+  triggerMessage: Message;
+  webhookPayload?: OrchestrationInput["webhookPayload"];
+  chatId: string;
+  messageId: string;
+}): Promise<AgentExecutionResult[]> {
   const { plan, context, triggerMessage, webhookPayload, chatId, messageId } =
     params;
   const results: AgentExecutionResult[] = [];
@@ -478,7 +468,7 @@ async function executeSequential(
   for (let i = 0; i < sortedAgents.length; i++) {
     const agentPlan = sortedAgents[i];
 
-    const result = await executeAgentTaskStep(writable, {
+    const result = await executeAgentTaskStep({
       agentPlan,
       context,
       triggerMessage,
@@ -531,7 +521,6 @@ async function executeSequential(
 
 // NOT a step - orchestration logic
 async function executeParallel(
-  writable: WritableStream<CustomUIMessageChunk>,
   plan: ExecutionPlan,
   context: ChatContext,
   triggerMessage: Message,
@@ -558,7 +547,7 @@ async function executeParallel(
 
     const groupResults = await Promise.all(
       groupAgents.map((agentPlan) =>
-        executeAgentTaskStep(writable, {
+        executeAgentTaskStep({
           agentPlan,
           context,
           triggerMessage,
@@ -594,7 +583,6 @@ async function executeParallel(
 
 // NOT a step - orchestration logic
 async function executeConditional(
-  writable: WritableStream<CustomUIMessageChunk>,
   plan: ExecutionPlan,
   context: ChatContext,
   triggerMessage: Message,
@@ -661,7 +649,7 @@ async function executeConditional(
 
     const batchResults = await Promise.all(
       ready.map((agentPlan) =>
-        executeAgentTaskStep(writable, {
+        executeAgentTaskStep({
           agentPlan,
           context,
           triggerMessage,
@@ -721,7 +709,6 @@ async function executeConditional(
 
 // NOT a step - orchestration logic
 async function executeSingle(
-  writable: WritableStream<CustomUIMessageChunk>,
   plan: ExecutionPlan,
   context: ChatContext,
   triggerMessage: Message,
@@ -731,7 +718,7 @@ async function executeSingle(
 ): Promise<AgentExecutionResult[]> {
   const agentPlan = plan.selectedAgents[0];
 
-  const result = await executeAgentTaskStep(writable, {
+  const result = await executeAgentTaskStep({
     agentPlan,
     context,
     triggerMessage,

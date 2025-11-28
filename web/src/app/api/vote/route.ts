@@ -1,6 +1,5 @@
 import { chatRepo, voteRepo } from "@/db/repositories";
-import { ChatSDKError } from "@/lib/errors";
-import { createSafeRoute } from "@/lib/server";
+import { ForbiddenError, NotFoundError, createSafeRoute } from "@/lib/server";
 import { authMiddleware } from "@/lib/server/middlewares";
 import { z } from "zod";
 
@@ -25,11 +24,11 @@ export const GET = createSafeRoute()
     const chat = await chatRepo.findById(chatId);
 
     if (!chat) {
-      throw new ChatSDKError("not_found:chat");
+      throw new NotFoundError("Chat not found");
     }
 
     if (chat.creatorId !== user.id) {
-      throw new ChatSDKError("forbidden:vote");
+      throw new ForbiddenError("You are not allowed to view votes for this chat");
     }
 
     const votes = await voteRepo.findForChat(chatId);
@@ -47,11 +46,11 @@ export const PATCH = createSafeRoute()
     const chat = await chatRepo.findById(chatId);
 
     if (!chat) {
-      throw new ChatSDKError("not_found:vote");
+      throw new NotFoundError("Chat not found");
     }
 
     if (chat.creatorId !== user.id) {
-      throw new ChatSDKError("forbidden:vote");
+      throw new ForbiddenError("You are not allowed to vote on this chat");
     }
 
     await voteRepo.vote(user.id, chatId, messageId, type);

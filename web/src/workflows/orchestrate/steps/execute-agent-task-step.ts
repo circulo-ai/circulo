@@ -6,6 +6,7 @@ import { OrchestrationInput } from "@/workflows/orchestrate/types";
 import { google } from "@ai-sdk/google";
 import { DurableAgent } from "@workflow/ai/agent";
 import { convertToModelMessages } from "ai";
+import { getWritable } from "workflow";
 import { ExecutionPlan } from "./plan-agent-execution-step";
 
 export interface AgentExecutionResult {
@@ -22,19 +23,23 @@ export interface AgentExecutionResult {
   cost?: number;
 }
 
-export async function executeAgentTaskStep(
-  writable: WritableStream<CustomUIMessageChunk>,
-  params: {
-    agentPlan: ExecutionPlan["selectedAgents"][0];
-    context: ChatContext;
-    triggerMessage: Message;
-    previousResults: AgentExecutionResult[];
-    webhookPayload?: OrchestrationInput["webhookPayload"];
-  },
-): Promise<AgentExecutionResult> {
+export async function executeAgentTaskStep(params: {
+  agentPlan: ExecutionPlan["selectedAgents"][0];
+  context: ChatContext;
+  triggerMessage: Message;
+  previousResults: AgentExecutionResult[];
+  webhookPayload?: OrchestrationInput["webhookPayload"];
+}): Promise<AgentExecutionResult> {
   "use step";
 
-  const { agentPlan, context, previousResults, webhookPayload, triggerMessage } = params;
+  const {
+    agentPlan,
+    context,
+    previousResults,
+    webhookPayload,
+    triggerMessage,
+  } = params;
+  const writable = getWritable<CustomUIMessageChunk>();
 
   const startTime = new Date();
   const chatAgent = context.agents.find((a) => a.agentId === agentPlan.agentId);
@@ -140,9 +145,10 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
     // CRITICAL: Extract the actual output from the messages array
     // The last message should be the assistant's response
     const assistantMessages = result.messages.filter(
-      (msg) => msg.role === "assistant"
+      (msg) => msg.role === "assistant",
     );
-    const lastAssistantMessage = assistantMessages[assistantMessages.length - 1];
+    const lastAssistantMessage =
+      assistantMessages[assistantMessages.length - 1];
 
     // Extract text content from the message
     let output = "";

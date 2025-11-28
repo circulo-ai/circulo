@@ -8,6 +8,7 @@ import {
   GetObjectCommand,
   PutObjectCommand,
   S3Client,
+  type S3ClientConfig,
   UploadPartCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -18,26 +19,42 @@ let _s3Client: S3Client | null = null;
 export function getS3Client(): S3Client {
   if (_s3Client) return _s3Client;
 
-  const { region } = S3_CONFIG;
+  const { region, endpoint, forcePathStyle, isMinio } = S3_CONFIG;
 
-  if (!region) {
+  if (!region && !endpoint) {
     throw new Error(
-      "AWS region is missing – set AWS_REGION in your environment or disable S3 uploads.",
+      "S3 configuration is missing. Set AWS_REGION (for S3) or MINIO_ENDPOINT (for MinIO) in your environment.",
     );
+  }
+
+  const clientConfig: S3ClientConfig = {
+    region: region || "us-east-1",
+  };
+
+  if (endpoint) {
+    clientConfig.endpoint = endpoint;
+    clientConfig.forcePathStyle = forcePathStyle ?? true;
+  } else if (forcePathStyle !== undefined) {
+    clientConfig.forcePathStyle = forcePathStyle;
   }
 
   // Only pass explicit credentials if both environment variables are available.
   // Otherwise, fall back to the AWS SDK default credential provider chain (e.g. EC2/ECS roles, shared config files, etc.).
-  _s3Client = new S3Client({
-    region,
-    credentials:
-      env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY
-        ? {
-            accessKeyId: env.AWS_ACCESS_KEY_ID,
-            secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
-          }
-        : undefined,
-  });
+  clientConfig.credentials = isMinio
+    ? env.MINIO_ACCESS_KEY && env.MINIO_SECRET_ACCESS_KEY
+      ? {
+          accessKeyId: env.MINIO_ACCESS_KEY,
+          secretAccessKey: env.MINIO_SECRET_ACCESS_KEY,
+        }
+      : undefined
+    : env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY
+      ? {
+          accessKeyId: env.AWS_ACCESS_KEY_ID,
+          secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
+        }
+      : undefined;
+
+  _s3Client = new S3Client(clientConfig);
 
   return _s3Client;
 }
@@ -437,7 +454,9 @@ export async function completeS3MultipartUpload(
   const response = await s3Client.send(command);
   const location =
     response.Location ||
-    `https://${config.bucket}.s3.${config.region}.amazonaws.com/${key}`;
+    (S3_CONFIG.endpoint
+      ? `${S3_CONFIG.endpoint.replace(/\/$/, "")}/${config.bucket}/${key}`
+      : `https://${config.bucket}.s3.${config.region}.amazonaws.com/${key}`);
   const path = `/api/files/serve/s3/${encodeURIComponent(key)}`;
 
   return {

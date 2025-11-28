@@ -66,6 +66,12 @@ const nextConfig: NextConfig = {
           })()
         : []),
     ],
+    // Allow images served from our API routes (includes query strings like ?context=)
+    localPatterns: [
+      {
+        pathname: "/api/files/serve/**",
+      },
+    ],
   },
   /* config options here */
   turbopack: {
