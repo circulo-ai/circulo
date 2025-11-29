@@ -74,22 +74,18 @@ export const env = createEnv({
     BILLING_ENABLED: z.boolean().optional(), // Enable billing enforcement and usage tracking
     OVERAGE_THRESHOLD_DOLLARS: z.number().optional().default(50), // Dollar threshold for incremental overage billing (default: $50)
 
-    // Cloud Storage - AWS S3
-    AWS_REGION: z.string().optional(), // AWS region for S3 buckets
-    AWS_ACCESS_KEY_ID: z.string().optional(), // AWS access key ID
-    AWS_SECRET_ACCESS_KEY: z.string().optional(), // AWS secret access key
+    // Cloud Storage - S3-compatible (AWS, R2, MinIO)
+    S3_ENDPOINT: z.string().optional(), // Custom endpoint for S3-compatible storage (leave empty for AWS)
+    S3_REGION: z.string().optional(), // Region (use "auto"/"us-east-1" for R2/MinIO)
+    S3_ACCESS_KEY_ID: z.string().optional(), // Access key for S3-compatible storage
+    S3_SECRET_ACCESS_KEY: z.string().optional(), // Secret key for S3-compatible storage
+    S3_FORCE_PATH_STYLE: z.boolean().optional(), // Force path-style URLs (true for R2/MinIO)
     S3_BUCKET_NAME: z.string().optional(), // S3 bucket for general file storage
+    S3_EXECUTION_FILES_BUCKET_NAME: z.string().optional(), // S3 bucket for workflow execution files
     S3_KB_BUCKET_NAME: z.string().optional(), // S3 bucket for knowledge base files
     S3_CHAT_BUCKET_NAME: z.string().optional(), // S3 bucket for chat logos
+    S3_COPILOT_BUCKET_NAME: z.string().optional(), // S3 bucket for copilot files
     S3_PROFILE_PICTURES_BUCKET_NAME: z.string().optional(), // S3 bucket for profile pictures
-    // Cloud Storage - MinIO (S3-compatible)
-    MINIO_ENDPOINT: z.string().optional(), // MinIO server host (e.g., localhost or minio.local)
-    MINIO_PORT: z.string().optional(), // MinIO server port
-    MINIO_REGION: z.string().optional(), // Optional MinIO region (defaults to us-east-1)
-    MINIO_USE_SSL: z.boolean().optional(), // Use HTTPS when connecting to MinIO
-    MINIO_FORCE_PATH_STYLE: z.boolean().optional(), // Force path-style URLs (recommended for MinIO)
-    MINIO_ACCESS_KEY: z.string().optional(), // MinIO access key
-    MINIO_SECRET_ACCESS_KEY: z.string().optional(), // MinIO secret key
 
     // Cloud Storage - Azure Blob
     AZURE_ACCOUNT_NAME: z.string().optional(), // Azure storage account name

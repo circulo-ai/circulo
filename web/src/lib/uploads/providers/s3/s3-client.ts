@@ -19,11 +19,11 @@ let _s3Client: S3Client | null = null;
 export function getS3Client(): S3Client {
   if (_s3Client) return _s3Client;
 
-  const { region, endpoint, forcePathStyle, isMinio } = S3_CONFIG;
+  const { region, endpoint, forcePathStyle } = S3_CONFIG;
 
   if (!region && !endpoint) {
     throw new Error(
-      "S3 configuration is missing. Set AWS_REGION (for S3) or MINIO_ENDPOINT (for MinIO) in your environment.",
+      "S3 configuration is missing. Set S3_BUCKET_NAME and S3_REGION (and optional S3_ENDPOINT) in your environment.",
     );
   }
 
@@ -40,17 +40,11 @@ export function getS3Client(): S3Client {
 
   // Only pass explicit credentials if both environment variables are available.
   // Otherwise, fall back to the AWS SDK default credential provider chain (e.g. EC2/ECS roles, shared config files, etc.).
-  clientConfig.credentials = isMinio
-    ? env.MINIO_ACCESS_KEY && env.MINIO_SECRET_ACCESS_KEY
+  clientConfig.credentials =
+    env.S3_ACCESS_KEY_ID && env.S3_SECRET_ACCESS_KEY
       ? {
-          accessKeyId: env.MINIO_ACCESS_KEY,
-          secretAccessKey: env.MINIO_SECRET_ACCESS_KEY,
-        }
-      : undefined
-    : env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY
-      ? {
-          accessKeyId: env.AWS_ACCESS_KEY_ID,
-          secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
+          accessKeyId: env.S3_ACCESS_KEY_ID,
+          secretAccessKey: env.S3_SECRET_ACCESS_KEY,
         }
       : undefined;
 

@@ -1,11 +1,7 @@
 import { createLogger } from "@/lib/logs/console/logger";
 import type { FileInfo } from "@/lib/uploads";
 import { getStorageConfig, type StorageContext } from "@/lib/uploads";
-import {
-  USE_BLOB_STORAGE,
-  USE_MINIO_STORAGE,
-  USE_S3_STORAGE,
-} from "@/lib/uploads/core/setup";
+import { USE_BLOB_STORAGE, USE_S3_STORAGE } from "@/lib/uploads/core/setup";
 
 const logger = createLogger("StorageService");
 
@@ -479,11 +475,9 @@ export function hasCloudStorage(): boolean {
  */
 export function getStorageProviderName():
   | "Azure Blob"
-  | "MinIO"
   | "S3"
   | "Local" {
   if (USE_BLOB_STORAGE) return "Azure Blob";
-  if (USE_MINIO_STORAGE) return "MinIO";
   if (USE_S3_STORAGE) return "S3";
   return "Local";
 }

@@ -3,7 +3,6 @@ import { createLogger } from "@/lib/logs/console/logger";
 import {
   getStorageProvider,
   USE_BLOB_STORAGE,
-  USE_MINIO_STORAGE,
   USE_S3_STORAGE,
 } from "@/lib/uploads/core/setup";
 import { existsSync } from "fs";
@@ -21,9 +20,7 @@ export const UPLOAD_DIR_SERVER = join(PROJECT_ROOT, "uploads");
  */
 export async function ensureUploadsDirectory() {
   if (USE_S3_STORAGE) {
-    logger.info(
-      `Using ${USE_MINIO_STORAGE ? "MinIO" : "S3"} storage, skipping local uploads directory creation`,
-    );
+    logger.info("Using S3-compatible storage, skipping local uploads directory creation");
     return true;
   }
 
@@ -89,31 +86,19 @@ if (typeof process !== "undefined") {
       }
     }
   } else if (USE_S3_STORAGE) {
-    // Verify AWS/MinIO credentials
+    // Verify S3-compatible credentials
     if (!env.S3_BUCKET_NAME) {
-      logger.warn("S3/MinIO storage configuration is missing a bucket name");
-    } else if (USE_MINIO_STORAGE) {
-      if (!env.MINIO_ACCESS_KEY || !env.MINIO_SECRET_ACCESS_KEY) {
-        logger.warn("MinIO credentials are not set in environment variables");
-        logger.warn("Set MINIO_ACCESS_KEY and MINIO_SECRET_ACCESS_KEY");
-      } else if (!env.MINIO_ENDPOINT) {
-        logger.warn("MinIO storage is enabled but MINIO_ENDPOINT is missing");
-      } else {
-        logger.info(
-          `MinIO credentials found. Endpoint: ${env.MINIO_ENDPOINT}${env.MINIO_PORT ? `:${env.MINIO_PORT}` : ""}`,
-        );
-      }
+      logger.warn("S3 storage configuration is missing a bucket name");
     } else {
-      if (!env.AWS_REGION) {
-        logger.warn("S3 storage configuration is incomplete");
-        logger.warn("Set S3_BUCKET_NAME and AWS_REGION for S3 storage");
-      } else if (!env.AWS_ACCESS_KEY_ID || !env.AWS_SECRET_ACCESS_KEY) {
-        logger.warn("AWS credentials are not set in environment variables");
-        logger.warn(
-          "Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY for S3 storage",
-        );
-      } else {
-        logger.info("AWS S3 credentials found in environment variables");
+      logger.info("S3-compatible credentials configured");
+      if (env.S3_ENDPOINT) {
+        logger.info(`Using custom endpoint: ${env.S3_ENDPOINT}`);
+      }
+      if (!env.S3_REGION) {
+        logger.warn("S3_REGION is not set; defaulting to us-east-1");
+      }
+      if (!env.S3_ACCESS_KEY_ID || !env.S3_SECRET_ACCESS_KEY) {
+        logger.warn("S3 access/secret keys are not set");
       }
     }
   } else {
