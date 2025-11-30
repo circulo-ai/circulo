@@ -1,24 +1,14 @@
 import { GetChatHistoryResponse } from "@/app/api/history/route";
 import { useDebounce } from "@/hooks/use-debounce";
-import { useDebouncedLoading } from "@/hooks/use-debounced-loading";
+import { useChatHistoryStore } from "@/stores/use-chat-history-store";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
-import { create } from "zustand";
-
-interface ChatHistoryStore {
-  isChatLoading: boolean;
-  setIsChatLoading: (isChatLoading: boolean) => void;
-}
-
-const useChatHistoryStore = create<ChatHistoryStore>()((set) => ({
-  isChatLoading: false,
-  setIsChatLoading: (isChatLoading) => set({ isChatLoading }),
-}));
 
 export function useChatHistory() {
   const { id } = useParams();
-  const [currentChatId, setCurrentChatId] = useState<string>();
+  const { currentChatId, setCurrentChatId, setIsChatLoading } =
+    useChatHistoryStore();
 
   useEffect(() => {
     let safeId = id;
@@ -26,8 +16,6 @@ export function useChatHistory() {
     if (safeId === currentChatId) return;
     setCurrentChatId(safeId);
   }, [id]);
-
-  const { setIsChatLoading } = useChatHistoryStore();
 
   useEffect(() => {
     let safeId = id;
@@ -64,17 +52,10 @@ export function useChatHistory() {
       data: sortedData,
       ...history,
     },
-    currentChatId,
-    setCurrentChatId,
     search,
-    debouncedSearch,
     setSearch,
+    debouncedSearch,
   };
-}
-
-export function useIsChatLoading() {
-  const { isChatLoading } = useChatHistoryStore();
-  return { isChatLoading: useDebouncedLoading(isChatLoading) };
 }
 
 // TODO useDebouncedLoading for the isLoading state of the history?

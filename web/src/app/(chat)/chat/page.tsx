@@ -1,48 +1,7 @@
-import { Chat } from "@/components/chat";
-import { DataStreamHandler } from "@/components/data-stream-handler";
-import { getSession } from "@/lib/auth";
 import { generateUUID } from "@/lib/utils";
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import { NewChat } from "../components/new-chat";
 
-export default async function Page() {
-  const session = await getSession();
-
-  if (!session) {
-    redirect("/auth/sign-in");
-  }
-
+export default function NewChatPage() {
   const id = generateUUID();
-
-  const cookieStore = await cookies();
-  const modelIdFromCookie = cookieStore.get("chat-model");
-
-  if (!modelIdFromCookie) {
-    return (
-      <>
-        <Chat
-          id={id}
-          initialMessages={[]}
-          initialVisibilityType="private"
-          isReadonly={false}
-          key={id}
-        />
-        <DataStreamHandler />
-      </>
-    );
-  }
-
-  return (
-    <>
-      {/* Show a telegram style empty chat page with a beautiful bacjground pattern */}
-      <Chat
-        id={id}
-        initialMessages={[]}
-        initialVisibilityType="private"
-        isReadonly={false}
-        key={id}
-      />
-      <DataStreamHandler />
-    </>
-  );
+  return <NewChat id={id} />;
 }

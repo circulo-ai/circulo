@@ -12,21 +12,18 @@ import { useOptimisticSWRMutation } from "@/hooks/use-optimistic-swr-mutation";
 import { formatDate } from "@/lib/format-date";
 import { getFetcher } from "@/lib/swr";
 import { cn } from "@/lib/utils";
+import { useChatHistoryStore } from "@/stores/use-chat-history-store";
 import { Pin } from "lucide-react";
-import { Dispatch, SetStateAction, useCallback } from "react";
+import { useCallback } from "react";
 import { Arguments, Key } from "swr";
 
 interface ChatSidebarItemProps {
   item: GetChatHistoryResponse["chats"][0];
-  currentChatId: string | undefined;
-  setCurrentChatId: Dispatch<SetStateAction<string | undefined>>;
 }
 
-export function ChatSidebarItem({
-  item,
-  currentChatId,
-  setCurrentChatId,
-}: ChatSidebarItemProps) {
+export function ChatSidebarItem({ item }: ChatSidebarItemProps) {
+  const { currentChatId, setCurrentChatId } = useChatHistoryStore();
+
   const isHistoryKey = useCallback(
     (key?: Arguments) =>
       (Array.isArray(key) && key[0] === "/api/history") ||

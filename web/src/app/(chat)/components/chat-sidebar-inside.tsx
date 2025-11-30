@@ -24,10 +24,8 @@ export function ChatSidebarInside() {
   const {
     history: { data, isLoading },
     search,
-    debouncedSearch,
     setSearch,
-    currentChatId,
-    setCurrentChatId,
+    debouncedSearch,
   } = useChatHistory();
 
   return (
@@ -69,8 +67,6 @@ export function ChatSidebarInside() {
                       <ChatSidebarItem
                         key={id} // TODO do I need this here?
                         item={chat}
-                        currentChatId={currentChatId}
-                        setCurrentChatId={setCurrentChatId}
                       />
                     );
                   }}

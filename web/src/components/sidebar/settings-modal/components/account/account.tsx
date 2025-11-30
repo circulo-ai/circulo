@@ -5,10 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { signOut } from "@/lib/auth-client";
+import { signOut, useSession } from "@/lib/auth-client";
 import { useBrandConfig } from "@/lib/branding/branding";
 import { createLogger } from "@/lib/logs/console/logger";
-import { useSession } from "@/providers/session-provider";
 import { clearUserData } from "@/stores";
 import { Camera, UserIcon } from "lucide-react";
 import Image from "next/image";
@@ -226,7 +225,7 @@ export function Account(_props: AccountProps) {
 
             {/* Sign Out Button Skeleton */}
             <div>
-              <Skeleton className="h-8 w-[71px] rounded-[8px]" />
+              <Skeleton className="h-8 w-[71px] rounded-xl" />
             </div>
           </>
         ) : (
@@ -236,7 +235,7 @@ export function Account(_props: AccountProps) {
               {/* Profile Picture Upload */}
               <div className="relative">
                 <div
-                  className="group relative flex h-12 w-12 flex-shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-[#802FFF] transition-all hover:opacity-80"
+                  className="group relative flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-[#802FFF] transition-all hover:opacity-80"
                   onClick={handleProfilePictureClick}
                 >
                   {(() => {
@@ -349,7 +348,7 @@ export function Account(_props: AccountProps) {
               <Button
                 onClick={handleSignOut}
                 variant="destructive"
-                className="h-8 rounded-[8px] bg-red-500 text-white transition-all duration-200 hover:bg-red-600"
+                className="h-8 rounded-xl bg-red-500 text-white transition-all duration-200 hover:bg-red-600"
               >
                 Sign Out
               </Button>
