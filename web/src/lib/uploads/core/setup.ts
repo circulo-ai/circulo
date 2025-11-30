@@ -3,32 +3,18 @@ import { env } from "@/lib/env";
 // Client-safe configuration - no Node.js modules
 export const UPLOAD_DIR = "/uploads";
 
-// MinIO detection (S3-compatible)
-const minioEndpointInput = env.MINIO_ENDPOINT?.replace(/\/$/, "");
-const minioPort = env.MINIO_PORT ? `:${env.MINIO_PORT}` : "";
-const minioUseSSL =
-  env.MINIO_USE_SSL === undefined
-    ? true
-    : String(env.MINIO_USE_SSL).toLowerCase() !== "false";
-const minioForcePathStyle =
-  env.MINIO_FORCE_PATH_STYLE === undefined
-    ? true
-    : String(env.MINIO_FORCE_PATH_STYLE).toLowerCase() !== "false";
-const minioEndpoint =
-  minioEndpointInput && minioEndpointInput.startsWith("http")
-    ? minioEndpointInput
-    : minioEndpointInput
-      ? `${minioUseSSL ? "https" : "http"}://${minioEndpointInput}${minioPort}`
+// Unified S3-compatible detection (AWS, R2, MinIO, etc.)
+const s3EndpointInput = env.S3_ENDPOINT?.replace(/\/$/, "");
+const s3Endpoint =
+  s3EndpointInput && s3EndpointInput.startsWith("http")
+    ? s3EndpointInput
+    : s3EndpointInput
+      ? `https://${s3EndpointInput}`
       : undefined;
-const hasMinioConfig = !!(
-  minioEndpoint &&
-  env.S3_BUCKET_NAME &&
-  env.MINIO_ACCESS_KEY &&
-  env.MINIO_SECRET_ACCESS_KEY
-);
-
-// Check if S3 is configured (has required credentials)
-const hasAwsS3Config = !!(env.S3_BUCKET_NAME && env.AWS_REGION);
+const s3ForcePathStyle =
+  env.S3_FORCE_PATH_STYLE ?? (s3Endpoint ? true : undefined);
+const resolvedS3Region = env.S3_REGION || (s3Endpoint ? "us-east-1" : "");
+const hasS3Config = !!(env.S3_BUCKET_NAME && resolvedS3Region);
 
 // Check if Azure Blob is configured (has required credentials)
 const hasBlobConfig = !!(
@@ -37,25 +23,16 @@ const hasBlobConfig = !!(
     env.AZURE_CONNECTION_STRING)
 );
 
-// Resolve region for S3-compatible storage (AWS or MinIO)
-const resolvedS3Region =
-  env.AWS_REGION ||
-  env.MINIO_REGION ||
-  (hasMinioConfig ? "us-east-1" : "");
-
 // Storage configuration flags - auto-detect based on available credentials
-// Priority: Blob > S3/MinIO > Local (if both are configured, Blob takes priority)
+// Priority: Blob > S3 > Local (if both are configured, Blob takes priority)
 export const USE_BLOB_STORAGE = hasBlobConfig;
-export const USE_MINIO_STORAGE = hasMinioConfig && !USE_BLOB_STORAGE;
-export const USE_S3_STORAGE =
-  (hasAwsS3Config || hasMinioConfig) && !USE_BLOB_STORAGE;
+export const USE_S3_STORAGE = hasS3Config && !USE_BLOB_STORAGE;
 
 export const S3_CONFIG = {
   bucket: env.S3_BUCKET_NAME || "",
   region: resolvedS3Region,
-  endpoint: hasMinioConfig ? minioEndpoint : undefined,
-  forcePathStyle: hasMinioConfig ? minioForcePathStyle : undefined,
-  isMinio: hasMinioConfig,
+  endpoint: s3Endpoint,
+  forcePathStyle: s3ForcePathStyle,
 };
 
 export const BLOB_CONFIG = {
@@ -129,9 +106,8 @@ export const BLOB_PROFILE_PICTURES_CONFIG = {
 /**
  * Get the current storage provider as a human-readable string
  */
-export function getStorageProvider(): "Azure Blob" | "MinIO" | "S3" | "Local" {
+export function getStorageProvider(): "Azure Blob" | "S3" | "Local" {
   if (USE_BLOB_STORAGE) return "Azure Blob";
-  if (USE_MINIO_STORAGE) return "MinIO";
   if (USE_S3_STORAGE) return "S3";
   return "Local";
 }

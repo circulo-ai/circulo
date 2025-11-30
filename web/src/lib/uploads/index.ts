@@ -5,7 +5,6 @@ export {
 export {
   UPLOAD_DIR,
   USE_BLOB_STORAGE,
-  USE_MINIO_STORAGE,
   USE_S3_STORAGE,
 } from "@/lib/uploads/core/setup";
 export {

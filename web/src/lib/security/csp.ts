@@ -54,15 +54,15 @@ export const buildTimeCSPDirectives: CSPDirectives = {
     "https://*.s3.amazonaws.com",
     "https://s3.amazonaws.com",
     "https://github.com/*",
-    ...(env.S3_BUCKET_NAME && env.AWS_REGION
-      ? [`https://${env.S3_BUCKET_NAME}.s3.${env.AWS_REGION}.amazonaws.com`]
+    ...(env.S3_BUCKET_NAME && env.S3_REGION
+      ? [`https://${env.S3_BUCKET_NAME}.s3.${env.S3_REGION}.amazonaws.com`]
       : []),
-    ...(env.S3_KB_BUCKET_NAME && env.AWS_REGION
-      ? [`https://${env.S3_KB_BUCKET_NAME}.s3.${env.AWS_REGION}.amazonaws.com`]
+    ...(env.S3_KB_BUCKET_NAME && env.S3_REGION
+      ? [`https://${env.S3_KB_BUCKET_NAME}.s3.${env.S3_REGION}.amazonaws.com`]
       : []),
-    ...(env.S3_CHAT_BUCKET_NAME && env.AWS_REGION
+    ...(env.S3_CHAT_BUCKET_NAME && env.S3_REGION
       ? [
-          `https://${env.S3_CHAT_BUCKET_NAME}.s3.${env.AWS_REGION}.amazonaws.com`,
+          `https://${env.S3_CHAT_BUCKET_NAME}.s3.${env.S3_REGION}.amazonaws.com`,
         ]
       : []),
     "https://*.amazonaws.com",
