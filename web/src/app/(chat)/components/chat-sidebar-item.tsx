@@ -108,7 +108,7 @@ export function ChatSidebarItem({ item }: ChatSidebarItemProps) {
                       Boolean(0) && "opacity-100",
                     )}
                   >
-                    12
+                    0
                   </Badge>
                 </div>
               </div>
