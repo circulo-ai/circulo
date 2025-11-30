@@ -3,8 +3,18 @@ import { env } from "@/lib/env";
 // Client-safe configuration - no Node.js modules
 export const UPLOAD_DIR = "/uploads";
 
-// Check if S3 is configured (has required credentials)
-const hasS3Config = !!(env.S3_BUCKET_NAME && env.AWS_REGION);
+// Unified S3-compatible detection (AWS, R2, MinIO, etc.)
+const s3EndpointInput = env.S3_ENDPOINT?.replace(/\/$/, "");
+const s3Endpoint =
+  s3EndpointInput && s3EndpointInput.startsWith("http")
+    ? s3EndpointInput
+    : s3EndpointInput
+      ? `https://${s3EndpointInput}`
+      : undefined;
+const s3ForcePathStyle =
+  env.S3_FORCE_PATH_STYLE ?? (s3Endpoint ? true : undefined);
+const resolvedS3Region = env.S3_REGION || (s3Endpoint ? "us-east-1" : "");
+const hasS3Config = !!(env.S3_BUCKET_NAME && resolvedS3Region);
 
 // Check if Azure Blob is configured (has required credentials)
 const hasBlobConfig = !!(
@@ -20,7 +30,9 @@ export const USE_S3_STORAGE = hasS3Config && !USE_BLOB_STORAGE;
 
 export const S3_CONFIG = {
   bucket: env.S3_BUCKET_NAME || "",
-  region: env.AWS_REGION || "",
+  region: resolvedS3Region,
+  endpoint: s3Endpoint,
+  forcePathStyle: s3ForcePathStyle,
 };
 
 export const BLOB_CONFIG = {
@@ -32,12 +44,12 @@ export const BLOB_CONFIG = {
 
 export const S3_KB_CONFIG = {
   bucket: env.S3_KB_BUCKET_NAME || "",
-  region: env.AWS_REGION || "",
+  region: resolvedS3Region,
 };
 
 export const S3_EXECUTION_FILES_CONFIG = {
   bucket: env.S3_EXECUTION_FILES_BUCKET_NAME || "sim-execution-files",
-  region: env.AWS_REGION || "",
+  region: resolvedS3Region,
 };
 
 export const BLOB_KB_CONFIG = {
@@ -57,7 +69,7 @@ export const BLOB_EXECUTION_FILES_CONFIG = {
 
 export const S3_CHAT_CONFIG = {
   bucket: env.S3_CHAT_BUCKET_NAME || "",
-  region: env.AWS_REGION || "",
+  region: resolvedS3Region,
 };
 
 export const BLOB_CHAT_CONFIG = {
@@ -69,7 +81,7 @@ export const BLOB_CHAT_CONFIG = {
 
 export const S3_COPILOT_CONFIG = {
   bucket: env.S3_COPILOT_BUCKET_NAME || "",
-  region: env.AWS_REGION || "",
+  region: resolvedS3Region,
 };
 
 export const BLOB_COPILOT_CONFIG = {
@@ -81,7 +93,7 @@ export const BLOB_COPILOT_CONFIG = {
 
 export const S3_PROFILE_PICTURES_CONFIG = {
   bucket: env.S3_PROFILE_PICTURES_BUCKET_NAME || "",
-  region: env.AWS_REGION || "",
+  region: resolvedS3Region,
 };
 
 export const BLOB_PROFILE_PICTURES_CONFIG = {

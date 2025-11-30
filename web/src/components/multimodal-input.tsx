@@ -14,6 +14,7 @@ import { myProvider } from "@/lib/ai/providers";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { cn } from "@/lib/utils";
+import { useUploadManager } from "@/lib/uploads";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
 import equal from "fast-deep-equal";
@@ -116,7 +117,23 @@ function PureMultimodalInput({
   };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadQueue, setUploadQueue] = useState<string[]>([]);
+  const uploadManager = useUploadManager({
+    defaultContext: "chat",
+  });
+
+  // Sync successful uploads into parent attachment state
+  useEffect(() => {
+    const completed = uploadManager.items.filter(
+      (item) => item.status === "success" && item.url,
+    );
+    setAttachments(
+      completed.map((item) => ({
+        url: item.url!,
+        name: item.file.name,
+        contentType: item.file.type,
+      })),
+    );
+  }, [uploadManager.items, setAttachments]);
 
   const submitForm = useCallback(() => {
     window.history.pushState({}, "", `/chat/${chatId}`);
@@ -137,6 +154,7 @@ function PureMultimodalInput({
       ],
     });
 
+    uploadManager.clear();
     setAttachments([]);
     setLocalStorageInput("");
     resetHeight();
@@ -150,39 +168,13 @@ function PureMultimodalInput({
     setInput,
     attachments,
     sendMessage,
+    uploadManager,
     setAttachments,
     setLocalStorageInput,
     width,
     chatId,
     resetHeight,
   ]);
-
-  const uploadFile = useCallback(async (file: File) => {
-    const formData = new FormData();
-    formData.append("file", file);
-
-    try {
-      const response = await fetch("/api/files/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const { url, path: pathname, type: contentType } = data;
-
-        return {
-          url,
-          name: pathname,
-          contentType,
-        };
-      }
-      const { error } = await response.json();
-      toast.error(error);
-    } catch (_error) {
-      toast.error("Failed to upload file, please try again!");
-    }
-  }, []);
 
   const _modelResolver = useMemo(() => {
     return myProvider.languageModel(selectedModelId);
@@ -198,27 +190,11 @@ function PureMultimodalInput({
   const handleFileChange = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
       const files = Array.from(event.target.files || []);
-
-      setUploadQueue(files.map((file) => file.name));
-
-      try {
-        const uploadPromises = files.map((file) => uploadFile(file));
-        const uploadedAttachments = await Promise.all(uploadPromises);
-        const successfullyUploadedAttachments = uploadedAttachments.filter(
-          (attachment) => attachment !== undefined,
-        );
-
-        setAttachments((currentAttachments) => [
-          ...currentAttachments,
-          ...successfullyUploadedAttachments,
-        ]);
-      } catch (error) {
-        console.error("Error uploading files!", error);
-      } finally {
-        setUploadQueue([]);
+      if (files.length > 0) {
+        uploadManager.addFiles(files, "chat");
       }
     },
-    [setAttachments, uploadFile],
+    [uploadManager],
   );
 
   const handlePaste = useCallback(
@@ -235,35 +211,16 @@ function PureMultimodalInput({
       // Prevent default paste behavior for images
       event.preventDefault();
 
-      setUploadQueue((prev) => [...prev, "Pasted image"]);
-
-      try {
-        const uploadPromises = imageItems.map(async (item) => {
-          const file = item.getAsFile();
-          if (!file) return;
-          return uploadFile(file);
-        });
-
-        const uploadedAttachments = await Promise.all(uploadPromises);
-        const successfullyUploadedAttachments = uploadedAttachments.filter(
-          (attachment) =>
-            attachment !== undefined &&
-            attachment.url !== undefined &&
-            attachment.contentType !== undefined,
-        );
-
-        setAttachments((curr) => [
-          ...curr,
-          ...(successfullyUploadedAttachments as Attachment[]),
-        ]);
-      } catch (error) {
-        console.error("Error uploading pasted images:", error);
-        toast.error("Failed to upload pasted image(s)");
-      } finally {
-        setUploadQueue([]);
+      const files: File[] = [];
+      for (const item of imageItems) {
+        const file = item.getAsFile();
+        if (file) files.push(file);
+      }
+      if (files.length > 0) {
+        uploadManager.addFiles(files, "chat");
       }
     },
-    [setAttachments],
+    [uploadManager],
   );
 
   // Add paste event listener to textarea
@@ -279,7 +236,7 @@ function PureMultimodalInput({
     <div className={cn("relative flex w-full flex-col gap-4", className)}>
       {messages.length === 0 &&
         attachments.length === 0 &&
-        uploadQueue.length === 0 && (
+        uploadManager.items.every((item) => item.status !== "queued" && item.status !== "preparing" && item.status !== "uploading") && (
           <SuggestedActions
             chatId={chatId}
             selectedVisibilityType={selectedVisibilityType}
@@ -308,7 +265,13 @@ function PureMultimodalInput({
           }}
           className="contents"
         >
-          {(attachments.length > 0 || uploadQueue.length > 0) && (
+          {(attachments.length > 0 ||
+            uploadManager.items.some(
+              (item) =>
+                item.status === "queued" ||
+                item.status === "preparing" ||
+                item.status === "uploading",
+            )) && (
             <div
               className="flex flex-row items-end gap-2 overflow-x-scroll"
               data-testid="attachments-preview"
@@ -318,11 +281,16 @@ function PureMultimodalInput({
                   attachment={attachment}
                   key={attachment.url}
                   onRemove={() => {
-                    setAttachments((currentAttachments) =>
-                      currentAttachments.filter(
-                        (a) => a.url !== attachment.url,
-                      ),
+                    const match = uploadManager.items.find(
+                      (item) => item.url === attachment.url,
                     );
+                    if (match) {
+                      uploadManager.remove(match.id);
+                    } else {
+                      setAttachments((current) =>
+                        current.filter((a) => a.url !== attachment.url),
+                      );
+                    }
                     if (fileInputRef.current) {
                       fileInputRef.current.value = "";
                     }
@@ -330,15 +298,22 @@ function PureMultimodalInput({
                 />
               ))}
 
-              {uploadQueue.map((filename) => (
+              {uploadManager.items
+                .filter(
+                  (item) =>
+                    item.status === "queued" ||
+                    item.status === "preparing" ||
+                    item.status === "uploading",
+                )
+                .map((item) => (
                 <PreviewAttachment
                   attachment={{
                     url: "",
-                    name: filename,
-                    contentType: "",
+                    name: item.file.name,
+                    contentType: item.file.type,
                   }}
                   isUploading={true}
-                  key={filename}
+                  key={item.id}
                 />
               ))}
             </div>
@@ -396,7 +371,12 @@ function PureMultimodalInput({
                 className="size-8 rounded-full bg-primary text-primary-foreground transition-colors duration-200 hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground"
                 disabled={
                   (input.trim().length === 0 && attachments.length === 0) ||
-                  uploadQueue.length > 0
+                  uploadManager.items.some(
+                    (item) =>
+                      item.status === "queued" ||
+                      item.status === "preparing" ||
+                      item.status === "uploading",
+                  )
                 }
                 status={status}
                 data-testid="send-button"

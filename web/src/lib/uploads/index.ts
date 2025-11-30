@@ -26,3 +26,8 @@ export {
   type MessageContent as AnthropicMessageContent,
   type FileAttachment,
 } from "@/lib/uploads/utils/file-utils";
+export {
+  useUploadManager,
+  type UploadItem,
+  type UploadStatus,
+} from "@/lib/uploads/hooks/use-upload-manager";

@@ -8,7 +8,6 @@ import {
   postRequest,
   putRequest,
 } from "./api/client";
-import { ChatSDKError, ErrorCode } from "./errors";
 import { toQueryString } from "./utils";
 
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -145,26 +144,23 @@ export async function fetchWithErrorHandlers(
     const response = await fetch(input, init);
 
     if (!response.ok) {
-      // Updated to match standard backend error shape if possible,
-      // otherwise keep generic handling
-      let code = "UNKNOWN_ERROR";
-      let cause = undefined;
-
+      let message = response.statusText;
+      let details: unknown;
+      let code = "API_ERROR";
       try {
         const data = await response.json();
-        code = data.message || response.statusText;
-        cause = data.errors;
-      } catch (e) {
-        // response was not JSON
+        message = data?.message || message;
+        details = data?.errors;
+      } catch {
+        // non-JSON response, keep defaults
       }
-
-      throw new ChatSDKError(code as ErrorCode, cause);
+      throw new ApiRequestError(response.status, code, message, details);
     }
 
     return response;
   } catch (error: unknown) {
     if (typeof navigator !== "undefined" && !navigator.onLine) {
-      throw new ChatSDKError("offline:chat");
+      throw new ApiRequestError(0, "NETWORK_ERROR", "Network request failed");
     }
 
     throw error;
