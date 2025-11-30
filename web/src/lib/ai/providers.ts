@@ -17,6 +17,8 @@ const supportingLanguageModels = {
   },
 } as const;
 
+export type SupportedModels = keyof typeof supportingLanguageModels;
+
 export const LLM_MODELS = Object.keys(supportingLanguageModels);
 
 export type modelID = keyof typeof supportingLanguageModels;

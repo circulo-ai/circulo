@@ -9,7 +9,6 @@ import {
   index,
   integer,
   jsonb,
-  numeric,
   pgEnum,
   pgTable,
   primaryKey,
@@ -19,7 +18,7 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
-import { agent } from "./agent";
+import { Agent, agent } from "./agent";
 import { organization, user } from "./auth";
 
 export const chatVisibilityEnum = pgEnum("chat_visibility", [
@@ -171,10 +170,7 @@ export const chatAgent = pgTable(
 
     // Per-chat overrides
     customInstructions: text("custom_instructions"),
-    customTemperature: numeric("custom_temperature", {
-      precision: 3,
-      scale: 2,
-    }),
+    customTemperature: integer("temperature").default(70),
 
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -439,6 +435,9 @@ export type Chat = typeof chat.$inferSelect;
 export type NewChat = typeof chat.$inferInsert;
 export type ChatMember = typeof chatMember.$inferSelect;
 export type ChatAgent = typeof chatAgent.$inferSelect;
+export type ChatAgentWithAgent = ChatAgent & {
+  agent: Agent;
+};
 export type Message = typeof message.$inferSelect;
 export type NewMessage = typeof message.$inferInsert;
 export type Document = typeof artifact.$inferSelect;

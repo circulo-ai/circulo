@@ -1,22 +1,24 @@
-import { generateTitleFromUserMessage } from "@/app/(chat)/actions";
+import { generateTitleFromUserMessages } from "@/app/(chat)/actions";
 import { chatRepo } from "@/db/repositories/chat-repo";
 import { messageRepo } from "@/db/repositories/message-repo";
 import { getActiveOrganizationId } from "@/lib/auth";
 import { hasPermission, isMemberOf } from "@/lib/permissions";
 import {
   BadRequestError,
+  createErrorHandler,
+  createSafeRoute,
   ForbiddenError,
   NotFoundError,
   RateLimitError,
-  createErrorHandler,
-  createSafeRoute,
 } from "@/lib/server";
 import { authMiddleware } from "@/lib/server/middlewares";
+import { ChatMessage } from "@/lib/types";
 import { getTextFromMessage } from "@/lib/utils";
 import { orchestrateWorkflow } from "@/workflows/orchestrate/orchestrate";
 import { OrchestrationInput } from "@/workflows/orchestrate/types";
-import { createUIMessageStreamResponse } from "ai";
+import { createUIMessageStreamResponse, safeValidateUIMessages } from "ai";
 import { start } from "workflow/api";
+import z from "zod";
 import { deleteQuerySchema } from "./schema";
 
 export const maxDuration = 60;
@@ -24,21 +26,39 @@ export const maxDuration = 60;
 const handleChatError = createErrorHandler((error) => {
   if (error instanceof RateLimitError) return error.toResponse();
   if (error.message?.includes("AI Gateway requires a valid credit card")) {
-    return new BadRequestError("AI Gateway requires a valid credit card")
-      .toResponse();
+    return new BadRequestError(
+      "AI Gateway requires a valid credit card",
+    ).toResponse();
   }
   return null;
 });
 
+const createChatSchema = z.object({
+  id: z.uuid(),
+  visibility: z.enum(["private", "public"]).default("private"),
+  messages: z.unknown().refine(async (value) => {
+    const { success } = await safeValidateUIMessages<ChatMessage>({
+      messages: value,
+    });
+    return success;
+  }),
+});
+
 export const POST = createSafeRoute({ handleServerError: handleChatError })
-  .methods("POST")
   .use(authMiddleware())
+  .body(createChatSchema)
   .handler(async (request, ctx) => {
     console.log(ctx.body);
-    const { id, message, selectedVisibilityType } = ctx.body as any;
+    const {
+      id,
+      messages: rawMessages,
+      visibility: selectedVisibilityType,
+    } = ctx.body;
     const {
       user: { id: userId },
     } = ctx.data;
+
+    const messages = rawMessages as ChatMessage[];
 
     const activeOrganizationId = await getActiveOrganizationId();
 
@@ -82,40 +102,44 @@ export const POST = createSafeRoute({ handleServerError: handleChatError })
       }
 
       // Create the chat
-      const title = await generateTitleFromUserMessage({ message });
+      const title = await generateTitleFromUserMessages({ messages });
       await chatRepo.create({
         id,
         creatorId: userId,
         title,
-        visibility: selectedVisibilityType as any,
+        visibility: selectedVisibilityType,
         organizationId: activeOrganizationId,
       });
     }
 
     // Save user message
-    await messageRepo.create({
-      chatId: id,
-      id: message.id,
-      role: "user",
-      parts: message.parts,
-      attachments: [],
-      content: getTextFromMessage(message),
-      createdAt: new Date(),
-      authorType: "user",
-      authorId: userId,
-      tokenCount: 0,
-      cost: "0.000000",
-      quotedMessageId: null,
-      isEdited: false,
-      editedAt: null,
-      isDeleted: false,
-      deletedAt: null,
-    });
+    await messageRepo.createMany(
+      messages.map((e) => {
+        return {
+          chatId: id,
+          id: e.id,
+          role: "user",
+          parts: e.parts,
+          attachments: [],
+          content: getTextFromMessage(e),
+          createdAt: new Date(),
+          authorType: "user",
+          authorId: userId,
+          tokenCount: 0,
+          cost: "0.000000",
+          quotedMessageId: null,
+          isEdited: false,
+          editedAt: null,
+          isDeleted: false,
+          deletedAt: null,
+        };
+      }),
+    );
 
     // Start the workflow
     const orchestrationInput: OrchestrationInput = {
       chatId: id,
-      messageId: message.id,
+      messages: messages,
       triggerType: "user_message",
     };
 
@@ -131,7 +155,6 @@ export const POST = createSafeRoute({ handleServerError: handleChatError })
   });
 
 export const DELETE = createSafeRoute({ handleServerError: handleChatError })
-  .methods("DELETE")
   .query(deleteQuerySchema)
   .use(authMiddleware())
   .handler(async (request, ctx) => {
