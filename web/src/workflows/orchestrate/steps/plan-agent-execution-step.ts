@@ -1,5 +1,7 @@
 // workflows/orchestration/steps/plan-agent-execution-step.ts
-import { Agent, ChatAgent, Message } from "@/db";
+import { Agent, ChatAgent } from "@/db";
+import { ChatMessage } from "@/lib/types";
+import { getTextFromMessages } from "@/lib/utils";
 import { OrchestrationInput } from "@/workflows/orchestrate/types";
 import { google } from "@ai-sdk/google";
 import { generateObject } from "ai";
@@ -43,12 +45,12 @@ export type ExecutionPlan = z.infer<typeof executionPlanSchema>;
 export async function planAgentExecutionStep(params: {
   classification: RequestClassification;
   agents: Array<ChatAgent & { agent: Agent }>;
-  triggerMessage: Message;
+  triggerMessages: ChatMessage[];
   webhookPayload?: OrchestrationInput["webhookPayload"];
 }): Promise<ExecutionPlan> {
   "use step";
 
-  const { classification, agents, triggerMessage, webhookPayload } = params;
+  const { classification, agents, triggerMessages, webhookPayload } = params;
 
   // Build agent catalog
   const agentDescriptions = agents
@@ -146,7 +148,7 @@ RULES:
 - Assign clear, specific tasks to each agent
 - Make sure tasks don't overlap unnecessarily
 - In sequential mode, explicitly state how each agent should use previous outputs`,
-    prompt: `User's request: "${triggerMessage.content}"
+    prompt: `User's request: "${getTextFromMessages(triggerMessages)}"
 
 Classification reasoning: ${classification.reasoning}
 

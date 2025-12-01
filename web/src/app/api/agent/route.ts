@@ -2,6 +2,7 @@ import { agentRepo } from "@/db/repositories";
 import { getUserRole, isMemberOf } from "@/lib/permissions";
 import {
   authMiddleware,
+  BadRequestError,
   createSafeRoute,
   ForbiddenError,
   NotFoundError,
@@ -57,6 +58,18 @@ export const POST = createSafeRoute()
     const isOrgMember = await isMemberOf(user.id, organizationId);
     if (!isOrgMember) {
       throw new ForbiddenError("You don't have access to this organization");
+    }
+
+    const [existing] = await agentRepo.findByOrganization({
+      organizationId,
+    });
+
+    if (existing) {
+      if (existing.name === ctx.body.name) {
+        throw new BadRequestError(
+          "An agent with the same name exists in current organization!",
+        );
+      }
     }
 
     const agent = await agentRepo.create({
