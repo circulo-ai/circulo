@@ -1,6 +1,8 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+"use client";
+
 import type { StorageContext } from "@/lib/uploads/core/config-resolver";
 import { nanoid } from "nanoid";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export type UploadStatus =
   | "queued"
@@ -18,7 +20,7 @@ export interface UploadItem {
   progress: number; // 0-100
   bytesSent: number;
   error?: string;
-  url?: string;
+  url?: string; // SHOULD be a stable/readable URL/path
   key?: string;
   metadata?: Record<string, string>;
   startedAt?: number;
@@ -26,48 +28,21 @@ export interface UploadItem {
 }
 
 export interface UseUploadManagerOptions {
-  /**
-   * Storage context (bucket/container selector). Defaults to "general".
-   */
   defaultContext?: StorageContext;
-  /**
-   * API path used to request presigned uploads.
-   */
   presignPath?: string;
-  /**
-   * Fallback API path when presigned uploads are unavailable.
-   */
   uploadPath?: string;
-  /**
-   * Maximum concurrent uploads.
-   */
   maxConcurrent?: number;
-  /**
-   * Automatically start queued uploads.
-   */
   autoStart?: boolean;
-  /**
-   * Use the legacy API upload when presign is not available.
-   */
   fallbackToApi?: boolean;
-  /**
-   * Extra headers applied to presign/upload requests (not to S3 PUT).
-   */
   requestHeaders?: Record<string, string>;
-  /**
-   * Called whenever an item changes (progress, status, etc.).
-   */
   onChange?: (items: UploadItem[]) => void;
-  /**
-   * Called when an item finishes (success or error).
-   */
   onItemFinish?: (item: UploadItem) => void;
 }
 
 interface PresignResponse {
-  presignedUrl?: string;
+  presignedUrl?: string; // PUT URL
   fileInfo?: {
-    path?: string;
+    path?: string; // GET/public URL or stable path
     key?: string;
   };
   uploadHeaders?: Record<string, string>;
@@ -84,13 +59,7 @@ const DEFAULTS = {
   defaultContext: "general" as StorageContext,
 };
 
-/**
- * Feature-rich upload manager with queueing, progress, cancellation,
- * retry, per-context routing, and presigned upload support.
- */
-export function useUploadManager(
-  options: UseUploadManagerOptions = {},
-) {
+export function useUploadManager(options: UseUploadManagerOptions = {}) {
   const {
     defaultContext = DEFAULTS.defaultContext,
     presignPath = DEFAULTS.presignPath,
@@ -111,9 +80,7 @@ export function useUploadManager(
 
   const notify = useCallback(() => {
     setVersion((v) => v + 1);
-    if (onChange) {
-      onChange(Object.values(itemsRef.current));
-    }
+    onChange?.(Object.values(itemsRef.current));
   }, [onChange]);
 
   const setItem = useCallback(
@@ -143,10 +110,13 @@ export function useUploadManager(
   );
 
   const startNext = useCallback(() => {
-    if (inFlightRef.current.size >= maxConcurrent) return;
-    const nextId = queueRef.current.shift();
-    if (!nextId) return;
-    void startUpload(nextId);
+    while (
+      inFlightRef.current.size < maxConcurrent &&
+      queueRef.current.length > 0
+    ) {
+      const nextId = queueRef.current.shift()!;
+      void startUpload(nextId);
+    }
   }, [maxConcurrent]);
 
   const addFiles = useCallback(
@@ -172,9 +142,7 @@ export function useUploadManager(
         addedIds.push(id);
       });
       notify();
-      if (autoStart) {
-        startNext();
-      }
+      if (autoStart) startNext();
       return addedIds;
     },
     [autoStart, defaultContext, notify, startNext],
@@ -182,9 +150,7 @@ export function useUploadManager(
 
   const cancel = useCallback(
     (id: string) => {
-      if (abortRef.current[id]) {
-        abortRef.current[id]!();
-      }
+      abortRef.current[id]?.();
       removeFromQueue(id);
       setItem(id, (item) => ({
         ...item,
@@ -211,9 +177,7 @@ export function useUploadManager(
         error: undefined,
         completedAt: undefined,
       }));
-      if (autoStart) {
-        startNext();
-      }
+      if (autoStart) startNext();
     },
     [autoStart, setItem, startNext],
   );
@@ -230,7 +194,7 @@ export function useUploadManager(
   );
 
   const clear = useCallback(() => {
-    Object.keys(abortRef.current).forEach((id) => abortRef.current[id]!());
+    Object.keys(abortRef.current).forEach((id) => abortRef.current[id]?.());
     queueRef.current = [];
     inFlightRef.current.clear();
     itemsRef.current = {};
@@ -238,25 +202,20 @@ export function useUploadManager(
     notify();
   }, [notify]);
 
-  async function presignRequest(
-    item: UploadItem,
-  ): Promise<PresignResponse> {
-    const res = await fetch(
-      `${presignPath}?type=${item.context}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(requestHeaders || {}),
-        },
-        body: JSON.stringify({
-          fileName: item.file.name,
-          contentType: item.file.type,
-          fileSize: item.file.size,
-          metadata: item.metadata,
-        }),
+  async function presignRequest(item: UploadItem): Promise<PresignResponse> {
+    const res = await fetch(`${presignPath}?type=${item.context}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(requestHeaders || {}),
       },
-    );
+      body: JSON.stringify({
+        fileName: item.file.name,
+        contentType: item.file.type,
+        fileSize: item.file.size,
+        metadata: item.metadata,
+      }),
+    });
 
     const json = (await res.json()) as PresignResponse;
     if (!res.ok) {
@@ -265,15 +224,13 @@ export function useUploadManager(
     return json;
   }
 
-  const apiUpload = async (
-    item: UploadItem,
-    signal: AbortSignal,
-  ) => {
-    if (item.context !== "general") {
+  const apiUpload = async (item: UploadItem, signal: AbortSignal) => {
+    if (item.context !== "general" && item.context !== "chat") {
       throw new Error(
-        `API fallback only supports the "general" context (got "${item.context}")`,
+        `API fallback only supports "general" or "chat" context (got "${item.context}")`,
       );
     }
+
     const formData = new FormData();
     formData.append("file", item.file);
 
@@ -283,26 +240,31 @@ export function useUploadManager(
       signal,
       headers: requestHeaders,
     });
+
     if (!res.ok) {
       const message = await res.text();
-      throw new Error(
-        message || `Upload failed with status ${res.status}`,
-      );
+      throw new Error(message || `Upload failed with status ${res.status}`);
     }
+
     const json = await res.json();
-    return {
-      url: json.url || json.path,
-      key: json.key,
-    };
+    return { url: json.url || json.path, key: json.key };
   };
 
-  const directUpload = (
-    item: UploadItem,
-    presign: PresignResponse,
-  ) => {
-    return new Promise<{ url?: string; key?: string }>((resolve, reject) => {
+  const directUpload = (item: UploadItem, presign: PresignResponse) => {
+    return new Promise<{ url: string; key?: string }>((resolve, reject) => {
       if (!presign.presignedUrl) {
         reject(new Error("Missing presigned URL"));
+        return;
+      }
+
+      // ✅ FIX: never store PUT URL as final attachment URL
+      if (!presign.fileInfo?.path) {
+        reject(
+          new Error(
+            "Presign response missing readable file path (fileInfo.path). " +
+              "Backend must return a stable GET/public URL.",
+          ),
+        );
         return;
       }
 
@@ -314,7 +276,11 @@ export function useUploadManager(
           xhr.setRequestHeader(k, v),
         );
       }
-      xhr.setRequestHeader("Content-Type", item.file.type || "application/octet-stream");
+
+      xhr.setRequestHeader(
+        "Content-Type",
+        item.file.type || "application/octet-stream",
+      );
 
       xhr.upload.onprogress = (event) => {
         if (!event.lengthComputable) return;
@@ -330,25 +296,22 @@ export function useUploadManager(
       xhr.onload = () => {
         if (xhr.status >= 200 && xhr.status < 300) {
           resolve({
-            url: presign.fileInfo?.path || presign.presignedUrl,
+            url: presign.fileInfo!.path!, // stable/readable
             key: presign.fileInfo?.key,
           });
         } else {
           reject(
             new Error(
-              `Upload failed with status ${xhr.status}: ${xhr.responseText || "Unknown error"}`,
+              `Upload failed with status ${xhr.status}: ${
+                xhr.responseText || "Unknown error"
+              }`,
             ),
           );
         }
       };
 
-      xhr.onerror = () => {
-        reject(new Error("Network error during upload"));
-      };
-
-      xhr.onabort = () => {
-        reject(new Error("Upload aborted"));
-      };
+      xhr.onerror = () => reject(new Error("Network error during upload"));
+      xhr.onabort = () => reject(new Error("Upload aborted"));
 
       xhr.send(item.file);
       abortRef.current[item.id] = () => xhr.abort();
@@ -358,11 +321,11 @@ export function useUploadManager(
   async function startUpload(id: string) {
     const item = itemsRef.current[id];
     if (!item || inFlightRef.current.has(id)) return;
+
     inFlightRef.current.add(id);
     setItem(id, (state) => ({
       ...state,
       status: "preparing",
-      progress: state.progress,
       startedAt: Date.now(),
       error: undefined,
     }));
@@ -370,9 +333,12 @@ export function useUploadManager(
     try {
       const presign = await presignRequest(item);
 
-      const canDirect =
-        presign.directUploadSupported && presign.presignedUrl;
-      const allowApiFallback = fallbackToApi && item.context === "general";
+      const canDirect = presign.directUploadSupported && presign.presignedUrl;
+
+      // ✅ OPTIONAL FIX: allow fallback for chat too (matches apiUpload above)
+      const allowApiFallback =
+        fallbackToApi &&
+        (item.context === "general" || item.context === "chat");
 
       let result: { url?: string; key?: string } | undefined;
 
@@ -384,6 +350,7 @@ export function useUploadManager(
           status: "uploading",
           progress: Math.max(state.progress, 10),
         }));
+
         const controller = new AbortController();
         abortRef.current[id] = () => controller.abort();
         result = await apiUpload(item, controller.signal);
@@ -403,21 +370,16 @@ export function useUploadManager(
         completedAt: Date.now(),
       }));
 
-      if (onItemFinish) {
-        onItemFinish(itemsRef.current[id]);
-      }
+      onItemFinish?.(itemsRef.current[id]);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Upload failed";
+      const message = error instanceof Error ? error.message : "Upload failed";
       setItem(id, (state) => ({
         ...state,
         status: message === "Upload aborted" ? "canceled" : "error",
         error: message,
         completedAt: Date.now(),
       }));
-      if (onItemFinish) {
-        onItemFinish(itemsRef.current[id]);
-      }
+      onItemFinish?.(itemsRef.current[id]);
     } finally {
       finalize(id);
       startNext();
@@ -449,8 +411,7 @@ export function useUploadManager(
   const activeCount = useMemo(
     () =>
       items.filter(
-        (item) =>
-          item.status === "uploading" || item.status === "preparing",
+        (item) => item.status === "uploading" || item.status === "preparing",
       ).length,
     [items],
   );
@@ -459,6 +420,44 @@ export function useUploadManager(
     () => items.some((item) => item.status === "error"),
     [items],
   );
+
+  useEffect(() => {
+    const abortAllActive = (reason: string) => {
+      const activeIds = Array.from(inFlightRef.current);
+
+      activeIds.forEach((id) => {
+        // trigger XHR/fetch abort
+        abortRef.current[id]?.();
+
+        // mark item as error so UI can retry / re-add
+        setItem(id, (item) => ({
+          ...item,
+          status: "error",
+          error: reason,
+          completedAt: Date.now(),
+        }));
+
+        finalize(id);
+      });
+
+      // allow queued items to restart once network is back
+      startNext();
+    };
+
+    const onOffline = () => abortAllActive("Network disconnected");
+    const onOnline = () => {
+      // kick queue again when we're back
+      startNext();
+    };
+
+    window.addEventListener("offline", onOffline);
+    window.addEventListener("online", onOnline);
+
+    return () => {
+      window.removeEventListener("offline", onOffline);
+      window.removeEventListener("online", onOnline);
+    };
+  }, [finalize, setItem, startNext]);
 
   return {
     items,

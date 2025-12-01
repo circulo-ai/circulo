@@ -23,7 +23,6 @@ type MessagesProps = {
   regenerate: UseChatHelpers<ChatMessage>["regenerate"];
   isReadonly: boolean;
   isArtifactVisible: boolean;
-  selectedModelId: string;
 };
 
 function PureMessages({
@@ -34,7 +33,6 @@ function PureMessages({
   setMessages,
   regenerate,
   isReadonly,
-  selectedModelId,
 }: MessagesProps) {
   const {
     containerRef: messagesContainerRef,
@@ -64,7 +62,7 @@ function PureMessages({
 
   return (
     <div
-      className="overscroll-behavior-contain -webkit-overflow-scrolling-touch flex-1 touch-pan-y overflow-y-scroll"
+      className="scrollbar-thin overscroll-behavior-contain flex-1 touch-pan-y overflow-y-scroll [-webkit-overflow-scrolling:touch]"
       ref={messagesContainerRef}
       style={{ overflowAnchor: "none" }}
     >
@@ -98,10 +96,7 @@ function PureMessages({
             {status === "submitted" && <ThinkingMessage key="thinking" />}
           </AnimatePresence>
 
-          <div
-            className="min-h-[24px] min-w-[24px] shrink-0"
-            ref={messagesEndRef}
-          />
+          <div className="min-h-6 min-w-6 shrink-0" ref={messagesEndRef} />
         </ConversationContent>
       </Conversation>
 
@@ -125,9 +120,6 @@ export const Messages = memo(PureMessages, (prevProps, nextProps) => {
   }
 
   if (prevProps.status !== nextProps.status) {
-    return false;
-  }
-  if (prevProps.selectedModelId !== nextProps.selectedModelId) {
     return false;
   }
   if (prevProps.messages.length !== nextProps.messages.length) {

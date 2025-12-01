@@ -1,13 +1,25 @@
+import { message } from "@/db";
+import { messageRepo } from "@/db/repositories";
 import { myProvider } from "@/lib/ai/providers";
 import { createDocument } from "@/lib/ai/tools/create-document";
 import { requestSuggestions } from "@/lib/ai/tools/request-suggestions";
 import { updateDocument } from "@/lib/ai/tools/update-document";
-import { ChatMessage, CustomUIMessageChunk } from "@/lib/types";
+import {
+  ChatMessage,
+  ChatTools,
+  CustomUIDataTypes,
+  CustomUIMessageChunk,
+} from "@/lib/types";
 import { convertToUIMessages } from "@/lib/utils";
 import { ChatContext } from "@/workflows/orchestrate/steps/load-chat-step";
 import { OrchestrationInput } from "@/workflows/orchestrate/types";
 import { DurableAgent } from "@workflow/ai/agent";
-import { convertToModelMessages, UIMessageStreamWriter } from "ai";
+import {
+  convertToModelMessages,
+  ModelMessage,
+  UIMessagePart,
+  UIMessageStreamWriter,
+} from "ai";
 import { Session } from "better-auth";
 import { getWritable } from "workflow";
 import { ExecutionPlan } from "./plan-agent-execution-step";
@@ -58,6 +70,243 @@ export interface AgentExecutionResult {
   durationMs: number;
   tokenCount?: number;
   cost?: number;
+}
+
+/**
+ * Convert ModelMessage.content into:
+ *  - flat string content (for messages.content)
+ *  - UIMessagePart[] (for messages.parts)
+ *
+ * IMPORTANT:
+ * Your app does NOT support a generic "data" UI part.
+ * So we ONLY preserve:
+ *   1) text parts
+ *   2) tool-call / tool-result parts mapped to `tool-${name}`
+ * Everything else is dropped.
+ */
+function modelContentToUIParts(raw: unknown): {
+  content: string;
+  parts: UIMessagePart<CustomUIDataTypes, ChatTools>[];
+} {
+  // If it's already a string, keep as one text part.
+  if (typeof raw === "string") {
+    return {
+      content: raw,
+      parts: [{ type: "text", text: raw }],
+    };
+  }
+
+  if (!Array.isArray(raw)) {
+    return { content: "", parts: [] };
+  }
+
+  const toolInputsById = new Map<string, unknown>();
+
+  const parts = raw.flatMap(
+    (part): UIMessagePart<CustomUIDataTypes, ChatTools>[] => {
+      if (typeof part !== "object" || part === null) return [];
+
+      const p = part as Record<string, unknown>;
+      const type = p.type;
+
+      // text
+      if (type === "text" && typeof p.text === "string") {
+        return [{ type: "text", text: p.text }];
+      }
+
+      // tool-call -> tool-${name} input-available
+      if (
+        type === "tool-call" &&
+        typeof p.toolCallId === "string" &&
+        typeof p.toolName === "string"
+      ) {
+        const toolCallId = p.toolCallId;
+        const toolName = p.toolName;
+        const input = p.args ?? p.input ?? {};
+
+        toolInputsById.set(toolCallId, input);
+
+        return [
+          {
+            type: `tool-${toolName}` as const,
+            toolCallId,
+            state: "input-available",
+            input,
+          },
+        ];
+      }
+
+      // tool-result -> tool-${name} output-available / output-error
+      if (
+        type === "tool-result" &&
+        typeof p.toolCallId === "string" &&
+        typeof p.toolName === "string"
+      ) {
+        const toolCallId = p.toolCallId;
+        const toolName = p.toolName;
+        const output = p.result ?? p.output;
+        const input = toolInputsById.get(toolCallId) ?? p.args ?? p.input ?? {};
+
+        const isError =
+          typeof p.isError === "boolean"
+            ? p.isError
+            : typeof p.errorText === "string";
+
+        if (isError) {
+          return [
+            {
+              type: `tool-${toolName}` as const,
+              toolCallId,
+              state: "output-error",
+              input,
+              errorText:
+                (typeof p.errorText === "string" && p.errorText) ||
+                "Tool error",
+            },
+          ];
+        }
+
+        return [
+          {
+            type: `tool-${toolName}` as const,
+            toolCallId,
+            state: "output-available",
+            input,
+            output,
+          },
+        ];
+      }
+
+      // Unknown part type -> drop (no generic data parts in your app)
+      return [];
+    },
+  );
+
+  const content = parts
+    .filter(
+      (
+        pt,
+      ): pt is UIMessagePart<CustomUIDataTypes, ChatTools> & {
+        type: "text";
+        text: string;
+      } => pt.type === "text" && typeof (pt as any).text === "string",
+    )
+    .map((pt) => (pt as any).text as string)
+    .join("\n");
+
+  return { content, parts };
+}
+
+async function persistAgentMessages(params: {
+  result: { messages: ModelMessage[] };
+  modelHistory: ModelMessage[];
+  agent: { id: string };
+  context: ChatContext;
+}) {
+  "use step";
+
+  const { result, modelHistory, agent, context } = params;
+
+  const chatId =
+    (context as { chatId?: string }).chatId ??
+    (context as { chat?: { id?: string } }).chat?.id ??
+    (context as { id?: string }).id;
+
+  if (!chatId) return;
+
+  type Insert = typeof message.$inferInsert;
+
+  // --- canonical signatures for robust diffing ---
+  const signatureOf = (m: ModelMessage): string => {
+    const role = m.role;
+    const raw = m.content;
+
+    if (typeof raw === "string") return `${role}:${raw}`;
+
+    if (Array.isArray(raw)) {
+      // only text + tool parts matter for equality
+      const stable = raw
+        .filter(
+          (p: any) =>
+            p?.type === "text" ||
+            p?.type?.startsWith("tool-") ||
+            p?.type === "tool-call" ||
+            p?.type === "tool-result",
+        )
+        .map((p: any) => {
+          if (p.type === "text") return `text:${p.text}`;
+          if (p.type === "tool-call")
+            return `tool-call:${p.toolName}:${p.toolCallId}:${JSON.stringify(p.args ?? p.input ?? {})}`;
+          if (p.type === "tool-result")
+            return `tool-result:${p.toolName}:${p.toolCallId}:${JSON.stringify(p.result ?? p.output ?? {})}`;
+          return "";
+        })
+        .join("|");
+
+      return `${role}:${stable}`;
+    }
+
+    return `${role}:`;
+  };
+
+  const historySigs = new Set(modelHistory.map(signatureOf));
+
+  // Only keep messages not already present in input history
+  const trulyNew = result.messages.filter(
+    (m) => !historySigs.has(signatureOf(m)),
+  );
+
+  // Optional extra guard: don’t insert duplicates vs DB tail
+  const existingTail = await messageRepo.findLatestForChat(chatId, 20);
+  const existingTailSigs = new Set(
+    existingTail.map((m) => `${m.role}:${m.content}`),
+  );
+
+  const inserts: Insert[] = trulyNew.flatMap((m): Insert[] => {
+    if (m.role !== "assistant" && m.role !== "tool") return [];
+
+    const { content, parts } = modelContentToUIParts(m.content);
+
+    // DB-tail guard (simple, not a hash)
+    const tailSig = `${m.role}:${content}`;
+    if (existingTailSigs.has(tailSig)) return [];
+
+    if (m.role === "assistant") {
+      return [
+        {
+          chatId,
+          authorType: "agent",
+          authorId: agent.id,
+          role: "assistant",
+          content,
+          parts,
+          attachments: [],
+          tokenCount: 0,
+          cost: "0",
+          isDeleted: false,
+        } satisfies Insert,
+      ];
+    }
+
+    return [
+      {
+        chatId,
+        authorType: "system",
+        authorId: agent.id,
+        role: "tool",
+        content,
+        parts,
+        attachments: [],
+        tokenCount: 0,
+        cost: "0",
+        isDeleted: false,
+      } satisfies Insert,
+    ];
+  });
+
+  if (inserts.length > 0) {
+    await messageRepo.createMany(inserts);
+  }
 }
 
 export async function executeAgentTaskStep(params: {
@@ -173,16 +422,17 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
       task: agentPlan.task,
     });
 
+    const modelHistory = convertToModelMessages(
+      convertToUIMessages(conversationHistory),
+    );
+
     // Stream the agent response
     const result = await durableAgent.stream({
-      messages: [
-        ...convertToModelMessages(convertToUIMessages(conversationHistory)),
-      ],
+      messages: modelHistory,
       writable,
     });
 
     // CRITICAL: Extract the actual output from the messages array
-    // The last message should be the assistant's response
     const assistantMessages = result.messages.filter(
       (msg) => msg.role === "assistant",
     );
@@ -195,13 +445,19 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
       if (typeof lastAssistantMessage.content === "string") {
         output = lastAssistantMessage.content;
       } else if (Array.isArray(lastAssistantMessage.content)) {
-        // Handle multi-part content (text, tool calls, etc.)
         output = lastAssistantMessage.content
           .filter((part: any) => part.type === "text")
           .map((part: any) => part.text)
           .join("\n");
       }
     }
+
+    await persistAgentMessages({
+      result,
+      modelHistory,
+      agent,
+      context,
+    });
 
     const endTime = new Date();
 
@@ -220,12 +476,10 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
       agentName: agent.name,
       task: agentPlan.task,
       success: true,
-      output, // CRITICAL: Return the actual output extracted from messages
+      output,
       startTime,
       endTime,
       durationMs: endTime.getTime() - startTime.getTime(),
-      // Note: Token count and cost tracking would require additional implementation
-      // We may need to add custom usage tracking or parse from model responses
     };
   } catch (error) {
     const endTime = new Date();

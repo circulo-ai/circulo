@@ -36,9 +36,9 @@ const handleChatError = createErrorHandler((error) => {
 const createChatSchema = z.object({
   id: z.uuid(),
   visibility: z.enum(["private", "public"]).default("private"),
-  messages: z.unknown().refine(async (value) => {
+  message: z.unknown().refine(async (value) => {
     const { success } = await safeValidateUIMessages<ChatMessage>({
-      messages: value,
+      messages: [value],
     });
     return success;
   }),
@@ -47,18 +47,14 @@ const createChatSchema = z.object({
 export const POST = createSafeRoute({ handleServerError: handleChatError })
   .use(authMiddleware())
   .body(createChatSchema)
-  .handler(async (request, ctx) => {
+  .handler(async (_, ctx) => {
     console.log(ctx.body);
-    const {
-      id,
-      messages: rawMessages,
-      visibility: selectedVisibilityType,
-    } = ctx.body;
+    const { id, message, visibility: selectedVisibilityType } = ctx.body;
     const {
       user: { id: userId },
     } = ctx.data;
 
-    const messages = rawMessages as ChatMessage[];
+    const messages: ChatMessage[] = [message as ChatMessage];
 
     const activeOrganizationId = await getActiveOrganizationId();
 
@@ -141,7 +137,7 @@ export const POST = createSafeRoute({ handleServerError: handleChatError })
       chatId: id,
       messages: messages,
       triggerType: "user_message",
-      session: ctx.data.session
+      session: ctx.data.session,
     };
 
     const run = await start(orchestrateWorkflow, [orchestrationInput]);
