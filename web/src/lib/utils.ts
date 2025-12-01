@@ -27,6 +27,16 @@ export function getTextFromMessage(message: ChatMessage | UIMessage): string {
     .join("");
 }
 
+export function getTextFromMessages(
+  messages: (ChatMessage | UIMessage)[],
+): string {
+  return messages
+    .flatMap((m) => m.parts ?? [])
+    .filter((part) => part.type === "text")
+    .map((part) => part.text)
+    .join("");
+}
+
 export function sanitizeText(text: string) {
   return text.replace("<has_function_call>", "");
 }

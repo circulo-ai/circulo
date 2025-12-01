@@ -1,5 +1,4 @@
-import { getActiveOrganizationId } from "@/lib/auth";
-import { BadRequestError } from "@/lib/server";
+import { LLM_MODELS } from "@/lib/ai/providers";
 import { z } from "zod";
 
 export const getQuerySchema = z.object({
@@ -15,7 +14,7 @@ export const baseAgentSchema = z.object({
   description: z.string().optional(),
   instructions: z.string().min(1, "Instructions are required"),
   avatarUrl: z.url().optional(),
-  model: z.string().optional(),
+  model: z.enum(LLM_MODELS).optional(),
   maxTokens: z.coerce.number().int().positive().optional(),
   temperature: z.coerce.number().int().min(0).max(100).optional(),
   defaultToolIds: z.array(z.string()).optional(),
@@ -24,7 +23,7 @@ export const baseAgentSchema = z.object({
 });
 
 export const createBodySchema = baseAgentSchema.extend({
-  id: z.string().uuid().optional(),
+  id: z.uuid().optional(),
 });
 
 export const updateBodySchema = baseAgentSchema

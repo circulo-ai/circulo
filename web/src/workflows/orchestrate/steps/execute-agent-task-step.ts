@@ -1,5 +1,4 @@
-import { Message } from "@/db";
-import { CustomUIMessageChunk } from "@/lib/types";
+import { ChatMessage, CustomUIMessageChunk } from "@/lib/types";
 import { convertToUIMessages } from "@/lib/utils";
 import { ChatContext } from "@/workflows/orchestrate/steps/load-chat-step";
 import { OrchestrationInput } from "@/workflows/orchestrate/types";
@@ -26,7 +25,7 @@ export interface AgentExecutionResult {
 export async function executeAgentTaskStep(params: {
   agentPlan: ExecutionPlan["selectedAgents"][0];
   context: ChatContext;
-  triggerMessage: Message;
+  triggerMessages: ChatMessage[];
   previousResults: AgentExecutionResult[];
   webhookPayload?: OrchestrationInput["webhookPayload"];
 }): Promise<AgentExecutionResult> {
@@ -37,7 +36,7 @@ export async function executeAgentTaskStep(params: {
     context,
     previousResults,
     webhookPayload,
-    triggerMessage,
+    triggerMessages,
   } = params;
   const writable = getWritable<CustomUIMessageChunk>();
 
@@ -94,7 +93,7 @@ Data: ${JSON.stringify(webhookPayload.data, null, 2)}
     // Use custom instructions if available
     const instructions = chatAgent.customInstructions || agent.instructions;
     const temperature = chatAgent.customTemperature
-      ? parseInt(chatAgent.customTemperature, 10) / 100
+      ? chatAgent.customTemperature / 100
       : (agent.temperature || 70) / 100;
 
     const maxTokens = agent.maxTokens || 2000;

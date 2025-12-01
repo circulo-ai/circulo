@@ -1,5 +1,7 @@
+import { ChatMessage } from "@/lib/types";
+
 export interface OrchestrationInput {
-  messageId: string;
+  messages: ChatMessage[];
   chatId: string;
   triggerType: "user_message" | "webhook_event";
   webhookPayload?: {

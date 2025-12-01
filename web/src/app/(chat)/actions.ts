@@ -4,7 +4,7 @@ import type { VisibilityType } from "@/components/visibility-selector";
 import { chatRepo, messageRepo } from "@/db/repositories";
 import { titlePrompt } from "@/lib/ai/prompts";
 import { myProvider } from "@/lib/ai/providers";
-import { getTextFromMessage } from "@/lib/utils";
+import { getTextFromMessage, getTextFromMessages } from "@/lib/utils";
 import { generateText, type UIMessage } from "ai";
 import { cookies } from "next/headers";
 
@@ -22,6 +22,20 @@ export async function generateTitleFromUserMessage({
     model: myProvider.languageModel("title-model"),
     system: titlePrompt,
     prompt: getTextFromMessage(message),
+  });
+
+  return title;
+}
+
+export async function generateTitleFromUserMessages({
+  messages,
+}: {
+  messages: UIMessage[];
+}) {
+  const { text: title } = await generateText({
+    model: myProvider.languageModel("title-model"),
+    system: titlePrompt,
+    prompt: getTextFromMessages(messages),
   });
 
   return title;

@@ -1,4 +1,6 @@
 import { Message } from "@/db";
+import { ChatMessage } from "@/lib/types";
+import { getTextFromMessages } from "@/lib/utils";
 import { OrchestrationInput } from "@/workflows/orchestrate/types";
 import { google } from "@ai-sdk/google";
 import { generateObject } from "ai";
@@ -34,16 +36,21 @@ const classificationSchema = z.object({
 export type RequestClassification = z.infer<typeof classificationSchema>;
 
 export async function classifyRequestStep(params: {
-  message: Message;
+  inputMessages: ChatMessage[];
   messages: Message[];
   triggerType: OrchestrationInput["triggerType"];
   webhookPayload?: OrchestrationInput["webhookPayload"];
 }): Promise<RequestClassification> {
   "use step";
 
-  const { message, messages, triggerType, webhookPayload } = params;
+  const {
+    inputMessages: message,
+    messages,
+    triggerType,
+    webhookPayload,
+  } = params;
 
-  let prompt = message.content;
+  let prompt = getTextFromMessages(message);
 
   // Enhance prompt with webhook context
   if (triggerType === "webhook_event" && webhookPayload) {
@@ -52,7 +59,7 @@ Source: ${webhookPayload.source}
 Event: ${webhookPayload.event}
 Data: ${JSON.stringify(webhookPayload.data, null, 2)}
 
-User Message: ${message.content}`;
+User Message: ${getTextFromMessages(message)}`;
   }
 
   // Get recent conversation context (last 10 messages)
