@@ -35,7 +35,6 @@ export async function sendEvent(event: CustomUIMessageChunk) {
   } finally {
     writer.releaseLock();
   }
-  writer.releaseLock();
 }
 
 function detectCircularDependencies(

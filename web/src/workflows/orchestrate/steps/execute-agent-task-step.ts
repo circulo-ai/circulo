@@ -27,35 +27,33 @@ import { ExecutionPlan } from "./plan-agent-execution-step";
 export function toUIMessageStreamWriter(
   writable: WritableStream<CustomUIMessageChunk>,
 ): UIMessageStreamWriter<ChatMessage> {
-  return {
+  const writer = writable.getWriter();
+  let chain = Promise.resolve();
+
+  const streamWriter: UIMessageStreamWriter<ChatMessage> = {
     write(part) {
-      const writer = writable.getWriter();
-      void writer.write(part).finally(() => {
-        writer.releaseLock();
-      });
+      chain = chain
+        .then(() => writer.write(part as unknown as CustomUIMessageChunk))
+        .catch((err) => streamWriter.onError?.(err));
     },
 
     merge(stream) {
       const reader = stream.getReader();
-
-      (async () => {
-        const writer = writable.getWriter();
-        try {
+      chain = chain
+        .then(async () => {
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-            await writer.write(value);
+            await writer.write(value as CustomUIMessageChunk);
           }
-        } catch (err) {
-          this.onError?.(err);
-        } finally {
-          writer.releaseLock();
-        }
-      })();
+        })
+        .catch((err) => streamWriter.onError?.(err));
     },
 
     onError: undefined,
   };
+
+  return streamWriter;
 }
 
 export interface AgentExecutionResult {
@@ -320,8 +318,17 @@ export async function executeAgentTaskStep(params: {
 
   const { agentPlan, context, previousResults, webhookPayload, session } =
     params;
-  const writable = getWritable<CustomUIMessageChunk>();
-  const dataStream = toUIMessageStreamWriter(writable);
+  const writable = getWritable<CustomUIMessageChunk>(); // the REAL workflow output
+  const dataStream = toUIMessageStreamWriter(writable); // you + tools write here
+
+  // Agent gets its own stream so it never locks the real one
+  const agentStream = new TransformStream<
+    CustomUIMessageChunk,
+    CustomUIMessageChunk
+  >();
+
+  // Pipe agent output into the real workflow output
+  dataStream.merge(agentStream.readable);
 
   const startTime = new Date();
   const chatAgent = context.agents.find((a) => a.agentId === agentPlan.agentId);
@@ -416,7 +423,7 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
     });
 
     // Send agent started event
-    await sendAgentStartEvent(writable, {
+    await sendAgentStartEvent(dataStream, {
       agentId: agent.id,
       agentName: agent.name,
       task: agentPlan.task,
@@ -429,7 +436,7 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
     // Stream the agent response
     const result = await durableAgent.stream({
       messages: modelHistory,
-      writable,
+      writable: agentStream.writable,
     });
 
     // CRITICAL: Extract the actual output from the messages array
@@ -462,7 +469,7 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
     const endTime = new Date();
 
     // Send agent completed event
-    await sendAgentCompletedEvent(writable, {
+    await sendAgentCompletedEvent(dataStream, {
       agentId: agent.id,
       agentName: agent.name,
       task: agentPlan.task,
@@ -486,7 +493,7 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
     const errorMessage = error instanceof Error ? error.message : String(error);
 
     // Send error event
-    await sendAgentErrorEvent(writable, {
+    await sendAgentErrorEvent(dataStream, {
       agentId: agent.id,
       agentName: agent.name,
       error: errorMessage,
@@ -507,22 +514,17 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
 
 // Helper functions for sending events (NOT steps)
 async function sendAgentStartEvent(
-  writable: WritableStream<CustomUIMessageChunk>,
+  dataStream: UIMessageStreamWriter<ChatMessage>,
   data: { agentId: string; agentName: string; task: string },
 ) {
-  const writer = writable.getWriter();
-  try {
-    await writer.write({
-      type: "data-workflowAgentStarted",
-      data,
-    });
-  } finally {
-    writer.releaseLock();
-  }
+  dataStream.write({
+    type: "data-workflowAgentStarted",
+    data,
+  });
 }
 
 async function sendAgentCompletedEvent(
-  writable: WritableStream<CustomUIMessageChunk>,
+  dataStream: UIMessageStreamWriter<ChatMessage>,
   data: {
     agentId: string;
     agentName: string;
@@ -532,39 +534,29 @@ async function sendAgentCompletedEvent(
     durationMs: number;
   },
 ) {
-  const writer = writable.getWriter();
-  try {
-    await writer.write({
-      type: "data-workflowAgentCompleted",
-      data: {
-        agentId: data.agentId,
-        agentName: data.agentName,
-        task: data.task,
-        success: data.success,
-        startTime: new Date(),
-        endTime: new Date(),
-        durationMs: data.durationMs,
-      },
-    });
-  } finally {
-    writer.releaseLock();
-  }
+  dataStream.write({
+    type: "data-workflowAgentCompleted",
+    data: {
+      agentId: data.agentId,
+      agentName: data.agentName,
+      task: data.task,
+      success: data.success,
+      startTime: new Date(),
+      endTime: new Date(),
+      durationMs: data.durationMs,
+    },
+  });
 }
 
 async function sendAgentErrorEvent(
-  writable: WritableStream<CustomUIMessageChunk>,
+  dataStream: UIMessageStreamWriter<ChatMessage>,
   data: { agentId: string; agentName: string; error: string },
 ) {
-  const writer = writable.getWriter();
-  try {
-    await writer.write({
-      type: "data-workflowError",
-      data: {
-        error: data.error,
-        agentId: data.agentId,
-      },
-    });
-  } finally {
-    writer.releaseLock();
-  }
+  dataStream.write({
+    type: "data-workflowError",
+    data: {
+      error: data.error,
+      agentId: data.agentId,
+    },
+  });
 }

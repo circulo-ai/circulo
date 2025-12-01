@@ -72,12 +72,12 @@ function PureMessages({
 
           {messages.map((message, index) => (
             <PreviewMessage
+              key={message.id + index}
               chatId={chatId}
               isLoading={
                 status === "streaming" && messages.length - 1 === index
               }
               isReadonly={isReadonly}
-              key={message.id}
               message={message}
               regenerate={regenerate}
               requiresScrollPadding={
