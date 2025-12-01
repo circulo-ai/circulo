@@ -141,6 +141,7 @@ export const POST = createSafeRoute({ handleServerError: handleChatError })
       chatId: id,
       messages: messages,
       triggerType: "user_message",
+      session: ctx.data.session
     };
 
     const run = await start(orchestrateWorkflow, [orchestrationInput]);

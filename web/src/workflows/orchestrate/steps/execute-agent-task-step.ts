@@ -1,12 +1,50 @@
+import { myProvider } from "@/lib/ai/providers";
+import { createDocument } from "@/lib/ai/tools/create-document";
+import { requestSuggestions } from "@/lib/ai/tools/request-suggestions";
+import { updateDocument } from "@/lib/ai/tools/update-document";
 import { ChatMessage, CustomUIMessageChunk } from "@/lib/types";
 import { convertToUIMessages } from "@/lib/utils";
 import { ChatContext } from "@/workflows/orchestrate/steps/load-chat-step";
 import { OrchestrationInput } from "@/workflows/orchestrate/types";
-import { google } from "@ai-sdk/google";
 import { DurableAgent } from "@workflow/ai/agent";
-import { convertToModelMessages } from "ai";
+import { convertToModelMessages, UIMessageStreamWriter } from "ai";
+import { Session } from "better-auth";
 import { getWritable } from "workflow";
 import { ExecutionPlan } from "./plan-agent-execution-step";
+
+export function toUIMessageStreamWriter(
+  writable: WritableStream<CustomUIMessageChunk>,
+): UIMessageStreamWriter<ChatMessage> {
+  return {
+    write(part) {
+      const writer = writable.getWriter();
+      void writer.write(part).finally(() => {
+        writer.releaseLock();
+      });
+    },
+
+    merge(stream) {
+      const reader = stream.getReader();
+
+      (async () => {
+        const writer = writable.getWriter();
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            await writer.write(value);
+          }
+        } catch (err) {
+          this.onError?.(err);
+        } finally {
+          writer.releaseLock();
+        }
+      })();
+    },
+
+    onError: undefined,
+  };
+}
 
 export interface AgentExecutionResult {
   agentId: string;
@@ -23,22 +61,18 @@ export interface AgentExecutionResult {
 }
 
 export async function executeAgentTaskStep(params: {
+  session: Session;
   agentPlan: ExecutionPlan["selectedAgents"][0];
   context: ChatContext;
-  triggerMessages: ChatMessage[];
   previousResults: AgentExecutionResult[];
   webhookPayload?: OrchestrationInput["webhookPayload"];
 }): Promise<AgentExecutionResult> {
   "use step";
 
-  const {
-    agentPlan,
-    context,
-    previousResults,
-    webhookPayload,
-    triggerMessages,
-  } = params;
+  const { agentPlan, context, previousResults, webhookPayload, session } =
+    params;
   const writable = getWritable<CustomUIMessageChunk>();
+  const dataStream = toUIMessageStreamWriter(writable);
 
   const startTime = new Date();
   const chatAgent = context.agents.find((a) => a.agentId === agentPlan.agentId);
@@ -92,11 +126,6 @@ Data: ${JSON.stringify(webhookPayload.data, null, 2)}
 
     // Use custom instructions if available
     const instructions = chatAgent.customInstructions || agent.instructions;
-    const temperature = chatAgent.customTemperature
-      ? chatAgent.customTemperature / 100
-      : (agent.temperature || 70) / 100;
-
-    const maxTokens = agent.maxTokens || 2000;
 
     // Build the system prompt
     const systemPrompt = `${instructions}
@@ -122,8 +151,19 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
 
     // Create durable agent
     const durableAgent = new DurableAgent({
-      model: async () => google(agent.model || "gemini-2.5-flash"),
+      model: async () => myProvider.languageModel(agent.model),
       system: systemPrompt,
+      tools: {
+        createDocument: createDocument({
+          session,
+          dataStream,
+        }),
+        updateDocument: updateDocument({ session, dataStream }),
+        requestSuggestions: requestSuggestions({
+          session,
+          dataStream,
+        }),
+      },
     });
 
     // Send agent started event

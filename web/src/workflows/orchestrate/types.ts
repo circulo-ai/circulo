@@ -1,9 +1,11 @@
 import { ChatMessage } from "@/lib/types";
+import { Session } from "better-auth";
 
 export interface OrchestrationInput {
   messages: ChatMessage[];
   chatId: string;
   triggerType: "user_message" | "webhook_event";
+  session: Session;
   webhookPayload?: {
     source: "github" | "telegram" | "slack" | "custom";
     event: string;
