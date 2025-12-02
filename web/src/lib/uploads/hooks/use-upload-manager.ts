@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useRef, useState } from "react";
 import type { StorageContext } from "@/lib/uploads/core/config-resolver";
 import { nanoid } from "nanoid";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 export type UploadStatus =
   | "queued"
@@ -88,9 +88,7 @@ const DEFAULTS = {
  * Feature-rich upload manager with queueing, progress, cancellation,
  * retry, per-context routing, and presigned upload support.
  */
-export function useUploadManager(
-  options: UseUploadManagerOptions = {},
-) {
+export function useUploadManager(options: UseUploadManagerOptions = {}) {
   const {
     defaultContext = DEFAULTS.defaultContext,
     presignPath = DEFAULTS.presignPath,
@@ -238,25 +236,20 @@ export function useUploadManager(
     notify();
   }, [notify]);
 
-  async function presignRequest(
-    item: UploadItem,
-  ): Promise<PresignResponse> {
-    const res = await fetch(
-      `${presignPath}?type=${item.context}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(requestHeaders || {}),
-        },
-        body: JSON.stringify({
-          fileName: item.file.name,
-          contentType: item.file.type,
-          fileSize: item.file.size,
-          metadata: item.metadata,
-        }),
+  async function presignRequest(item: UploadItem): Promise<PresignResponse> {
+    const res = await fetch(`${presignPath}?type=${item.context}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(requestHeaders || {}),
       },
-    );
+      body: JSON.stringify({
+        fileName: item.file.name,
+        contentType: item.file.type,
+        fileSize: item.file.size,
+        metadata: item.metadata,
+      }),
+    });
 
     const json = (await res.json()) as PresignResponse;
     if (!res.ok) {
@@ -265,10 +258,7 @@ export function useUploadManager(
     return json;
   }
 
-  const apiUpload = async (
-    item: UploadItem,
-    signal: AbortSignal,
-  ) => {
+  const apiUpload = async (item: UploadItem, signal: AbortSignal) => {
     if (item.context !== "general") {
       throw new Error(
         `API fallback only supports the "general" context (got "${item.context}")`,
@@ -285,9 +275,7 @@ export function useUploadManager(
     });
     if (!res.ok) {
       const message = await res.text();
-      throw new Error(
-        message || `Upload failed with status ${res.status}`,
-      );
+      throw new Error(message || `Upload failed with status ${res.status}`);
     }
     const json = await res.json();
     return {
@@ -296,10 +284,7 @@ export function useUploadManager(
     };
   };
 
-  const directUpload = (
-    item: UploadItem,
-    presign: PresignResponse,
-  ) => {
+  const directUpload = (item: UploadItem, presign: PresignResponse) => {
     return new Promise<{ url?: string; key?: string }>((resolve, reject) => {
       if (!presign.presignedUrl) {
         reject(new Error("Missing presigned URL"));
@@ -314,7 +299,10 @@ export function useUploadManager(
           xhr.setRequestHeader(k, v),
         );
       }
-      xhr.setRequestHeader("Content-Type", item.file.type || "application/octet-stream");
+      xhr.setRequestHeader(
+        "Content-Type",
+        item.file.type || "application/octet-stream",
+      );
 
       xhr.upload.onprogress = (event) => {
         if (!event.lengthComputable) return;
@@ -370,8 +358,7 @@ export function useUploadManager(
     try {
       const presign = await presignRequest(item);
 
-      const canDirect =
-        presign.directUploadSupported && presign.presignedUrl;
+      const canDirect = presign.directUploadSupported && presign.presignedUrl;
       const allowApiFallback = fallbackToApi && item.context === "general";
 
       let result: { url?: string; key?: string } | undefined;
@@ -407,8 +394,7 @@ export function useUploadManager(
         onItemFinish(itemsRef.current[id]);
       }
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Upload failed";
+      const message = error instanceof Error ? error.message : "Upload failed";
       setItem(id, (state) => ({
         ...state,
         status: message === "Upload aborted" ? "canceled" : "error",
@@ -449,8 +435,7 @@ export function useUploadManager(
   const activeCount = useMemo(
     () =>
       items.filter(
-        (item) =>
-          item.status === "uploading" || item.status === "preparing",
+        (item) => item.status === "uploading" || item.status === "preparing",
       ).length,
     [items],
   );

@@ -32,7 +32,11 @@ export type CustomUIDataTypes = {
   finish: null;
   usage: AppUsage;
 
-  workflowStarted: { workflowId: string; chatId: string; messages: ChatMessage[] };
+  workflowStarted: {
+    workflowId: string;
+    chatId: string;
+    messages: ChatMessage[];
+  };
   workflowClassification: RequestClassification;
   workflowPlan: ExecutionPlan;
   workflowAgentStarted: { agentId: string; agentName: string; task: string };

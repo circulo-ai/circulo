@@ -473,10 +473,7 @@ export function hasCloudStorage(): boolean {
 /**
  * Get the current storage provider name
  */
-export function getStorageProviderName():
-  | "Azure Blob"
-  | "S3"
-  | "Local" {
+export function getStorageProviderName(): "Azure Blob" | "S3" | "Local" {
   if (USE_BLOB_STORAGE) return "Azure Blob";
   if (USE_S3_STORAGE) return "S3";
   return "Local";

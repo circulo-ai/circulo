@@ -1,9 +1,5 @@
-import type {
-  AnchorHTMLAttributes,
-  ImgHTMLAttributes,
-  ReactNode,
-} from "react";
 import { useStorageAsset } from "@/components/storage/use-storage-asset";
+import type { AnchorHTMLAttributes, ImgHTMLAttributes, ReactNode } from "react";
 
 export interface StorageAssetProps {
   /** Full serve path (e.g., `/api/files/serve/s3/<key>?context=profile-pictures`). */
@@ -65,7 +61,9 @@ export function StorageAsset({
   if (!src) return null;
 
   if (render) {
-    return <>{render({ src, isImage: forceImage || isImage, hasError, onError })}</>;
+    return (
+      <>{render({ src, isImage: forceImage || isImage, hasError, onError })}</>
+    );
   }
 
   if (forceImage || isImage) {
@@ -74,7 +72,11 @@ export function StorageAsset({
   }
 
   return (
-    <a href={src} onClick={(e) => hasError && e.preventDefault()} {...linkProps}>
+    <a
+      href={src}
+      onClick={(e) => hasError && e.preventDefault()}
+      {...linkProps}
+    >
       {label || linkProps?.children || "Download"}
     </a>
   );
