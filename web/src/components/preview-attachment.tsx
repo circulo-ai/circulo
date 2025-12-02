@@ -46,9 +46,14 @@ export const PreviewAttachment = ({
       {onRemove && !isUploading && (
         <Button
           className="absolute top-0.5 right-0.5 size-4 rounded-full p-0 opacity-0 transition-opacity group-hover:opacity-100"
-          onClick={onRemove}
+          onClick={(e) => {
+            e.preventDefault(); // Prevent form submission
+            e.stopPropagation(); // Stop event bubbling
+            onRemove();
+          }}
           size="sm"
           variant="destructive"
+          type="button" // ✅ CRITICAL: Explicitly set type="button"
         >
           <CrossSmallIcon size={8} />
         </Button>

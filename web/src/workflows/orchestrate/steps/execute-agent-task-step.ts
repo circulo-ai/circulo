@@ -1,12 +1,60 @@
-import { ChatMessage, CustomUIMessageChunk } from "@/lib/types";
+import { message } from "@/db";
+import { messageRepo } from "@/db/repositories";
+import { myProvider } from "@/lib/ai/providers";
+import { createDocument } from "@/lib/ai/tools/create-document";
+import { requestSuggestions } from "@/lib/ai/tools/request-suggestions";
+import { updateDocument } from "@/lib/ai/tools/update-document";
+import {
+  ChatMessage,
+  ChatTools,
+  CustomUIDataTypes,
+  CustomUIMessageChunk,
+} from "@/lib/types";
 import { convertToUIMessages } from "@/lib/utils";
 import { ChatContext } from "@/workflows/orchestrate/steps/load-chat-step";
 import { OrchestrationInput } from "@/workflows/orchestrate/types";
-import { google } from "@ai-sdk/google";
 import { DurableAgent } from "@workflow/ai/agent";
-import { convertToModelMessages } from "ai";
+import {
+  convertToModelMessages,
+  ModelMessage,
+  UIMessagePart,
+  UIMessageStreamWriter,
+} from "ai";
+import { Session } from "better-auth";
 import { getWritable } from "workflow";
 import { ExecutionPlan } from "./plan-agent-execution-step";
+
+export function toUIMessageStreamWriter(
+  writable: WritableStream<CustomUIMessageChunk>,
+): UIMessageStreamWriter<ChatMessage> {
+  const writer = writable.getWriter();
+  let chain = Promise.resolve();
+
+  const streamWriter: UIMessageStreamWriter<ChatMessage> = {
+    write(part) {
+      chain = chain
+        .then(() => writer.write(part as unknown as CustomUIMessageChunk))
+        .catch((err) => streamWriter.onError?.(err));
+    },
+
+    merge(stream) {
+      const reader = stream.getReader();
+      chain = chain
+        .then(async () => {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            await writer.write(value as CustomUIMessageChunk);
+          }
+        })
+        .catch((err) => streamWriter.onError?.(err));
+    },
+
+    onError: undefined,
+  };
+
+  return streamWriter;
+}
 
 export interface AgentExecutionResult {
   agentId: string;
@@ -22,23 +70,265 @@ export interface AgentExecutionResult {
   cost?: number;
 }
 
+/**
+ * Convert ModelMessage.content into:
+ *  - flat string content (for messages.content)
+ *  - UIMessagePart[] (for messages.parts)
+ *
+ * IMPORTANT:
+ * Your app does NOT support a generic "data" UI part.
+ * So we ONLY preserve:
+ *   1) text parts
+ *   2) tool-call / tool-result parts mapped to `tool-${name}`
+ * Everything else is dropped.
+ */
+function modelContentToUIParts(raw: unknown): {
+  content: string;
+  parts: UIMessagePart<CustomUIDataTypes, ChatTools>[];
+} {
+  // If it's already a string, keep as one text part.
+  if (typeof raw === "string") {
+    return {
+      content: raw,
+      parts: [{ type: "text", text: raw }],
+    };
+  }
+
+  if (!Array.isArray(raw)) {
+    return { content: "", parts: [] };
+  }
+
+  const toolInputsById = new Map<string, unknown>();
+
+  const parts = raw.flatMap(
+    (part): UIMessagePart<CustomUIDataTypes, ChatTools>[] => {
+      if (typeof part !== "object" || part === null) return [];
+
+      const p = part as Record<string, unknown>;
+      const type = p.type;
+
+      // text
+      if (type === "text" && typeof p.text === "string") {
+        return [{ type: "text", text: p.text }];
+      }
+
+      // tool-call -> tool-${name} input-available
+      if (
+        type === "tool-call" &&
+        typeof p.toolCallId === "string" &&
+        typeof p.toolName === "string"
+      ) {
+        const toolCallId = p.toolCallId;
+        const toolName = p.toolName;
+        const input = p.args ?? p.input ?? {};
+
+        toolInputsById.set(toolCallId, input);
+
+        return [
+          {
+            type: `tool-${toolName}` as const,
+            toolCallId,
+            state: "input-available",
+            input,
+          },
+        ];
+      }
+
+      // tool-result -> tool-${name} output-available / output-error
+      if (
+        type === "tool-result" &&
+        typeof p.toolCallId === "string" &&
+        typeof p.toolName === "string"
+      ) {
+        const toolCallId = p.toolCallId;
+        const toolName = p.toolName;
+        const output = p.result ?? p.output;
+        const input = toolInputsById.get(toolCallId) ?? p.args ?? p.input ?? {};
+
+        const isError =
+          typeof p.isError === "boolean"
+            ? p.isError
+            : typeof p.errorText === "string";
+
+        if (isError) {
+          return [
+            {
+              type: `tool-${toolName}` as const,
+              toolCallId,
+              state: "output-error",
+              input,
+              errorText:
+                (typeof p.errorText === "string" && p.errorText) ||
+                "Tool error",
+            },
+          ];
+        }
+
+        return [
+          {
+            type: `tool-${toolName}` as const,
+            toolCallId,
+            state: "output-available",
+            input,
+            output,
+          },
+        ];
+      }
+
+      // Unknown part type -> drop (no generic data parts in your app)
+      return [];
+    },
+  );
+
+  const content = parts
+    .filter(
+      (
+        pt,
+      ): pt is UIMessagePart<CustomUIDataTypes, ChatTools> & {
+        type: "text";
+        text: string;
+      } => pt.type === "text" && typeof (pt as any).text === "string",
+    )
+    .map((pt) => (pt as any).text as string)
+    .join("\n");
+
+  return { content, parts };
+}
+
+async function persistAgentMessages(params: {
+  result: { messages: ModelMessage[] };
+  modelHistory: ModelMessage[];
+  agent: { id: string };
+  context: ChatContext;
+}) {
+  "use step";
+
+  const { result, modelHistory, agent, context } = params;
+
+  const chatId =
+    (context as { chatId?: string }).chatId ??
+    (context as { chat?: { id?: string } }).chat?.id ??
+    (context as { id?: string }).id;
+
+  if (!chatId) return;
+
+  type Insert = typeof message.$inferInsert;
+
+  // --- canonical signatures for robust diffing ---
+  const signatureOf = (m: ModelMessage): string => {
+    const role = m.role;
+    const raw = m.content;
+
+    if (typeof raw === "string") return `${role}:${raw}`;
+
+    if (Array.isArray(raw)) {
+      // only text + tool parts matter for equality
+      const stable = raw
+        .filter(
+          (p: any) =>
+            p?.type === "text" ||
+            p?.type?.startsWith("tool-") ||
+            p?.type === "tool-call" ||
+            p?.type === "tool-result",
+        )
+        .map((p: any) => {
+          if (p.type === "text") return `text:${p.text}`;
+          if (p.type === "tool-call")
+            return `tool-call:${p.toolName}:${p.toolCallId}:${JSON.stringify(p.args ?? p.input ?? {})}`;
+          if (p.type === "tool-result")
+            return `tool-result:${p.toolName}:${p.toolCallId}:${JSON.stringify(p.result ?? p.output ?? {})}`;
+          return "";
+        })
+        .join("|");
+
+      return `${role}:${stable}`;
+    }
+
+    return `${role}:`;
+  };
+
+  const historySigs = new Set(modelHistory.map(signatureOf));
+
+  // Only keep messages not already present in input history
+  const trulyNew = result.messages.filter(
+    (m) => !historySigs.has(signatureOf(m)),
+  );
+
+  // Optional extra guard: don’t insert duplicates vs DB tail
+  const existingTail = await messageRepo.findLatestForChat(chatId, 20);
+  const existingTailSigs = new Set(
+    existingTail.map((m) => `${m.role}:${m.content}`),
+  );
+
+  const inserts: Insert[] = trulyNew.flatMap((m): Insert[] => {
+    if (m.role !== "assistant" && m.role !== "tool") return [];
+
+    const { content, parts } = modelContentToUIParts(m.content);
+
+    // DB-tail guard (simple, not a hash)
+    const tailSig = `${m.role}:${content}`;
+    if (existingTailSigs.has(tailSig)) return [];
+
+    if (m.role === "assistant") {
+      return [
+        {
+          chatId,
+          authorType: "agent",
+          authorId: agent.id,
+          role: "assistant",
+          content,
+          parts,
+          attachments: [],
+          tokenCount: 0,
+          cost: "0",
+          isDeleted: false,
+        } satisfies Insert,
+      ];
+    }
+
+    return [
+      {
+        chatId,
+        authorType: "system",
+        authorId: agent.id,
+        role: "tool",
+        content,
+        parts,
+        attachments: [],
+        tokenCount: 0,
+        cost: "0",
+        isDeleted: false,
+      } satisfies Insert,
+    ];
+  });
+
+  if (inserts.length > 0) {
+    await messageRepo.createMany(inserts);
+  }
+}
+
 export async function executeAgentTaskStep(params: {
+  session: Session;
   agentPlan: ExecutionPlan["selectedAgents"][0];
   context: ChatContext;
-  triggerMessages: ChatMessage[];
   previousResults: AgentExecutionResult[];
   webhookPayload?: OrchestrationInput["webhookPayload"];
 }): Promise<AgentExecutionResult> {
   "use step";
 
-  const {
-    agentPlan,
-    context,
-    previousResults,
-    webhookPayload,
-    triggerMessages,
-  } = params;
-  const writable = getWritable<CustomUIMessageChunk>();
+  const { agentPlan, context, previousResults, webhookPayload, session } =
+    params;
+  const writable = getWritable<CustomUIMessageChunk>(); // the REAL workflow output
+  const dataStream = toUIMessageStreamWriter(writable); // you + tools write here
+
+  // Agent gets its own stream so it never locks the real one
+  const agentStream = new TransformStream<
+    CustomUIMessageChunk,
+    CustomUIMessageChunk
+  >();
+
+  // Pipe agent output into the real workflow output
+  dataStream.merge(agentStream.readable);
 
   const startTime = new Date();
   const chatAgent = context.agents.find((a) => a.agentId === agentPlan.agentId);
@@ -92,11 +382,6 @@ Data: ${JSON.stringify(webhookPayload.data, null, 2)}
 
     // Use custom instructions if available
     const instructions = chatAgent.customInstructions || agent.instructions;
-    const temperature = chatAgent.customTemperature
-      ? chatAgent.customTemperature / 100
-      : (agent.temperature || 70) / 100;
-
-    const maxTokens = agent.maxTokens || 2000;
 
     // Build the system prompt
     const systemPrompt = `${instructions}
@@ -122,27 +407,39 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
 
     // Create durable agent
     const durableAgent = new DurableAgent({
-      model: async () => google(agent.model || "gemini-2.5-flash"),
+      model: async () => myProvider.languageModel(agent.model),
       system: systemPrompt,
+      tools: {
+        createDocument: createDocument({
+          session,
+          dataStream,
+        }),
+        updateDocument: updateDocument({ session, dataStream }),
+        requestSuggestions: requestSuggestions({
+          session,
+          dataStream,
+        }),
+      },
     });
 
     // Send agent started event
-    await sendAgentStartEvent(writable, {
+    await sendAgentStartEvent(dataStream, {
       agentId: agent.id,
       agentName: agent.name,
       task: agentPlan.task,
     });
 
+    const modelHistory = convertToModelMessages(
+      convertToUIMessages(conversationHistory),
+    );
+
     // Stream the agent response
     const result = await durableAgent.stream({
-      messages: [
-        ...convertToModelMessages(convertToUIMessages(conversationHistory)),
-      ],
-      writable,
+      messages: modelHistory,
+      writable: agentStream.writable,
     });
 
     // CRITICAL: Extract the actual output from the messages array
-    // The last message should be the assistant's response
     const assistantMessages = result.messages.filter(
       (msg) => msg.role === "assistant",
     );
@@ -155,7 +452,6 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
       if (typeof lastAssistantMessage.content === "string") {
         output = lastAssistantMessage.content;
       } else if (Array.isArray(lastAssistantMessage.content)) {
-        // Handle multi-part content (text, tool calls, etc.)
         output = lastAssistantMessage.content
           .filter((part: any) => part.type === "text")
           .map((part: any) => part.text)
@@ -163,10 +459,17 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
       }
     }
 
+    await persistAgentMessages({
+      result,
+      modelHistory,
+      agent,
+      context,
+    });
+
     const endTime = new Date();
 
     // Send agent completed event
-    await sendAgentCompletedEvent(writable, {
+    await sendAgentCompletedEvent(dataStream, {
       agentId: agent.id,
       agentName: agent.name,
       task: agentPlan.task,
@@ -180,19 +483,17 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
       agentName: agent.name,
       task: agentPlan.task,
       success: true,
-      output, // CRITICAL: Return the actual output extracted from messages
+      output,
       startTime,
       endTime,
       durationMs: endTime.getTime() - startTime.getTime(),
-      // Note: Token count and cost tracking would require additional implementation
-      // We may need to add custom usage tracking or parse from model responses
     };
   } catch (error) {
     const endTime = new Date();
     const errorMessage = error instanceof Error ? error.message : String(error);
 
     // Send error event
-    await sendAgentErrorEvent(writable, {
+    await sendAgentErrorEvent(dataStream, {
       agentId: agent.id,
       agentName: agent.name,
       error: errorMessage,
@@ -213,22 +514,17 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
 
 // Helper functions for sending events (NOT steps)
 async function sendAgentStartEvent(
-  writable: WritableStream<CustomUIMessageChunk>,
+  dataStream: UIMessageStreamWriter<ChatMessage>,
   data: { agentId: string; agentName: string; task: string },
 ) {
-  const writer = writable.getWriter();
-  try {
-    await writer.write({
-      type: "data-workflowAgentStarted",
-      data,
-    });
-  } finally {
-    writer.releaseLock();
-  }
+  dataStream.write({
+    type: "data-workflowAgentStarted",
+    data,
+  });
 }
 
 async function sendAgentCompletedEvent(
-  writable: WritableStream<CustomUIMessageChunk>,
+  dataStream: UIMessageStreamWriter<ChatMessage>,
   data: {
     agentId: string;
     agentName: string;
@@ -238,39 +534,29 @@ async function sendAgentCompletedEvent(
     durationMs: number;
   },
 ) {
-  const writer = writable.getWriter();
-  try {
-    await writer.write({
-      type: "data-workflowAgentCompleted",
-      data: {
-        agentId: data.agentId,
-        agentName: data.agentName,
-        task: data.task,
-        success: data.success,
-        startTime: new Date(),
-        endTime: new Date(),
-        durationMs: data.durationMs,
-      },
-    });
-  } finally {
-    writer.releaseLock();
-  }
+  dataStream.write({
+    type: "data-workflowAgentCompleted",
+    data: {
+      agentId: data.agentId,
+      agentName: data.agentName,
+      task: data.task,
+      success: data.success,
+      startTime: new Date(),
+      endTime: new Date(),
+      durationMs: data.durationMs,
+    },
+  });
 }
 
 async function sendAgentErrorEvent(
-  writable: WritableStream<CustomUIMessageChunk>,
+  dataStream: UIMessageStreamWriter<ChatMessage>,
   data: { agentId: string; agentName: string; error: string },
 ) {
-  const writer = writable.getWriter();
-  try {
-    await writer.write({
-      type: "data-workflowError",
-      data: {
-        error: data.error,
-        agentId: data.agentId,
-      },
-    });
-  } finally {
-    writer.releaseLock();
-  }
+  dataStream.write({
+    type: "data-workflowError",
+    data: {
+      error: data.error,
+      agentId: data.agentId,
+    },
+  });
 }

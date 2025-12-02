@@ -5,7 +5,7 @@ import {
   wrapLanguageModel,
 } from "ai";
 
-const supportingLanguageModels = {
+export const supportingLanguageModels = {
   "gemini-2.5-flash": {
     gateway: google("gemini-2.5-flash"),
     capabilities: {

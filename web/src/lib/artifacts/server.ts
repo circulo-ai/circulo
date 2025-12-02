@@ -4,8 +4,8 @@ import { textDocumentHandler } from "@/artifacts/text/server";
 import type { ArtifactKind } from "@/components/artifacts/artifact";
 import { artifactRepo } from "@/db/repositories";
 import type { Document } from "@/db/schema";
-import { Session } from "@/lib/auth";
 import type { UIMessageStreamWriter } from "ai";
+import { Session } from "better-auth";
 import type { ChatMessage } from "../types";
 
 export type SaveDocumentProps = {
@@ -51,13 +51,13 @@ export function createDocumentHandler<T extends ArtifactKind>(config: {
         session: args.session,
       });
 
-      if (args.session?.user?.id) {
+      if (args.session?.userId) {
         await artifactRepo.save({
           id: args.id,
           title: args.title,
           content: draftContent,
           kind: config.kind,
-          userId: args.session.user.id,
+          userId: args.session.userId,
         });
       }
 
@@ -71,13 +71,13 @@ export function createDocumentHandler<T extends ArtifactKind>(config: {
         session: args.session,
       });
 
-      if (args.session?.user?.id) {
+      if (args.session?.userId) {
         await artifactRepo.save({
           id: args.document.id,
           title: args.document.title,
           content: draftContent,
           kind: config.kind,
-          userId: args.session.user.id,
+          userId: args.session.userId,
         });
       }
 

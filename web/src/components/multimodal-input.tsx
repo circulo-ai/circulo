@@ -10,7 +10,6 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { ArrowUpIcon, PaperclipIcon, StopIcon } from "@/components/icons/icons";
 import { Agent, ChatAgent } from "@/db";
-import { myProvider } from "@/lib/ai/providers";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import { useUploadManager } from "@/lib/uploads";
 import type { AppUsage } from "@/lib/usage";
@@ -26,7 +25,6 @@ import {
   type SetStateAction,
   useCallback,
   useEffect,
-  useMemo,
   useRef,
 } from "react";
 import { toast } from "sonner";
@@ -49,8 +47,6 @@ function PureMultimodalInput({
   sendMessage,
   className,
   selectedVisibilityType,
-  selectedModelId,
-  onModelChange,
   usage,
 }: {
   chatId: string;
@@ -65,8 +61,6 @@ function PureMultimodalInput({
   sendMessage: UseChatHelpers<ChatMessage>["sendMessage"];
   className?: string;
   selectedVisibilityType: VisibilityType;
-  selectedModelId: string;
-  onModelChange?: (modelId: string) => void;
   usage?: AppUsage;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -125,13 +119,18 @@ function PureMultimodalInput({
     const completed = uploadManager.items.filter(
       (item) => item.status === "success" && item.url,
     );
-    setAttachments(
-      completed.map((item) => ({
-        url: item.url!,
-        name: item.file.name,
-        contentType: item.file.type,
-      })),
-    );
+
+    setAttachments((prev) => {
+      const map = new Map(prev.map((a) => [a.url, a]));
+      completed.forEach((item) => {
+        map.set(item.url!, {
+          url: item.url!,
+          name: item.file.name,
+          contentType: item.file.type,
+        });
+      });
+      return Array.from(map.values());
+    });
   }, [uploadManager.items, setAttachments]);
 
   const submitForm = useCallback(() => {
@@ -175,22 +174,14 @@ function PureMultimodalInput({
     resetHeight,
   ]);
 
-  const _modelResolver = useMemo(() => {
-    return myProvider.languageModel(selectedModelId);
-  }, [selectedModelId]);
-
-  const contextProps = useMemo(
-    () => ({
-      usage,
-    }),
-    [usage],
-  );
-
   const handleFileChange = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
       const files = Array.from(event.target.files || []);
       if (files.length > 0) {
         uploadManager.addFiles(files, "chat");
+      }
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
       }
     },
     [uploadManager],
@@ -257,7 +248,7 @@ function PureMultimodalInput({
         type="file"
       />
 
-      <PromptInput className="rounded-xl border border-border bg-background p-3 shadow-xs transition-all duration-200 focus-within:border-border hover:border-muted-foreground/50">
+      <PromptInput className="rounded-xl border border-border bg-sidebar p-3 shadow-xs transition-all duration-200 focus-within:border-border hover:border-muted-foreground/50">
         <form
           onSubmit={(event) => {
             event.preventDefault();
@@ -355,13 +346,9 @@ function PureMultimodalInput({
             />{" "}
             {/*<Context {...contextProps} />*/}
           </div>
-          <PromptInputToolbar className="!border-top-0 border-t-0! p-0 shadow-none dark:border-0 dark:border-transparent!">
+          <PromptInputToolbar className="border-top-0! border-t-0! p-0 shadow-none dark:border-0 dark:border-transparent!">
             <PromptInputTools className="gap-0 sm:gap-0.5">
-              <AttachmentsButton
-                fileInputRef={fileInputRef}
-                selectedModelId={selectedModelId}
-                status={status}
-              />
+              <AttachmentsButton fileInputRef={fileInputRef} status={status} />
               {/*<ModelSelectorCompact*/}
               {/*  onModelChange={onModelChange}*/}
               {/*  selectedModelId={selectedModelId}*/}
@@ -372,7 +359,7 @@ function PureMultimodalInput({
               <StopButton setMessages={setMessages} stop={stop} />
             ) : (
               <PromptInputSubmit
-                className="size-8 rounded-full bg-primary text-primary-foreground transition-colors duration-200 hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground"
+                className="size-8 rounded-full bg-teal-50 text-background transition-colors duration-200 hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground"
                 disabled={
                   (input.trim().length === 0 && attachments.length === 0) ||
                   uploadManager.items.some(
@@ -410,9 +397,6 @@ export const MultimodalInput = memo(
     if (prevProps.selectedVisibilityType !== nextProps.selectedVisibilityType) {
       return false;
     }
-    if (prevProps.selectedModelId !== nextProps.selectedModelId) {
-      return false;
-    }
 
     return true;
   },
@@ -421,21 +405,15 @@ export const MultimodalInput = memo(
 function PureAttachmentsButton({
   fileInputRef,
   status,
-  selectedModelId,
 }: {
   fileInputRef: React.MutableRefObject<HTMLInputElement | null>;
   status: UseChatHelpers<ChatMessage>["status"];
-  selectedModelId: string;
 }) {
-  const isReasoningModel = selectedModelId === "chat-model-reasoning";
-
   return (
     <Button
       className="aspect-square h-8 rounded-lg p-1 transition-colors hover:bg-accent"
       data-testid="attachments-button"
-      disabled={
-        status === "submitted" || status === "streaming" || isReasoningModel
-      }
+      disabled={status === "submitted" || status === "streaming"}
       onClick={(event) => {
         event.preventDefault();
         fileInputRef.current?.click();
