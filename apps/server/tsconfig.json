@@ -1,15 +1,26 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "module": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "esModuleInterop": true,
     "strict": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "types": [
       "node"
     ],
+    "lib": [
+      "ESNext"
+    ],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@/db": ["../../packages/db"],
+      "@/db/*": ["../../packages/db/*"]
+    },
     "jsx": "react-jsx",
     "jsxImportSource": "hono/jsx",
+    "baseUrl": ".",
     "outDir": "./dist"
   },
   "exclude": ["node_modules"]

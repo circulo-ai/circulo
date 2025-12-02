@@ -10,18 +10,15 @@
     "scripts": {
         "build": "turbo run build",
         "dev": "turbo run dev",
-        "dev:sockets": "cd apps/sim && bun run dev:sockets",
-        "dev:full": "cd apps/sim && bun run dev:full",
+        "dev:sockets": "cd apps/sim && pnpm dev:sockets",
+        "dev:full": "cd apps/sim && pnpm dev:full",
         "test": "turbo run test",
-        "format": "bunx biome format --write .",
-        "format:check": "bunx biome format .",
-        "lint": "bunx biome check --write --unsafe .",
-        "lint:check": "bunx biome check --unsafe .",
-        "lint:helm": "helm lint ./helm/sim --strict --values ./helm/sim/test/values-lint.yaml",
-        "lint:all": "bun run lint && bun run lint:helm",
-        "check": "bunx biome check --files-ignore-unknown=true",
-        "type-check": "turbo run type-check",
-        "release": "bun run scripts/create-single-release.ts"
+        "format": "pnpm dlx biome format --write .",
+        "format:check": "pnpm dlx biome format .",
+        "lint": "pnpm dlx biome check --write --unsafe .",
+        "lint:check": "pnpm dlx biome check --unsafe .",
+        "check": "pnpm dlx biome check --files-ignore-unknown=true",
+        "type-check": "turbo run type-check"
     },
     "overrides": {
         "react": "19.1.0",
