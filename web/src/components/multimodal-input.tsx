@@ -12,9 +12,9 @@ import { ArrowUpIcon, PaperclipIcon, StopIcon } from "@/components/icons/icons";
 import { Agent, ChatAgent } from "@/db";
 import { myProvider } from "@/lib/ai/providers";
 import type { Attachment, ChatMessage } from "@/lib/types";
+import { useUploadManager } from "@/lib/uploads";
 import type { AppUsage } from "@/lib/usage";
 import { cn } from "@/lib/utils";
-import { useUploadManager } from "@/lib/uploads";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import type { UIMessage } from "ai";
 import equal from "fast-deep-equal";
@@ -28,7 +28,6 @@ import {
   useEffect,
   useMemo,
   useRef,
-  useState,
 } from "react";
 import { toast } from "sonner";
 import { useLocalStorage, useWindowSize } from "usehooks-ts";
@@ -236,7 +235,12 @@ function PureMultimodalInput({
     <div className={cn("relative flex w-full flex-col gap-4", className)}>
       {messages.length === 0 &&
         attachments.length === 0 &&
-        uploadManager.items.every((item) => item.status !== "queued" && item.status !== "preparing" && item.status !== "uploading") && (
+        uploadManager.items.every(
+          (item) =>
+            item.status !== "queued" &&
+            item.status !== "preparing" &&
+            item.status !== "uploading",
+        ) && (
           <SuggestedActions
             chatId={chatId}
             selectedVisibilityType={selectedVisibilityType}
@@ -306,16 +310,16 @@ function PureMultimodalInput({
                     item.status === "uploading",
                 )
                 .map((item) => (
-                <PreviewAttachment
-                  attachment={{
-                    url: "",
-                    name: item.file.name,
-                    contentType: item.file.type,
-                  }}
-                  isUploading={true}
-                  key={item.id}
-                />
-              ))}
+                  <PreviewAttachment
+                    attachment={{
+                      url: "",
+                      name: item.file.name,
+                      contentType: item.file.type,
+                    }}
+                    isUploading={true}
+                    key={item.id}
+                  />
+                ))}
             </div>
           )}
           <div className="flex flex-row items-start gap-1 sm:gap-2">

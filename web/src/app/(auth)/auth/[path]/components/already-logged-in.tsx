@@ -3,8 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
-import { signOut } from "@/lib/auth-client";
-import { useSession } from "@/providers/session-provider";
+import { signOut, useSession } from "@/lib/auth-client";
 import { UserAvatar } from "@daveyplate/better-auth-ui";
 import { ArrowRight, LogOut } from "lucide-react";
 import Link from "next/link";

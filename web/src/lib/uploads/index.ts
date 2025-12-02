@@ -16,6 +16,11 @@ export {
 } from "@/lib/uploads/core/storage-client";
 export * as StorageService from "@/lib/uploads/core/storage-service";
 export {
+  useUploadManager,
+  type UploadItem,
+  type UploadStatus,
+} from "@/lib/uploads/hooks/use-upload-manager";
+export {
   MIME_TYPE_MAPPING,
   bufferToBase64,
   createFileContent as createAnthropicFileContent,
@@ -26,8 +31,3 @@ export {
   type MessageContent as AnthropicMessageContent,
   type FileAttachment,
 } from "@/lib/uploads/utils/file-utils";
-export {
-  useUploadManager,
-  type UploadItem,
-  type UploadStatus,
-} from "@/lib/uploads/hooks/use-upload-manager";

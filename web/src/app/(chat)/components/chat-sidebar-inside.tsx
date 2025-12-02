@@ -5,6 +5,7 @@ import {
   CustomSidebarHeader,
   CustomSidebarMenuSkeleton,
 } from "@/components/ui-custom/sidebar";
+import { AnimatedList } from "@/components/ui/animated-list";
 import {
   SidebarContent,
   SidebarGroupContent,
@@ -21,13 +22,10 @@ import { ChatSidebarSearch } from "./chat-sidebar-search";
 
 export function ChatSidebarInside() {
   const {
-    data,
-    isLoading,
+    history: { data, isLoading },
     search,
-    debouncedSearch,
     setSearch,
-    currentChatId,
-    setCurrentChatId,
+    debouncedSearch,
   } = useChatHistory();
 
   return (
@@ -49,22 +47,31 @@ export function ChatSidebarInside() {
                 ))}
 
               {!isLoading &&
-                data?.chats.length === 0 &&
+                data &&
+                data.chats.length === 0 &&
                 debouncedSearch.length === 0 && <ChatSidebarEmpty />}
 
               {!isLoading &&
-                data?.chats.length === 0 &&
+                data &&
+                data.chats.length === 0 &&
                 debouncedSearch.length !== 0 && <ChatSidebarNoResult />}
 
-              {!isLoading &&
-                data?.chats.map((item) => (
-                  <ChatSidebarItem
-                    key={item.id}
-                    item={item}
-                    currentChatId={currentChatId}
-                    setCurrentChatId={setCurrentChatId}
-                  />
-                ))}
+              {!isLoading && data && data.chats.length !== 0 && (
+                <AnimatedList
+                  ids={data.chats.map((chat) => chat.id)}
+                  itemElement="div"
+                  renderItem={(id) => {
+                    const chat = data.chats.find((chat) => chat.id === id);
+                    if (!chat) return;
+                    return (
+                      <ChatSidebarItem
+                        key={id} // TODO do I need this here?
+                        item={chat}
+                      />
+                    );
+                  }}
+                />
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
           <ChatSidebarAddAction />

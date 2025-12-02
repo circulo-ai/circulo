@@ -20,7 +20,9 @@ export const UPLOAD_DIR_SERVER = join(PROJECT_ROOT, "uploads");
  */
 export async function ensureUploadsDirectory() {
   if (USE_S3_STORAGE) {
-    logger.info("Using S3-compatible storage, skipping local uploads directory creation");
+    logger.info(
+      "Using S3-compatible storage, skipping local uploads directory creation",
+    );
     return true;
   }
 

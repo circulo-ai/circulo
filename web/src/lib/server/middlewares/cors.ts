@@ -40,14 +40,14 @@ export function corsMiddleware(options: CorsOptions = {}) {
     if (options.allowedHeaders) {
       headers.set(
         "Access-Control-Allow-Headers",
-        options.allowedHeaders.join(", ")
+        options.allowedHeaders.join(", "),
       );
     }
 
     if (options.exposedHeaders) {
       headers.set(
         "Access-Control-Expose-Headers",
-        options.exposedHeaders.join(", ")
+        options.exposedHeaders.join(", "),
       );
     }
 

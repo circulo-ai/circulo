@@ -423,3 +423,36 @@
     }
   }
 }
+
+@theme {
+  --animate-error: error 300ms;
+
+  @keyframes error {
+    0% {
+      transform: translateX(0rem);
+    }
+    33% {
+      transform: translateX(0.5rem);
+    }
+    66% {
+      transform: translateX(-0.5rem);
+    }
+    100% {
+      transform: translateX(0rem);
+    }
+  }
+}
+
+@theme {
+  --animate-ping-with-shadow: ping-with-shadow 1s cubic-bezier(0, 0, 0.2, 1)
+    infinite;
+
+  @keyframes ping-with-shadow {
+    from {
+      box-shadow: 0 0 0 0 var(--tw-shadow-color);
+    }
+    to {
+      box-shadow: 0 0 0 8px transparent;
+    }
+  }
+}

@@ -1,7 +1,6 @@
 import { cn } from "@/lib/utils";
 import { AuthClientProvider } from "@/providers/auth-client-provider";
 import { PointerProvider } from "@/providers/pointer-provider";
-import { SessionProvider } from "@/providers/session-provider";
 import { SWRProvider } from "@/providers/swr-provider";
 import { ThemeProvider } from "@/providers/theme-provider";
 import { AutumnProvider } from "autumn-js/react";
@@ -30,18 +29,16 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     >
       <body className={cn("font-sans", "antialiased")}>
         <ThemeProvider>
-          <SessionProvider>
-            <AutumnProvider
-              betterAuthUrl={process.env.NEXT_PUBLIC_BETTER_AUTH_URL}
-            >
-              <SWRProvider>
-                <PointerProvider>
-                  <AuthClientProvider>{children}</AuthClientProvider>
-                  <Toaster />
-                </PointerProvider>
-              </SWRProvider>
-            </AutumnProvider>
-          </SessionProvider>
+          <AutumnProvider
+            betterAuthUrl={process.env.NEXT_PUBLIC_BETTER_AUTH_URL}
+          >
+            <SWRProvider>
+              <PointerProvider>
+                <AuthClientProvider>{children}</AuthClientProvider>
+                <Toaster />
+              </PointerProvider>
+            </SWRProvider>
+          </AutumnProvider>
         </ThemeProvider>
       </body>
     </html>

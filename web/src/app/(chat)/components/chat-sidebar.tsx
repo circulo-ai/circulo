@@ -40,7 +40,7 @@ export async function ChatSidebar({ children }: { children: ReactNode }) {
         <ChatSidebarResizablePanel
           id={firstResizablePanelId}
           min="256px"
-          default="256px"
+          default="320px"
           max="384px"
           // isStaticAtRest // TODO can't use but it's a good prop, could make a pr to the library's repo to fix it
           collapsible

@@ -8,11 +8,17 @@ import { cn } from "@/lib/utils";
 function ScrollArea({
   className,
   children,
+  customScrollBar,
   viewportRef,
   ...props
 }: React.ComponentProps<typeof ScrollAreaPrimitive.Root> & {
+  customScrollBar?: React.FC<
+    React.ComponentProps<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>
+  >;
   viewportRef?: React.RefObject<HTMLDivElement | null>;
 }) {
+  const FinalScrollbar = customScrollBar ?? ScrollBar;
+
   return (
     <ScrollAreaPrimitive.Root
       data-slot="scroll-area"
@@ -26,7 +32,7 @@ function ScrollArea({
       >
         {children}
       </ScrollAreaPrimitive.Viewport>
-      <ScrollBar />
+      <FinalScrollbar />
       <ScrollAreaPrimitive.Corner />
     </ScrollAreaPrimitive.Root>
   );

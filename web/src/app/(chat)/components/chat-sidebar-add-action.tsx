@@ -1,3 +1,4 @@
+import { EnhancedLink } from "@/components/enhanced-link";
 import {
   CustomDropdownMenuContent,
   CustomDropdownMenuItem,
@@ -9,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useSidebar } from "@/components/ui/sidebar";
+import { useChatHistoryStore } from "@/stores/use-chat-history-store";
 import { Bot, MessagesSquare, Pencil, Users } from "lucide-react";
 import { ComponentProps } from "react";
 
@@ -17,19 +19,26 @@ interface ChatSidebarAddActionProps
 
 export function ChatSidebarAddAction(props: ChatSidebarAddActionProps) {
   const { open } = useSidebar();
+  const { setCurrentChatId } = useChatHistoryStore();
 
   return (
     <DropdownMenu {...props}>
       <DropdownMenuTrigger asChild>
-        <CustomSidebarGroupAction title="Add Chat">
-          <Pencil /> <span className="sr-only">Add Chat</span>
+        <CustomSidebarGroupAction title="Add">
+          <Pencil /> <span className="sr-only">Add</span>
         </CustomSidebarGroupAction>
       </DropdownMenuTrigger>
       <CustomDropdownMenuContent sideOffset={8} align={open ? "end" : "start"}>
         <DropdownMenuGroup>
-          <CustomDropdownMenuItem>
-            <MessagesSquare />
-            New Chat
+          <CustomDropdownMenuItem asChild>
+            <EnhancedLink
+              onClick={() => setCurrentChatId(undefined)}
+              asButton={false}
+              href="/chat"
+            >
+              <MessagesSquare />
+              New Chat
+            </EnhancedLink>
           </CustomDropdownMenuItem>
           <CustomDropdownMenuItem>
             <Bot />

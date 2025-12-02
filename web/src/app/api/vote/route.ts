@@ -28,7 +28,9 @@ export const GET = createSafeRoute()
     }
 
     if (chat.creatorId !== user.id) {
-      throw new ForbiddenError("You are not allowed to view votes for this chat");
+      throw new ForbiddenError(
+        "You are not allowed to view votes for this chat",
+      );
     }
 
     const votes = await voteRepo.findForChat(chatId);

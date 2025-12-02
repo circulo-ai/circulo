@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { Vote } from "@/db/schema";
 import { useArtifactSelector } from "@/hooks/api/chats/use-artifact";
-import { useIsChatLoading } from "@/hooks/api/chats/use-chat-history";
 import { useChatVisibility } from "@/hooks/api/chats/use-chat-visibility";
 import { ApiRequestError } from "@/lib/api/client";
 import {
@@ -26,6 +25,7 @@ import {
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { generateUUID } from "@/lib/utils";
+import { useChatHistoryStore } from "@/stores/use-chat-history-store";
 import { useChat } from "@ai-sdk/react";
 import { WorkflowChatTransport } from "@workflow/ai";
 import { useSearchParams } from "next/navigation";
@@ -55,7 +55,7 @@ export function Chat({
   isReadonly: boolean;
   initialLastContext?: AppUsage;
 }) {
-  const { isChatLoading } = useIsChatLoading();
+  const { isChatLoading } = useChatHistoryStore();
 
   const { visibilityType } = useChatVisibility({
     chatId: id,

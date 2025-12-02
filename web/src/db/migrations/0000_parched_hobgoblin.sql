@@ -2,25 +2,6 @@ CREATE TYPE "public"."chat_type" AS ENUM('direct', 'group');--> statement-breakp
 CREATE TYPE "public"."chat_visibility" AS ENUM('private', 'public');--> statement-breakpoint
 CREATE TYPE "public"."invitation_status" AS ENUM('pending', 'accepted', 'declined', 'expired');--> statement-breakpoint
 CREATE TYPE "public"."message_author_type" AS ENUM('user', 'agent', 'system');--> statement-breakpoint
-CREATE TABLE "agents" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"organization_id" text NOT NULL,
-	"created_by" text NOT NULL,
-	"name" text NOT NULL,
-	"description" text,
-	"instructions" text NOT NULL,
-	"avatar_url" text,
-	"model" text DEFAULT 'gemini-2.5-flash' NOT NULL,
-	"max_tokens" integer DEFAULT 1000,
-	"temperature" integer DEFAULT 70,
-	"is_archived" boolean DEFAULT false NOT NULL,
-	"default_tool_ids" jsonb DEFAULT '[]'::jsonb,
-	"default_knowledge_base_ids" jsonb DEFAULT '[]'::jsonb,
-	"metadata" jsonb,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
 CREATE TABLE "account" (
 	"id" text PRIMARY KEY NOT NULL,
 	"account_id" text NOT NULL,
@@ -136,6 +117,37 @@ CREATE TABLE "verification" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "agents" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"organization_id" text NOT NULL,
+	"created_by" text NOT NULL,
+	"name" text NOT NULL,
+	"description" text,
+	"instructions" text NOT NULL,
+	"avatar_url" text,
+	"model" text DEFAULT 'gemini-2.5-flash' NOT NULL,
+	"max_tokens" integer DEFAULT 1000,
+	"temperature" integer DEFAULT 70,
+	"is_archived" boolean DEFAULT false NOT NULL,
+	"default_tool_ids" jsonb DEFAULT '[]'::jsonb,
+	"default_knowledge_base_ids" jsonb DEFAULT '[]'::jsonb,
+	"metadata" jsonb,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "artifacts" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"chat_id" uuid,
+	"user_id" text NOT NULL,
+	"title" text NOT NULL,
+	"content" text,
+	"kind" varchar DEFAULT 'text' NOT NULL,
+	"version" integer DEFAULT 1 NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "chats" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"organization_id" text NOT NULL,
@@ -198,18 +210,6 @@ CREATE TABLE "chat_members" (
 	CONSTRAINT "chat_members_unread_check" CHECK (unread_count >= 0)
 );
 --> statement-breakpoint
-CREATE TABLE "documents" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"chat_id" uuid,
-	"user_id" text NOT NULL,
-	"title" text NOT NULL,
-	"content" text,
-	"kind" varchar DEFAULT 'text' NOT NULL,
-	"version" integer DEFAULT 1 NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
 CREATE TABLE "messages" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"chat_id" uuid NOT NULL,
@@ -230,11 +230,11 @@ CREATE TABLE "messages" (
 	CONSTRAINT "messages_costs_check" CHECK (token_count >= 0 AND cost >= 0)
 );
 --> statement-breakpoint
-CREATE TABLE "Stream" (
+CREATE TABLE "stream" (
 	"id" uuid DEFAULT gen_random_uuid() NOT NULL,
 	"chatId" uuid NOT NULL,
 	"createdAt" timestamp NOT NULL,
-	CONSTRAINT "Stream_id_pk" PRIMARY KEY("id")
+	CONSTRAINT "stream_id_pk" PRIMARY KEY("id")
 );
 --> statement-breakpoint
 CREATE TABLE "suggestions" (
@@ -294,8 +294,19 @@ CREATE TABLE "orchestration_logs" (
 	"completed_at" timestamp with time zone
 );
 --> statement-breakpoint
-ALTER TABLE "agents" ADD CONSTRAINT "agents_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "agents" ADD CONSTRAINT "agents_created_by_user_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE TABLE "workflow_progress" (
+	"chat_id" uuid NOT NULL,
+	"message_id" uuid NOT NULL,
+	"status" varchar(50) NOT NULL,
+	"current_agent" varchar(255),
+	"completed_agents" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"total_agents" integer NOT NULL,
+	"progress" integer NOT NULL,
+	"estimated_time_remaining" integer,
+	"last_update" timestamp NOT NULL,
+	CONSTRAINT "workflow_progress_chat_id_message_id_pk" PRIMARY KEY("chat_id","message_id")
+);
+--> statement-breakpoint
 ALTER TABLE "account" ADD CONSTRAINT "account_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "api_key" ADD CONSTRAINT "api_key_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "api_key" ADD CONSTRAINT "api_key_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -306,6 +317,10 @@ ALTER TABLE "member" ADD CONSTRAINT "member_organization_id_organization_id_fk" 
 ALTER TABLE "member" ADD CONSTRAINT "member_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "session" ADD CONSTRAINT "session_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "settings" ADD CONSTRAINT "settings_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "agents" ADD CONSTRAINT "agents_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "agents" ADD CONSTRAINT "agents_created_by_user_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "artifacts" ADD CONSTRAINT "artifacts_chat_id_chats_id_fk" FOREIGN KEY ("chat_id") REFERENCES "public"."chats"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "artifacts" ADD CONSTRAINT "artifacts_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "chats" ADD CONSTRAINT "chats_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "chats" ADD CONSTRAINT "chats_creator_id_user_id_fk" FOREIGN KEY ("creator_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "chat_agents" ADD CONSTRAINT "chat_agents_chat_id_chats_id_fk" FOREIGN KEY ("chat_id") REFERENCES "public"."chats"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -316,23 +331,23 @@ ALTER TABLE "chat_invitations" ADD CONSTRAINT "chat_invitations_inviter_id_user_
 ALTER TABLE "chat_invitations" ADD CONSTRAINT "chat_invitations_invitee_id_user_id_fk" FOREIGN KEY ("invitee_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "chat_members" ADD CONSTRAINT "chat_members_chat_id_chats_id_fk" FOREIGN KEY ("chat_id") REFERENCES "public"."chats"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "chat_members" ADD CONSTRAINT "chat_members_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "documents" ADD CONSTRAINT "documents_chat_id_chats_id_fk" FOREIGN KEY ("chat_id") REFERENCES "public"."chats"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "documents" ADD CONSTRAINT "documents_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "messages" ADD CONSTRAINT "messages_chat_id_chats_id_fk" FOREIGN KEY ("chat_id") REFERENCES "public"."chats"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "Stream" ADD CONSTRAINT "Stream_chatId_chats_id_fk" FOREIGN KEY ("chatId") REFERENCES "public"."chats"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "suggestions" ADD CONSTRAINT "suggestions_document_id_documents_id_fk" FOREIGN KEY ("document_id") REFERENCES "public"."documents"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "stream" ADD CONSTRAINT "stream_chatId_chats_id_fk" FOREIGN KEY ("chatId") REFERENCES "public"."chats"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "suggestions" ADD CONSTRAINT "suggestions_document_id_artifacts_id_fk" FOREIGN KEY ("document_id") REFERENCES "public"."artifacts"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "suggestions" ADD CONSTRAINT "suggestions_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "votes" ADD CONSTRAINT "votes_chat_id_chats_id_fk" FOREIGN KEY ("chat_id") REFERENCES "public"."chats"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "votes" ADD CONSTRAINT "votes_message_id_messages_id_fk" FOREIGN KEY ("message_id") REFERENCES "public"."messages"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "votes" ADD CONSTRAINT "votes_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "orchestration_logs" ADD CONSTRAINT "orchestration_logs_chat_id_chats_id_fk" FOREIGN KEY ("chat_id") REFERENCES "public"."chats"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "orchestration_logs" ADD CONSTRAINT "orchestration_logs_message_id_messages_id_fk" FOREIGN KEY ("message_id") REFERENCES "public"."messages"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "agents_org_idx" ON "agents" USING btree ("organization_id");--> statement-breakpoint
-CREATE INDEX "agents_creator_idx" ON "agents" USING btree ("created_by");--> statement-breakpoint
-CREATE UNIQUE INDEX "agents_org_name_idx" ON "agents" USING btree ("organization_id","name");--> statement-breakpoint
 CREATE INDEX "account_userId_idx" ON "account" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "session_userId_idx" ON "session" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "verification_identifier_idx" ON "verification" USING btree ("identifier");--> statement-breakpoint
+CREATE INDEX "agents_org_idx" ON "agents" USING btree ("organization_id");--> statement-breakpoint
+CREATE INDEX "agents_creator_idx" ON "agents" USING btree ("created_by");--> statement-breakpoint
+CREATE UNIQUE INDEX "agents_org_name_idx" ON "agents" USING btree ("organization_id","name");--> statement-breakpoint
+CREATE INDEX "artifacts_chat_idx" ON "artifacts" USING btree ("chat_id");--> statement-breakpoint
+CREATE INDEX "artifacts_user_idx" ON "artifacts" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "chats_org_idx" ON "chats" USING btree ("organization_id");--> statement-breakpoint
 CREATE INDEX "chats_creator_idx" ON "chats" USING btree ("creator_id");--> statement-breakpoint
 CREATE INDEX "chats_org_created_idx" ON "chats" USING btree ("organization_id","created_at");--> statement-breakpoint
@@ -344,8 +359,6 @@ CREATE INDEX "chat_invitations_token_idx" ON "chat_invitations" USING btree ("to
 CREATE UNIQUE INDEX "chat_members_chat_user_idx" ON "chat_members" USING btree ("chat_id","user_id");--> statement-breakpoint
 CREATE INDEX "chat_members_user_idx" ON "chat_members" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "chat_members_user_pinned_idx" ON "chat_members" USING btree ("user_id","is_pinned");--> statement-breakpoint
-CREATE INDEX "documents_chat_idx" ON "documents" USING btree ("chat_id");--> statement-breakpoint
-CREATE INDEX "documents_user_idx" ON "documents" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "messages_chat_created_idx" ON "messages" USING btree ("chat_id","created_at");--> statement-breakpoint
 CREATE INDEX "messages_author_idx" ON "messages" USING btree ("author_type","author_id");--> statement-breakpoint
 CREATE INDEX "messages_quoted_idx" ON "messages" USING btree ("quoted_message_id");--> statement-breakpoint
@@ -355,4 +368,6 @@ CREATE INDEX "orchestration_logs_message_idx" ON "orchestration_logs" USING btre
 CREATE INDEX "orchestration_logs_created_idx" ON "orchestration_logs" USING btree ("created_at");--> statement-breakpoint
 CREATE INDEX "orchestration_logs_success_idx" ON "orchestration_logs" USING btree ("success");--> statement-breakpoint
 CREATE INDEX "orchestration_logs_strategy_idx" ON "orchestration_logs" USING btree ("strategy");--> statement-breakpoint
-CREATE INDEX "orchestration_logs_trigger_idx" ON "orchestration_logs" USING btree ("trigger_type");
+CREATE INDEX "orchestration_logs_trigger_idx" ON "orchestration_logs" USING btree ("trigger_type");--> statement-breakpoint
+CREATE INDEX "idx_workflow_progress_chat" ON "workflow_progress" USING btree ("chat_id");--> statement-breakpoint
+CREATE INDEX "idx_workflow_progress_updated" ON "workflow_progress" USING btree ("last_update");

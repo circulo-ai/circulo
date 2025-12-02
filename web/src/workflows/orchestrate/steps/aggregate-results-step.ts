@@ -1,11 +1,11 @@
 import { ChatMessage } from "@/lib/types";
+import { getTextFromMessages } from "@/lib/utils";
 import { google } from "@ai-sdk/google";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { RequestClassification } from "./classify-request-step";
 import { AgentExecutionResult } from "./execute-agent-task-step";
 import { ExecutionPlan } from "./plan-agent-execution-step";
-import { getTextFromMessages } from "@/lib/utils";
 
 const aggregatedResultSchema = z.object({
   summary: z.string().describe("Concise summary of what was accomplished"),
