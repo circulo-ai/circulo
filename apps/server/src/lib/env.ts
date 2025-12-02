@@ -1,5 +1,4 @@
 import { createEnv } from "@t3-oss/env-nextjs";
-import { env as runtimeEnv } from "next-runtime-env";
 import { z } from "zod";
 
 /**
@@ -8,8 +7,7 @@ import { z } from "zod";
  * - Server-side: Falls back to process.env when runtimeEnv returns undefined
  * - Provides seamless Docker runtime variable support for NEXT_PUBLIC_ vars
  */
-const getEnv = (variable: string) =>
-  runtimeEnv(variable) ?? process.env[variable];
+const getEnv = (variable: string) => process.env[variable];
 
 export const env = createEnv({
   skipValidation: true,

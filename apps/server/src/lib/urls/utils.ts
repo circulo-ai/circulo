@@ -3,7 +3,7 @@ import { isProd } from "@/lib/environment";
 
 /**
  * Returns the base URL of the application, respecting environment variables for deployment environments
- * @returns The base URL string (e.g., 'http://localhost:3000' or 'https://example.com')
+ * @returns The base URL string (e.g., 'http://localhost:3002' or 'https://example.com')
  */
 export function getBaseUrl(): string {
   const baseUrl = getEnv("NEXT_PUBLIC_APP_URL");
@@ -16,7 +16,7 @@ export function getBaseUrl(): string {
     return `${protocol}${baseUrl}`;
   }
 
-  return "http://localhost:3000";
+  return "http://localhost:3002";
 }
 
 /**
