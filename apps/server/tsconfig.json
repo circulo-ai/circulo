@@ -10,6 +10,8 @@
     "types": [
       "node"
     ],
+    "allowJs": true,
+    "checkJs": true,
     "lib": [
       "ESNext"
     ],
@@ -19,7 +21,7 @@
       "@/db/*": ["../../packages/db/*"]
     },
     "jsx": "react-jsx",
-    "jsxImportSource": "hono/jsx",
+    "jsxImportSource": "react",
     "baseUrl": ".",
     "outDir": "./dist"
   },
