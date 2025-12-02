@@ -14,19 +14,12 @@ export interface AuthResult {
   error?: string;
 }
 
-/**
- * Check for authentication using any of the 3 supported methods:
- * 1. Session authentication (cookies)
- * 2. API key authentication (X-API-Key header)
- *
- * For internal JWT calls, requires chatId to determine user context
- */
 export async function checkHybridAuth(
   request: NextRequest,
   options: { requireChatId?: boolean } = {},
 ): Promise<AuthResult> {
   try {
-    // 1. Check for internal JWT token first
+    // 1. Internal JWT
     const authHeader = request.headers.get("authorization");
     if (authHeader?.startsWith("Bearer ")) {
       const token = authHeader.split(" ")[1];
@@ -38,13 +31,10 @@ export async function checkHybridAuth(
 
         const { searchParams } = new URL(request.url);
         chatId = searchParams.get("chatId");
-        if (!userId) {
-          userId = searchParams.get("userId");
-        }
+        if (!userId) userId = searchParams.get("userId");
 
         if (!chatId && !userId && request.method === "POST") {
           try {
-            // Clone the request to avoid consuming the original body
             const clonedRequest = request.clone();
             const bodyText = await clonedRequest.text();
             if (bodyText) {
@@ -52,17 +42,11 @@ export async function checkHybridAuth(
               chatId = body.chatId || body._context?.chatId;
               userId = userId || body.userId || body._context?.userId;
             }
-          } catch {
-            // Ignore JSON parse errors
-          }
+          } catch {}
         }
 
         if (userId) {
-          return {
-            success: true,
-            userId,
-            authType: "internal_jwt",
-          };
+          return { success: true, userId, authType: "internal_jwt" };
         }
 
         if (chatId) {
@@ -72,12 +56,7 @@ export async function checkHybridAuth(
             .where(eq(chat.id, chatId))
             .limit(1);
 
-          if (!chatData) {
-            return {
-              success: false,
-              error: "Chat not found",
-            };
-          }
+          if (!chatData) return { success: false, error: "Chat not found" };
 
           return {
             success: true,
@@ -93,14 +72,11 @@ export async function checkHybridAuth(
           };
         }
 
-        return {
-          success: true,
-          authType: "internal_jwt",
-        };
+        return { success: true, authType: "internal_jwt" };
       }
     }
 
-    // 2. Try session auth (for web UI)
+    // 2. Session auth
     const session = await getSession();
     if (session?.user?.id) {
       return {
@@ -110,7 +86,6 @@ export async function checkHybridAuth(
       };
     }
 
-    // No authentication found
     return {
       success: false,
       error:
@@ -118,9 +93,6 @@ export async function checkHybridAuth(
     };
   } catch (error) {
     logger.error("Error in hybrid authentication:", error);
-    return {
-      success: false,
-      error: "Authentication error",
-    };
+    return { success: false, error: "Authentication error" };
   }
 }

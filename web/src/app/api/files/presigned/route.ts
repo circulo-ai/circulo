@@ -4,6 +4,7 @@ import { createLogger } from "@/lib/logs/console/logger";
 import type { StorageContext } from "@/lib/uploads/core/config-resolver";
 import { USE_BLOB_STORAGE } from "@/lib/uploads/core/setup";
 import {
+  generatePresignedDownloadUrl,
   generatePresignedUploadUrl,
   hasCloudStorage,
 } from "@/lib/uploads/core/storage-service";
@@ -128,13 +129,31 @@ export async function POST(request: NextRequest) {
       expirationSeconds: 3600, // 1 hour
     });
 
-    const finalPath = `/api/files/serve/${USE_BLOB_STORAGE ? "blob" : "s3"}/${encodeURIComponent(presignedUrlResponse.key)}?context=${uploadType}`;
+    let finalPath: string;
+
+    try {
+      // Generate presigned download URL (valid for 24 hours)
+      const downloadUrl = await generatePresignedDownloadUrl(
+        presignedUrlResponse.key,
+        uploadType,
+        24 * 60 * 60, // 24 hours
+      );
+      finalPath = downloadUrl;
+      logger.info(`Generated presigned download URL for ${fileName}`);
+    } catch (error) {
+      // Fallback to serve endpoint if presigned URL generation fails
+      logger.warn(
+        `Failed to generate presigned download URL, using serve endpoint:`,
+        error,
+      );
+      finalPath = `/api/files/serve/${USE_BLOB_STORAGE ? "blob" : "s3"}/${encodeURIComponent(presignedUrlResponse.key)}?context=${uploadType}`;
+    }
 
     return NextResponse.json({
       fileName,
       presignedUrl: presignedUrlResponse.url,
       fileInfo: {
-        path: finalPath,
+        path: finalPath, // Now this is a presigned GET URL or fallback
         key: presignedUrlResponse.key,
         name: fileName,
         size: fileSize,

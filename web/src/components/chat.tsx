@@ -43,7 +43,6 @@ const WORKFLOW_RUN_ID_KEY = "active-workflow-run-id";
 export function Chat({
   id,
   initialMessages,
-  initialChatModel = "gemini-2.5-flash",
   initialVisibilityType,
   isReadonly,
   initialLastContext,
@@ -68,7 +67,6 @@ export function Chat({
   const [input, setInput] = useState<string>("");
   const [usage, setUsage] = useState<AppUsage | undefined>(initialLastContext);
   const [showCreditCardAlert, setShowCreditCardAlert] = useState(false);
-  const [currentModelId, setCurrentModelId] = useState(initialChatModel);
 
   // Workflow orchestration state
   const [workflowStatus, setWorkflowStatus] = useState<{
@@ -116,7 +114,6 @@ export function Chat({
             body: {
               id,
               message: config.messages.at(-1),
-              selectedChatModel: currentModelId,
               selectedVisibilityType: visibilityType,
               agentIds: [],
             },
@@ -292,7 +289,6 @@ export function Chat({
           isReadonly={isReadonly}
           messages={messages}
           regenerate={regenerate}
-          selectedModelId={initialChatModel}
           setMessages={setMessages}
           status={status}
           votes={votes}
@@ -305,8 +301,6 @@ export function Chat({
               chatId={id}
               input={input}
               messages={messages}
-              onModelChange={setCurrentModelId}
-              selectedModelId={currentModelId}
               selectedVisibilityType={visibilityType}
               sendMessage={sendMessage}
               setAttachments={setAttachments}
@@ -327,7 +321,6 @@ export function Chat({
         isReadonly={isReadonly}
         messages={messages}
         regenerate={regenerate}
-        selectedModelId={currentModelId}
         selectedVisibilityType={visibilityType}
         sendMessage={sendMessage}
         setAttachments={setAttachments}

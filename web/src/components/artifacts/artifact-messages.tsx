@@ -45,10 +45,10 @@ function PureArtifactMessages({
     >
       {messages.map((message, index) => (
         <PreviewMessage
+          key={message.id + index}
           chatId={chatId}
           isLoading={status === "streaming" && index === messages.length - 1}
           isReadonly={isReadonly}
-          key={message.id}
           message={message}
           regenerate={regenerate}
           requiresScrollPadding={
@@ -68,7 +68,7 @@ function PureArtifactMessages({
       </AnimatePresence>
 
       <motion.div
-        className="min-h-[24px] min-w-[24px] shrink-0"
+        className="min-h-6 min-w-6 shrink-0"
         onViewportEnter={onViewportEnter}
         onViewportLeave={onViewportLeave}
         ref={messagesEndRef}

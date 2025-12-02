@@ -1,4 +1,4 @@
-import { ChatMessage, CustomUIMessageChunk } from "@/lib/types";
+import { CustomUIMessageChunk } from "@/lib/types";
 import { aggregateResultsStep } from "@/workflows/orchestrate/steps/aggregate-results-step";
 import {
   AgentExecutionResult,
@@ -13,6 +13,7 @@ import {
   planAgentExecutionStep,
 } from "@/workflows/orchestrate/steps/plan-agent-execution-step";
 import { OrchestrationInput } from "@/workflows/orchestrate/types";
+import { Session } from "better-auth";
 import {
   FatalError,
   fetch,
@@ -24,7 +25,7 @@ import { classifyRequestStep } from "./steps/classify-request-step";
 
 const logger = console;
 
-async function sendEvent(event: CustomUIMessageChunk) {
+export async function sendEvent(event: CustomUIMessageChunk) {
   "use step";
 
   const writable = getWritable<CustomUIMessageChunk>();
@@ -34,7 +35,6 @@ async function sendEvent(event: CustomUIMessageChunk) {
   } finally {
     writer.releaseLock();
   }
-  writer.releaseLock();
 }
 
 function detectCircularDependencies(
@@ -81,6 +81,8 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
 
   // Enable AI SDK calls as workflow steps
   globalThis.fetch = fetch;
+
+  const session = input.session;
 
   const startTime = Date.now();
   let errorStack: string | undefined;
@@ -167,9 +169,9 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
     })();
 
     const executionPromise = executeAgentsAccordingToStrategy({
+      session,
       plan: executionPlan,
       context,
-      triggerMessages: input.messages,
       webhookPayload: input.webhookPayload,
     });
 
@@ -191,9 +193,9 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
 
       if (fallbackAgent) {
         const fallbackResult = await executeAgentTaskStep({
+          session,
           agentPlan: fallbackAgent,
           context,
-          triggerMessages: input.messages,
           previousResults: agentResults,
           webhookPayload: input.webhookPayload,
         });
@@ -246,45 +248,30 @@ export async function orchestrateWorkflow(input: OrchestrationInput) {
 
 // NOT a step - orchestration logic
 async function executeAgentsAccordingToStrategy(params: {
+  session: Session;
   plan: ExecutionPlan;
   context: ChatContext;
-  triggerMessages: ChatMessage[];
   webhookPayload?: OrchestrationInput["webhookPayload"];
 }) {
-  const { plan, context, triggerMessages, webhookPayload } = params;
+  const { plan, context, webhookPayload, session } = params;
 
   switch (plan.strategy) {
     case "sequential":
       return await executeSequential({
+        session,
         plan,
         context,
-        triggerMessages,
         webhookPayload,
       });
 
     case "parallel":
-      return await executeParallel(
-        plan,
-        context,
-        triggerMessages,
-        webhookPayload,
-      );
+      return await executeParallel(session, plan, context, webhookPayload);
 
     case "conditional":
-      return await executeConditional(
-        plan,
-        context,
-        triggerMessages,
-        webhookPayload,
-      );
+      return await executeConditional(session, plan, context, webhookPayload);
 
     case "single":
-      return await executeSingle(
-        plan,
-        context,
-        triggerMessages,
-        webhookPayload,
-      );
+      return await executeSingle(session, plan, context, webhookPayload);
 
     default:
       throw new Error(`Unknown execution strategy: ${plan.strategy}`);
@@ -293,12 +280,12 @@ async function executeAgentsAccordingToStrategy(params: {
 
 // NOT a step - orchestration logic
 async function executeSequential(params: {
+  session: Session;
   plan: ExecutionPlan;
   context: ChatContext;
-  triggerMessages: ChatMessage[];
   webhookPayload?: OrchestrationInput["webhookPayload"];
 }): Promise<AgentExecutionResult[]> {
-  const { plan, context, triggerMessages, webhookPayload } = params;
+  const { plan, context, webhookPayload, session } = params;
   const results: AgentExecutionResult[] = [];
 
   const sortedAgents = [...plan.selectedAgents].sort(
@@ -309,9 +296,9 @@ async function executeSequential(params: {
     const agentPlan = sortedAgents[i];
 
     const result = await executeAgentTaskStep({
+      session,
       agentPlan,
       context,
-      triggerMessages,
       previousResults: results,
       webhookPayload,
     });
@@ -345,9 +332,9 @@ async function executeSequential(params: {
 
 // NOT a step - orchestration logic
 async function executeParallel(
+  session: Session,
   plan: ExecutionPlan,
   context: ChatContext,
-  triggerMessages: ChatMessage[],
   webhookPayload?: OrchestrationInput["webhookPayload"],
 ): Promise<AgentExecutionResult[]> {
   const groups = new Map<number, typeof plan.selectedAgents>();
@@ -370,9 +357,9 @@ async function executeParallel(
     const groupResults = await Promise.all(
       groupAgents.map((agentPlan) =>
         executeAgentTaskStep({
+          session,
           agentPlan,
           context,
-          triggerMessages,
           previousResults: results,
           webhookPayload,
         }),
@@ -391,9 +378,9 @@ async function executeParallel(
 
 // NOT a step - orchestration logic
 async function executeConditional(
+  session: Session,
   plan: ExecutionPlan,
   context: ChatContext,
-  triggerMessages: ChatMessage[],
   webhookPayload: OrchestrationInput["webhookPayload"] | undefined,
 ): Promise<AgentExecutionResult[]> {
   const results: AgentExecutionResult[] = [];
@@ -456,9 +443,9 @@ async function executeConditional(
     const batchResults = await Promise.all(
       ready.map((agentPlan) =>
         executeAgentTaskStep({
+          session,
           agentPlan,
           context,
-          triggerMessages,
           previousResults: results,
           webhookPayload,
         }),
@@ -501,17 +488,17 @@ async function executeConditional(
 
 // NOT a step - orchestration logic
 async function executeSingle(
+  session: Session,
   plan: ExecutionPlan,
   context: ChatContext,
-  triggerMessages: ChatMessage[],
   webhookPayload?: OrchestrationInput["webhookPayload"],
 ): Promise<AgentExecutionResult[]> {
   const agentPlan = plan.selectedAgents[0];
 
   const result = await executeAgentTaskStep({
+    session,
     agentPlan,
     context,
-    triggerMessages,
     previousResults: [],
     webhookPayload,
   });
