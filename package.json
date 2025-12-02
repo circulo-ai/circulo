@@ -1,0 +1,56 @@
+{
+    "name": "circulo",
+    "packageManager": "pnpm@10.4.1",
+    "version": "0.0.0",
+    "private": true,
+    "workspaces": [
+        "apps/*",
+        "packages/*"
+    ],
+    "scripts": {
+        "build": "turbo run build",
+        "dev": "turbo run dev",
+        "dev:sockets": "cd apps/sim && bun run dev:sockets",
+        "dev:full": "cd apps/sim && bun run dev:full",
+        "test": "turbo run test",
+        "format": "bunx biome format --write .",
+        "format:check": "bunx biome format .",
+        "lint": "bunx biome check --write --unsafe .",
+        "lint:check": "bunx biome check --unsafe .",
+        "lint:helm": "helm lint ./helm/sim --strict --values ./helm/sim/test/values-lint.yaml",
+        "lint:all": "bun run lint && bun run lint:helm",
+        "check": "bunx biome check --files-ignore-unknown=true",
+        "prepare": "bun husky",
+        "type-check": "turbo run type-check",
+        "release": "bun run scripts/create-single-release.ts"
+    },
+    "overrides": {
+        "react": "19.1.0",
+        "react-dom": "19.1.0",
+        "next": "15.4.1",
+        "@next/env": "15.4.1",
+        "drizzle-orm": "^0.44.5",
+        "postgres": "^3.4.5"
+    },
+    "dependencies": {
+        "@t3-oss/env-nextjs": "0.13.4",
+        "@types/fluent-ffmpeg": "2.1.28",
+        "drizzle-orm": "^0.44.5",
+        "postgres": "^3.4.5"
+    },
+    "devDependencies": {
+        "@next/env": "15.4.1",
+        "@tailwindcss/typography": "0.5.19",
+        "drizzle-kit": "^0.31.4",
+        "lint-staged": "16.0.0",
+        "turbo": "2.6.1"
+    },
+    "lint-staged": {
+        "*.{js,jsx,ts,tsx,json,css,scss}": [
+            "biome check --write --no-errors-on-unmatched --files-ignore-unknown=true"
+        ]
+    },
+    "trustedDependencies": [
+        "ffmpeg-static"
+    ]
+}

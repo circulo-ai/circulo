@@ -23,9 +23,11 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
-      "@/db/*": ["./src/db/*"],
+      "@/db": ["../../packages/db"],
+      "@/db/*": ["../../packages/db/*"],
       "#/*": ["./public/*"],
-      "@circulo-ai/ai": ["../packages/ai/src/index.node.ts"]
+      "@circulo/db": ["../../packages/db"],
+      "@circulo/db/*": ["../../packages/db/*"],
     }
   },
   "include": [
