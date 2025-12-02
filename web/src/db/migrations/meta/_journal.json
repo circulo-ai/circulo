@@ -5,15 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1763940652828,
-      "tag": "0000_happy_captain_cross",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1764046260943,
-      "tag": "0001_first_storm",
+      "when": 1764097074399,
+      "tag": "0000_parched_hobgoblin",
       "breakpoints": true
     },
     {

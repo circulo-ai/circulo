@@ -3,7 +3,7 @@ import { chatMember } from "@/db/schema/chat";
 import { createSafeRoute } from "@/lib/server";
 import { ForbiddenError } from "@/lib/server/errors";
 import { authMiddleware } from "@/lib/server/middlewares";
-import { and, eq, gt, gte, sql } from "drizzle-orm";
+import { and, eq, gte, sql } from "drizzle-orm";
 import { z } from "zod";
 
 export type PinChatResponse = {
@@ -33,7 +33,7 @@ export const POST = createSafeRoute()
     const { user } = ctx.data;
 
     const memberRows = await db
-      .select({ id: chatMember.id })
+      .select({ id: chatMember.id, isPinned: chatMember.isPinned })
       .from(chatMember)
       .where(and(eq(chatMember.chatId, chatId), eq(chatMember.userId, user.id)))
       .limit(1);
@@ -43,6 +43,7 @@ export const POST = createSafeRoute()
     }
 
     const desiredOrder = ctx.body?.pinOrder;
+    const desiredIsPinned = !memberRows[0].isPinned;
 
     const result: PinChatResponse = await db.transaction(async (tx) => {
       let insertOrder: number;
@@ -54,7 +55,7 @@ export const POST = createSafeRoute()
           .where(
             and(
               eq(chatMember.userId, user.id),
-              eq(chatMember.isPinned, true),
+              eq(chatMember.isPinned, desiredIsPinned),
               gte(chatMember.pinOrder, insertOrder),
             ),
           );
@@ -66,7 +67,7 @@ export const POST = createSafeRoute()
           .where(
             and(
               eq(chatMember.userId, user.id),
-              eq(chatMember.isPinned, true),
+              eq(chatMember.isPinned, desiredIsPinned),
               gte(chatMember.pinOrder, insertOrder),
             ),
           );
@@ -74,7 +75,11 @@ export const POST = createSafeRoute()
 
       const [updated] = await tx
         .update(chatMember)
-        .set({ isPinned: true, pinnedAt: new Date(), pinOrder: insertOrder })
+        .set({
+          isPinned: desiredIsPinned,
+          pinnedAt: new Date(),
+          pinOrder: insertOrder,
+        })
         .where(
           and(eq(chatMember.chatId, chatId), eq(chatMember.userId, user.id)),
         )
@@ -99,49 +104,4 @@ export const POST = createSafeRoute()
     });
 
     return Response.json(result);
-  });
-
-export const DELETE = createSafeRoute()
-  .methods("DELETE")
-  .params(paramsSchema)
-  .use(authMiddleware())
-  .handler(async (req, ctx) => {
-    const { id: chatId } = ctx.params;
-    const { user } = ctx.data;
-
-    const existing = await db
-      .select({ pinOrder: chatMember.pinOrder, isPinned: chatMember.isPinned })
-      .from(chatMember)
-      .where(and(eq(chatMember.chatId, chatId), eq(chatMember.userId, user.id)))
-      .limit(1);
-
-    if (existing.length === 0) {
-      throw new ForbiddenError("Not a member of this chat");
-    }
-
-    const currentOrder = existing[0].pinOrder;
-
-    await db.transaction(async (tx) => {
-      await tx
-        .update(chatMember)
-        .set({ isPinned: false, pinnedAt: null, pinOrder: null })
-        .where(
-          and(eq(chatMember.chatId, chatId), eq(chatMember.userId, user.id)),
-        );
-
-      if (typeof currentOrder === "number") {
-        await tx
-          .update(chatMember)
-          .set({ pinOrder: sql`${chatMember.pinOrder} - 1` })
-          .where(
-            and(
-              eq(chatMember.userId, user.id),
-              eq(chatMember.isPinned, true),
-              gt(chatMember.pinOrder, currentOrder),
-            ),
-          );
-      }
-    });
-
-    return Response.json({});
   });

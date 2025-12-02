@@ -1,8 +1,8 @@
 "use client";
 
+import { useSession } from "@/lib/auth-client";
 import { useGeneralStore } from "@/stores/settings/general/store";
 import { useEffect, useRef } from "react";
-import { useSession } from "./session-provider";
 
 /**
  * Loads user settings from database once per workspace session.

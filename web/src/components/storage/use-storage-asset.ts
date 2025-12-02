@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
 import { getServePathPrefix } from "@/lib/uploads/core/storage-client";
+import { useCallback, useMemo, useState } from "react";
 
 export interface UseStorageAssetOptions {
   /**
@@ -64,7 +64,7 @@ export function useStorageAsset(options: UseStorageAssetOptions) {
 
   const [hasError, setHasError] = useState(false);
 
-  const src = hasError ? fallbackUrl ?? resolved : resolved ?? fallbackUrl;
+  const src = hasError ? (fallbackUrl ?? resolved) : (resolved ?? fallbackUrl);
   const isImage = !!src && imagePattern.test(src.split("?")[0] || "");
 
   const onError = useCallback(() => {

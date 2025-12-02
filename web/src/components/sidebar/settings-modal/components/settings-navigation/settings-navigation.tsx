@@ -1,7 +1,6 @@
 import { env, isTruthy } from "@/lib/env";
 import { isHosted } from "@/lib/environment";
 import { cn } from "@/lib/utils";
-import { useSession } from "@/providers/session-provider";
 import { useGeneralStore } from "@/stores/settings/general/store";
 import { CreditCard, Home, Settings, Shield, User, Users } from "lucide-react";
 
@@ -62,7 +61,6 @@ export function SettingsNavigation({
   hasOrganization,
 }: SettingsNavigationProps) {
   console.log(isBillingEnabled);
-  const { data: session } = useSession();
 
   const navigationItems = allNavigationItems.filter((item) => {
     if (item.hideWhenBillingDisabled && !isBillingEnabled) {
@@ -97,13 +95,13 @@ export function SettingsNavigation({
               }}
               onClick={() => onSectionChange(item.id)}
               className={cn(
-                "group flex h-9 w-full cursor-pointer items-center rounded-[8px] px-2 py-2 font-sans text-sm font-medium transition-colors",
+                "group flex h-9 w-full cursor-pointer items-center rounded-xl px-2 py-2 font-sans text-sm font-medium transition-colors",
                 activeSection === item.id ? "bg-muted" : "hover:bg-muted",
               )}
             >
               <item.icon
                 className={cn(
-                  "mr-2 h-[14px] w-[14px] flex-shrink-0 transition-colors",
+                  "mr-2 h-3.5 w-3.5 shrink-0 transition-colors",
                   activeSection === item.id
                     ? "text-foreground"
                     : "text-muted-foreground group-hover:text-foreground",
@@ -129,9 +127,9 @@ export function SettingsNavigation({
         <div className="px-2 pb-4">
           <button
             onClick={handleHomepageClick}
-            className="group flex h-9 w-full cursor-pointer items-center rounded-[8px] px-2 py-2 font-sans text-sm font-medium transition-colors hover:bg-muted"
+            className="group flex h-9 w-full cursor-pointer items-center rounded-xl px-2 py-2 font-sans text-sm font-medium transition-colors hover:bg-muted"
           >
-            <Home className="mr-2 h-[14px] w-[14px] flex-shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" />
+            <Home className="mr-2 h-3.5 w-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" />
             <span className="min-w-0 flex-1 truncate pr-1 text-left text-muted-foreground transition-colors select-none group-hover:text-foreground">
               Homepage
             </span>

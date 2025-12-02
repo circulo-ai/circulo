@@ -424,33 +424,35 @@
   }
 }
 
-.scrollbar-thin {
-  scrollbar-width: thin; /* Firefox */
-  scrollbar-color: hsl(var(--muted-foreground) / 0.45) transparent;
+@theme {
+  --animate-error: error 300ms;
+
+  @keyframes error {
+    0% {
+      transform: translateX(0rem);
+    }
+    33% {
+      transform: translateX(0.5rem);
+    }
+    66% {
+      transform: translateX(-0.5rem);
+    }
+    100% {
+      transform: translateX(0rem);
+    }
+  }
 }
 
-/* Chrome / Safari / Edge */
-.scrollbar-thin::-webkit-scrollbar {
-  width: 7px;
-}
+@theme {
+  --animate-ping-with-shadow: ping-with-shadow 1s cubic-bezier(0, 0, 0.2, 1)
+    infinite;
 
-.scrollbar-thin::-webkit-scrollbar-track {
-  background: transparent;
-  box-shadow: none;
-  border: none;
-}
-
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background-color: hsl(var(--muted-foreground) / 0.35);
-  border-radius: 9999px;
-  border: 0; /* no fake “track” */
-  background-clip: padding-box;
-}
-
-.scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background-color: hsl(var(--muted-foreground) / 0.55);
-}
-
-.scrollbar-thin::-webkit-scrollbar-corner {
-  background: transparent;
+  @keyframes ping-with-shadow {
+    from {
+      box-shadow: 0 0 0 0 var(--tw-shadow-color);
+    }
+    to {
+      box-shadow: 0 0 0 8px transparent;
+    }
+  }
 }

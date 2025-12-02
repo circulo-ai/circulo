@@ -216,6 +216,20 @@ export function useUploadManager(options: UseUploadManagerOptions = {}) {
         metadata: item.metadata,
       }),
     });
+  async function presignRequest(item: UploadItem): Promise<PresignResponse> {
+    const res = await fetch(`${presignPath}?type=${item.context}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(requestHeaders || {}),
+      },
+      body: JSON.stringify({
+        fileName: item.file.name,
+        contentType: item.file.type,
+        fileSize: item.file.size,
+        metadata: item.metadata,
+      }),
+    });
 
     const json = (await res.json()) as PresignResponse;
     if (!res.ok) {
@@ -243,6 +257,7 @@ export function useUploadManager(options: UseUploadManagerOptions = {}) {
 
     if (!res.ok) {
       const message = await res.text();
+      throw new Error(message || `Upload failed with status ${res.status}`);
       throw new Error(message || `Upload failed with status ${res.status}`);
     }
 
@@ -373,6 +388,7 @@ export function useUploadManager(options: UseUploadManagerOptions = {}) {
       onItemFinish?.(itemsRef.current[id]);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Upload failed";
+      const message = error instanceof Error ? error.message : "Upload failed";
       setItem(id, (state) => ({
         ...state,
         status: message === "Upload aborted" ? "canceled" : "error",
@@ -411,6 +427,7 @@ export function useUploadManager(options: UseUploadManagerOptions = {}) {
   const activeCount = useMemo(
     () =>
       items.filter(
+        (item) => item.status === "uploading" || item.status === "preparing",
         (item) => item.status === "uploading" || item.status === "preparing",
       ).length,
     [items],

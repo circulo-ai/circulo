@@ -6,7 +6,7 @@ interface CustomInputProps extends ComponentProps<typeof Input> {
   type?: "number" | "email" | "password" | "search" | "tel" | "text" | "url";
 }
 
-export function CustomInput({
+export function BasicInput({
   className,
   type = "text",
   ...props

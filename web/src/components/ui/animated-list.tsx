@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { ReactNode, useRef, useState } from "react";
+import { ElementType, ReactNode, useMemo, useRef, useState } from "react";
 
 /**
  * AnimatedList
@@ -13,6 +13,7 @@ export function AnimatedList<T extends string | number>(props: {
   ids: T[];
   renderItem: (id: T, index: number) => ReactNode;
   className?: string;
+  itemElement?: ElementType;
   itemClassName?: string;
   /**
    * Spring tuning for layout shifts of siblings.
@@ -23,12 +24,15 @@ export function AnimatedList<T extends string | number>(props: {
     ids,
     renderItem,
     className,
+    itemElement = "li",
     itemClassName,
     layoutTransition = {
       duration: 0.15,
       ease: [0.4, 0, 0.2, 1],
     },
   } = props;
+
+  const MotionItem = useMemo(() => motion.create(itemElement), [itemElement]);
 
   return (
     <motion.ul
@@ -39,7 +43,7 @@ export function AnimatedList<T extends string | number>(props: {
     >
       <AnimatePresence mode="popLayout">
         {ids.map((id, index) => (
-          <motion.li
+          <MotionItem
             key={id}
             layout
             transition={layoutTransition}
@@ -56,7 +60,7 @@ export function AnimatedList<T extends string | number>(props: {
             >
               {renderItem(id, index)}
             </motion.div>
-          </motion.li>
+          </MotionItem>
         ))}
       </AnimatePresence>
     </motion.ul>
@@ -151,3 +155,5 @@ export default function Demo() {
     </div>
   );
 }
+
+// TODO make this component partitioned like the Shadcn components so the sidebar's gap would work

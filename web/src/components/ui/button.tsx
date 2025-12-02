@@ -11,6 +11,7 @@ function Button({
   size,
   rounded,
   asChild = false,
+  type = "button",
   ...props
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
@@ -20,6 +21,7 @@ function Button({
 
   return (
     <Comp
+      type={type}
       data-slot="button"
       className={cn(buttonVariants({ variant, size, rounded, className }))}
       {...props}

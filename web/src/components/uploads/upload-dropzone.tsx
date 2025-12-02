@@ -1,10 +1,5 @@
-import {
-  useCallback,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
 import clsx from "clsx";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 
 export interface UploadDropzoneProps {
   onFiles: (files: File[]) => void;

@@ -56,6 +56,7 @@ export function FaqList(props: ComponentProps<typeof ScrollArea>) {
         />
       </Accordion>
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-linear-to-t from-background to-transparent" />
+      {/* needs CustomScrollBar with z-10? */}
     </ScrollArea>
   );
 }
