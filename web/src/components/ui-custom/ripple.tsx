@@ -23,7 +23,7 @@ export function Ripple({
   return (
     <Comp
       id={id}
-      disabled
+      disabled={disabled === undefined ? true : disabled}
       className={cn(
         "relative touch-none overflow-hidden select-none [&_.ripple]:bg-teal-50/15",
         className,

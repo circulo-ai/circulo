@@ -5,45 +5,49 @@ import {
   FieldValues,
   FormProvider,
   Form as RHForm,
-  useForm,
-  UseFormProps,
+  UseFormReturn,
 } from "react-hook-form";
-import useSWR from "swr";
 
-interface CustomFormProps<Output extends Input, Input extends FieldValues>
-  extends ComponentProps<typeof RHForm> {
-  useFormProps: UseFormProps;
-  useSWRProps: Parameters<typeof useSWR>;
+interface CustomFormProps<
+  Input extends FieldValues = FieldValues,
+  Output = Input,
+> extends ComponentProps<typeof RHForm<Input>> {
+  form: UseFormReturn<Input>;
+  swr: { trigger: (props: Output) => Promise<void> };
   omitFields?: (keyof Input)[];
 }
 
-export function CustomForm<Output extends Input, Input extends FieldValues>({
-  useFormProps,
-  useSWRProps,
+export function CustomForm<
+  Input extends FieldValues = FieldValues,
+  Output = Input,
+>({
+  form,
+  swr: { trigger },
   omitFields,
   children,
+  onSubmit,
   ...props
-}: CustomFormProps<Output, Input>) {
-  const form = useForm(useFormProps);
-
-  const { mutate } = useSWR(useSWRProps);
-
+}: CustomFormProps<Input, Output>) {
   return (
-    <RHForm
-      onSubmit={async (data) => {
-        const finalData = omitFields
-          ? Object.fromEntries(
-              Object.entries(data).filter(([key]) => !omitFields.includes(key)),
-            )
-          : data;
+    <FormProvider<Input> {...form}>
+      <RHForm<Input>
+        onSubmit={async (payload) => {
+          onSubmit?.(payload);
 
-        await mutate(finalData);
-      }}
-      {...props}
-    >
-      <FormProvider {...form}>{children}</FormProvider>
-    </RHForm>
+          const finalData = omitFields
+            ? Object.fromEntries(
+                Object.entries(payload.data).filter(
+                  ([key]) => !omitFields.includes(key),
+                ),
+              )
+            : payload.data;
+
+          await trigger(finalData as Output);
+        }}
+        {...props}
+      >
+        {children}
+      </RHForm>
+    </FormProvider>
   );
 }
-
-// TODO could be more type safe

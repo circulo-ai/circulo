@@ -3,14 +3,7 @@ import { chatRepo } from "@/db/repositories/chat-repo";
 import { messageRepo } from "@/db/repositories/message-repo";
 import { getActiveOrganizationId } from "@/lib/auth";
 import { hasPermission, isMemberOf } from "@/lib/permissions";
-import {
-  BadRequestError,
-  ForbiddenError,
-  NotFoundError,
-  RateLimitError,
-  createErrorHandler,
-  createSafeRoute,
-} from "@/lib/server";
+import { ForbiddenError, NotFoundError, createSafeRoute } from "@/lib/server";
 import { authMiddleware } from "@/lib/server/middlewares";
 import { getTextFromMessage } from "@/lib/utils";
 import { orchestrateWorkflow } from "@/workflows/orchestrate/orchestrate";
@@ -21,16 +14,7 @@ import { deleteQuerySchema } from "./schema";
 
 export const maxDuration = 60;
 
-const handleChatError = createErrorHandler((error) => {
-  if (error instanceof RateLimitError) return error.toResponse();
-  if (error.message?.includes("AI Gateway requires a valid credit card")) {
-    return new BadRequestError("AI Gateway requires a valid credit card")
-      .toResponse();
-  }
-  return null;
-});
-
-export const POST = createSafeRoute({ handleServerError: handleChatError })
+export const POST = createSafeRoute({})
   .methods("POST")
   .use(authMiddleware())
   .handler(async (request, ctx) => {
@@ -130,7 +114,7 @@ export const POST = createSafeRoute({ handleServerError: handleChatError })
     });
   });
 
-export const DELETE = createSafeRoute({ handleServerError: handleChatError })
+export const DELETE = createSafeRoute({})
   .methods("DELETE")
   .query(deleteQuerySchema)
   .use(authMiddleware())
