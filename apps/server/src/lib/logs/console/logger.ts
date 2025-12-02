@@ -131,7 +131,7 @@ export class Logger {
     if (!config.enabled) return false;
 
     // In production, only log on server-side (where window is undefined)
-    if (ENV === "production" && typeof window !== "undefined") {
+    if (ENV === "production") {
       return false;
     }
 

@@ -50,11 +50,6 @@ function validateEmailSyntax(email: string): boolean {
  * Checks if domain has valid MX records (server-side only)
  */
 async function checkMXRecord(domain: string): Promise<boolean> {
-  // Skip MX check on client-side (browser)
-  if (typeof window !== "undefined") {
-    return true; // Assume valid on client-side
-  }
-
   try {
     const { promisify } = await import("util");
     const dns = await import("dns");
