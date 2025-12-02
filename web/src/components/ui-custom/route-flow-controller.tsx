@@ -144,7 +144,7 @@ export function RouteViewHeader({
   return (
     <header
       className={cn(
-        "flex h-18.25 items-center gap-2 border-b border-teal-50/15 px-4",
+        "flex h-18.25 shrink-0 items-center gap-2 border-b border-teal-50/15 px-4",
         className,
       )}
       {...props}

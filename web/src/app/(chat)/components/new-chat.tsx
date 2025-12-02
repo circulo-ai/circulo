@@ -392,7 +392,7 @@ function NewAgent() {
             Add
           </Submit>
         </RouteViewHeader>
-        <CustomScrollArea className="overflow-auto">
+        <CustomScrollArea className="h-full overflow-auto">
           <FieldGroup className="mt-7">
             <ControlledInput<NewAgentRequest>
               inputComponent={CustomInputGroupInput}
