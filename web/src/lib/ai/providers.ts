@@ -17,9 +17,11 @@ const supportingLanguageModels = {
   },
 } as const;
 
-export const LLM_MODELS = Object.keys(supportingLanguageModels);
+export type SupportedModels = keyof typeof supportingLanguageModels;
 
-export type modelID = keyof typeof supportingLanguageModels;
+export const LLM_MODELS = Object.keys(
+  supportingLanguageModels,
+) as SupportedModels[];
 
 export const myProvider = customProvider({
   languageModels: {
@@ -40,4 +42,4 @@ export const myProvider = customProvider({
   },
 });
 
-export const defaultModel: modelID = "gemini-2.5-flash";
+export const defaultModel: SupportedModels = "gemini-2.5-flash";

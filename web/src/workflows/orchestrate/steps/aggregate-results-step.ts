@@ -1,10 +1,11 @@
-import { Message } from "@/db";
+import { ChatMessage } from "@/lib/types";
 import { google } from "@ai-sdk/google";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { RequestClassification } from "./classify-request-step";
 import { AgentExecutionResult } from "./execute-agent-task-step";
 import { ExecutionPlan } from "./plan-agent-execution-step";
+import { getTextFromMessages } from "@/lib/utils";
 
 const aggregatedResultSchema = z.object({
   summary: z.string().describe("Concise summary of what was accomplished"),
@@ -24,11 +25,11 @@ export async function aggregateResultsStep(params: {
   agentResults: AgentExecutionResult[];
   plan: ExecutionPlan;
   classification: RequestClassification;
-  triggerMessage: Message;
+  triggerMessages: ChatMessage[];
 }): Promise<AggregatedResult> {
   "use step";
 
-  const { agentResults, plan, classification, triggerMessage } = params;
+  const { agentResults, plan, classification, triggerMessages } = params;
 
   // If single agent, return its result directly
   if (agentResults.length === 1) {
@@ -59,7 +60,7 @@ Duration: ${r.durationMs}ms`,
     schema: aggregatedResultSchema,
     system: `You are synthesizing the outputs from multiple AI agents into a coherent final response.
 
-ORIGINAL REQUEST: "${triggerMessage.content}"
+ORIGINAL REQUEST: "${getTextFromMessages(triggerMessages)}"
 REQUEST TYPE: ${classification.intent}
 EXECUTION STRATEGY: ${plan.strategy}
 
