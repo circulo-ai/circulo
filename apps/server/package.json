@@ -2,8 +2,8 @@
   "name": "server",
   "type": "module",
   "scripts": {
-    "dev": "nitro dev",
-    "build": "nitro build",
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
     "start": "node dist/index.js"
   },
   "dependencies": {
@@ -19,7 +19,10 @@
     "date-fns": "^4.1.0",
     "hono": "^4.10.7",
     "nanoid": "^5.1.6",
+    "nitro": "3.0.1-alpha.1",
     "resend": "^6.5.2",
+    "rollup": "^4.53.3",
+    "workflow": "4.0.1-beta.22",
     "zod": "^4.1.13"
   },
   "devDependencies": {
