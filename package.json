@@ -10,7 +10,7 @@
     "scripts": {
         "build": "turbo run build",
         "dev": "turbo run dev",
-        "dev:stack": "concurrently -k -s first -n server,web \"pnpm --filter server dev\" \"pnpm --filter web dev\"",
+        "dev:stack": "concurrently -k -s first -n db,server,web \"pnpm --filter @circulo/db dev\" \"pnpm --filter server dev\" \"pnpm --filter web dev\"",
         "dev:sockets": "cd apps/sim && pnpm dev:sockets",
         "dev:full": "cd apps/sim && pnpm dev:full",
         "test": "turbo run test",

@@ -1,7 +1,6 @@
 import { env, getEnv } from "@/lib/env";
 import { isDev } from "@/lib/environment";
 import type { NextConfig } from "next";
-import { withWorkflow } from "workflow/next";
 
 const apiBaseUrl =
   process.env.SERVER_API_URL ??
@@ -154,4 +153,4 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
 };
 
-export default withWorkflow(nextConfig);
+export default nextConfig;

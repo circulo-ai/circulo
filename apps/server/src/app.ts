@@ -35,6 +35,7 @@ import createApp from "@/lib/create-app";
 import { requestId } from "hono/request-id";
 import { prettyJSON } from "hono/pretty-json";
 import { cors } from "hono/cors";
+import { logger } from "hono/logger";
 import { getBaseUrl } from "./lib/urls/utils";
 
 const app = createApp();
@@ -75,12 +76,13 @@ const routes = [
 ] as const;
 
 routes.forEach((route) => {
-  app.basePath("/api").route("/", route);
+  app.route("/api", route);
 });
 
 export type AppType = (typeof routes)[number];
 
 // Middlewares
+app.use("*", logger());
 app.use("*", requestId());
 app.use(prettyJSON());
 app.use(

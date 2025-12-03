@@ -34,3 +34,5 @@ export const requireAuth = createMiddleware<AuthType>(async (c, next) => {
 
   await next();
 });
+
+export default requireAuth;

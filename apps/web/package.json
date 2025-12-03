@@ -9,13 +9,9 @@
     "lint": "eslint",
     "format": "prettier . --write",
     "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx,json,css,scss,md}\"",
-    "workflow:inspect": "npx workflow inspect runs",
     "db:dbml": "npx tsx dbml.ts",
     "type-check": "tsc --noEmit"
   },
-  "sideEffects": [
-    "src/workflows/**/*"
-  ],
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.50",
     "@ai-sdk/deepseek": "^1.0.30",
@@ -82,7 +78,6 @@
     "@vercel/toolbar": "^0.1.41",
     "@window-splitter/react": "^1.1.2",
     "@workflow/ai": "4.0.1-beta.21",
-    "@workflow/world-vercel": "4.0.1-beta.10",
     "@xyflow/react": "^12.9.3",
     "ai": "5.0.101",
     "autumn-js": "^0.1.48",
@@ -159,7 +154,6 @@
     "uuid": "^13.0.0",
     "valibot": "^1.2.0",
     "vaul": "^1.1.2",
-    "workflow": "4.0.1-beta.22",
     "xlsx": "^0.18.5",
     "zod": "^4.1.13",
     "zustand": "^5.0.9"

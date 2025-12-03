@@ -309,7 +309,7 @@ async function persistAgentMessages(params: {
 
 export async function executeAgentTaskStep(params: {
   session: Session;
-  agentPlan: ExecutionPlan["selectedAgents"][0];
+  agentPlan: NonNullable<ExecutionPlan["selectedAgents"][number]>;
   context: ChatContext;
   previousResults: AgentExecutionResult[];
   webhookPayload?: OrchestrationInput["webhookPayload"];

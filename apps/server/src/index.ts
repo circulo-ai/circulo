@@ -1,6 +1,14 @@
+import { serve } from "@hono/node-server";
 import app from "./app";
 
-// Nitro expects a default export that is a fetch handler.
-// Hono's `app.fetch` already satisfies the signature.
-export const handler = app.fetch;
-export default handler;
+const port = Number.parseInt(process.env.PORT || "3002", 10);
+
+serve(
+  {
+    fetch: app.fetch,
+    port,
+  },
+  (info: { port: number }) => {
+    console.log(`Server is running on http://localhost:${info.port}`);
+  },
+);

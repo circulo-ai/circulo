@@ -3,7 +3,8 @@ import { createRouter } from "@/lib/create-app";
 
 const router = createRouter();
 
-router.on(["POST", "GET"], "/auth/**", (c) => {
+// Forward all auth routes (any method) to Better Auth handler
+router.all("/auth/*", (c) => {
   return auth.handler(c.req.raw);
 });
 
