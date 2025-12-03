@@ -87,6 +87,10 @@ export const env = createEnv({
 
     // Logging
     LOG_LEVEL: z.enum(["DEBUG", "INFO", "WARN", "ERROR"]).optional(),
+    // Inngest / workflow
+    INNGEST_EVENT_KEY: z.string().optional(),
+    INNGEST_SIGNING_KEY: z.string().optional(),
+    INNGEST_BASE_URL: z.string().optional(),
 
     // Scheduled tasks / rate limiting
     CRON_SECRET: z.string().optional(),

@@ -36,6 +36,7 @@ import { requestId } from "hono/request-id";
 import { prettyJSON } from "hono/pretty-json";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
+import { inngestRouter } from "@/lib/inngest/handler";
 import { getBaseUrl } from "./lib/urls/utils";
 
 const app = createApp();
@@ -96,6 +97,9 @@ app.use(
 		credentials: true,
 	}),
 );
+
+// Inngest handler (dev/prod)
+app.use("/api/inngest/*", inngestRouter);
 
 app.onError((err, c) => {
   if (err instanceof HttpError) {

@@ -15,16 +15,12 @@ import {
 } from "@/lib/server/errors";
 import { requireAuth } from "@/middleware/auth";
 import { type ChatMessage } from "@/lib/types";
-import {
-  createUIMessageStreamResponse,
-  generateText,
-  safeValidateUIMessages,
-} from "ai";
+import { generateText, safeValidateUIMessages } from "ai";
 import { zValidator } from "@hono/zod-validator";
-import { start } from "workflow/api";
-import { orchestrateWorkflow } from "@/workflows/orchestrate/orchestrate";
 import { type OrchestrationInput } from "@/workflows/orchestrate/types";
 import { z } from "zod";
+import { inngest } from "@/lib/inngest/client";
+import { randomUUID } from "crypto";
 
 const deleteQuerySchema = z.object({
   id: z.string().uuid(),
@@ -152,15 +148,14 @@ router.post(
         session: session as any,
       };
 
-      const run = await start(orchestrateWorkflow, [orchestrationInput]);
-      const workflowStream = run.readable;
-
-      return createUIMessageStreamResponse({
-        stream: workflowStream,
-        headers: {
-          "x-workflow-run-id": run.runId,
-        },
+      const eventId = randomUUID();
+      await inngest.send({
+        name: "app/orchestrate.run",
+        data: orchestrationInput,
+        id: eventId,
       });
+
+      return c.json({ success: true, eventId }, 202);
     } catch (error) {
       if (error instanceof RateLimitError) return error.toResponse();
       if (

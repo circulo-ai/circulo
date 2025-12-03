@@ -11,9 +11,6 @@
       "ESNext",
       "DOM"
     ],
-    "plugins": [{
-      "name": "workflow"
-    }],
     "paths": {
       "@/*": ["./src/*"],
       "@/db": ["../../packages/db"],
