@@ -18,6 +18,8 @@
     "@aws-sdk/s3-request-presigner": "^3.940.0",
     "@azure/communication-email": "^1.1.0",
     "@azure/storage-blob": "^12.29.1",
+    "@circulo/core": "workspace:^",
+    "@circulo-ai/di": "workspace:^",
     "@circulo/db": "workspace:^",
     "@e2b/code-interpreter": "^2.3.1",
     "@hono/node-server": "^1.19.6",

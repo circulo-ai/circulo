@@ -3,6 +3,8 @@
     "verbatimModuleSyntax": true,
     "paths": {
       "@/*": ["./src/*"],
+      "@circulo/core": ["../../packages/core/src"],
+      "@circulo-ai/di": ["../../packages/di/src"],
       "@/db": ["../../packages/db"],
       "@/db/*": ["../../packages/db/*"]
     },
@@ -18,7 +20,6 @@
     "moduleResolution": "bundler",
     "lib": ["ES2022"],
     "outDir": "./dist",
-    "rootDir": ".",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,

@@ -1,7 +1,7 @@
 import { createMiddleware } from "hono/factory";
 import type { Context } from "hono";
 import { auth } from "@/lib/auth";
-import type { AuthType } from "@/lib/create-app";
+import type { AppEnv } from "@/lib/create-app";
 
 // Infer Better Auth session type
 type SessionResponse = Awaited<ReturnType<typeof auth.api.getSession>>;
@@ -17,7 +17,7 @@ async function getSessionFromContext(c: Context): Promise<SessionResponse> {
  * Loads Better Auth session and stores it on context.
  * If no user, returns 401.
  */
-export const requireAuth = createMiddleware<AuthType>(async (c, next) => {
+export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
   const session = await getSessionFromContext(c);
 
   if (!session?.user) {

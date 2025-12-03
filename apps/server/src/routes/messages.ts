@@ -1,4 +1,4 @@
-import { chatRepo, messageRepo } from "@/db/repositories";
+import { getChatRepository, getMessageRepository } from "@/di/resolvers";
 import { getActiveOrganizationId } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
 import { createRouter } from "@/lib/create-app";
@@ -18,15 +18,18 @@ router.delete(
   requireAuth,
   zValidator("param", paramsSchema),
   async (c) => {
+    const messageRepository = getMessageRepository(c);
+    const chatRepository = getChatRepository(c);
+
     const { user, activeOrgId, session } = c.var;
     const { id } = c.req.valid("param");
 
-    const message = await messageRepo.findById(id);
+    const message = await messageRepository.findById(id);
     if (!message) {
       throw new NotFoundError("Message not found");
     }
 
-    const chat = await chatRepo.findById(message.chatId);
+    const chat = await chatRepository.findById(message.chatId);
     if (!chat) {
       throw new NotFoundError("Chat not found");
     }
@@ -52,7 +55,7 @@ router.delete(
       }
     }
 
-    await messageRepo.deleteByChatIdAfterTimestamp({
+    await messageRepository.deleteByChatIdAfterTimestamp({
       chatId: chat.id,
       timestamp: message.createdAt,
     });
