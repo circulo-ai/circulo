@@ -39,21 +39,42 @@ importers:
 
   apps/server:
     dependencies:
+      '@ai-sdk/google':
+        specifier: 2.0.0
+        version: 2.0.0(zod@4.1.13)
+      '@aws-sdk/client-s3':
+        specifier: ^3.940.0
+        version: 3.940.0
+      '@aws-sdk/s3-request-presigner':
+        specifier: ^3.940.0
+        version: 3.940.0
       '@azure/communication-email':
         specifier: ^1.1.0
         version: 1.1.0
+      '@azure/storage-blob':
+        specifier: ^12.29.1
+        version: 12.29.1
       '@circulo/db':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../../packages/db
       '@hono/node-server':
         specifier: ^1.19.6
         version: 1.19.6(hono@4.10.7)
+      '@hono/standard-validator':
+        specifier: ^0.2.0
+        version: 0.2.0(@standard-schema/spec@1.0.0)(hono@4.10.7)
+      '@hono/zod-validator':
+        specifier: ^0.7.5
+        version: 0.7.5(hono@4.10.7)(zod@4.1.13)
       '@react-email/components':
         specifier: ^0.5.7
         version: 0.5.7(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       '@react-email/render':
         specifier: ^2.0.0
         version: 2.0.0(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+      '@workflow/ai':
+        specifier: 4.0.1-beta.21
+        version: 4.0.1-beta.21(ai@5.0.101(zod@4.1.13))(workflow@4.0.1-beta.22(@aws-sdk/client-sts@3.940.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(@swc/helpers@0.5.17)(babel-plugin-react-compiler@1.0.0)(next@15.5.4(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3))
       ai:
         specifier: 5.0.101
         version: 5.0.101(zod@4.1.13)
@@ -63,30 +84,66 @@ importers:
       better-auth:
         specifier: ^1.4.4
         version: 1.4.4(next@15.5.4(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+      binary-extensions:
+        specifier: ^3.1.0
+        version: 3.1.0
       chalk:
         specifier: ^5.6.2
         version: 5.6.2
+      cheerio:
+        specifier: ^1.1.2
+        version: 1.1.2
+      csv-parse:
+        specifier: ^6.1.0
+        version: 6.1.0
       date-fns:
         specifier: ^4.1.0
         version: 4.1.0
       hono:
         specifier: ^4.10.7
         version: 4.10.7
+      jose:
+        specifier: ^6.1.3
+        version: 6.1.3
+      js-yaml:
+        specifier: ^4.1.1
+        version: 4.1.1
+      jwt-decode:
+        specifier: ^4.0.0
+        version: 4.0.0
+      mammoth:
+        specifier: ^1.11.0
+        version: 1.11.0
       nanoid:
         specifier: ^5.1.6
         version: 5.1.6
       nitro:
         specifier: 3.0.1-alpha.1
         version: 3.0.1-alpha.1(@azure/storage-blob@12.29.1)(@vercel/blob@2.0.0)(@vercel/functions@3.3.4(@aws-sdk/credential-provider-web-identity@3.609.0(@aws-sdk/client-sts@3.940.0)))(chokidar@4.0.3)(drizzle-orm@0.44.7(@opentelemetry/api@1.9.0)(@types/pg@8.15.6)(kysely@0.28.8)(pg@8.16.3)(postgres@3.4.7))(ioredis@5.8.2)(lru-cache@11.2.4)(rollup@4.53.3)(vite@7.2.6(@types/node@20.19.25)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2))
+      officeparser:
+        specifier: ^5.2.2
+        version: 5.2.2
+      pdf-parse:
+        specifier: ^2.4.5
+        version: 2.4.5
       resend:
         specifier: ^6.5.2
         version: 6.5.2(@react-email/render@2.0.0(react-dom@19.2.0(react@19.2.0))(react@19.2.0))
       rollup:
         specifier: ^4.53.3
         version: 4.53.3
+      tokenlens:
+        specifier: ^1.3.1
+        version: 1.3.1
+      uuid:
+        specifier: ^13.0.0
+        version: 13.0.0
       workflow:
         specifier: 4.0.1-beta.22
         version: 4.0.1-beta.22(@aws-sdk/client-sts@3.940.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(@swc/helpers@0.5.17)(babel-plugin-react-compiler@1.0.0)(next@15.5.4(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
+      xlsx:
+        specifier: ^0.18.5
+        version: 0.18.5
       zod:
         specifier: ^4.1.13
         version: 4.1.13
@@ -94,6 +151,9 @@ importers:
       '@biomejs/biome':
         specifier: ^2.3.8
         version: 2.3.8
+      '@types/js-yaml':
+        specifier: ^4.0.9
+        version: 4.0.9
       '@types/node':
         specifier: ^20.11.17
         version: 20.19.25
@@ -635,6 +695,9 @@ importers:
 
   packages/db:
     dependencies:
+      ai:
+        specifier: 5.0.101
+        version: 5.0.101(zod@4.1.13)
       drizzle-orm:
         specifier: ^0.44.5
         version: 0.44.7(@opentelemetry/api@1.9.0)(@types/pg@8.15.6)(kysely@0.28.8)(pg@8.16.3)(postgres@3.4.7)
@@ -2003,6 +2066,18 @@ packages:
     engines: {node: '>=18.14.1'}
     peerDependencies:
       hono: ^4
+
+  '@hono/standard-validator@0.2.0':
+    resolution: {integrity: sha512-pFq0UVAnjzXcDAgqFpDeVL3MOUPrlIh/kPqBDvbCYoThVhhS+Vf37VcdsakdOFFGiqoiYVxp3LifXFhGhp/rgQ==}
+    peerDependencies:
+      '@standard-schema/spec': 1.0.0
+      hono: '>=3.9.0'
+
+  '@hono/zod-validator@0.7.5':
+    resolution: {integrity: sha512-n4l4hutkfYU07PzRUHBOVzUEn38VSfrh+UVE5d0w4lyfWDOEhzxIupqo5iakRiJL44c3vTuFJBvcmUl8b9agIA==}
+    peerDependencies:
+      hono: '>=3.9.0'
+      zod: ^3.25.0 || ^4.0.0
 
   '@hookform/resolvers@5.2.2':
     resolution: {integrity: sha512-A/IxlMLShx3KjV/HeTcTfaMxdwy690+L/ZADoeaTltLx+CVuzkeVIPuybK3jrRfw7YZnmdKsVVHAlEPIAEUNlA==}
@@ -11916,6 +11991,16 @@ snapshots:
     dependencies:
       hono: 4.10.7
 
+  '@hono/standard-validator@0.2.0(@standard-schema/spec@1.0.0)(hono@4.10.7)':
+    dependencies:
+      '@standard-schema/spec': 1.0.0
+      hono: 4.10.7
+
+  '@hono/zod-validator@0.7.5(hono@4.10.7)(zod@4.1.13)':
+    dependencies:
+      hono: 4.10.7
+      zod: 4.1.13
+
   '@hookform/resolvers@5.2.2(react-hook-form@7.67.0(react@19.2.0))':
     dependencies:
       '@standard-schema/utils': 0.3.0
@@ -14940,6 +15025,13 @@ snapshots:
       '@ai-sdk/provider': 2.0.0
       ai: 5.0.101(zod@4.1.13)
       workflow: 4.0.1-beta.22(@aws-sdk/client-sts@3.940.0)(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(@swc/helpers@0.5.17)(babel-plugin-react-compiler@1.0.0)(next@16.0.1(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
+      zod: 4.1.11
+
+  '@workflow/ai@4.0.1-beta.21(ai@5.0.101(zod@4.1.13))(workflow@4.0.1-beta.22(@aws-sdk/client-sts@3.940.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(@swc/helpers@0.5.17)(babel-plugin-react-compiler@1.0.0)(next@15.5.4(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3))':
+    dependencies:
+      '@ai-sdk/provider': 2.0.0
+      ai: 5.0.101(zod@4.1.13)
+      workflow: 4.0.1-beta.22(@aws-sdk/client-sts@3.940.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(@swc/helpers@0.5.17)(babel-plugin-react-compiler@1.0.0)(next@15.5.4(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
       zod: 4.1.11
 
   '@workflow/builders@4.0.1-beta.18(@aws-sdk/client-sts@3.940.0)(@opentelemetry/api@1.9.0)(@swc/helpers@0.5.17)':
@@ -19123,7 +19215,7 @@ snapshots:
 
   pdfjs-dist@5.4.296:
     optionalDependencies:
-      '@napi-rs/canvas': 0.1.80
+      '@napi-rs/canvas': 0.1.83
 
   pdfjs-dist@5.4.449:
     optionalDependencies:

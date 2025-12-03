@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { suggestion, Suggestion } from "@/db/schema";
+import { suggestion, type Suggestion } from "@/db/schema";
 import { and, desc, eq, sql } from "drizzle-orm";
 
 export const suggestionRepo = {

@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { agent, Agent } from "@/db/schema";
+import { agent, type Agent } from "@/db/schema";
 import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 
 export interface AgentFilters {

@@ -1,4 +1,4 @@
-import { SupportedModels } from "@/lib/ai/providers";
+import type { SupportedModels } from "@/lib/ai/providers";
 import { relations } from "drizzle-orm";
 import {
   boolean,

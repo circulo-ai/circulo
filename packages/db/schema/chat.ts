@@ -1,6 +1,6 @@
-import { ChatTools, CustomUIDataTypes } from "@/lib/types";
-import { UIMessagePart } from "ai";
-import { InferSelectModel, relations, sql } from "drizzle-orm";
+import type { ChatTools, CustomUIDataTypes } from "@/lib/types";
+import type { UIMessagePart } from "ai";
+import { type InferSelectModel, relations, sql } from "drizzle-orm";
 import {
   boolean,
   check,
@@ -18,7 +18,7 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
-import { Agent, agent } from "./agent";
+import { type Agent, agent } from "./agent";
 import { organization, user } from "./auth";
 
 export const chatVisibilityEnum = pgEnum("chat_visibility", [
@@ -74,7 +74,7 @@ export const chat = pgTable(
     index("chats_org_idx").on(t.organizationId),
     index("chats_creator_idx").on(t.creatorId),
     index("chats_org_created_idx").on(t.organizationId, t.createdAt),
-  ],
+  ]
 );
 
 export const chatMember = pgTable(
@@ -115,7 +115,7 @@ export const chatMember = pgTable(
     index("chat_members_user_idx").on(t.userId),
     index("chat_members_user_pinned_idx").on(t.userId, t.isPinned),
     check("chat_members_unread_check", sql`unread_count >= 0`),
-  ],
+  ]
 );
 
 export const chatInvitation = pgTable(
@@ -149,7 +149,7 @@ export const chatInvitation = pgTable(
     index("chat_invitations_chat_idx").on(t.chatId),
     index("chat_invitations_email_idx").on(t.email),
     index("chat_invitations_token_idx").on(t.token),
-  ],
+  ]
 );
 
 export const chatAgent = pgTable(
@@ -179,7 +179,7 @@ export const chatAgent = pgTable(
   (t) => [
     uniqueIndex("chat_agents_chat_agent_idx").on(t.chatId, t.agentId),
     index("chat_agents_chat_idx").on(t.chatId),
-  ],
+  ]
 );
 
 export const message = pgTable(
@@ -220,7 +220,7 @@ export const message = pgTable(
     index("messages_author_idx").on(t.authorType, t.authorId),
     index("messages_quoted_idx").on(t.quotedMessageId),
     check("messages_costs_check", sql`token_count >= 0 AND cost >= 0`),
-  ],
+  ]
 );
 
 export const vote = pgTable(
@@ -237,7 +237,7 @@ export const vote = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     isUpvoted: boolean("is_upvoted").notNull(),
   },
-  (t) => [primaryKey({ columns: [t.chatId, t.messageId, t.userId] })],
+  (t) => [primaryKey({ columns: [t.chatId, t.messageId, t.userId] })]
 );
 
 export const artifact = pgTable(
@@ -268,7 +268,7 @@ export const artifact = pgTable(
   (t) => [
     index("artifacts_chat_idx").on(t.chatId),
     index("artifacts_user_idx").on(t.userId),
-  ],
+  ]
 );
 
 export const suggestion = pgTable(
@@ -291,7 +291,7 @@ export const suggestion = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [index("suggestions_document_idx").on(t.documentId)],
+  (t) => [index("suggestions_document_idx").on(t.documentId)]
 );
 
 export const stream = pgTable(
@@ -307,7 +307,7 @@ export const stream = pgTable(
       columns: [table.chatId],
       foreignColumns: [chat.id],
     }),
-  ],
+  ]
 );
 
 export const chatRelations = relations(chat, ({ one, many }) => ({

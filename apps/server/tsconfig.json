@@ -13,8 +13,12 @@
     "allowJs": true,
     "checkJs": true,
     "lib": [
-      "ESNext"
+      "ESNext",
+      "DOM"
     ],
+    "plugins": [{
+      "name": "workflow"
+    }],
     "paths": {
       "@/*": ["./src/*"],
       "@/db": ["../../packages/db"],

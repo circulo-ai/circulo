@@ -1,4 +1,5 @@
 import { getSubscriptionForOrg, orgHasPlan } from "@/lib/billing/autumn";
+import { getSession, type SessionResponse } from "@/lib/auth";
 import { type Action, type Resource, hasPermission } from "@/lib/permissions";
 
 /**
@@ -10,14 +11,16 @@ export async function canAccessFeature(params: {
   action: Action<Resource>;
   requiredPlans?: string[]; // e.g., ["pro", "team", "enterprise"]
   organizationId?: string;
+  session?: SessionResponse;
 }): Promise<{ allowed: boolean; reason?: string }> {
-  const { resource, action, requiredPlans, organizationId } = params;
+  const { resource, action, requiredPlans, organizationId, session } = params;
 
   // Check permission first (cheaper query)
   const hasPermissionCheck = await hasPermission(
     resource,
     action,
-    organizationId
+    organizationId,
+    session
   );
 
   if (!hasPermissionCheck) {
@@ -30,9 +33,9 @@ export async function canAccessFeature(params: {
   }
 
   // Check subscription
-  const session = await import("@/lib/auth").then((m) => m.getSession());
+  const sessionData = session ?? (await getSession());
   const orgId =
-    organizationId || (session?.session as any)?.activeOrganizationId;
+    organizationId || (sessionData?.session as any)?.activeOrganizationId;
 
   if (!orgId) {
     return { allowed: false, reason: "no_organization" };
@@ -54,6 +57,7 @@ export async function requireFeatureAccess(params: {
   action: Action<Resource>;
   requiredPlans?: string[];
   organizationId?: string;
+  session?: SessionResponse;
 }): Promise<void> {
   const result = await canAccessFeature(params);
 
@@ -124,16 +128,19 @@ export async function canUserCreateTeamOrg(userId: string): Promise<boolean> {
 /**
  * Get usage limits for current organization
  */
-export async function getOrgLimits(organizationId?: string): Promise<{
+export async function getOrgLimits(
+  organizationId?: string,
+  session?: SessionResponse,
+): Promise<{
   maxAgents: number | "unlimited";
   apiCalls: number | "unlimited";
   currentApiCalls: number;
   canCreateTeamOrg: boolean;
   hasPrioritySupport: boolean;
 }> {
-  const session = await import("@/lib/auth").then((m) => m.getSession());
+  const sessionData = session ?? (await getSession());
   const orgId =
-    organizationId || (session?.session as any)?.activeOrganizationId;
+    organizationId || (sessionData?.session as any)?.activeOrganizationId;
 
   if (!orgId) {
     throw new Error("No organization context");

@@ -149,7 +149,7 @@ export const chatAgentRepo = {
     agentId: string,
     data: {
       customInstructions?: string | null;
-      customTemperature?: string | null;
+      customTemperature?: number | null;
     },
   ) {
     const [row] = await db

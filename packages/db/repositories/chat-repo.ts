@@ -1,10 +1,10 @@
 import { db } from "@/db";
 import {
-  Agent,
+  type Agent,
   chat,
   chatAgent,
   chatMember,
-  ChatVisibility,
+  type ChatVisibility,
   message,
   stream,
   vote,
@@ -230,8 +230,8 @@ export const chatRepo = {
       conditions.push(
         or(
           ilike(chat.title, `%${filters.search}%`),
-          ilike(chat.description, `%${filters.search}%`),
-        )!,
+          ilike(chat.description, `%${filters.search}%`)
+        )!
       );
     }
 
@@ -262,7 +262,7 @@ export const chatRepo = {
       const searchCondition = search
         ? or(
             ilike(chat.title, `%${search}%`),
-            ilike(chat.description, `%${search}%`),
+            ilike(chat.description, `%${search}%`)
           )
         : undefined;
 
@@ -272,8 +272,8 @@ export const chatRepo = {
             ? and(eq(chat.creatorId, id), whereCondition, searchCondition)
             : and(eq(chat.creatorId, id), searchCondition)
           : whereCondition
-            ? and(whereCondition, eq(chat.creatorId, id))
-            : eq(chat.creatorId, id);
+          ? and(whereCondition, eq(chat.creatorId, id))
+          : eq(chat.creatorId, id);
 
         return db
           .select()
@@ -343,7 +343,7 @@ export const chatRepo = {
       const searchCondition = search
         ? or(
             ilike(chat.title, `%${search}%`),
-            ilike(chat.description, `%${search}%`),
+            ilike(chat.description, `%${search}%`)
           )
         : undefined;
 
@@ -353,8 +353,8 @@ export const chatRepo = {
             ? and(eq(chat.organizationId, id), whereCondition, searchCondition)
             : and(eq(chat.organizationId, id), searchCondition)
           : whereCondition
-            ? and(whereCondition, eq(chat.organizationId, id))
-            : eq(chat.organizationId, id);
+          ? and(whereCondition, eq(chat.organizationId, id))
+          : eq(chat.organizationId, id);
 
         return db
           .select()
@@ -426,7 +426,7 @@ export const chatRepo = {
           .where(
             whereCondition
               ? and(whereCondition, eq(chat.creatorId, id))
-              : eq(chat.creatorId, id),
+              : eq(chat.creatorId, id)
           )
           .orderBy(desc(chat.createdAt))
           .limit(extendedLimit);
@@ -488,7 +488,7 @@ export const chatRepo = {
         })
         .from(chatMember)
         .where(
-          and(inArray(chatMember.chatId, chatIds), eq(chatMember.userId, id)),
+          and(inArray(chatMember.chatId, chatIds), eq(chatMember.userId, id))
         );
       const unreadByChat = new Map<string, number>();
       for (const row of memberRows) {
@@ -534,7 +534,7 @@ export const chatRepo = {
 
   async findByOrganization(
     organizationId: string,
-    opts?: { limit?: number; includeDeleted?: boolean },
+    opts?: { limit?: number; includeDeleted?: boolean }
   ) {
     const conditions = [eq(chat.organizationId, organizationId)];
     if (!opts?.includeDeleted) {
@@ -550,7 +550,7 @@ export const chatRepo = {
 
   async findByCreator(
     userId: string,
-    opts?: { limit?: number; includeDeleted?: boolean },
+    opts?: { limit?: number; includeDeleted?: boolean }
   ) {
     const conditions = [eq(chat.creatorId, userId)];
     if (!opts?.includeDeleted) {
@@ -569,7 +569,7 @@ export const chatRepo = {
       where: and(
         eq(chat.organizationId, organizationId),
         eq(chat.visibility, "public"),
-        eq(chat.isDeleted, false),
+        eq(chat.isDeleted, false)
       ),
       orderBy: desc(chat.createdAt),
       limit: opts?.limit ?? 50,
@@ -613,7 +613,7 @@ export const chatRepo = {
       .select({ count: sql<number>`count(*)` })
       .from(chatMember)
       .where(
-        and(eq(chatMember.chatId, chatId), sql`${chatMember.leftAt} IS NULL`),
+        and(eq(chatMember.chatId, chatId), sql`${chatMember.leftAt} IS NULL`)
       );
     return result[0]?.count ?? 0;
   },
@@ -623,7 +623,7 @@ export const chatRepo = {
       where: and(
         eq(chatMember.chatId, chatId),
         eq(chatMember.userId, userId),
-        sql`${chatMember.leftAt} IS NULL`,
+        sql`${chatMember.leftAt} IS NULL`
       ),
     });
     return !!member;
@@ -634,7 +634,7 @@ export const chatRepo = {
       where: and(
         eq(chatMember.chatId, chatId),
         eq(chatMember.userId, userId),
-        sql`${chatMember.leftAt} IS NULL`,
+        sql`${chatMember.leftAt} IS NULL`
       ),
     });
     return member?.role ?? null;
@@ -644,7 +644,7 @@ export const chatRepo = {
 
   async findAgentsForChat(
     chatId: string,
-    opts?: { includeDisabled?: boolean; search?: string },
+    opts?: { includeDisabled?: boolean; search?: string }
   ) {
     const conditions = [eq(chatAgent.chatId, chatId)];
     if (!opts?.includeDisabled) {
@@ -663,7 +663,7 @@ export const chatRepo = {
       agents = agents.filter(
         (a) =>
           a.name.toLowerCase().includes(searchLower) ||
-          a.description?.toLowerCase().includes(searchLower),
+          a.description?.toLowerCase().includes(searchLower)
       );
     }
 
@@ -672,13 +672,13 @@ export const chatRepo = {
 
   async findAgentInChat(
     chatId: string,
-    agentId: string,
+    agentId: string
   ): Promise<Agent | undefined> {
     const row = await db.query.chatAgent.findFirst({
       where: and(
         eq(chatAgent.chatId, chatId),
         eq(chatAgent.agentId, agentId),
-        eq(chatAgent.isEnabled, true),
+        eq(chatAgent.isEnabled, true)
       ),
       with: { agent: true },
     });
@@ -689,7 +689,7 @@ export const chatRepo = {
       ...row.agent,
       instructions: row.customInstructions ?? row.agent.instructions,
       temperature: row.customTemperature
-        ? parseInt(row.customTemperature, 10)
+        ? row.customTemperature
         : row.agent.temperature,
     } as Agent;
   },
@@ -713,14 +713,14 @@ export const chatRepo = {
       isEnabled?: boolean;
       customInstructions?: string | null;
       customTemperature?: number | null;
-    },
+    }
   ) {
     const [row] = await db
       .update(chatAgent)
       .set({
         isEnabled: update.isEnabled,
         customInstructions: update.customInstructions ?? undefined,
-        customTemperature: update.customTemperature?.toString() ?? null,
+        customTemperature: update.customTemperature,
       })
       .where(and(eq(chatAgent.chatId, chatId), eq(chatAgent.agentId, agentId)))
       .returning();
@@ -750,7 +750,7 @@ export const chatRepo = {
       .select({ count: sql<number>`count(*)` })
       .from(chat)
       .where(
-        and(eq(chat.organizationId, organizationId), eq(chat.isDeleted, false)),
+        and(eq(chat.organizationId, organizationId), eq(chat.isDeleted, false))
       );
     return result[0]?.count ?? 0;
   },

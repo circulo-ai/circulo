@@ -1,6 +1,6 @@
 "use client";
 
-import { createBodySchema } from "@/app/api/agent/schema";
+import { createBodySchema } from "@/lib/schemas/agent";
 import { DataStreamHandler } from "@/components/data-stream-handler";
 import { PageSpinner } from "@/components/page-spinner";
 import {

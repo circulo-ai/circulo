@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import * as schema from "@/db/schema";
-import { getSession, statement } from "@/lib/auth";
+import { getSession, statement, type SessionResponse } from "@/lib/auth";
 import { and, eq } from "drizzle-orm";
 
 export type Resource = keyof typeof statement;
@@ -82,15 +82,17 @@ export async function hasPermission<R extends Resource>(
   resource: R,
   action: Action<R>,
   organizationId?: string,
+  session?: SessionResponse,
 ): Promise<boolean> {
-  const session = await getSession();
+  const sessionData = session ?? (await getSession());
 
-  if (!session?.user) return false;
+  if (!sessionData?.user) return false;
 
-  const orgId = organizationId || (session.session as any).activeOrganizationId;
+  const orgId =
+    organizationId || (sessionData.session as any).activeOrganizationId;
   if (!orgId) return false;
 
-  const role = await getUserRole(session.user.id, orgId);
+  const role = await getUserRole(sessionData.user.id, orgId);
   if (!role) return false;
 
   // Get permissions for the role and resource
@@ -108,15 +110,21 @@ export async function requirePermission<R extends Resource>(
   resource: R,
   action: Action<R>,
   organizationId?: string,
+  session?: SessionResponse,
 ): Promise<void> {
-  const allowed = await hasPermission(resource, action, organizationId);
+  const allowed = await hasPermission(
+    resource,
+    action,
+    organizationId,
+    session,
+  );
 
   if (!allowed) {
-    const session = await getSession();
+    const sessionData = session ?? (await getSession());
     const orgId =
-      organizationId || (session?.session as any)?.activeOrganizationId;
-    const role = session?.user
-      ? await getUserRole(session.user.id, orgId)
+      organizationId || (sessionData?.session as any)?.activeOrganizationId;
+    const role = sessionData?.user
+      ? await getUserRole(sessionData.user.id, orgId)
       : null;
 
     throw new Error(
@@ -139,14 +147,18 @@ export async function isMemberOf(
 /**
  * Check if current user is owner of the active organization
  */
-export async function isOwner(organizationId?: string): Promise<boolean> {
-  const session = await getSession();
-  if (!session?.user) return false;
+export async function isOwner(
+  organizationId?: string,
+  session?: SessionResponse,
+): Promise<boolean> {
+  const sessionData = session ?? (await getSession());
+  if (!sessionData?.user) return false;
 
-  const orgId = organizationId || (session.session as any).activeOrganizationId;
+  const orgId =
+    organizationId || (sessionData.session as any).activeOrganizationId;
   if (!orgId) return false;
 
-  const role = await getUserRole(session.user.id, orgId);
+  const role = await getUserRole(sessionData.user.id, orgId);
   return role === "owner";
 }
 
@@ -155,14 +167,16 @@ export async function isOwner(organizationId?: string): Promise<boolean> {
  */
 export async function isAdminOrOwner(
   organizationId?: string,
+  session?: SessionResponse,
 ): Promise<boolean> {
-  const session = await getSession();
-  if (!session?.user) return false;
+  const sessionData = session ?? (await getSession());
+  if (!sessionData?.user) return false;
 
-  const orgId = organizationId || (session.session as any).activeOrganizationId;
+  const orgId =
+    organizationId || (sessionData.session as any).activeOrganizationId;
   if (!orgId) return false;
 
-  const role = await getUserRole(session.user.id, orgId);
+  const role = await getUserRole(sessionData.user.id, orgId);
   return role === "owner" || role === "admin";
 }
 
@@ -202,6 +216,7 @@ export async function getOrganizationsByRole(
 export async function hasPermissions(
   checks: Array<{ resource: Resource; action: string }>,
   organizationId?: string,
+  session?: SessionResponse,
 ): Promise<Record<string, boolean>> {
   const results: Record<string, boolean> = {};
 
@@ -211,6 +226,7 @@ export async function hasPermissions(
       check.resource,
       check.action as any, // Safe here since we're checking dynamically
       organizationId,
+      session,
     );
   }
 
@@ -222,14 +238,16 @@ export async function hasPermissions(
  */
 export async function getUserPermissions(
   organizationId?: string,
+  session?: SessionResponse,
 ): Promise<Record<string, string[]>> {
-  const session = await getSession();
-  if (!session?.user) return {};
+  const sessionData = session ?? (await getSession());
+  if (!sessionData?.user) return {};
 
-  const orgId = organizationId || (session.session as any).activeOrganizationId;
+  const orgId =
+    organizationId || (sessionData.session as any).activeOrganizationId;
   if (!orgId) return {};
 
-  const role = await getUserRole(session.user.id, orgId);
+  const role = await getUserRole(sessionData.user.id, orgId);
   if (!role) return {};
 
   return rolePermissions[role] as Record<string, string[]>;

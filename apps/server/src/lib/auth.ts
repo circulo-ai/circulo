@@ -1304,6 +1304,16 @@ export const auth = betterAuth({
       },
     }),
   ],
+  advanced: {
+    defaultCookieAttributes: {
+      sameSite: "none",
+      secure: true,
+      partitioned: true // New browser standards will mandate this for foreign cookies
+    },
+    crossSubDomainCookies: {
+      enabled: true
+    }
+  }
 });
 
 export type AuthType = {
@@ -1311,5 +1321,34 @@ export type AuthType = {
   session: typeof auth.$Infer.Session.session | null;
 };
 
-type SessionResponse = Awaited<ReturnType<typeof auth.api.getSession>>;
+export type SessionResponse = Awaited<ReturnType<typeof auth.api.getSession>>;
 export type Session = NonNullable<SessionResponse>;
+
+// Helpers to read session/organization in the non-Next runtime
+export async function getSession(
+  headersOrRequest?: HeadersInit | Request,
+): Promise<SessionResponse> {
+  const headers =
+    headersOrRequest instanceof Request
+      ? headersOrRequest.headers
+      : headersOrRequest;
+
+  return auth.api.getSession({
+    headers: headers ? new Headers(headers) : undefined,
+  });
+}
+
+export async function getActiveOrganizationId(
+  sessionOrHeaders?: SessionResponse | HeadersInit | Request,
+): Promise<string> {
+  const session =
+    sessionOrHeaders && "session" in (sessionOrHeaders as any)
+      ? (sessionOrHeaders as SessionResponse)
+      : await getSession(sessionOrHeaders as any);
+
+  const activeOrgId = (session?.session as any)?.activeOrganizationId;
+  if (!activeOrgId) {
+    throw new Error("No organization id provided");
+  }
+  return activeOrgId;
+}

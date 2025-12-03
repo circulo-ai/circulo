@@ -1,4 +1,4 @@
-import { GetChatHistoryResponse } from "@/app/api/history/route";
+import type { GetChatHistoryResponse } from "@/types/history";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useChatHistoryStore } from "@/stores/use-chat-history-store";
 import { useParams } from "next/navigation";

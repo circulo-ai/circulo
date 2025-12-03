@@ -1,4 +1,4 @@
-import { GetChatHistoryResponse } from "@/app/api/history/route";
+import type { GetChatHistoryResponse } from "@/types/history";
 import { EnhancedLink } from "@/components/enhanced-link";
 import { WithRipple } from "@/components/ui-custom/ripple";
 import {

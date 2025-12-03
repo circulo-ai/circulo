@@ -1,6 +1,6 @@
 "use client";
 
-import { GetChatHistoryResponse } from "@/app/api/history/route";
+import type { GetChatHistoryResponse } from "@/types/history";
 import { LoaderIcon } from "@/components/icons/icons";
 import {
   AlertDialog,

@@ -3,6 +3,11 @@ import { isDev } from "@/lib/environment";
 import type { NextConfig } from "next";
 import { withWorkflow } from "workflow/next";
 
+const apiBaseUrl =
+  process.env.SERVER_API_URL ??
+  process.env.API_BASE_URL ??
+  "http://localhost:3002";
+
 const nextConfig: NextConfig = {
   devIndicators: false,
   images: {
@@ -131,6 +136,18 @@ const nextConfig: NextConfig = {
             value: "noindex",
           },
         ],
+      },
+    ];
+  },
+  async rewrites() {
+    const normalizedApiBaseUrl = apiBaseUrl.endsWith("/")
+      ? apiBaseUrl.slice(0, -1)
+      : apiBaseUrl;
+
+    return [
+      {
+        source: "/api/:path*",
+        destination: `${normalizedApiBaseUrl}/api/:path*`,
       },
     ];
   },

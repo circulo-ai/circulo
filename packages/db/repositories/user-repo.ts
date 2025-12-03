@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { user, User } from "@/db/schema";
+import { user, type User } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 export const userRepo = {
@@ -30,7 +30,7 @@ export const userRepo = {
 
   async update(
     id: string,
-    data: Partial<typeof user.$inferInsert>,
+    data: Partial<typeof user.$inferInsert>
   ): Promise<User | undefined> {
     const [row] = await db
       .update(user)

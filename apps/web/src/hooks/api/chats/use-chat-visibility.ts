@@ -1,7 +1,7 @@
 "use client";
 
 import { updateChatVisibility } from "@/app/(chat)/actions";
-import { GetChatHistoryResponse } from "@/app/api/history/route";
+import type { GetChatHistoryResponse } from "@/types/history";
 import { getChatHistoryPaginationKey } from "@/components/sidebar/sidebar-history";
 import type { VisibilityType } from "@/components/visibility-selector";
 import { useMemo } from "react";
