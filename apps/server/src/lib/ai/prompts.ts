@@ -1,4 +1,4 @@
-type ArtifactKind = "text" | "code" | "image" | "sheet";
+import type { ArtifactKind } from "@/db/schema";
 
 type GeoLike = {
   latitude: number;

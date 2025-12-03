@@ -99,13 +99,18 @@ router.get("/auth/oauth/microsoft/files", requireAuth, async (c) => {
           errorData.error?.message ||
           "Failed to fetch Excel files from Microsoft OneDrive",
       });
-      return c.json(
-        {
+      return new Response(
+        JSON.stringify({
           error:
             errorData.error?.message ||
             "Failed to fetch Excel files from Microsoft OneDrive",
+        }),
+        {
+          status: response.status,
+          headers: {
+            "content-type": "application/json",
+          },
         },
-        response.status,
       );
     }
 

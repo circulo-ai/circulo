@@ -22,7 +22,7 @@ export const authClient = createAuthClient({
   plugins: [
     oneTimeTokenClient(),
     nextCookies(),
-    customSessionClient<typeof auth>(),
+    customSessionClient<any>(),
     apiKeyClient(),
     magicLinkClient(),
     organizationClient(),

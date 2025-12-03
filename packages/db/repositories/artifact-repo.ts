@@ -1,8 +1,6 @@
 import { db } from "@/db";
-import { artifact, suggestion } from "@/db/schema";
+import { artifact, suggestion, type ArtifactKind } from "@/db/schema";
 import { and, desc, eq, gt, ilike, or, sql } from "drizzle-orm";
-
-type ArtifactKind = "text" | "code" | "image" | "sheet";
 
 export interface ArtifactFilters {
   chatId?: string;

@@ -45,6 +45,19 @@ router.post("/files/upload", requireAuth, async (c) => {
 
     const formData = await c.req.raw.formData();
     const files = formData.getAll("file") as File[];
+    const contextInput = formData.get("context");
+    const context =
+      typeof contextInput === "string" &&
+      ["general", "knowledge-base", "organization", "chat", "profile-pictures"].includes(
+        contextInput,
+      )
+        ? (contextInput as
+            | "general"
+            | "knowledge-base"
+            | "organization"
+            | "chat"
+            | "profile-pictures")
+        : "general";
 
     if (!files || files.length === 0) {
       throw new InvalidRequestError("No files provided");
@@ -74,13 +87,13 @@ router.post("/files/upload", requireAuth, async (c) => {
       const buffer = Buffer.from(bytes);
 
       try {
-        logger.info(`Uploading file (general context): ${originalName}`);
+        logger.info(`Uploading file (${context} context): ${originalName}`);
 
         const fileInfo = await uploadFile({
           file: buffer,
           fileName: originalName,
           contentType: file.type,
-          context: "general",
+          context,
         });
 
         let downloadUrl: string | undefined;
@@ -88,7 +101,7 @@ router.post("/files/upload", requireAuth, async (c) => {
           try {
             downloadUrl = await generatePresignedDownloadUrl(
               fileInfo.key,
-              "general",
+              context,
               24 * 60 * 60,
             );
           } catch (error) {
@@ -108,7 +121,7 @@ router.post("/files/upload", requireAuth, async (c) => {
           url: downloadUrl || fileInfo.path,
           uploadedAt: new Date().toISOString(),
           expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-          context: "general",
+          context,
         };
 
         logger.info(`Successfully uploaded: ${fileInfo.key}`);

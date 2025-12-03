@@ -5,7 +5,7 @@ import {
 import type { ChatMessage } from "@/lib/types";
 import { generateUUID } from "@/lib/utils";
 import { tool, type UIMessageStreamWriter } from "ai";
-import { Session } from "better-auth";
+import type { Session } from "better-auth";
 import { z } from "zod";
 
 type CreateDocumentProps = {

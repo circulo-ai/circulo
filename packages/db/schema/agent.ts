@@ -1,4 +1,3 @@
-import type { SupportedModels } from "@/lib/ai/providers";
 import { relations } from "drizzle-orm";
 import {
   boolean,
@@ -36,7 +35,7 @@ export const agent = pgTable(
     // Model configuration
     model: text("model")
       .notNull()
-      .$type<SupportedModels>()
+      .$type<string>()
       .default("gemini-2.5-flash"),
     maxTokens: integer("max_tokens").default(1000),
     temperature: integer("temperature").default(70), // 0-100 scale

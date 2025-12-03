@@ -400,6 +400,8 @@ export const voteRelations = relations(vote, ({ one }) => ({
   }),
 }));
 
+export type ArtifactKind = typeof artifact.$inferSelect["kind"];
+
 export const documentRelations = relations(artifact, ({ one, many }) => ({
   chat: one(chat, {
     fields: [artifact.chatId],

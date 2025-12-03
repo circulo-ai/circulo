@@ -8,6 +8,7 @@ import chatPin from "@/routes/chat-pin";
 import chatAgents from "@/routes/chat-agents";
 import chatStream from "@/routes/chat-stream";
 import chat from "@/routes/chat";
+import chatVisibility from "@/routes/chat-visibility";
 import fileDelete from "@/routes/files/delete";
 import fileDownload from "@/routes/files/download";
 import filePresigned from "@/routes/files/presigned";
@@ -17,6 +18,7 @@ import fileMultipart from "@/routes/files/multipart";
 import fileParse from "@/routes/files/parse";
 import fileServe from "@/routes/files/serve";
 import history from "@/routes/history";
+import messages from "@/routes/messages";
 import suggestions from "@/routes/suggestions";
 import oauthConnections from "@/routes/oauth/connections";
 import oauthDisconnect from "@/routes/oauth/disconnect";
@@ -47,6 +49,7 @@ const routes = [
   chatPin,
   chatStream,
   chat,
+  chatVisibility,
   fileDelete,
   fileDownload,
   filePresigned,
@@ -55,6 +58,7 @@ const routes = [
   fileMultipart,
   fileParse,
   fileServe,
+  messages,
   oauthConnections,
   oauthDisconnect,
   oauthCredentials,

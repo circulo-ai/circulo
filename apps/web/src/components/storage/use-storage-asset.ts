@@ -1,4 +1,3 @@
-import { getServePathPrefix } from "@/lib/uploads/core/storage-client";
 import { useCallback, useMemo, useState } from "react";
 
 export interface UseStorageAssetOptions {
@@ -30,7 +29,7 @@ function buildServeUrl(
   baseUrl?: string,
 ): string | undefined {
   if (!key) return undefined;
-  const prefix = getServePathPrefix().replace(/\/+$/, "/");
+  const prefix = "/api/files/serve/".replace(/\/+$/, "/");
   const url = `${prefix}${encodeURIComponent(key)}${context ? `?context=${encodeURIComponent(context)}` : ""}`;
   if (!baseUrl) return url;
   const trimmed = baseUrl.replace(/\/$/, "");

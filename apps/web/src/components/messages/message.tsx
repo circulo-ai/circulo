@@ -177,15 +177,19 @@ const PurePreviewMessage = ({
             }
 
             if (type == "data-workflowClassification") {
-              const { data: classification } = part;
+              const classification = (part as any).data as {
+                complexity?: unknown;
+              };
               return (
-                <span>Workflow classified {classification.complexity}</span>
+                <span>
+                  Workflow classified {String(classification?.complexity ?? "")}
+                </span>
               );
             }
 
             if (type == "data-workflowPlan") {
-              const { data: plan } = part;
-              return <span>Workflow plan {plan.strategy}</span>;
+              const plan = (part as any).data as { strategy?: unknown };
+              return <span>Workflow plan {String(plan?.strategy ?? "")}</span>;
             }
 
             if (type === "tool-createDocument") {

@@ -1,12 +1,13 @@
 import type { ArtifactKind } from "@/components/artifacts/artifact";
 import type { Suggestion } from "@/db/schema";
-import { AggregatedResult } from "@/workflows/orchestrate/steps/aggregate-results-step";
-import { RequestClassification } from "@/workflows/orchestrate/steps/classify-request-step";
-import { AgentExecutionResult } from "@/workflows/orchestrate/steps/execute-agent-task-step";
-import { ExecutionPlan } from "@/workflows/orchestrate/steps/plan-agent-execution-step";
 import type { UIMessage, UIMessageChunk } from "ai";
 import { z } from "zod";
 import type { AppUsage } from "./usage";
+
+type RequestClassification = Record<string, unknown>;
+type ExecutionPlan = Record<string, unknown>;
+type AgentExecutionResult = Record<string, unknown>;
+type AggregatedResult = Record<string, unknown>;
 
 export type DataPart = { type: "append-message"; message: string };
 

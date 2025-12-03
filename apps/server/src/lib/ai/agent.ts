@@ -1,4 +1,4 @@
-import { Agent, ChatAgentWithAgent } from "@/db";
+import type { Agent, ChatAgentWithAgent } from "@/db";
 import { myProvider } from "@/lib/ai/providers";
 import { streamText } from "ai";
 

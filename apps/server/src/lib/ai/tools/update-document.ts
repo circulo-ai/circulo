@@ -2,7 +2,7 @@ import { artifactRepo } from "@/db/repositories";
 import { documentHandlersByArtifactKind } from "@/lib/artifacts/server";
 import type { ChatMessage } from "@/lib/types";
 import { tool, type UIMessageStreamWriter } from "ai";
-import { Session } from "better-auth";
+import type { Session } from "better-auth";
 import { z } from "zod";
 
 type UpdateDocumentProps = {

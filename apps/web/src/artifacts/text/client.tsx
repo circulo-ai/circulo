@@ -12,7 +12,6 @@ import {
 } from "@/components/icons/icons";
 import type { Suggestion } from "@/db/schema";
 import { toast } from "sonner";
-import { getSuggestions } from "../actions";
 
 type TextArtifactMetadata = {
   suggestions: Suggestion[];
@@ -22,7 +21,19 @@ export const textArtifact = new Artifact<"text", TextArtifactMetadata>({
   kind: "text",
   description: "Useful for text content, like drafting essays and emails.",
   initialize: async ({ documentId, setMetadata }) => {
-    const suggestions = await getSuggestions({ documentId });
+    let suggestions: Suggestion[] = [];
+
+    try {
+      const res = await fetch(
+        `/api/suggestions?documentId=${encodeURIComponent(documentId)}`,
+      );
+      if (res.ok) {
+        const data = await res.json();
+        suggestions = data?.suggestions ?? [];
+      }
+    } catch (error) {
+      console.error("Failed to fetch suggestions", error);
+    }
 
     setMetadata({
       suggestions,

@@ -1,5 +1,6 @@
-import { LLM_MODELS } from "@/lib/ai/providers";
 import { z } from "zod";
+
+const LLM_MODELS = ["gemini-2.5-flash"] as const;
 
 export const getQuerySchema = z.object({
   id: z.uuid().optional(),

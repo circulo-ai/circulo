@@ -1,4 +1,4 @@
-import type { Suggestion } from "@/db/schema";
+import type { ArtifactKind, Suggestion } from "@/db/schema";
 import { type AggregatedResult } from "@/workflows/orchestrate/steps/aggregate-results-step";
 import { type RequestClassification } from "@/workflows/orchestrate/steps/classify-request-step";
 import { type AgentExecutionResult } from "@/workflows/orchestrate/steps/execute-agent-task-step";
