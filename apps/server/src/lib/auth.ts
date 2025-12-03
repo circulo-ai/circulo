@@ -27,7 +27,6 @@ import {
 import { and, eq, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { env } from "./env";
-import { getBaseUrl } from "./urls/utils";
 
 const logger = createLogger("Auth");
 
@@ -102,7 +101,7 @@ const createPersonalOrganization = async (user: User) => {
 
 export const auth = betterAuth({
   appName: "circulo",
-  baseURL: getBaseUrl(),
+  baseURL: env.BETTER_AUTH_URL ?? "http://localhost:3002",
   databaseHooks: {
     user: {
       create: {
@@ -160,7 +159,10 @@ export const auth = betterAuth({
       },
     },
   },
-  trustedOrigins: [env.NEXT_PUBLIC_APP_URL as string].filter(Boolean),
+  trustedOrigins: [
+    env.NEXT_PUBLIC_APP_URL as string,
+    env.BETTER_AUTH_URL as string,
+  ].filter(Boolean),
   database: drizzleAdapter(db, {
     provider: "pg",
     schema,

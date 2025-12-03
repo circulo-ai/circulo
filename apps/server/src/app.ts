@@ -41,10 +41,40 @@ import { getBaseUrl } from "@/lib/urls/utils";
 
 const app = createApp();
 
+// Middlewares (register before routes)
+app.use("*", logger());
+app.use("*", requestId());
+app.use("*", prettyJSON());
+const allowedOrigins = [
+  getBaseUrl(),
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+];
+const corsMiddleware = cors({
+  origin: (origin) => {
+    if (!origin) return getBaseUrl();
+    if (allowedOrigins.includes(origin)) return origin;
+    try {
+      const originHost = new URL(origin).host;
+      const appHost = new URL(getBaseUrl()).host;
+      if (originHost === appHost) return origin;
+    } catch {
+      // fall through
+    }
+    return getBaseUrl();
+  },
+  allowHeaders: ["Content-Type", "Authorization"],
+  allowMethods: ["POST", "GET", "OPTIONS"],
+  exposeHeaders: ["Content-Length"],
+  maxAge: 600,
+  credentials: true,
+});
+app.use("*", corsMiddleware); // apply globally so preflight never 404s
+
 const routes = [
+  autumn,
   auth,
   authSocketToken,
-  autumn,
   artifact,
   agent,
   chatAgents,
@@ -81,22 +111,6 @@ routes.forEach((route) => {
 });
 
 export type AppType = (typeof routes)[number];
-
-// Middlewares
-app.use("*", logger());
-app.use("*", requestId());
-app.use(prettyJSON());
-app.use(
-  "/api/auth/*", // or replace with "*" to enable cors for all routes
-  cors({
-    origin: getBaseUrl(), // replace with your origin
-    allowHeaders: ["Content-Type", "Authorization"],
-    allowMethods: ["POST", "GET", "OPTIONS"],
-    exposeHeaders: ["Content-Length"],
-    maxAge: 600,
-    credentials: true,
-  }),
-);
 
 // Inngest handler (dev/prod)
 app.use("/api/inngest/*", inngestRouter);

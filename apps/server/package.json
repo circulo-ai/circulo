@@ -27,6 +27,7 @@
     "@react-email/render": "^2.0.0",
     "@workflow/ai": "4.0.1-beta.21",
     "ai": "5.0.101",
+    "atmn": "^0.0.28",
     "autumn-js": "^0.1.48",
     "better-auth": "^1.4.4",
     "binary-extensions": "^3.1.0",

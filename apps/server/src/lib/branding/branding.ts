@@ -28,7 +28,7 @@ const defaultConfig: BrandConfig = {
   logoUrl: undefined,
   faviconUrl: "/favicon/favicon.ico",
   customCssUrl: undefined,
-  supportEmail: "help@circulo.ir",
+  supportEmail: "help@circulo-ai.com",
   documentationUrl: undefined,
   termsUrl: undefined,
   privacyUrl: undefined,

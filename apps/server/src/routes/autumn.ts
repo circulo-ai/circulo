@@ -7,18 +7,24 @@ const router = createRouter();
 const autumnMiddleware = autumnHandler({
   identify: async (ctx) => {
     const session = await getSession(ctx.req.raw);
+    const customerId = session
+      ? await getActiveOrganizationId(ctx.req.raw).catch(() => undefined)
+      : undefined;
 
     return {
-      customerId: await getActiveOrganizationId(ctx.req.raw),
-      customerData: {
-        userId: session?.user?.id,
-        name: session?.user?.name,
-        email: session?.user?.email,
-      },
+      customerId,
+      customerData: session
+        ? {
+            userId: session?.user?.id,
+            name: session?.user?.name,
+            email: session?.user?.email,
+          }
+        : undefined,
     };
   },
 });
 
-router.use("/autumn/*", autumnMiddleware);
+// Single mount: the frontend points to /auth/autumn
+router.use("/auth/autumn/*", autumnMiddleware);
 
 export default router;

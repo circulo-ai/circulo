@@ -23,7 +23,7 @@ interface ResetPasswordEmailProps {
   updatedDate?: Date;
 }
 
-const baseUrl = getEnv("NEXT_PUBLIC_APP_URL") || "https://circulo.ir";
+const baseUrl = getEnv("NEXT_PUBLIC_APP_URL") || "https://circulo-ai.com";
 
 export const ResetPasswordEmail = ({
   username = "",

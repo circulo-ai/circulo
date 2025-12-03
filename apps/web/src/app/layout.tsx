@@ -5,10 +5,10 @@ import { SWRProvider } from "@/providers/swr-provider";
 import { ThemeProvider } from "@/providers/theme-provider";
 import { AutumnProvider } from "autumn-js/react";
 import type { Metadata } from "next";
+import { env } from "process";
 import { ReactNode } from "react";
 import { Toaster } from "sonner";
 import "./globals.css";
-import { env } from "process";
 
 export const viewport = {
   maximumScale: 1, // Disable auto-zoom on mobile Safari
@@ -30,9 +30,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     >
       <body className={cn("font-sans", "antialiased")}>
         <ThemeProvider>
-          <AutumnProvider
-            betterAuthUrl={env.NEXT_PUBLIC_BETTER_AUTH_URL}
-          >
+          <AutumnProvider betterAuthUrl={env.NEXT_PUBLIC_BETTER_AUTH_URL}>
             <SWRProvider>
               <PointerProvider>
                 <AuthClientProvider>{children}</AuthClientProvider>

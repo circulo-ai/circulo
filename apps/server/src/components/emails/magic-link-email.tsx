@@ -22,7 +22,7 @@ interface MagicLinkEmailProps {
   type?: "sign-in" | "email-verification";
 }
 
-const baseUrl = getEnv("NEXT_PUBLIC_APP_URL") || "https://circulo.ir";
+const baseUrl = getEnv("NEXT_PUBLIC_APP_URL") || "https://circulo-ai.com";
 
 const getSubjectByType = (type: string, brandName: string) => {
   switch (type) {
