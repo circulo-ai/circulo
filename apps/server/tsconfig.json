@@ -1,16 +1,6 @@
 {
   "compilerOptions": {
-    "module": "esnext",
-    "target": "esnext",
-    "moduleResolution": "bundler",
     "verbatimModuleSyntax": true,
-    "types": [
-      "node"
-    ],
-    "lib": [
-      "ESNext",
-      "DOM"
-    ],
     "paths": {
       "@/*": ["./src/*"],
       "@/db": ["../../packages/db"],
@@ -19,16 +9,28 @@
     "jsx": "react-jsx",
     "jsxImportSource": "react",
     "baseUrl": ".",
-    "outDir": "./dist",
-    "esModuleInterop": true,
-    "skipLibCheck": true,
     "allowJs": true,
     "checkJs": true,
-    "resolveJsonModule": true,
     "moduleDetection": "force",
-    "forceConsistentCasingInFileNames": true,
-    "strict": false,
     "noUncheckedIndexedAccess": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "outDir": "./dist",
+    "rootDir": ".",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "types": ["node"],
+    "isolatedModules": true
   },
-  "exclude": ["node_modules", "**/*.test.ts", "dist"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "**/*.test.ts", "dist", "drizzle.config.ts"]
 }

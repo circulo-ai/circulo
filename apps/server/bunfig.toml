@@ -1,0 +1,10 @@
+[install]
+# Use pnpm for package management
+auto = "disable"
+
+[test]
+preload = ["./test-setup.ts"]
+
+[run]
+# Load .env file automatically
+env = [".env"]

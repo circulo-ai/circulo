@@ -1,4 +1,3 @@
-import type { auth } from "@/lib/auth";
 import { getEnv } from "@/lib/env";
 import {
   apiKeyClient,

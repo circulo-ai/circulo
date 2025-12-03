@@ -169,7 +169,7 @@
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
     "atmn": "^0.0.28",
-    "baseline-browser-mapping": "^2.8.32",
+    "baseline-browser-mapping": "^2.9.0",
     "cross-env": "^10.1.0",
     "dotenv": "^16.6.1",
     "drizzle-dbml-generator": "^0.10.0",

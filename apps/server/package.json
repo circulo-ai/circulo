@@ -2,9 +2,9 @@
   "name": "server",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch --env-file=.env src/index.ts",
-    "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js",
+    "dev": "bun --hot src/index.ts",
+    "build": "bun build src/index.ts --outdir ./dist --target bun",
+    "start": "bun src/index.ts",
     "db:generate": "npx drizzle-kit generate",
     "db:drop": "npx drizzle-kit drop",
     "db:migrate": "npx drizzle-kit migrate",
@@ -56,10 +56,10 @@
   "devDependencies": {
     "@biomejs/biome": "^2.3.8",
     "@types/js-yaml": "^4.0.9",
-    "@types/node": "^20.11.17",
+    "@types/node": "^20.19.25",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
-    "tsx": "^4.7.1",
-    "typescript": "^5.8.3"
+    "cross-env": "^10.1.0",
+    "typescript": "^5.9.3"
   }
 }

@@ -37,7 +37,7 @@ import { prettyJSON } from "hono/pretty-json";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { inngestRouter } from "@/lib/inngest/handler";
-import { getBaseUrl } from "./lib/urls/utils";
+import { getBaseUrl } from "@/lib/urls/utils";
 
 const app = createApp();
 
@@ -87,15 +87,15 @@ app.use("*", logger());
 app.use("*", requestId());
 app.use(prettyJSON());
 app.use(
-	"/api/auth/*", // or replace with "*" to enable cors for all routes
-	cors({
-		origin: getBaseUrl(), // replace with your origin
-		allowHeaders: ["Content-Type", "Authorization"],
-		allowMethods: ["POST", "GET", "OPTIONS"],
-		exposeHeaders: ["Content-Length"],
-		maxAge: 600,
-		credentials: true,
-	}),
+  "/api/auth/*", // or replace with "*" to enable cors for all routes
+  cors({
+    origin: getBaseUrl(), // replace with your origin
+    allowHeaders: ["Content-Type", "Authorization"],
+    allowMethods: ["POST", "GET", "OPTIONS"],
+    exposeHeaders: ["Content-Length"],
+    maxAge: 600,
+    credentials: true,
+  }),
 );
 
 // Inngest handler (dev/prod)
