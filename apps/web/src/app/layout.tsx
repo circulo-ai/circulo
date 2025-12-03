@@ -8,6 +8,7 @@ import type { Metadata } from "next";
 import { ReactNode } from "react";
 import { Toaster } from "sonner";
 import "./globals.css";
+import { env } from "process";
 
 export const viewport = {
   maximumScale: 1, // Disable auto-zoom on mobile Safari
@@ -30,7 +31,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className={cn("font-sans", "antialiased")}>
         <ThemeProvider>
           <AutumnProvider
-            betterAuthUrl={process.env.NEXT_PUBLIC_BETTER_AUTH_URL}
+            betterAuthUrl={env.NEXT_PUBLIC_BETTER_AUTH_URL}
           >
             <SWRProvider>
               <PointerProvider>

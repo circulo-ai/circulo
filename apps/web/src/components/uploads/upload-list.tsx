@@ -1,7 +1,4 @@
-import type {
-  UploadItem,
-  UploadStatus,
-} from "@/lib/uploads/hooks/use-upload-manager";
+import type { UploadItem, UploadStatus } from "@/hooks/use-upload-manager";
 import clsx from "clsx";
 import type { ReactNode } from "react";
 

@@ -10,6 +10,7 @@
     "scripts": {
         "build": "turbo run build",
         "dev": "turbo run dev",
+        "dev:stack": "concurrently -k -s first -n server,web \"pnpm --filter server dev\" \"pnpm --filter web dev\"",
         "dev:sockets": "cd apps/sim && pnpm dev:sockets",
         "dev:full": "cd apps/sim && pnpm dev:full",
         "test": "turbo run test",
@@ -21,13 +22,15 @@
         "type-check": "turbo run type-check"
     },
     "overrides": {
-        "react": "19.1.0",
-        "react-dom": "19.1.0",
-        "next": "15.4.1",
-        "@next/env": "15.4.1",
-        "drizzle-orm": "^0.44.5",
-        "postgres": "^3.4.5"
-    },
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "next": "15.4.1",
+    "@next/env": "15.4.1",
+    "drizzle-orm": "^0.44.5",
+    "postgres": "^3.4.5",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2"
+  },
     "dependencies": {
         "@t3-oss/env-nextjs": "0.13.4",
         "@types/fluent-ffmpeg": "2.1.28",
@@ -35,6 +38,7 @@
         "postgres": "^3.4.5"
     },
     "devDependencies": {
+        "concurrently": "^9.1.2",
         "@next/env": "15.4.1",
         "@tailwindcss/typography": "0.5.19",
         "drizzle-kit": "^0.31.4",

@@ -10,8 +10,8 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { ArrowUpIcon, PaperclipIcon, StopIcon } from "@/components/icons/icons";
 import { Agent, ChatAgent } from "@/db";
+import { useUploadManager } from "@/hooks/use-upload-manager";
 import type { Attachment, ChatMessage } from "@/lib/types";
-import { useUploadManager } from "@/lib/uploads";
 import type { AppUsage } from "@/lib/usage";
 import { cn } from "@/lib/utils";
 import type { UseChatHelpers } from "@ai-sdk/react";

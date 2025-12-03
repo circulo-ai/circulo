@@ -10,11 +10,6 @@
     "format": "prettier . --write",
     "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx,json,css,scss,md}\"",
     "workflow:inspect": "npx workflow inspect runs",
-    "db:generate": "npx drizzle-kit generate",
-    "db:drop": "npx drizzle-kit drop",
-    "db:migrate": "npx drizzle-kit migrate",
-    "db:push": "npx drizzle-kit push",
-    "db:studio": "npx drizzle-kit studio",
     "db:dbml": "npx tsx dbml.ts",
     "type-check": "tsc --noEmit"
   },
@@ -198,11 +193,5 @@
     "typescript": "^5.9.3",
     "vitest": "^4.0.14"
   },
-  "packageManager": "pnpm@10.4.1",
-  "pnpm": {
-    "overrides": {
-      "@types/react": "19.2.2",
-      "@types/react-dom": "19.2.2"
-    }
-  }
+  "packageManager": "pnpm@10.4.1"
 }

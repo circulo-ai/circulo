@@ -7,6 +7,7 @@ import { createLogger } from "@/lib/logs/console/logger";
 import { generateRequestId } from "@/lib/utils";
 import { requireAuth } from "@/middleware/auth";
 import { eq } from "drizzle-orm";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 export const dynamic = "force-dynamic";
 
@@ -93,24 +94,20 @@ router.get("/auth/oauth/microsoft/files", requireAuth, async (c) => {
       const errorData = await response
         .json()
         .catch(() => ({ error: { message: "Unknown error" } }));
+      const status = response.status as ContentfulStatusCode;
       logger.error(`[${requestId}] Microsoft Graph API error`, {
         status: response.status,
         error:
           errorData.error?.message ||
           "Failed to fetch Excel files from Microsoft OneDrive",
       });
-      return new Response(
-        JSON.stringify({
+      return c.json(
+        {
           error:
             errorData.error?.message ||
             "Failed to fetch Excel files from Microsoft OneDrive",
-        }),
-        {
-          status: response.status,
-          headers: {
-            "content-type": "application/json",
-          },
         },
+        status,
       );
     }
 
