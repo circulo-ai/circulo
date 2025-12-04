@@ -2,9 +2,9 @@ name: CI - Test
 
 on:
   pull_request:
-    branches: [main, develop]
+    branches: [master, dev]
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - 'packages/**'
       - 'pnpm-lock.yaml'
