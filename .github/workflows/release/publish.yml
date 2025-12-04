@@ -1,0 +1,125 @@
+name: Release - Publish
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/*/package.json'
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  detect-publishable:
+    name: Detect Publishable Packages
+    runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.detect.outputs.packages }}
+      has_packages: ${{ steps.detect.outputs.has_packages }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Detect public packages
+        id: detect
+        run: |
+          # Find all packages that are NOT private
+          PUBLIC_PACKAGES=$(find packages -name "package.json" -type f -exec sh -c '
+            PRIVATE=$(cat "$1" | jq -r ".private // false")
+            if [ "$PRIVATE" = "false" ]; then
+              cat "$1" | jq -r ".name"
+            fi
+          ' sh {} \; | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          
+          echo "packages=$PUBLIC_PACKAGES" >> $GITHUB_OUTPUT
+          
+          # Check if we have any packages to publish
+          if [ "$PUBLIC_PACKAGES" = "[]" ] || [ -z "$PUBLIC_PACKAGES" ]; then
+            echo "has_packages=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_packages=true" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "Public packages detected: $PUBLIC_PACKAGES"
+
+  publish:
+    name: Build & Publish
+    needs: detect-publishable
+    if: needs.detect-publishable.outputs.has_packages == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Build public packages
+        run: |
+          # Build only packages that are not private
+          for pkg in packages/*; do
+            if [ -f "$pkg/package.json" ]; then
+              PRIVATE=$(cat "$pkg/package.json" | jq -r ".private // false")
+              PKG_NAME=$(cat "$pkg/package.json" | jq -r ".name")
+              
+              if [ "$PRIVATE" = "false" ]; then
+                echo "Building $PKG_NAME..."
+                pnpm --filter "$PKG_NAME" build
+              fi
+            fi
+          done
+      
+      - name: Run tests for public packages
+        run: |
+          for pkg in packages/*; do
+            if [ -f "$pkg/package.json" ]; then
+              PRIVATE=$(cat "$pkg/package.json" | jq -r ".private // false")
+              PKG_NAME=$(cat "$pkg/package.json" | jq -r ".name")
+              HAS_TEST=$(cat "$pkg/package.json" | jq -r '.scripts.test // empty')
+              
+              if [ "$PRIVATE" = "false" ] && [ -n "$HAS_TEST" ]; then
+                echo "Testing $PKG_NAME..."
+                pnpm --filter "$PKG_NAME" test
+              fi
+            fi
+          done
+      
+      - name: Publish to npm
+        uses: changesets/action@v1
+        with:
+          publish: pnpm changeset publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      
+      - name: Post-publish summary
+        if: always()
+        run: |
+          echo "## Published Packages" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "${{ needs.detect-publishable.outputs.packages }}" | jq -r '.[]' | while read pkg; do
+            echo "- ✅ $pkg" >> $GITHUB_STEP_SUMMARY
+          done
