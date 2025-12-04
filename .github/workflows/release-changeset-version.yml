@@ -1,12 +1,17 @@
 name: Release - Version PR
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - backend
       - master
     paths:
       - '.changeset/**'
+
+permissions:
+  contents: write
+  pull-requests: write
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
