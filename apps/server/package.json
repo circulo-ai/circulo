@@ -1,6 +1,8 @@
 {
   "name": "server",
   "type": "module",
+  "private": true,
+  "version": "0.0.0",
   "scripts": {
     "dev": "bun --hot src/index.ts",
     "build": "bun build src/index.ts --outdir ./dist --target bun",
