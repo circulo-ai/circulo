@@ -1,3 +1,11 @@
-web/node_modules
-web/.next
-web/.env.local
+LICENSE
+NOTICE
+.prettierrc
+.prettierignore
+README.md
+.gitignore
+.husky
+.github
+.devcontainer
+.env.example
+node_modules
