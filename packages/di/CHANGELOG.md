@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.0.0
+
+### Major Changes
+
+- 37b9b8f: code reformat
+- 69ee9ea: Added keywords to package.json
+
+### Minor Changes
+
+- 63d07d6: Enhanced package.json
+
 ## 1.1.0
 
 - Added multi-registration and keyed services: register multiple implementations per token with optional `key`, resolve by key or via `resolveAll`.
