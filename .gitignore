@@ -70,3 +70,5 @@ start-collector.sh
 
 # VSCode
 .vscode
+
+.note.md
