@@ -40,34 +40,34 @@ const parseNumber = (value: unknown, fallback: number): number => {
 export const RATE_LIMIT_WINDOW_MS = parseNumber(env.RATE_LIMIT_WINDOW_MS, 60_000);
 
 const API_ENDPOINT_LIMITS: Record<RateLimitPlan, number> = {
-  free: 10,
-  pro: 30,
-  team: 60,
-  enterprise: 120,
+  free: 60,
+  pro: 120,
+  team: 240,
+  enterprise: 480,
 };
 
 export const RATE_LIMITS: Record<RateLimitPlan, RateLimitPlanConfig> = {
   free: {
     api: API_ENDPOINT_LIMITS.free,
-    sync: parseNumber(env.RATE_LIMIT_FREE_SYNC, 10),
+    sync: parseNumber(env.RATE_LIMIT_FREE_SYNC, 60),
     async: parseNumber(env.RATE_LIMIT_FREE_ASYNC, 50),
     windowMs: RATE_LIMIT_WINDOW_MS,
   },
   pro: {
     api: API_ENDPOINT_LIMITS.pro,
-    sync: parseNumber(env.RATE_LIMIT_PRO_SYNC, 25),
+    sync: parseNumber(env.RATE_LIMIT_PRO_SYNC, 120),
     async: parseNumber(env.RATE_LIMIT_PRO_ASYNC, 200),
     windowMs: RATE_LIMIT_WINDOW_MS,
   },
   team: {
     api: API_ENDPOINT_LIMITS.team,
-    sync: parseNumber(env.RATE_LIMIT_TEAM_SYNC, 75),
+    sync: parseNumber(env.RATE_LIMIT_TEAM_SYNC, 240),
     async: parseNumber(env.RATE_LIMIT_TEAM_ASYNC, 500),
     windowMs: RATE_LIMIT_WINDOW_MS,
   },
   enterprise: {
     api: API_ENDPOINT_LIMITS.enterprise,
-    sync: parseNumber(env.RATE_LIMIT_ENTERPRISE_SYNC, 150),
+    sync: parseNumber(env.RATE_LIMIT_ENTERPRISE_SYNC, 480),
     async: parseNumber(env.RATE_LIMIT_ENTERPRISE_ASYNC, 1000),
     windowMs: RATE_LIMIT_WINDOW_MS,
   },
