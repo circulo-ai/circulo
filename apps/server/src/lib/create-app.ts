@@ -1,6 +1,7 @@
 import { createContainerMiddleware, type ContainerEnv } from "@circulo-ai/di";
 import { Hono } from "hono";
 import { buildRootProvider, type RequestContainer } from "@/di/container";
+import { requestDi } from "@/di/di-context";
 import type { AuthType } from "./auth";
 
 export type AppEnv = {
@@ -19,6 +20,7 @@ export default function createApp() {
   const provider = buildRootProvider();
 
   app.use("*", createContainerMiddleware<RequestContainer, AppEnv>(provider));
+  app.use("*", requestDi);
 
   return app;
 }

@@ -1,4 +1,3 @@
-import { getChatRepository, getMessageRepository } from "@/di/resolvers";
 import { getActiveOrganizationId } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
 import { createRouter } from "@/lib/create-app";
@@ -13,13 +12,19 @@ const paramsSchema = z.object({
 
 const router = createRouter();
 
+router.get("/messages/test", async (c) => {
+  return c.json({ message: await c.di.ChatRepository.findMany({}) });
+});
+
 router.delete(
   "/messages/:id/trailing",
   requireAuth,
   zValidator("param", paramsSchema),
   async (c) => {
-    const messageRepository = getMessageRepository(c);
-    const chatRepository = getChatRepository(c);
+    const {
+      ChatRepository: chatRepository,
+      MessageRepository: messageRepository,
+    } = c.di;
 
     const { user, activeOrgId, session } = c.var;
     const { id } = c.req.valid("param");

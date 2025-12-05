@@ -112,9 +112,6 @@ routes.forEach((route) => {
 
 export type AppType = (typeof routes)[number];
 
-// Inngest handler (dev/prod)
-app.use("/api/inngest/*", inngestRouter);
-
 app.onError((err, c) => {
   if (err instanceof HttpError) {
     return err.toResponse();
