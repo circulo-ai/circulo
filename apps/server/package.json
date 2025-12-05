@@ -20,7 +20,7 @@
     "@aws-sdk/s3-request-presigner": "^3.940.0",
     "@azure/communication-email": "^1.1.0",
     "@azure/storage-blob": "^12.29.1",
-    "@circulo/core": "workspace:^",
+    "@circulo-ai/core": "workspace:^",
     "@circulo-ai/di": "workspace:^",
     "@circulo-ai/file-parsers": "workspace:^",
     "@circulo/db": "workspace:^",

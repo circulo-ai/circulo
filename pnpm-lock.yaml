@@ -69,7 +69,7 @@ importers:
       '@circulo-ai/redis':
         specifier: workspace:^
         version: link:../../packages/redis
-      '@circulo/core':
+      '@circulo-ai/core':
         specifier: workspace:^
         version: link:../../packages/core
       '@circulo/db':
