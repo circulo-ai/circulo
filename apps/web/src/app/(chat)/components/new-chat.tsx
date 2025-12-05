@@ -39,6 +39,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { FileInput } from "@/components/uploads";
 import { Agent } from "@/db";
 import { createBodySchema } from "@/lib/schemas/agent";
 import { getFetcher } from "@/lib/swr";
@@ -392,8 +393,13 @@ function NewAgent() {
             Add
           </Submit>
         </RouteViewHeader>
-        <CustomScrollArea className="overflow-auto">
+        <CustomScrollArea className="h-full overflow-auto">
           <FieldGroup className="mt-7">
+            <ControlledInput<NewAgentRequest>
+              inputComponent={FileInput}
+              name="avatarUrl"
+              unstyled
+            />
             <ControlledInput<NewAgentRequest>
               inputComponent={CustomInputGroupInput}
               name="name"

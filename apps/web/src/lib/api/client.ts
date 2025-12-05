@@ -14,17 +14,23 @@ export class ApiRequestError extends Error {
 
 export async function request<T>(
   endpoint: string,
-  options?: RequestInit,
+  options?: Omit<RequestInit, "body"> & { body?: unknown },
 ): Promise<T> {
   const url = `${getBaseUrl()}${endpoint}`;
+
+  const body = normalizeBody(options?.body);
+  const headers: HeadersInit = {
+    ...(shouldSetJsonContentType(options?.body, options?.headers)
+      ? { "Content-Type": "application/json" }
+      : {}),
+    ...options?.headers,
+  };
 
   try {
     const response = await fetch(url, {
       ...options,
-      headers: {
-        "Content-Type": "application/json",
-        ...options?.headers,
-      },
+      body,
+      headers,
     });
 
     // Handle 204 No Content (e.g., successful DELETE)
@@ -105,6 +111,49 @@ function inferCodeFromStatus(status: number): string {
   }
 }
 
+function normalizeBody(body: unknown): BodyInit | undefined {
+  if (body === null || body === undefined) return undefined;
+  if (isBodyInit(body)) return body;
+  return JSON.stringify(body);
+}
+
+function shouldSetJsonContentType(
+  body: unknown,
+  headers?: HeadersInit,
+): boolean {
+  if (hasContentType(headers)) return false;
+  return body !== null && body !== undefined && !isBodyInit(body);
+}
+
+function hasContentType(headers?: HeadersInit): boolean {
+  if (!headers) return false;
+  if (headers instanceof Headers) return headers.has("content-type");
+  if (Array.isArray(headers)) {
+    return headers.some(([key]) => key.toLowerCase() === "content-type");
+  }
+  return Object.keys(headers).some(
+    (key) => key.toLowerCase() === "content-type",
+  );
+}
+
+function isBodyInit(body: unknown): body is BodyInit {
+  if (body === null || body === undefined) return false;
+  if (typeof body === "string") return true;
+
+  if (typeof FormData !== "undefined" && body instanceof FormData) return true;
+  if (typeof Blob !== "undefined" && body instanceof Blob) return true;
+  if (typeof URLSearchParams !== "undefined" && body instanceof URLSearchParams)
+    return true;
+  if (typeof ReadableStream !== "undefined" && body instanceof ReadableStream)
+    return true;
+  if (typeof ArrayBuffer !== "undefined" && body instanceof ArrayBuffer)
+    return true;
+  if (typeof ArrayBuffer !== "undefined" && ArrayBuffer.isView(body))
+    return true;
+
+  return false;
+}
+
 export async function getRequest<T>(
   endpoint: string,
   options?: RequestInit,
@@ -120,7 +169,7 @@ export async function postRequest<T>(
   return request<T>(endpoint, {
     ...options,
     method: "POST",
-    body: body ? JSON.stringify(body) : undefined,
+    body,
   });
 }
 
@@ -132,7 +181,7 @@ export async function putRequest<T>(
   return request<T>(endpoint, {
     ...options,
     method: "PUT",
-    body: body ? JSON.stringify(body) : undefined,
+    body,
   });
 }
 
@@ -144,7 +193,7 @@ export async function patchRequest<T>(
   return request<T>(endpoint, {
     ...options,
     method: "PATCH",
-    body: body ? JSON.stringify(body) : undefined,
+    body,
   });
 }
 

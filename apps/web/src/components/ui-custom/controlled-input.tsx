@@ -15,7 +15,11 @@ import {
 } from "react";
 import {
   Controller,
+<<<<<<< HEAD
   ControllerFieldState,
+=======
+  ControllerRenderProps,
+>>>>>>> 38cc45947af540b267716395c1b988e6c3e8c6e3
   FieldValues,
   Path,
   useFormContext,
@@ -38,9 +42,12 @@ export interface InputComponentProps
   onChange?: ChangeEventHandler;
   onBlur?: FocusEventHandler;
   ref?: Ref<any>;
+<<<<<<< HEAD
   context: {
     fieldState: ControllerFieldState;
   };
+=======
+>>>>>>> 38cc45947af540b267716395c1b988e6c3e8c6e3
 }
 
 interface ControlledInputProps<T extends FieldValues>
@@ -49,6 +56,7 @@ interface ControlledInputProps<T extends FieldValues>
   title?: string;
   description?: string;
   saveAsNumber?: boolean;
+<<<<<<< HEAD
   inputProps?: ComponentProps<"input">;
   addons?: ReactNode;
   inputComponent: FC<InputComponentProps>;
@@ -68,12 +76,94 @@ export const ControlledInput = <T extends FieldValues>({
 
   const { control } = useFormContext();
 
+=======
+  addons?: ReactNode;
+  inputComponent: FC<InputComponentProps>;
+  inputProps?: ComponentProps<"input">;
+  unstyled?: boolean;
+}
+
+export function ControlledInput<T extends FieldValues>({
+  name,
+  title,
+  description,
+  saveAsNumber = false,
+  addons,
+  inputComponent: InputComponent,
+  inputProps = {},
+  unstyled,
+  id: explicitId,
+  ...props
+}: ControlledInputProps<T>) {
+  const implicitId = useId();
+  const id = explicitId ?? implicitId;
+
+  const { control } = useFormContext();
+
+  return (
+    <Controller
+      name={name}
+      control={control}
+      render={({ field, fieldState: { invalid, error } }) =>
+        unstyled ? (
+          <FormInputAdapter<T>
+            id={id}
+            field={field}
+            invalid={invalid}
+            inputProps={inputProps}
+            saveAsNumber={saveAsNumber}
+            inputComponent={InputComponent}
+          />
+        ) : (
+          <Field data-invalid={invalid} {...props}>
+            <FieldLabel htmlFor={id}>{title ?? camelToTitle(name)}</FieldLabel>
+            {description && <FieldDescription>{description}</FieldDescription>}
+            <CustomInputGroup>
+              <FormInputAdapter<T>
+                id={id}
+                field={field}
+                invalid={invalid}
+                inputProps={inputProps}
+                saveAsNumber={saveAsNumber}
+                inputComponent={InputComponent}
+              />
+              {addons}
+            </CustomInputGroup>
+            {invalid && <FieldError errors={[error]} />}
+          </Field>
+        )
+      }
+    />
+  );
+}
+
+const FormInputAdapter = <T extends FieldValues>({
+  id,
+  field: { value, onChange, ...field },
+  invalid,
+  inputProps,
+  saveAsNumber,
+  inputComponent: InputComponent,
+}: {
+  id: string;
+  field: ControllerRenderProps<FieldValues, Path<T>>;
+  invalid: boolean;
+  inputProps: ComponentProps<"input">;
+  saveAsNumber: boolean;
+  inputComponent: FC<InputComponentProps>;
+}) => {
+  // TODO convert to a utility
+>>>>>>> 38cc45947af540b267716395c1b988e6c3e8c6e3
   const extractDigitsOnly = useCallback(
     (e: ChangeEvent<HTMLInputElement>) =>
       convertPersianToEnglishNumbers(e.target.value).replace(/\D/g, ""),
     [],
   );
 
+<<<<<<< HEAD
+=======
+  // TODO convert to a utility
+>>>>>>> 38cc45947af540b267716395c1b988e6c3e8c6e3
   const extractNumberFromInput = useCallback(
     (event: ChangeEvent<HTMLInputElement>) =>
       parseInt(extractDigitsOnly(event)),
@@ -81,6 +171,7 @@ export const ControlledInput = <T extends FieldValues>({
   );
 
   return (
+<<<<<<< HEAD
     <Controller
       name={name}
       control={control}
@@ -116,3 +207,27 @@ export const ControlledInput = <T extends FieldValues>({
     />
   );
 };
+=======
+    <InputComponent
+      id={id} // TODO pass these props only if InputComponent accepts them
+      aria-invalid={invalid}
+      value={value ?? ""}
+      onChange={(e: ChangeEvent<HTMLInputElement>) =>
+        onChange(
+          inputProps?.type === "number"
+            ? saveAsNumber
+              ? isNaN(extractNumberFromInput(e))
+                ? 0
+                : extractNumberFromInput(e)
+              : extractDigitsOnly(e)
+            : e.target.value,
+        )
+      }
+      {...inputProps}
+      {...field}
+    />
+  );
+};
+
+// TODO make it type safe
+>>>>>>> 38cc45947af540b267716395c1b988e6c3e8c6e3
