@@ -5,6 +5,7 @@
       "@/*": ["./src/*"],
       "@circulo/core": ["../../packages/core/src"],
       "@circulo-ai/di": ["../../packages/di/src"],
+      "@circulo-ai/file-parsers": ["../../packages/file-parsers/src"],
       "@circulo-ai/redis": ["../../packages/redis/src"],
       "@/db": ["../../packages/db/index.ts"],
       "@/db/*": ["../../packages/db/*"]

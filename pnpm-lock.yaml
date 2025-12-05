@@ -63,6 +63,9 @@ importers:
       '@circulo-ai/di':
         specifier: workspace:^
         version: link:../../packages/di
+      '@circulo-ai/file-parsers':
+        specifier: workspace:^
+        version: link:../../packages/file-parsers
       '@circulo-ai/redis':
         specifier: workspace:^
         version: link:../../packages/redis
@@ -762,6 +765,40 @@ importers:
       vitest:
         specifier: ^2.1.4
         version: 2.1.9(@types/node@20.19.25)(lightningcss@1.30.2)
+
+  packages/file-parsers:
+    dependencies:
+      cheerio:
+        specifier: ^1.1.2
+        version: 1.1.2
+      csv-parse:
+        specifier: ^6.1.0
+        version: 6.1.0
+      js-yaml:
+        specifier: ^4.1.1
+        version: 4.1.1
+      mammoth:
+        specifier: ^1.11.0
+        version: 1.11.0
+      officeparser:
+        specifier: ^5.2.2
+        version: 5.2.2
+      pdf-parse:
+        specifier: ^2.4.5
+        version: 2.4.5
+      xlsx:
+        specifier: ^0.18.5
+        version: 0.18.5
+    devDependencies:
+      '@types/js-yaml':
+        specifier: ^4.0.9
+        version: 4.0.9
+      '@types/node':
+        specifier: ^20.19.25
+        version: 20.19.25
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
   packages/redis:
     devDependencies:

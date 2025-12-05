@@ -1,4 +1,9 @@
-import { isSupportedFileType, parseFile } from "@/lib/file-parsers";
+import {
+  isSupportedFileType,
+  parseBuffer as parseBufferFromParsers,
+  parseFile,
+  PdfParser,
+} from "@circulo-ai/file-parsers";
 import { createLogger } from "@/lib/logs/console/logger";
 import { validateExternalUrl } from "@/lib/security/input-validation";
 import {
@@ -310,7 +315,7 @@ async function handleExternalUrl(
     if (extension === "csv") {
       return await handleCsvBuffer(buffer, filename, fileType, url);
     }
-    if (isSupportedFileType(extension)) {
+    if (await isSupportedFileType(extension)) {
       return await handleGenericTextBuffer(
         buffer,
         filename,
@@ -363,7 +368,7 @@ async function handleCloudFile(
     if (extension === "csv") {
       return await handleCsvBuffer(fileBuffer, filename, fileType, filePath);
     }
-    if (isSupportedFileType(extension)) {
+    if (await isSupportedFileType(extension)) {
       return await handleGenericTextBuffer(
         fileBuffer,
         filename,
@@ -456,13 +461,14 @@ async function handlePdfBuffer(
 
     const result = await parseBufferAsPdf(fileBuffer);
 
+    const pageCount =
+      typeof result.metadata?.pageCount === "number"
+        ? result.metadata.pageCount
+        : Number(result.metadata?.pageCount ?? 0);
+
     const content =
       result.content ||
-      createPdfFallbackMessage(
-        result.metadata?.pageCount || 0,
-        fileBuffer.length,
-        originalPath,
-      );
+      createPdfFallbackMessage(pageCount, fileBuffer.length, originalPath);
 
     return {
       success: true,
@@ -511,8 +517,7 @@ async function handleCsvBuffer(
   try {
     logger.info(`Parsing CSV in memory: ${filename}`);
 
-    const { parseBuffer } = await import("@/lib/file-parsers");
-    const result = await parseBuffer(fileBuffer, "csv");
+    const result = await parseBufferFromParsers(fileBuffer, "csv");
 
     return {
       success: true,
@@ -555,12 +560,8 @@ async function handleGenericTextBuffer(
     logger.info(`Parsing text file in memory: ${filename}`);
 
     try {
-      const { parseBuffer, isSupportedFileType } = await import(
-        "@/lib/file-parsers"
-      );
-
-      if (isSupportedFileType(extension)) {
-        const result = await parseBuffer(fileBuffer, extension);
+      if (await isSupportedFileType(extension)) {
+        const result = await parseBufferFromParsers(fileBuffer, extension);
 
         return {
           success: true,
@@ -642,7 +643,6 @@ function handleGenericBuffer(
  */
 async function parseBufferAsPdf(buffer: Buffer) {
   try {
-    const { PdfParser } = await import("@/lib/file-parsers/pdf-parser");
     const parser = new PdfParser();
     logger.info("Using main PDF parser for buffer");
 
@@ -679,11 +679,16 @@ function createPdfFallbackMessage(
   size: number,
   path?: string,
 ): string {
-  const formattedPath = path
-    ? path.includes("/api/files/serve/s3/")
-      ? `S3 path: ${decodeURIComponent(path.split("/api/files/serve/s3/")[1])}`
-      : `Local path: ${path}`
-    : "Unknown path";
+  if (!path) {
+    return `PDF document - ${pageCount} page(s), ${prettySize(size)}\nPath: Unknown path\n\nThis file appears to be a PDF document that could not be fully processed as text.\nPlease use a PDF viewer for best results.`;
+  }
+
+  const safePath = path;
+  const formattedPath = safePath.includes("/api/files/serve/s3/")
+    ? `S3 path: ${decodeURIComponent(
+        safePath.split("/api/files/serve/s3/")[1] ?? "",
+      )}`
+    : `Local path: ${safePath}`;
 
   return `PDF document - ${pageCount} page(s), ${prettySize(size)}
 Path: ${formattedPath}
@@ -701,9 +706,12 @@ function createPdfFailureMessage(
   path: string,
   error: string,
 ): string {
-  const formattedPath = path.includes("/api/files/serve/s3/")
-    ? `S3 path: ${decodeURIComponent(path.split("/api/files/serve/s3/")[1])}`
-    : `Local path: ${path}`;
+  const safePath = path ?? "Unknown path";
+  const formattedPath = safePath.includes("/api/files/serve/s3/")
+    ? `S3 path: ${decodeURIComponent(
+        safePath.split("/api/files/serve/s3/")[1] ?? "",
+      )}`
+    : `Local path: ${safePath}`;
 
   return `PDF document - Processing failed, ${prettySize(size)}
 Path: ${formattedPath}
