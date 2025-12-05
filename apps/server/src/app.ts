@@ -32,6 +32,7 @@ import userUnsubscribe from "@/routes/users/unsubscribe";
 import vote from "@/routes/vote";
 import { HttpError } from "@/lib/server/errors";
 import createApp from "@/lib/create-app";
+import { env } from "@/lib/env";
 import { requestId } from "hono/request-id";
 import { prettyJSON } from "hono/pretty-json";
 import { cors } from "hono/cors";
@@ -40,6 +41,7 @@ import { getBaseUrl } from "@/lib/urls/utils";
 import { rateLimit } from "@/middleware/rate-limit";
 
 const app = createApp();
+const NODE_ENV = env.NODE_ENV ?? "development";
 
 // Middlewares (register before routes)
 app.use("*", logger());
@@ -70,7 +72,11 @@ const corsMiddleware = cors({
   credentials: true,
 });
 app.use("*", corsMiddleware); // apply globally so preflight never 404s
-app.use("/api/*", rateLimit());
+
+// Skip rate limiting in development (or when NODE_ENV is unset) to avoid throttling local reloads
+if (NODE_ENV !== "development") {
+  app.use("/api/*", rateLimit());
+}
 
 const routes = [
   autumn,
