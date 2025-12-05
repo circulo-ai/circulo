@@ -1,9 +1,9 @@
 "use client";
 
 import { updateChatVisibility } from "@/app/(chat)/actions";
-import type { GetChatHistoryResponse } from "@/types/history";
 import { getChatHistoryPaginationKey } from "@/components/sidebar/sidebar-history";
 import type { VisibilityType } from "@/components/visibility-selector";
+import type { GetChatHistoryResponse } from "@/types/history";
 import { useMemo } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { unstable_serialize } from "swr/infinite";

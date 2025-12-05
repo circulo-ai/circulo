@@ -1,9 +1,12 @@
-import type { UploadItem, UploadStatus } from "@/hooks/use-upload-manager";
+import type {
+  UploadState,
+  UploadTask,
+} from "@/hooks/use-upload-task-manager";
 import clsx from "clsx";
 import type { ReactNode } from "react";
 
 export interface UploadListProps {
-  items: UploadItem[];
+  items: UploadTask[];
   onCancel?: (id: string) => void;
   onRetry?: (id: string) => void;
   onRemove?: (id: string) => void;
@@ -11,11 +14,11 @@ export interface UploadListProps {
   /**
    * Custom action renderer. Defaults to built-in retry/remove/cancel buttons.
    */
-  renderActions?: (item: UploadItem) => ReactNode;
+  renderActions?: (item: UploadTask) => ReactNode;
   /**
    * Custom metadata renderer (e.g., show context or size).
    */
-  renderMeta?: (item: UploadItem) => ReactNode;
+  renderMeta?: (item: UploadTask) => ReactNode;
   /**
    * Hide progress bars when not needed.
    */
@@ -24,7 +27,7 @@ export interface UploadListProps {
    * Render a fully custom item; receives default parts for easy reuse.
    */
   renderItem?: (
-    item: UploadItem,
+    item: UploadTask,
     parts: {
       actions: ReactNode;
       meta: ReactNode;
@@ -35,7 +38,7 @@ export interface UploadListProps {
   ) => ReactNode;
 }
 
-const statusColor: Record<UploadStatus, string> = {
+const statusColor: Record<UploadState, string> = {
   queued: "text-muted-foreground",
   preparing: "text-foreground",
   uploading: "text-primary",
@@ -44,7 +47,7 @@ const statusColor: Record<UploadStatus, string> = {
   canceled: "text-muted-foreground",
 };
 
-const statusLabel: Record<UploadStatus, string> = {
+const statusLabel: Record<UploadState, string> = {
   queued: "Queued",
   preparing: "Preparing",
   uploading: "Uploading",
@@ -61,7 +64,7 @@ function ProgressBar({
   status,
 }: {
   value: number;
-  status: UploadStatus;
+  status: UploadState;
 }) {
   const isIndeterminate = value <= 0 || value === Infinity;
   return (

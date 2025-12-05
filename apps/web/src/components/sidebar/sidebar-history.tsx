@@ -1,6 +1,5 @@
 "use client";
 
-import type { GetChatHistoryResponse } from "@/types/history";
 import { LoaderIcon } from "@/components/icons/icons";
 import {
   AlertDialog,
@@ -20,6 +19,7 @@ import {
 } from "@/components/ui/sidebar";
 import type { Chat } from "@/db/schema";
 import { User } from "@/providers/session-provider";
+import type { GetChatHistoryResponse } from "@/types/history";
 import { isToday, isYesterday, subMonths, subWeeks } from "date-fns";
 import { motion } from "framer-motion";
 import { useParams, useRouter } from "next/navigation";

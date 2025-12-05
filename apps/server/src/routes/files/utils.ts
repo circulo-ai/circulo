@@ -63,6 +63,7 @@ export const contentTypeMap: Record<string, string> = {
   jpg: "image/jpeg",
   jpeg: "image/jpeg",
   gif: "image/gif",
+  webp: "image/webp",
   // Archive formats
   zip: "application/zip",
   // Folder format
@@ -227,6 +228,7 @@ const SAFE_INLINE_TYPES = new Set([
   "image/jpeg",
   "image/jpg",
   "image/gif",
+  "image/webp",
   "application/pdf",
   "text/plain",
   "text/csv",

@@ -1,6 +1,6 @@
-import type { GetChatHistoryResponse } from "@/types/history";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useChatHistoryStore } from "@/stores/use-chat-history-store";
+import type { GetChatHistoryResponse } from "@/types/history";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
