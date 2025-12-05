@@ -1,2 +1,2 @@
-export { UploadDropzone } from "@/components/uploads/upload-dropzone";
+export { FileInput } from "@/components/uploads/file-input";
 export { UploadList } from "@/components/uploads/upload-list";

@@ -16,10 +16,10 @@ export {
 } from "@/lib/uploads/core/storage-client";
 export * as StorageService from "@/lib/uploads/core/storage-service";
 export {
-  useUploadManager,
-  type UploadItem,
-  type UploadStatus,
-} from "@/lib/uploads/hooks/use-upload-manager";
+  useUploadTaskManager,
+  type UploadState,
+  type UploadTask,
+} from "@/lib/uploads/hooks/use-upload-task-manager";
 export {
   MIME_TYPE_MAPPING,
   bufferToBase64,

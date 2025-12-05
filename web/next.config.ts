@@ -33,6 +33,7 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "lh3.googleusercontent.com",
       },
+      { hostname: "circulo-minio-17cd9b-193-203-169-161.traefik.me" },
       // Brand logo domain if configured
       ...(getEnv("NEXT_PUBLIC_BRAND_LOGO_URL")
         ? (() => {

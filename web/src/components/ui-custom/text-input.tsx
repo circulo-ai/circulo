@@ -2,15 +2,15 @@ import { cn } from "@/lib/utils";
 import { ComponentProps, InputHTMLAttributes } from "react";
 import { Input } from "../ui/input";
 
-interface CustomInputProps extends ComponentProps<typeof Input> {
+interface TextInputProps extends ComponentProps<typeof Input> {
   type?: "number" | "email" | "password" | "search" | "tel" | "text" | "url";
 }
 
-export function BasicInput({
+export function TextInput({
   className,
   type = "text",
   ...props
-}: CustomInputProps) {
+}: TextInputProps) {
   const inputModes: Record<
     typeof type,
     InputHTMLAttributes<HTMLInputElement>["inputMode"]
