@@ -1,4 +1,3 @@
-import type { GetChatHistoryResponse } from "@/types/history";
 import { EnhancedLink } from "@/components/enhanced-link";
 import { WithRipple } from "@/components/ui-custom/ripple";
 import {
@@ -13,6 +12,7 @@ import { formatDate } from "@/lib/format-date";
 import { getFetcher } from "@/lib/swr";
 import { cn } from "@/lib/utils";
 import { useChatHistoryStore } from "@/stores/use-chat-history-store";
+import type { GetChatHistoryResponse } from "@/types/history";
 import { Pin } from "lucide-react";
 import { useCallback } from "react";
 import { Arguments, Key } from "swr";

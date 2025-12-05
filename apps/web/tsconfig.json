@@ -27,7 +27,7 @@
       "@/db/*": ["../../packages/db/*"],
       "#/*": ["./public/*"],
       "@circulo/db": ["../../packages/db"],
-      "@circulo/db/*": ["../../packages/db/*"],
+      "@circulo/db/*": ["../../packages/db/*"]
     }
   },
   "include": [
@@ -37,7 +37,8 @@
     ".types/**/*.ts",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "trigger.config.ts"
-, "../server/drizzle.config.ts"  ],
+    "trigger.config.ts",
+    "../server/drizzle.config.ts"
+  ],
   "exclude": ["node_modules"]
 }

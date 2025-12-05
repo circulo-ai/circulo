@@ -24,13 +24,7 @@ export type UseUploadManagerOptions = {
   onItemFinish?: (item: UploadItem) => void;
 };
 
-async function uploadFile({
-  file,
-  context,
-}: {
-  file: File;
-  context: string;
-}) {
+async function uploadFile({ file, context }: { file: File; context: string }) {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("context", context);
@@ -61,8 +55,7 @@ export function useUploadManager(options: UseUploadManagerOptions = {}) {
   const isUploading = useMemo(
     () =>
       items.some(
-        (item) =>
-          item.status === "uploading" || item.status === "preparing",
+        (item) => item.status === "uploading" || item.status === "preparing",
       ),
     [items],
   );

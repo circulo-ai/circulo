@@ -1,6 +1,5 @@
 "use client";
 
-import { createBodySchema } from "@/lib/schemas/agent";
 import { DataStreamHandler } from "@/components/data-stream-handler";
 import { PageSpinner } from "@/components/page-spinner";
 import {
@@ -41,6 +40,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Agent } from "@/db";
+import { createBodySchema } from "@/lib/schemas/agent";
 import { getFetcher } from "@/lib/swr";
 import { cn } from "@/lib/utils";
 import { useChatHistoryStore } from "@/stores/use-chat-history-store";
