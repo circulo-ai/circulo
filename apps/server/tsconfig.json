@@ -1,0 +1,39 @@
+{
+  "compilerOptions": {
+    "verbatimModuleSyntax": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@circulo/core": ["../../packages/core/src"],
+      "@circulo-ai/di": ["../../packages/di/src"],
+      "@circulo-ai/file-parsers": ["../../packages/file-parsers/src"],
+      "@circulo-ai/redis": ["../../packages/redis/src"],
+      "@/db": ["../../packages/db/index.ts"],
+      "@/db/*": ["../../packages/db/*"]
+    },
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "baseUrl": ".",
+    "allowJs": true,
+    "checkJs": true,
+    "moduleDetection": "force",
+    "noUncheckedIndexedAccess": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "outDir": "./dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "types": ["node"],
+    "isolatedModules": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "**/*.test.ts", "dist", "drizzle.config.ts"]
+}

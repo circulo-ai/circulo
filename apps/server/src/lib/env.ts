@@ -1,0 +1,136 @@
+import { createEnv } from "@t3-oss/env-nextjs";
+import { z } from "zod";
+
+const getEnv = (variable: string) => process.env[variable];
+
+export const env = createEnv({
+  skipValidation: true,
+  server: {
+    // Core app/auth
+    DATABASE_URL: z.url(),
+    BETTER_AUTH_URL: z.url(),
+    BETTER_AUTH_SECRET: z.string().min(32),
+    ENCRYPTION_KEY: z.string().min(32),
+    INTERNAL_API_SECRET: z.string().min(32),
+    AUTUMN_SECRET_KEY: z.string().optional(),
+    E2B_API_KEY: z.string().optional(),
+
+    // OAuth credentials
+    GOOGLE_CLIENT_ID: z.string().optional(),
+    GOOGLE_CLIENT_SECRET: z.string().optional(),
+    GITHUB_CLIENT_ID: z.string().optional(),
+    GITHUB_CLIENT_SECRET: z.string().optional(),
+    GITHUB_REPO_CLIENT_ID: z.string().optional(),
+    GITHUB_REPO_CLIENT_SECRET: z.string().optional(),
+    X_CLIENT_ID: z.string().optional(),
+    X_CLIENT_SECRET: z.string().optional(),
+    CONFLUENCE_CLIENT_ID: z.string().optional(),
+    CONFLUENCE_CLIENT_SECRET: z.string().optional(),
+    JIRA_CLIENT_ID: z.string().optional(),
+    JIRA_CLIENT_SECRET: z.string().optional(),
+    AIRTABLE_CLIENT_ID: z.string().optional(),
+    AIRTABLE_CLIENT_SECRET: z.string().optional(),
+    SUPABASE_CLIENT_ID: z.string().optional(),
+    SUPABASE_CLIENT_SECRET: z.string().optional(),
+    NOTION_CLIENT_ID: z.string().optional(),
+    NOTION_CLIENT_SECRET: z.string().optional(),
+    DISCORD_CLIENT_ID: z.string().optional(),
+    DISCORD_CLIENT_SECRET: z.string().optional(),
+    MICROSOFT_CLIENT_ID: z.string().optional(),
+    MICROSOFT_CLIENT_SECRET: z.string().optional(),
+    HUBSPOT_CLIENT_ID: z.string().optional(),
+    HUBSPOT_CLIENT_SECRET: z.string().optional(),
+    WEALTHBOX_CLIENT_ID: z.string().optional(),
+    WEALTHBOX_CLIENT_SECRET: z.string().optional(),
+    LINEAR_CLIENT_ID: z.string().optional(),
+    LINEAR_CLIENT_SECRET: z.string().optional(),
+    SLACK_CLIENT_ID: z.string().optional(),
+    SLACK_CLIENT_SECRET: z.string().optional(),
+    REDDIT_CLIENT_ID: z.string().optional(),
+    REDDIT_CLIENT_SECRET: z.string().optional(),
+
+    // Billing toggle
+    BILLING_ENABLED: z.boolean().optional(),
+
+    // Storage (S3/Azure)
+    S3_ENDPOINT: z.string().optional(),
+    S3_REGION: z.string().optional(),
+    S3_ACCESS_KEY_ID: z.string().optional(),
+    S3_SECRET_ACCESS_KEY: z.string().optional(),
+    S3_FORCE_PATH_STYLE: z.boolean().optional(),
+    S3_BUCKET_NAME: z.string().optional(),
+    S3_EXECUTION_FILES_BUCKET_NAME: z.string().optional(),
+    S3_KB_BUCKET_NAME: z.string().optional(),
+    S3_CHAT_BUCKET_NAME: z.string().optional(),
+    S3_COPILOT_BUCKET_NAME: z.string().optional(),
+    S3_PROFILE_PICTURES_BUCKET_NAME: z.string().optional(),
+    AZURE_ACCOUNT_NAME: z.string().optional(),
+    AZURE_ACCOUNT_KEY: z.string().optional(),
+    AZURE_CONNECTION_STRING: z.string().optional(),
+    AZURE_STORAGE_CONTAINER_NAME: z.string().optional(),
+    AZURE_STORAGE_KB_CONTAINER_NAME: z.string().optional(),
+    AZURE_STORAGE_EXECUTION_FILES_CONTAINER_NAME: z.string().optional(),
+    AZURE_STORAGE_CHAT_CONTAINER_NAME: z.string().optional(),
+    AZURE_STORAGE_COPILOT_CONTAINER_NAME: z.string().optional(),
+    AZURE_STORAGE_PROFILE_PICTURES_CONTAINER_NAME: z.string().optional(),
+
+    // Email
+    RESEND_API_KEY: z.string().optional(),
+    AZURE_ACS_CONNECTION_STRING: z.string().optional(),
+
+    // Redis / caching
+    REDIS_URL: z.url().optional(),
+
+    // AI
+    GOOGLE_GENERATIVE_AI_API_KEY: z.string().optional(),
+    OLLAMA_URL: z.string().optional(),
+
+    // Logging
+    LOG_LEVEL: z.enum(["DEBUG", "INFO", "WARN", "ERROR"]).optional(),
+    // Inngest / workflow
+    INNGEST_EVENT_KEY: z.string().optional(),
+    INNGEST_SIGNING_KEY: z.string().optional(),
+    INNGEST_BASE_URL: z.string().optional(),
+
+    // Scheduled tasks / rate limiting
+    CRON_SECRET: z.string().optional(),
+    RATE_LIMIT_WINDOW_MS: z.string().optional().default("60000"),
+    MANUAL_EXECUTION_LIMIT: z.string().optional().default("999999"),
+    RATE_LIMIT_FREE_SYNC: z.string().optional().default("10"),
+    RATE_LIMIT_FREE_ASYNC: z.string().optional().default("50"),
+    RATE_LIMIT_PRO_SYNC: z.string().optional().default("25"),
+    RATE_LIMIT_PRO_ASYNC: z.string().optional().default("200"),
+    RATE_LIMIT_TEAM_SYNC: z.string().optional().default("75"),
+    RATE_LIMIT_TEAM_ASYNC: z.string().optional().default("500"),
+    RATE_LIMIT_ENTERPRISE_SYNC: z.string().optional().default("150"),
+    RATE_LIMIT_ENTERPRISE_ASYNC: z.string().optional().default("1000"),
+  },
+  client: {
+    NEXT_PUBLIC_APP_URL: z.url(),
+    NEXT_PUBLIC_BILLING_ENABLED: z.boolean().optional(),
+    NEXT_PUBLIC_BETTER_AUTH_URL: z.string().optional(),
+  },
+  shared: {
+    NODE_ENV: z.enum(["development", "test", "production"]).optional(),
+    NEXT_TELEMETRY_DISABLED: z.string().optional(),
+  },
+  experimental__runtimeEnv: {
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+    NEXT_PUBLIC_BILLING_ENABLED: process.env.NEXT_PUBLIC_BILLING_ENABLED,
+    NEXT_PUBLIC_BETTER_AUTH_URL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL,
+    NODE_ENV: process.env.NODE_ENV,
+    NEXT_TELEMETRY_DISABLED: process.env.NEXT_TELEMETRY_DISABLED,
+  },
+});
+
+export const isTruthy = (value: string | boolean | number | undefined) =>
+  typeof value === "string"
+    ? value.toLowerCase() === "true" || value === "1"
+    : Boolean(value);
+
+export const isFalsy = (value: string | boolean | number | undefined) =>
+  typeof value === "string"
+    ? value.toLowerCase() === "false" || value === "0"
+    : value === false;
+
+export { getEnv };

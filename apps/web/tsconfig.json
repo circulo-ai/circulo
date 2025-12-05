@@ -1,0 +1,43 @@
+{
+  "compilerOptions": {
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "target": "ESNext",
+    "plugins": [
+      {
+        "name": "next"
+      },
+      {
+        "name": "workflow"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@/db": ["../../packages/db"],
+      "@/db/*": ["../../packages/db/*"],
+      "#/*": ["./public/*"],
+      "@circulo/db": ["../../packages/db"],
+      "@circulo/db/*": ["../../packages/db/*"],
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".types/**/*.ts",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "trigger.config.ts"
+, "../server/drizzle.config.ts"  ],
+  "exclude": ["node_modules"]
+}
