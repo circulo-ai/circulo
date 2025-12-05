@@ -5,6 +5,8 @@ import { ForbiddenError, NotFoundError } from "@/lib/server/errors";
 import { requireAuth } from "@/middleware/auth";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { chat } from "@/db/schema/chat";
+import { db } from "@/db";
 
 const paramsSchema = z.object({
   id: z.string().uuid(),
@@ -13,7 +15,16 @@ const paramsSchema = z.object({
 const router = createRouter();
 
 router.get("/messages/test", async (c) => {
-  return c.json({ message: await c.di.ChatRepository.findMany({}) });
+  const result = await db.transaction(async (uow) => {
+    const recentChats = await uow
+      .select()
+      .from(chat)
+      .limit(5);
+
+    return { recentChats };
+  });
+
+  return c.json({ message: result });
 });
 
 router.delete(

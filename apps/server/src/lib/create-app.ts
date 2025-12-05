@@ -1,12 +1,12 @@
-import { createContainerMiddleware, type ContainerEnv } from "@circulo-ai/di";
+import { bindToHono, type ContainerEnv } from "@circulo-ai/di";
 import { Hono } from "hono";
-import { buildRootProvider, type RequestContainer } from "@/di/container";
-import { requestDi } from "@/di/di-context";
+import { DI_TOKENS, buildRootProvider, type RequestContainer } from "@/di/container";
 import type { AuthType } from "./auth";
+import type { RateLimitDecision } from "@/services/rate-limit";
 
 export type AppEnv = {
   Variables: ContainerEnv<RequestContainer>["Variables"] &
-    AuthType & { activeOrgId?: string };
+    AuthType & { activeOrgId?: string; rateLimit?: RateLimitDecision };
 };
 
 export function createRouter() {
@@ -19,8 +19,7 @@ export default function createApp() {
   const app = createRouter();
   const provider = buildRootProvider();
 
-  app.use("*", createContainerMiddleware<RequestContainer, AppEnv>(provider));
-  app.use("*", requestDi);
+  bindToHono(app, provider, DI_TOKENS, { cache: true, strict: true });
 
   return app;
 }

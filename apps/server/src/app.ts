@@ -37,6 +37,7 @@ import { prettyJSON } from "hono/pretty-json";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { getBaseUrl } from "@/lib/urls/utils";
+import { rateLimit } from "@/middleware/rate-limit";
 
 const app = createApp();
 
@@ -69,6 +70,7 @@ const corsMiddleware = cors({
   credentials: true,
 });
 app.use("*", corsMiddleware); // apply globally so preflight never 404s
+app.use("/api/*", rateLimit());
 
 const routes = [
   autumn,
