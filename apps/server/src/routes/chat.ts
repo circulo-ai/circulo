@@ -1,5 +1,4 @@
-import { chatRepo } from "@/db/repositories/chat-repo";
-import { messageRepo } from "@/db/repositories/message-repo";
+import { DI_TOKENS } from "@/di/container";
 import { getActiveOrganizationId } from "@/lib/auth";
 import { titlePrompt } from "@/lib/ai/prompts";
 import { myProvider } from "@/lib/ai/providers";
@@ -21,6 +20,7 @@ import { type OrchestrationInput } from "@/workflows/orchestrate/types";
 import { z } from "zod";
 import { inngest } from "@/lib/inngest/client";
 import { randomUUID } from "crypto";
+import { Identifier } from "@circulo-ai/core";
 
 const deleteQuerySchema = z.object({
   id: z.string().uuid(),
@@ -59,9 +59,10 @@ router.post(
   zValidator("json", createChatSchema),
   async (c) => {
     try {
-      const { id, message, visibility: selectedVisibilityType } =
-        c.req.valid("json");
-      const { user, session, activeOrgId } = c.var;
+      const { id, message, visibility: selectedVisibilityType } = c.req.valid("json");
+      const { user, session } = c.var;
+      const di = c.di;
+      const activeOrgId = c.get("activeOrgId");
 
       const messages: ChatMessage[] = [message as ChatMessage];
 
@@ -70,76 +71,46 @@ router.post(
 
       const isOrgMember = await isMemberOf(user!.id, activeOrganizationId);
       if (!isOrgMember) {
-        throw new ForbiddenError(
-          "You are not a member of this organization",
-        );
+        throw new ForbiddenError("You are not a member of this organization");
       }
 
-      const existingChat = await chatRepo.findById(id);
-
-      if (existingChat) {
-        if (existingChat.creatorId !== user!.id) {
-          if (existingChat.organizationId !== activeOrganizationId) {
-            throw new ForbiddenError("You don't have access to this chat");
-          }
-
-          const canUpdate = await hasPermission(
-            "chat",
-            "update",
-            activeOrganizationId,
-            session as any,
-          );
-          if (!canUpdate) {
-            throw new ForbiddenError(
-              "You don't have permission to update chats in this organization",
-            );
-          }
-        }
-      } else {
-        const canCreate = await hasPermission(
-          "chat",
-          "create",
-          activeOrganizationId,
-          session as any,
-        );
-        if (!canCreate) {
-          throw new ForbiddenError(
-            "You don't have permission to create chats in this organization",
-          );
-        }
-
-        const title = await generateTitleFromUserMessages({ messages });
-        await chatRepo.create({
-          id,
-          creatorId: user!.id,
-          title,
-          visibility: selectedVisibilityType,
-          organizationId: activeOrganizationId,
-        });
-      }
-
-      await messageRepo.createMany(
-        messages.map((msg) => {
-          return {
-            chatId: id,
-            id: msg.id,
-            role: "user",
-            parts: msg.parts,
-            attachments: [],
-            content: getTextFromMessage(msg),
-            createdAt: new Date(),
-            authorType: "user",
-            authorId: user!.id,
-            tokenCount: 0,
-            cost: "0.000000",
-            quotedMessageId: null,
-            isEdited: false,
-            editedAt: null,
-            isDeleted: false,
-            deletedAt: null,
-          };
-        }),
+      const canCreate = await hasPermission(
+        "chat",
+        "create",
+        activeOrganizationId,
+        session as any,
       );
+      if (!canCreate) {
+        throw new ForbiddenError("You don't have permission to create chats in this organization");
+      }
+
+      const title = await generateTitleFromUserMessages({ messages });
+
+      const createChat = di.CreateChatUseCase;
+      const postMessage = di.PostMessageUseCase;
+
+      const chatResult = await createChat.execute({
+        id,
+        organizationId: activeOrganizationId,
+        creatorId: user!.id,
+        title,
+        visibility: selectedVisibilityType,
+      });
+      if (chatResult.isFailure) {
+        throw new BadRequestError(chatResult.getError() ?? "Unable to create chat");
+      }
+
+      for (const msg of messages) {
+        const messageResult = await postMessage.execute({
+          id: msg.id,
+          chatId: id,
+          authorId: user!.id,
+          content: getTextFromMessage(msg),
+        });
+        if (messageResult.isFailure) {
+          throw new BadRequestError(messageResult.getError() ?? "Unable to post message");
+        }
+      }
 
       const orchestrationInput: OrchestrationInput = {
         chatId: id,
@@ -182,7 +153,8 @@ router.delete(
   zValidator("query", deleteQuerySchema),
   async (c) => {
     const { id } = c.req.valid("query");
-    const { user, activeOrgId } = c.var;
+    const di = c.di;
+    const activeOrgId = c.get("activeOrgId");
 
     const activeOrganizationId =
       activeOrgId ?? (await getActiveOrganizationId(c.req.raw));
@@ -191,32 +163,11 @@ router.delete(
       throw new ForbiddenError("No active organization");
     }
 
-    const chat = await chatRepo.findById(id);
-
-    if (!chat) {
-      throw new NotFoundError("Chat not found");
+    const result = await di.DeleteChatUseCase.execute({ id });
+    if (result.isFailure) {
+      return new BadRequestError(result.getError() ?? "Unable to delete chat").toResponse();
     }
-
-    if (chat.organizationId !== activeOrganizationId) {
-      throw new ForbiddenError("Chat does not belong to your organization");
-    }
-
-    if (chat.creatorId !== user!.id) {
-      const canDelete = await hasPermission(
-        "chat",
-        "delete",
-        activeOrganizationId,
-        c.var.session as any,
-      );
-      if (!canDelete) {
-        throw new ForbiddenError(
-          "You don't have permission to delete this chat",
-        );
-      }
-    }
-
-    const deletedChat = await chatRepo.softDelete(id);
-    return c.json(deletedChat, 200);
+    return c.json({ success: true }, 200);
   },
 );
 

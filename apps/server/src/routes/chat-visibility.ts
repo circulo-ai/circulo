@@ -1,67 +1,40 @@
-import { chatRepo } from "@/db/repositories/chat-repo";
-import { getActiveOrganizationId } from "@/lib/auth";
 import { createRouter } from "@/lib/create-app";
-import { ForbiddenError, NotFoundError } from "@/lib/server/errors";
 import { requireAuth } from "@/middleware/auth";
-import { hasPermission, isMemberOf } from "@/lib/permissions";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-
-const paramsSchema = z.object({
-  id: z.string().uuid(),
-});
-
-const bodySchema = z.object({
-  visibility: z.enum(["private", "public"]),
-});
+import { BadRequestError, ForbiddenError, NotFoundError } from "@/lib/server/errors";
+import { getActiveOrganizationId } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
+import { DI_TOKENS, type RequestContainer } from "@/di/container";
 
 const router = createRouter();
 
+const visibilitySchema = z.object({
+  id: z.string().uuid(),
+  visibility: z.enum(["private", "public"]),
+});
+
 router.patch(
-  "/chat/:id/visibility",
+  "/chat/visibility",
   requireAuth,
-  zValidator("param", paramsSchema),
-  zValidator("json", bodySchema),
+  zValidator("json", visibilitySchema),
   async (c) => {
-    const { user, activeOrgId, session } = c.var;
-    const { id } = c.req.valid("param");
-    const { visibility } = c.req.valid("json");
+    const { id, visibility } = c.req.valid("json");
+    const { session, activeOrgId, di } = c.var as typeof c.var & { di: RequestContainer };
+    const activeOrganizationId = activeOrgId ?? (await getActiveOrganizationId(c.req.raw));
+    if (!activeOrganizationId) throw new ForbiddenError("No active organization");
 
-    const chat = await chatRepo.findById(id);
-    if (!chat) {
-      throw new NotFoundError("Chat not found");
+    const canUpdate = await hasPermission("chat", "update", activeOrganizationId, session as any);
+    if (!canUpdate) throw new ForbiddenError("You don't have permission to update chat visibility");
+
+    const useCase = di.resolve(DI_TOKENS.ChangeChatVisibilityUseCase);
+    const result = await useCase.execute({ id, visibility });
+    if (result.isFailure) {
+      const msg = result.getError() ?? "Unable to update chat visibility";
+      if (/not found/i.test(msg)) throw new NotFoundError(msg);
+      throw new BadRequestError(msg);
     }
-
-    const organizationId =
-      activeOrgId ?? (await getActiveOrganizationId(c.req.raw));
-
-    if (chat.organizationId !== organizationId) {
-      throw new ForbiddenError("Chat does not belong to your organization");
-    }
-
-    const isOrgMember = await isMemberOf(user!.id, chat.organizationId);
-    if (!isOrgMember) {
-      throw new ForbiddenError("You are not a member of this organization");
-    }
-
-    if (chat.creatorId !== user!.id) {
-      const canUpdate = await hasPermission(
-        "chat",
-        "update",
-        chat.organizationId,
-        session as any,
-      );
-      if (!canUpdate) {
-        throw new ForbiddenError("You don't have permission to update chats");
-      }
-    }
-
-    const updated = await chatRepo.updateVisibilityById({
-      chatId: chat.id,
-      visibility,
-    });
-
-    return c.json({ success: true, chat: updated });
+    return c.json({ success: true }, 200);
   },
 );
 
