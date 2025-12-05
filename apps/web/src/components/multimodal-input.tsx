@@ -10,12 +10,8 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { ArrowUpIcon, PaperclipIcon, StopIcon } from "@/components/icons/icons";
 import { Agent, ChatAgent } from "@/db";
-import { useUploadManager } from "@/hooks/use-upload-manager";
+import { useUploadTaskManager } from "@/hooks/use-upload-task-manager";
 import type { Attachment, ChatMessage } from "@/lib/types";
-<<<<<<< HEAD
-=======
-import { useUploadTaskManager } from "@/lib/uploads";
->>>>>>> 38cc45947af540b267716395c1b988e6c3e8c6e3
 import type { AppUsage } from "@/lib/usage";
 import { cn } from "@/lib/utils";
 import type { UseChatHelpers } from "@ai-sdk/react";

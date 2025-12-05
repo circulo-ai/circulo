@@ -3,19 +3,11 @@
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-<<<<<<< HEAD
-import { UploadDropzone } from "@/components/uploads";
-import { useUploadManager } from "@/hooks/use-upload-manager";
+import { FileInput } from "@/components/uploads/file-input";
+import { useUploadTaskManager } from "@/hooks/use-upload-task-manager";
 import { signOut, useSession } from "@/lib/auth-client";
 import { useBrandConfig } from "@/lib/branding/branding";
 import { createLogger } from "@/lib/logs/console/logger";
-=======
-import { FileInput } from "@/components/uploads";
-import { signOut, useSession } from "@/lib/auth-client";
-import { useBrandConfig } from "@/lib/branding/branding";
-import { createLogger } from "@/lib/logs/console/logger";
-import { useUploadTaskManager } from "@/lib/uploads";
->>>>>>> 38cc45947af540b267716395c1b988e6c3e8c6e3
 import { clearUserData } from "@/stores";
 import { Camera, UserIcon } from "lucide-react";
 import Image from "next/image";

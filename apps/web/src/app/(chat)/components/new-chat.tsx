@@ -39,7 +39,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { FileInput } from "@/components/uploads";
+import { FileInput } from "@/components/uploads/file-input";
 import { Agent } from "@/db";
 import { createBodySchema } from "@/lib/schemas/agent";
 import { getFetcher } from "@/lib/swr";

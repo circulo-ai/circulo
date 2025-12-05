@@ -6,7 +6,13 @@ import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
 
 import { getFetcher } from "@/lib/swr";
-import { StorageContext } from "@/lib/uploads/core/config-resolver";
+
+type StorageContext =
+  | "general"
+  | "knowledge-base"
+  | "organization"
+  | "chat"
+  | "profile-pictures";
 
 interface PresignUploadResponse {
   presignedUrl?: string;

@@ -1,4 +1,4 @@
-import { UploadTask, useUploadTaskManager } from "@/lib/uploads";
+import { UploadTask, useUploadTaskManager } from "@/hooks/use-upload-task-manager";
 import { cn } from "@/lib/utils";
 import { ImageMinus, ImagePlus } from "lucide-react";
 import Image from "next/image";

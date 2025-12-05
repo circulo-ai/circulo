@@ -15,11 +15,7 @@ import {
 } from "react";
 import {
   Controller,
-<<<<<<< HEAD
-  ControllerFieldState,
-=======
   ControllerRenderProps,
->>>>>>> 38cc45947af540b267716395c1b988e6c3e8c6e3
   FieldValues,
   Path,
   useFormContext,
@@ -42,12 +38,6 @@ export interface InputComponentProps
   onChange?: ChangeEventHandler;
   onBlur?: FocusEventHandler;
   ref?: Ref<any>;
-<<<<<<< HEAD
-  context: {
-    fieldState: ControllerFieldState;
-  };
-=======
->>>>>>> 38cc45947af540b267716395c1b988e6c3e8c6e3
 }
 
 interface ControlledInputProps<T extends FieldValues>
@@ -56,27 +46,6 @@ interface ControlledInputProps<T extends FieldValues>
   title?: string;
   description?: string;
   saveAsNumber?: boolean;
-<<<<<<< HEAD
-  inputProps?: ComponentProps<"input">;
-  addons?: ReactNode;
-  inputComponent: FC<InputComponentProps>;
-}
-
-export const ControlledInput = <T extends FieldValues>({
-  name,
-  title,
-  description,
-  saveAsNumber,
-  inputProps,
-  addons,
-  inputComponent: InputComponent,
-  ...props
-}: ControlledInputProps<T>) => {
-  const id = useId();
-
-  const { control } = useFormContext();
-
-=======
   addons?: ReactNode;
   inputComponent: FC<InputComponentProps>;
   inputProps?: ComponentProps<"input">;
@@ -153,17 +122,13 @@ const FormInputAdapter = <T extends FieldValues>({
   inputComponent: FC<InputComponentProps>;
 }) => {
   // TODO convert to a utility
->>>>>>> 38cc45947af540b267716395c1b988e6c3e8c6e3
   const extractDigitsOnly = useCallback(
     (e: ChangeEvent<HTMLInputElement>) =>
       convertPersianToEnglishNumbers(e.target.value).replace(/\D/g, ""),
     [],
   );
 
-<<<<<<< HEAD
-=======
   // TODO convert to a utility
->>>>>>> 38cc45947af540b267716395c1b988e6c3e8c6e3
   const extractNumberFromInput = useCallback(
     (event: ChangeEvent<HTMLInputElement>) =>
       parseInt(extractDigitsOnly(event)),
@@ -171,43 +136,6 @@ const FormInputAdapter = <T extends FieldValues>({
   );
 
   return (
-<<<<<<< HEAD
-    <Controller
-      name={name}
-      control={control}
-      render={({ field: { value, onChange, ...field }, fieldState }) => (
-        <Field data-invalid={fieldState.invalid} {...props}>
-          <FieldLabel htmlFor={id}>{title ?? camelToTitle(name)}</FieldLabel>
-          {description && <FieldDescription>{description}</FieldDescription>}
-          <CustomInputGroup>
-            <InputComponent
-              id={id}
-              aria-invalid={fieldState.invalid}
-              context={{ fieldState }}
-              value={value ?? ""}
-              onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                onChange(
-                  inputProps?.type === "number"
-                    ? saveAsNumber
-                      ? isNaN(extractNumberFromInput(e))
-                        ? 0
-                        : extractNumberFromInput(e)
-                      : extractDigitsOnly(e)
-                    : e.target.value,
-                )
-              }
-              {...inputProps}
-              {...field}
-            />
-            {addons}
-          </CustomInputGroup>
-          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-        </Field>
-      )}
-    />
-  );
-};
-=======
     <InputComponent
       id={id} // TODO pass these props only if InputComponent accepts them
       aria-invalid={invalid}
@@ -230,4 +158,3 @@ const FormInputAdapter = <T extends FieldValues>({
 };
 
 // TODO make it type safe
->>>>>>> 38cc45947af540b267716395c1b988e6c3e8c6e3

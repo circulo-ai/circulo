@@ -1,11 +1,7 @@
-<<<<<<< HEAD
-import type { UploadItem, UploadStatus } from "@/hooks/use-upload-manager";
-=======
 import type {
   UploadState,
   UploadTask,
-} from "@/lib/uploads/hooks/use-upload-task-manager";
->>>>>>> 38cc45947af540b267716395c1b988e6c3e8c6e3
+} from "@/hooks/use-upload-task-manager";
 import clsx from "clsx";
 import type { ReactNode } from "react";
 
