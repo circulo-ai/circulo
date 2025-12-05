@@ -5,7 +5,8 @@
       "@/*": ["./src/*"],
       "@circulo/core": ["../../packages/core/src"],
       "@circulo-ai/di": ["../../packages/di/src"],
-      "@/db": ["../../packages/db"],
+      "@circulo-ai/redis": ["../../packages/redis/src"],
+      "@/db": ["../../packages/db/index.ts"],
       "@/db/*": ["../../packages/db/*"]
     },
     "jsx": "react-jsx",
