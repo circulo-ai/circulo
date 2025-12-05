@@ -1,4 +1,4 @@
-import type { UnitOfWork } from "@circulo/core";
+import type { UnitOfWork } from "@circulo-ai/core";
 import { beginTransaction, getDb, type DbInstance } from "@/db";
 
 type DbClient = DbInstance;
