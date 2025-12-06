@@ -8,10 +8,12 @@ import {
   ComponentProps,
   FC,
   FocusEventHandler,
+  Fragment,
   ReactNode,
   Ref,
   useCallback,
   useId,
+  useMemo,
 } from "react";
 import {
   Controller,
@@ -20,7 +22,13 @@ import {
   Path,
   useFormContext,
 } from "react-hook-form";
-import { Field, FieldDescription, FieldError, FieldLabel } from "../ui/field";
+import {
+  FieldContent,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "../ui/field";
+import { CustomField } from "./field";
 import { CustomInputGroup } from "./input-group";
 
 export interface InputComponentProps
@@ -34,38 +42,46 @@ export interface InputComponentProps
     | "disabled"
     | "name"
     | "ref"
+    | "type"
   > {
   onChange?: ChangeEventHandler;
   onBlur?: FocusEventHandler;
   ref?: Ref<any>;
 }
 
-interface ControlledInputProps<T extends FieldValues>
-  extends ComponentProps<typeof Field> {
+interface ControlledInputProps<
+  T extends FieldValues,
+  ExtendedInputComponentProps extends InputComponentProps,
+> extends ComponentProps<typeof CustomField> {
   name: Path<T>;
   title?: string;
   description?: string;
   saveAsNumber?: boolean;
   addons?: ReactNode;
-  inputComponent: FC<InputComponentProps>;
-  inputProps?: ComponentProps<"input">;
-  unstyled?: boolean;
+  inputComponent: FC<ExtendedInputComponentProps>;
+  inputProps?: ExtendedInputComponentProps;
+  inputStyle?: "vertical" | "horizontal" | "unstyled";
 }
 
-export function ControlledInput<T extends FieldValues>({
+export function ControlledInput<
+  T extends FieldValues,
+  ExtendedInputComponentProps extends InputComponentProps,
+>({
   name,
-  title,
+  title: rawTitle,
   description,
   saveAsNumber = false,
   addons,
   inputComponent: InputComponent,
-  inputProps = {},
-  unstyled,
+  inputProps = {} as ExtendedInputComponentProps,
+  inputStyle = "vertical",
   id: explicitId,
+  className,
   ...props
-}: ControlledInputProps<T>) {
+}: ControlledInputProps<T, ExtendedInputComponentProps>) {
   const implicitId = useId();
-  const id = explicitId ?? implicitId;
+  const id = useMemo(() => explicitId ?? implicitId, [explicitId, implicitId]);
+  const title = useMemo(() => rawTitle ?? camelToTitle(name), [rawTitle, name]);
 
   const { control } = useFormContext();
 
@@ -74,21 +90,23 @@ export function ControlledInput<T extends FieldValues>({
       name={name}
       control={control}
       render={({ field, fieldState: { invalid, error } }) =>
-        unstyled ? (
-          <FormInputAdapter<T>
+        inputStyle === "unstyled" ? (
+          <FormInputAdapter<T, ExtendedInputComponentProps>
             id={id}
             field={field}
             invalid={invalid}
+            className={className}
             inputProps={inputProps}
             saveAsNumber={saveAsNumber}
             inputComponent={InputComponent}
           />
-        ) : (
-          <Field data-invalid={invalid} {...props}>
-            <FieldLabel htmlFor={id}>{title ?? camelToTitle(name)}</FieldLabel>
+        ) : inputStyle === "vertical" ? (
+          // TODO could write less by combining the cases
+          <CustomField data-invalid={invalid} className={className} {...props}>
+            <FieldLabel htmlFor={id}>{title}</FieldLabel>
             {description && <FieldDescription>{description}</FieldDescription>}
             <CustomInputGroup>
-              <FormInputAdapter<T>
+              <FormInputAdapter<T, ExtendedInputComponentProps>
                 id={id}
                 field={field}
                 invalid={invalid}
@@ -99,17 +117,46 @@ export function ControlledInput<T extends FieldValues>({
               {addons}
             </CustomInputGroup>
             {invalid && <FieldError errors={[error]} />}
-          </Field>
+          </CustomField>
+        ) : inputStyle === "horizontal" ? (
+          <CustomField
+            orientation="horizontal"
+            data-invalid={invalid}
+            className={className}
+            {...props}
+          >
+            <FieldContent>
+              <FieldLabel htmlFor={id}>{title}</FieldLabel>
+              {description && (
+                <FieldDescription>{description}</FieldDescription>
+              )}
+              {invalid && <FieldError errors={[error]} />}
+            </FieldContent>
+            <FormInputAdapter<T, ExtendedInputComponentProps>
+              id={id}
+              field={field}
+              invalid={invalid}
+              inputProps={inputProps}
+              saveAsNumber={saveAsNumber}
+              inputComponent={InputComponent}
+            />
+          </CustomField>
+        ) : (
+          <Fragment />
         )
       }
     />
   );
 }
 
-const FormInputAdapter = <T extends FieldValues>({
+const FormInputAdapter = <
+  T extends FieldValues,
+  ExtendedInputComponentProps extends InputComponentProps,
+>({
   id,
   field: { value, onChange, ...field },
   invalid,
+  className,
   inputProps,
   saveAsNumber,
   inputComponent: InputComponent,
@@ -117,9 +164,10 @@ const FormInputAdapter = <T extends FieldValues>({
   id: string;
   field: ControllerRenderProps<FieldValues, Path<T>>;
   invalid: boolean;
-  inputProps: ComponentProps<"input">;
+  className?: string;
+  inputProps: ExtendedInputComponentProps;
   saveAsNumber: boolean;
-  inputComponent: FC<InputComponentProps>;
+  inputComponent: FC<ExtendedInputComponentProps>;
 }) => {
   // TODO convert to a utility
   const extractDigitsOnly = useCallback(
@@ -139,16 +187,20 @@ const FormInputAdapter = <T extends FieldValues>({
     <InputComponent
       id={id} // TODO pass these props only if InputComponent accepts them
       aria-invalid={invalid}
+      className={className}
       value={value ?? ""}
       onChange={(e: ChangeEvent<HTMLInputElement>) =>
         onChange(
+          // TODO make this more readable
           inputProps?.type === "number"
             ? saveAsNumber
               ? isNaN(extractNumberFromInput(e))
                 ? 0
                 : extractNumberFromInput(e)
               : extractDigitsOnly(e)
-            : e.target.value,
+            : typeof e === "string"
+              ? e
+              : e.target.value,
         )
       }
       {...inputProps}

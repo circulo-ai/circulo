@@ -1,4 +1,8 @@
-import { UploadTask, useUploadTaskManager } from "@/hooks/use-upload-task-manager";
+import {
+  UploadTask,
+  useUploadTaskManager,
+} from "@/hooks/use-upload-task-manager";
+import { getGhostProps } from "@/lib/ghost";
 import { cn } from "@/lib/utils";
 import { ImageMinus, ImagePlus } from "lucide-react";
 import Image from "next/image";
@@ -108,7 +112,7 @@ export function FileInput({
   return (
     <label
       htmlFor={id}
-      className={className}
+      className={cn("rounded-full", "size-fit", className)} // TODO get rid of the rounded-full
       onDragOver={handleDropOver}
       onDragLeave={handleDropLeave}
       onDrop={handleDrop}
@@ -118,7 +122,7 @@ export function FileInput({
         type="file"
         value=""
         onChange={handleChange}
-        className="pointer-events-none absolute opacity-0"
+        {...getGhostProps({ isGhost: true })}
         disabled={disabled}
         {...props}
       />
@@ -146,10 +150,7 @@ function DefaultComponent({
 }: CustomComponentProps) {
   return (
     <div
-      className={cn(
-        "mx-auto",
-        "relative size-32 overflow-hidden rounded-full border border-input",
-      )}
+      className={cn("relative size-32 overflow-hidden rounded-full")}
       onClick={(e) => {
         if (url) {
           e.preventDefault();
@@ -170,7 +171,7 @@ function DefaultComponent({
       )}
       <div
         className={cn(
-          "absolute inset-0 flex items-center justify-center",
+          "absolute inset-0 flex items-center justify-center rounded-full border border-input",
           isLoaded && "bg-background/50",
           !isLoaded && "bg-input/30",
         )}
@@ -184,3 +185,4 @@ function DefaultComponent({
 }
 
 // TODO global drag and drop
+// TODO when the form resets, this doesn't

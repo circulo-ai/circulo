@@ -45,3 +45,4 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 }
 
 // TODO button active style
+// TODO prettier: https://chatgpt.com/c/69338b4a-b524-8328-879b-13bb0bda08a8
