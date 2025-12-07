@@ -21,7 +21,7 @@ export async function checkHybridAuth(
     // 1. Internal JWT
     const authHeader = request.headers.get("authorization");
     if (authHeader?.startsWith("Bearer ")) {
-      const token = authHeader.split(" ")[1];
+      const token = authHeader.split(" ")[1] || "";
       const verification = await verifyInternalToken(token);
 
       if (verification.valid) {

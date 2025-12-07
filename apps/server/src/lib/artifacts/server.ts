@@ -1,6 +1,6 @@
-import { codeDocumentHandler } from "@/artifacts/code/server";
-import { sheetDocumentHandler } from "@/artifacts/sheet/server";
-import { textDocumentHandler } from "@/artifacts/text/server";
+import { codeDocumentHandler } from "@/application/artifact/handlers/code/server";
+import { sheetDocumentHandler } from "@/application/artifact/handlers/sheet/server";
+import { textDocumentHandler } from "@/application/artifact/handlers/text/server";
 import { artifactRepo } from "@/db/repositories";
 import type { ArtifactKind, Document } from "@/db/schema";
 import type { UIMessageStreamWriter } from "ai";

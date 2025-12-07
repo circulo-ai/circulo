@@ -1,27 +1,25 @@
 import { agentRepo } from "@/db/repositories";
 import { getUserRole, hasPermission, isMemberOf } from "@/lib/permissions";
 import { createRouter } from "@/lib/create-app";
-import {
-  BadRequestError,
-  ForbiddenError,
-  NotFoundError,
-} from "@/lib/server/errors";
 import { requireAuth } from "@/middleware/auth";
 import { zValidator } from "@hono/zod-validator";
 import {
-  createBodySchema,
-  deleteQuerySchema,
-  getQuerySchema,
-  updateBodySchema,
-} from "./schema";
-import { resolveOrganizationId } from "./utils";
+  BadRequestError,
+  createAgentBodySchema,
+  deleteAgentQuerySchema,
+  ForbiddenError,
+  getAgentQuerySchema,
+  updateAgentBodySchema,
+} from "@circulo-ai/types";
+import { resolveOrganizationId } from "../utils";
+import { NotFoundError } from "@circulo-ai/core";
 
 const router = createRouter();
 
 router.get(
   "/agent",
   requireAuth,
-  zValidator("query", getQuerySchema),
+  zValidator("query", getAgentQuerySchema),
   async (c) => {
     const { user, activeOrgId } = c.var;
     const query = c.req.valid("query");
@@ -60,7 +58,7 @@ router.get(
 router.post(
   "/agent",
   requireAuth,
-  zValidator("json", createBodySchema),
+  zValidator("json", createAgentBodySchema),
   async (c) => {
     const { user, activeOrgId } = c.var;
     const body = c.req.valid("json");
@@ -118,7 +116,7 @@ function assertCanManageAgent(
 router.patch(
   "/agent",
   requireAuth,
-  zValidator("json", updateBodySchema),
+  zValidator("json", updateAgentBodySchema),
   async (c) => {
     const { user, activeOrgId } = c.var;
     const body = c.req.valid("json");
@@ -173,7 +171,7 @@ router.patch(
 router.delete(
   "/agent",
   requireAuth,
-  zValidator("query", deleteQuerySchema),
+  zValidator("query", deleteAgentQuerySchema),
   async (c) => {
     const { user, activeOrgId } = c.var;
     const query = c.req.valid("query");

@@ -1,8 +1,8 @@
 import { bindToHono, type ContainerEnv } from "@circulo-ai/di";
-import { Hono } from "hono";
 import { DI_TOKENS, buildRootProvider, type RequestContainer } from "@/di/container";
 import type { AuthType } from "./auth";
 import type { RateLimitDecision } from "@/services/rate-limit";
+import { Hono } from "hono";
 
 export type AppEnv = {
   Variables: ContainerEnv<RequestContainer>["Variables"] &
@@ -11,7 +11,7 @@ export type AppEnv = {
 
 export function createRouter() {
   return new Hono<AppEnv>({
-    strict: false,
+    strict: true,
   });
 }
 

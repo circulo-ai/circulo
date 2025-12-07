@@ -30,6 +30,9 @@
       "@circulo/db/*": ["../../packages/db/*"]
     }
   },
+  "references": [
+    { "path": "../../packages/types" }
+  ],
   "include": [
     "next-env.d.ts",
     "**/*.ts",
