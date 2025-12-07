@@ -27,5 +27,5 @@ export const isBillingEnabled = isTruthy(env.BILLING_ENABLED);
  * Is this the hosted version of the application
  */
 export const isHosted =
-  env.NEXT_PUBLIC_APP_URL === "https://www.circulo-ai.com" ||
-  env.NEXT_PUBLIC_APP_URL === "https://www.staging.circulo-ai.com";
+  env.NEXT_PUBLIC_APP_URL === "https://api.circulo-ai.com" ||
+  env.NEXT_PUBLIC_APP_URL === "https://www.staging-api.circulo-ai.com";

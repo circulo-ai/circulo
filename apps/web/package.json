@@ -156,7 +156,8 @@
     "vaul": "^1.1.2",
     "xlsx": "^0.18.5",
     "zod": "^4.1.13",
-    "zustand": "^5.0.9"
+    "zustand": "^5.0.9",
+    "@circulo-ai/types": "workspace:*"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.3",

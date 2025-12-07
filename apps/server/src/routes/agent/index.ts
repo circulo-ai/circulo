@@ -13,7 +13,7 @@ import {
   deleteQuerySchema,
   getQuerySchema,
   updateBodySchema,
-} from "./schema";
+} from "@circulo-ai/types";
 import { resolveOrganizationId } from "./utils";
 
 const router = createRouter();

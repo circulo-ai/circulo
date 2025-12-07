@@ -34,6 +34,9 @@
     "types": ["node"],
     "isolatedModules": true
   },
+  "references": [
+    { "path": "../../packages/types" }
+  ],
   "include": ["src/**/*"],
   "exclude": ["node_modules", "**/*.test.ts", "dist", "drizzle.config.ts"]
 }

@@ -9,7 +9,7 @@ import { chat } from "@/db/schema/chat";
 import { db } from "@/db";
 
 const paramsSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
 });
 
 const router = createRouter();

@@ -16,18 +16,14 @@ import { requireAuth } from "@/middleware/auth";
 import { type ChatMessage } from "@/lib/types";
 import { generateText, safeValidateUIMessages } from "ai";
 import { zValidator } from "@hono/zod-validator";
-import { type OrchestrationInput } from "@/workflows/orchestrate/types";
 import { z } from "zod";
-import { inngest } from "@/lib/inngest/client";
-import { randomUUID } from "crypto";
-import { Identifier } from "@circulo-ai/core";
 
 const deleteQuerySchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
 });
 
 const createChatSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   visibility: z.enum(["private", "public"]).default("private"),
   message: z.unknown().refine(async (value) => {
     const { success } = await safeValidateUIMessages<ChatMessage>({
@@ -112,21 +108,22 @@ router.post(
         }
       }
 
-      const orchestrationInput: OrchestrationInput = {
-        chatId: id,
-        messages: messages,
-        triggerType: "user_message",
-        session: session as any,
-      };
+      // TODO
+      // const orchestrationInput: OrchestrationInput = {
+      //   chatId: id,
+      //   messages: messages,
+      //   triggerType: "user_message",
+      //   session: session as any,
+      // };
 
-      const eventId = randomUUID();
-      await inngest.send({
-        name: "app/orchestrate.run",
-        data: orchestrationInput,
-        id: eventId,
-      });
+      // const eventId = randomUUID();
+      // await inngest.send({
+      //   name: "app/orchestrate.run",
+      //   data: orchestrationInput,
+      //   id: eventId,
+      // });
 
-      return c.json({ success: true, eventId }, 202);
+      return c.json({ success: true, eventId: 12 }, 202);
     } catch (error) {
       if (error instanceof RateLimitError) return error.toResponse();
       if (
