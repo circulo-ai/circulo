@@ -33,9 +33,10 @@ export type LinkAgentOutput = Result<{ linkId: string }>;
 export type ToggleAgentLinkOutput = Result<void>;
 export type UpdateAgentLinkOverridesOutput = Result<void>;
 
-export class LinkAgentToChat
-  implements UseCase<LinkAgentInput, LinkAgentOutput>
-{
+export class LinkAgentToChat implements UseCase<
+  LinkAgentInput,
+  LinkAgentOutput
+> {
   constructor(
     private readonly links: DrizzleChatAgentLinkRepository,
     private readonly uow: UnitOfWork,
@@ -64,9 +65,10 @@ export class LinkAgentToChat
   }
 }
 
-export class ToggleAgentLink
-  implements UseCase<ToggleAgentLinkInput, ToggleAgentLinkOutput>
-{
+export class ToggleAgentLink implements UseCase<
+  ToggleAgentLinkInput,
+  ToggleAgentLinkOutput
+> {
   constructor(
     private readonly links: DrizzleChatAgentLinkRepository,
     private readonly uow: UnitOfWork,
@@ -86,9 +88,10 @@ export class ToggleAgentLink
   }
 }
 
-export class UpdateAgentLinkOverrides
-  implements UseCase<UpdateAgentLinkOverridesInput, UpdateAgentLinkOverridesOutput>
-{
+export class UpdateAgentLinkOverrides implements UseCase<
+  UpdateAgentLinkOverridesInput,
+  UpdateAgentLinkOverridesOutput
+> {
   constructor(
     private readonly links: DrizzleChatAgentLinkRepository,
     private readonly uow: UnitOfWork,

@@ -17,8 +17,9 @@ export function CustomInputGroup({
   );
 }
 
-interface CustomInputGroupInputProps
-  extends ComponentProps<typeof InputGroupInput> {}
+interface CustomInputGroupInputProps extends ComponentProps<
+  typeof InputGroupInput
+> {}
 
 export function CustomInputGroupInput({
   className,

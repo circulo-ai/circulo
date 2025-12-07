@@ -34,9 +34,9 @@ export const updateAgentBodySchema = baseAgentSchema
   .refine(
     (data) =>
       Object.entries(data).some(
-        ([key, value]) => key !== "id" && value !== undefined
+        ([key, value]) => key !== "id" && value !== undefined,
       ),
-    { message: "At least one field must be provided to update" }
+    { message: "At least one field must be provided to update" },
   );
 
 export const deleteAgentQuerySchema = z.object({

@@ -42,8 +42,7 @@ interface OptionSeparatorWithKey extends OptionSeparator {
 }
 
 interface SelectInputProps
-  extends Omit<ComponentProps<typeof Select>, "value">,
-    InputComponentProps {
+  extends Omit<ComponentProps<typeof Select>, "value">, InputComponentProps {
   options?: (Option | OptionGroup | OptionSeparator)[];
   placeholder?: ReactNode;
 }
@@ -108,8 +107,9 @@ function RenderOptions({
   );
 }
 
-interface CustomSelectTriggerProps
-  extends ComponentProps<typeof SelectTrigger> {}
+interface CustomSelectTriggerProps extends ComponentProps<
+  typeof SelectTrigger
+> {}
 
 export function CustomSelectTrigger({
   className,

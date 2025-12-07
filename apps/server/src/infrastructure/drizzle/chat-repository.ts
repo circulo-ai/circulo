@@ -56,7 +56,11 @@ export class DrizzleChatRepository implements Repository<Chat> {
   }
 
   async deleteById(id: Identifier): Promise<boolean> {
-    const result = await this.db.delete(chatTable).where(eq(chatTable.id, id.toString()));
-    return "rowCount" in result ? (result as { rowCount: number }).rowCount > 0 : true;
+    const result = await this.db
+      .delete(chatTable)
+      .where(eq(chatTable.id, id.toString()));
+    return "rowCount" in result
+      ? (result as { rowCount: number }).rowCount > 0
+      : true;
   }
 }

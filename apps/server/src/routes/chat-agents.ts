@@ -132,11 +132,7 @@ router.get(
     const params = c.req.valid("param");
     const query = c.req.valid("query");
 
-    const { chat } = await getChatContext(
-      params.id,
-      user!.id,
-      activeOrgId,
-    );
+    const { chat } = await getChatContext(params.id, user!.id, activeOrgId);
 
     const agents = await chatAgentRepo.findForChat(chat.id, {
       includeDisabled: query.includeDisabled,
@@ -177,10 +173,7 @@ router.post(
       throw new ForbiddenError("Agent belongs to a different organization");
     }
 
-    const existing = await chatAgentRepo.findAgentInChat(
-      body.agentId,
-      chat.id,
-    );
+    const existing = await chatAgentRepo.findAgentInChat(body.agentId, chat.id);
     const normalizedTemp = normalizeTemperature(body.customTemperature);
 
     if (existing) {

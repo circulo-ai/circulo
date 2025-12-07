@@ -1,7 +1,9 @@
 import { getEnv } from "@/lib/env";
 import { isProd } from "@/lib/environment";
 
-const DEFAULT_APP_URL = isProd ? "https://circulo-ai.com" : "http://localhost:3002";
+const DEFAULT_APP_URL = isProd
+  ? "https://circulo-ai.com"
+  : "http://localhost:3002";
 
 function normalizeUrl(url: string): string {
   if (url.startsWith("http://") || url.startsWith("https://")) {

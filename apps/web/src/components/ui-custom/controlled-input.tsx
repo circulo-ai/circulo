@@ -30,19 +30,18 @@ import {
 import { CustomField } from "./field";
 import { CustomInputGroup } from "./input-group";
 
-export interface InputComponentProps
-  extends Pick<
-    ComponentProps<"input">,
-    | "id"
-    | "aria-invalid"
-    | "value"
-    | "onChange"
-    | "onBlur"
-    | "disabled"
-    | "name"
-    | "ref"
-    | "type"
-  > {
+export interface InputComponentProps extends Pick<
+  ComponentProps<"input">,
+  | "id"
+  | "aria-invalid"
+  | "value"
+  | "onChange"
+  | "onBlur"
+  | "disabled"
+  | "name"
+  | "ref"
+  | "type"
+> {
   onChange?: ChangeEventHandler;
   onBlur?: FocusEventHandler;
   ref?: Ref<any>;

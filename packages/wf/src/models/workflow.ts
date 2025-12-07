@@ -71,11 +71,11 @@ export interface Step<TContext, TInput, TOutput> {
   errorClassifier?: (error: Error) => ErrorType;
   compensation?: (
     input: TInput,
-    ctx: WorkflowContext<TContext>
+    ctx: WorkflowContext<TContext>,
   ) => Promise<void>;
   run(
     input: TInput,
-    ctx: WorkflowContext<TContext>
+    ctx: WorkflowContext<TContext>,
   ):
     | Promise<StepResult<TOutput>>
     | AsyncGenerator<StepResult<TOutput>, StepResult<TOutput>, unknown>;

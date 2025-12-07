@@ -19,9 +19,10 @@ export type PostMessageInput = {
 
 export type PostMessageOutput = Result<{ messageId: string }>;
 
-export class PostMessage
-  implements UseCase<PostMessageInput, PostMessageOutput>
-{
+export class PostMessage implements UseCase<
+  PostMessageInput,
+  PostMessageOutput
+> {
   constructor(
     private readonly chats: DrizzleChatRepository,
     private readonly messages: DrizzleMessageRepository,

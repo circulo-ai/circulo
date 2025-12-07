@@ -6,7 +6,11 @@ import { Vote } from "@/domain/vote/vote";
 export class DrizzleVoteRepository {
   constructor(private readonly db: DbInstance) {}
 
-  async get(chatId: string, messageId: string, userId: string): Promise<Vote | null> {
+  async get(
+    chatId: string,
+    messageId: string,
+    userId: string,
+  ): Promise<Vote | null> {
     const row = await this.db.query.vote.findFirst({
       where: and(
         eq(voteTable.chatId, chatId),

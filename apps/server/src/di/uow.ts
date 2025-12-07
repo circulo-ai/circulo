@@ -24,7 +24,10 @@ export class DrizzleUnitOfWork implements UnitOfWork<DrizzleUnitOfWork> {
 
   constructor(
     readonly client: DbClient = getDb(),
-    private readonly tx?: { commit(): Promise<void>; rollback(): Promise<void> },
+    private readonly tx?: {
+      commit(): Promise<void>;
+      rollback(): Promise<void>;
+    },
   ) {}
 
   /**

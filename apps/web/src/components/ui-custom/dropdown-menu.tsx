@@ -2,8 +2,9 @@ import { cn } from "@/lib/utils";
 import { ComponentProps } from "react";
 import { DropdownMenuContent, DropdownMenuItem } from "../ui/dropdown-menu";
 
-interface CustomDropdownMenuContentProps
-  extends ComponentProps<typeof DropdownMenuContent> {}
+interface CustomDropdownMenuContentProps extends ComponentProps<
+  typeof DropdownMenuContent
+> {}
 
 export function CustomDropdownMenuContent({
   className,
@@ -17,8 +18,9 @@ export function CustomDropdownMenuContent({
   );
 }
 
-interface CustomDropdownMenuItemProps
-  extends ComponentProps<typeof DropdownMenuItem> {}
+interface CustomDropdownMenuItemProps extends ComponentProps<
+  typeof DropdownMenuItem
+> {}
 
 export function CustomDropdownMenuItem({
   className,

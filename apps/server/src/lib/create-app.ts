@@ -1,5 +1,9 @@
 import { bindToHono, type ContainerEnv } from "@circulo-ai/di";
-import { DI_TOKENS, buildRootProvider, type RequestContainer } from "@/di/container";
+import {
+  DI_TOKENS,
+  buildRootProvider,
+  type RequestContainer,
+} from "@/di/container";
 import type { AuthType } from "./auth";
 import type { RateLimitDecision } from "@/services/rate-limit";
 import { Hono } from "hono";

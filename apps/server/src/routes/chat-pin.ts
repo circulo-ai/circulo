@@ -88,7 +88,9 @@ router.post("/chat/:id/pin", requireAuth, async (c) => {
         pinnedAt: new Date(),
         pinOrder: insertOrder,
       })
-      .where(and(eq(chatMember.chatId, chatId), eq(chatMember.userId, user!.id)))
+      .where(
+        and(eq(chatMember.chatId, chatId), eq(chatMember.userId, user!.id)),
+      )
       .returning({
         id: chatMember.id,
         chatId: chatMember.chatId,

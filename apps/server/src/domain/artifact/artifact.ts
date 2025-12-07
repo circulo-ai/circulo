@@ -31,7 +31,8 @@ export class Artifact extends AggregateRoot<ArtifactProps> {
   }
 
   rename(title: string) {
-    if (!title.trim()) throw new ValidationError("Artifact title is required", "title");
+    if (!title.trim())
+      throw new ValidationError("Artifact title is required", "title");
     this.props = { ...this.props, title };
     this.touch();
   }

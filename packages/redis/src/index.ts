@@ -4,7 +4,7 @@ export type LogLevel = "info" | "warn" | "error";
 export type RedisLogger = (
   level: LogLevel,
   message: string,
-  meta?: Record<string, unknown>
+  meta?: Record<string, unknown>,
 ) => void;
 
 export type RedisConfig = {
@@ -82,7 +82,7 @@ function attachLogging(client: Redis, logger?: RedisLogger) {
   client.on("connect", () => logger("info", "Redis connect"));
   client.on("ready", () => logger("info", "Redis ready"));
   client.on("reconnecting", (delay: number) =>
-    logger("warn", "Redis reconnecting", { delay })
+    logger("warn", "Redis reconnecting", { delay }),
   );
   client.on("error", (err: Error) => logger("error", "Redis error", { err }));
   client.on("end", () => logger("warn", "Redis connection closed"));
@@ -93,7 +93,7 @@ export class CirculoRedis {
     readonly raw: Redis,
     private readonly namespace?: string,
     private readonly logger?: RedisLogger,
-    private readonly shared = true
+    private readonly shared = true,
   ) {}
 
   withNamespace(namespace: string): CirculoRedis {
@@ -126,7 +126,7 @@ export class CirculoRedis {
   async set(
     key: string,
     value: string | Buffer | number,
-    options?: SetOptions
+    options?: SetOptions,
   ): Promise<boolean> {
     const args: (string | number | Buffer)[] = [this.key(key), value];
     if (options?.ex !== undefined) args.push("EX", options.ex);
@@ -136,7 +136,7 @@ export class CirculoRedis {
     if (options?.keepTtl) args.push("KEEPTTL");
 
     const result = (await this.raw.set(
-      ...(args as Parameters<Redis["set"]>)
+      ...(args as Parameters<Redis["set"]>),
     )) as string | null;
     return result === "OK";
   }
@@ -144,7 +144,7 @@ export class CirculoRedis {
   async setJson<T>(
     key: string,
     value: T,
-    options?: SetOptions
+    options?: SetOptions,
   ): Promise<boolean> {
     return this.set(key, JSON.stringify(value), options);
   }
@@ -178,14 +178,14 @@ export class CirculoRedis {
   async acquireLock(
     key: string,
     value: string,
-    ttlSeconds: number
+    ttlSeconds: number,
   ): Promise<boolean> {
     const result = await this.raw.set(
       this.key(key),
       value,
       "EX",
       ttlSeconds,
-      "NX"
+      "NX",
     );
     return result === "OK";
   }
@@ -200,7 +200,7 @@ export class CirculoRedis {
   async withLock<T>(
     key: string,
     run: () => Promise<T>,
-    options: LockOptions
+    options: LockOptions,
   ): Promise<T> {
     const lockValue = randomId();
     const maxAttempts = options.maxAttempts ?? 1;
@@ -215,7 +215,7 @@ export class CirculoRedis {
       const acquired = await this.acquireLock(
         key,
         lockValue,
-        options.ttlSeconds
+        options.ttlSeconds,
       );
       if (acquired) {
         try {

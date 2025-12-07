@@ -61,6 +61,8 @@ export class DrizzleSuggestionRepository implements Repository<Suggestion> {
     const result = await this.db
       .delete(suggestionTable)
       .where(eq(suggestionTable.id, id.toString()));
-    return "rowCount" in result ? (result as { rowCount: number }).rowCount > 0 : true;
+    return "rowCount" in result
+      ? (result as { rowCount: number }).rowCount > 0
+      : true;
   }
 }

@@ -2,8 +2,9 @@ import { cn } from "@/lib/utils";
 import { ComponentProps } from "react";
 import { ContextMenuContent, ContextMenuItem } from "../ui/context-menu";
 
-interface CustomContextMenuContentProps
-  extends ComponentProps<typeof ContextMenuContent> {}
+interface CustomContextMenuContentProps extends ComponentProps<
+  typeof ContextMenuContent
+> {}
 
 export function CustomContextMenuContent({
   className,
@@ -17,8 +18,9 @@ export function CustomContextMenuContent({
   );
 }
 
-interface CustomContextMenuItemProps
-  extends ComponentProps<typeof ContextMenuItem> {}
+interface CustomContextMenuItemProps extends ComponentProps<
+  typeof ContextMenuItem
+> {}
 
 export function CustomContextMenuItem({
   className,

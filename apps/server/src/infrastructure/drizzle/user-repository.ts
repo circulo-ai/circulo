@@ -52,7 +52,11 @@ export class DrizzleUserRepository implements Repository<User> {
   }
 
   async deleteById(id: Identifier): Promise<boolean> {
-    const result = await this.db.delete(userTable).where(eq(userTable.id, id.toString()));
-    return "rowCount" in result ? (result as { rowCount: number }).rowCount > 0 : true;
+    const result = await this.db
+      .delete(userTable)
+      .where(eq(userTable.id, id.toString()));
+    return "rowCount" in result
+      ? (result as { rowCount: number }).rowCount > 0
+      : true;
   }
 }

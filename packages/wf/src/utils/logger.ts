@@ -3,7 +3,7 @@ import type { Logger, LogLevel, LogContext } from "../models";
 export class ConsoleLogger implements Logger {
   constructor(
     private level: LogLevel = "info",
-    private context: LogContext = {}
+    private context: LogContext = {},
   ) {}
 
   debug(message: string, context?: LogContext): void {

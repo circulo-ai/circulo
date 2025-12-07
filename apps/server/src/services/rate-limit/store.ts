@@ -117,14 +117,10 @@ export class DatabaseRateLimitStore implements RateLimitStore {
         .onConflictDoUpdate({
           target: userRateLimits.referenceId,
           set: {
-            syncApiRequests:
-              sql`CASE WHEN ${userRateLimits.windowStart} < ${windowStartBoundary.toISOString()} THEN ${initialCounts.syncApiRequests} ELSE ${userRateLimits.syncApiRequests} + ${initialCounts.syncApiRequests} END`,
-            asyncApiRequests:
-              sql`CASE WHEN ${userRateLimits.windowStart} < ${windowStartBoundary.toISOString()} THEN ${initialCounts.asyncApiRequests} ELSE ${userRateLimits.asyncApiRequests} + ${initialCounts.asyncApiRequests} END`,
-            apiEndpointRequests:
-              sql`CASE WHEN ${userRateLimits.windowStart} < ${windowStartBoundary.toISOString()} THEN ${initialCounts.apiEndpointRequests} ELSE ${userRateLimits.apiEndpointRequests} + ${initialCounts.apiEndpointRequests} END`,
-            windowStart:
-              sql`CASE WHEN ${userRateLimits.windowStart} < ${windowStartBoundary.toISOString()} THEN ${now.toISOString()} ELSE ${userRateLimits.windowStart} END`,
+            syncApiRequests: sql`CASE WHEN ${userRateLimits.windowStart} < ${windowStartBoundary.toISOString()} THEN ${initialCounts.syncApiRequests} ELSE ${userRateLimits.syncApiRequests} + ${initialCounts.syncApiRequests} END`,
+            asyncApiRequests: sql`CASE WHEN ${userRateLimits.windowStart} < ${windowStartBoundary.toISOString()} THEN ${initialCounts.asyncApiRequests} ELSE ${userRateLimits.asyncApiRequests} + ${initialCounts.asyncApiRequests} END`,
+            apiEndpointRequests: sql`CASE WHEN ${userRateLimits.windowStart} < ${windowStartBoundary.toISOString()} THEN ${initialCounts.apiEndpointRequests} ELSE ${userRateLimits.apiEndpointRequests} + ${initialCounts.apiEndpointRequests} END`,
+            windowStart: sql`CASE WHEN ${userRateLimits.windowStart} < ${windowStartBoundary.toISOString()} THEN ${now.toISOString()} ELSE ${userRateLimits.windowStart} END`,
             lastRequestAt: now,
             isRateLimited: false,
             rateLimitResetAt: null,
@@ -151,7 +147,9 @@ export class DatabaseRateLimitStore implements RateLimitStore {
 
     const updateSet =
       bucket === "api"
-        ? { apiEndpointRequests: sql`${userRateLimits.apiEndpointRequests} + 1` }
+        ? {
+            apiEndpointRequests: sql`${userRateLimits.apiEndpointRequests} + 1`,
+          }
         : bucket === "async"
           ? { asyncApiRequests: sql`${userRateLimits.asyncApiRequests} + 1` }
           : { syncApiRequests: sql`${userRateLimits.syncApiRequests} + 1` };
@@ -182,7 +180,9 @@ export class DatabaseRateLimitStore implements RateLimitStore {
   }
 
   async reset(key: string): Promise<void> {
-    await this.db.delete(userRateLimits).where(eq(userRateLimits.referenceId, key));
+    await this.db
+      .delete(userRateLimits)
+      .where(eq(userRateLimits.referenceId, key));
   }
 }
 

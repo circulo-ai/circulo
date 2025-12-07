@@ -37,9 +37,10 @@ export type AddChatMemberOutput = Result<{ memberId: string }>;
 export type RemoveChatMemberOutput = Result<void>;
 export type UpdateChatMemberPermissionsOutput = Result<void>;
 
-export class AddChatMember
-  implements UseCase<AddChatMemberInput, AddChatMemberOutput>
-{
+export class AddChatMember implements UseCase<
+  AddChatMemberInput,
+  AddChatMemberOutput
+> {
   constructor(
     private readonly members: DrizzleChatMemberRepository,
     private readonly uow: UnitOfWork,
@@ -75,9 +76,10 @@ export class AddChatMember
   }
 }
 
-export class RemoveChatMember
-  implements UseCase<RemoveChatMemberInput, RemoveChatMemberOutput>
-{
+export class RemoveChatMember implements UseCase<
+  RemoveChatMemberInput,
+  RemoveChatMemberOutput
+> {
   constructor(
     private readonly members: DrizzleChatMemberRepository,
     private readonly uow: UnitOfWork,
@@ -94,9 +96,10 @@ export class RemoveChatMember
   }
 }
 
-export class UpdateChatMemberPermissions
-  implements UseCase<UpdateChatMemberPermissionsInput, UpdateChatMemberPermissionsOutput>
-{
+export class UpdateChatMemberPermissions implements UseCase<
+  UpdateChatMemberPermissionsInput,
+  UpdateChatMemberPermissionsOutput
+> {
   constructor(
     private readonly members: DrizzleChatMemberRepository,
     private readonly uow: UnitOfWork,
@@ -109,7 +112,9 @@ export class UpdateChatMemberPermissions
     if (!idCheck.succeeded) return Result.fail(idCheck.message);
 
     return this.uow.transaction(async () => {
-      const member = await this.members.getById(Identifier.from(input.memberId));
+      const member = await this.members.getById(
+        Identifier.from(input.memberId),
+      );
       if (!member) throw new NotFoundError("Chat member", input.memberId);
       member.updatePermissions(input.permissions);
       await this.members.save(member);

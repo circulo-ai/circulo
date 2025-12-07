@@ -5,11 +5,11 @@ export interface WorkflowStore<TContext, TInput, TOutput> {
   loadWorkflow(id: string): Promise<Workflow<TContext, TInput, TOutput> | null>;
   updateWorkflow(
     wf: Workflow<TContext, TInput, TOutput>,
-    expectedVersion: number
+    expectedVersion: number,
   ): Promise<boolean>;
   deleteWorkflow(id: string): Promise<void>;
   listWorkflows(
-    filter?: WorkflowFilter
+    filter?: WorkflowFilter,
   ): Promise<Workflow<TContext, TInput, TOutput>[]>;
   acquireLock(workflowId: string, ttl: number): Promise<Lock | null>;
   releaseLock(lock: Lock): Promise<void>;
@@ -37,7 +37,7 @@ export interface EventStore<TOutput> {
   appendBatch(events: WorkflowEvent<TOutput>[]): Promise<void>;
   list(
     workflowId: string,
-    fromTimestamp?: number
+    fromTimestamp?: number,
   ): Promise<WorkflowEvent<TOutput>[]>;
   clear(workflowId: string): Promise<void>;
   count(workflowId: string): Promise<number>;

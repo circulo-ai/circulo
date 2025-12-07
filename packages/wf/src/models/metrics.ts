@@ -9,5 +9,9 @@ export interface MetricsCollector {
   recordWorkflowSuccess(): void;
   recordWorkflowFailure(errorType: ErrorType): void;
   incrementCounter(metric: string, tags?: Record<string, string>): void;
-  recordGauge(metric: string, value: number, tags?: Record<string, string>): void;
+  recordGauge(
+    metric: string,
+    value: number,
+    tags?: Record<string, string>,
+  ): void;
 }

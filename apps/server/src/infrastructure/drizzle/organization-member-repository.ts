@@ -25,9 +25,7 @@ function toRow(entity: OrganizationMember): typeof memberTable.$inferInsert {
   };
 }
 
-export class DrizzleOrganizationMemberRepository
-  implements Repository<OrganizationMember>
-{
+export class DrizzleOrganizationMemberRepository implements Repository<OrganizationMember> {
   constructor(private readonly db: DbInstance) {}
 
   async getById(id: Identifier): Promise<OrganizationMember | null> {
@@ -53,7 +51,9 @@ export class DrizzleOrganizationMemberRepository
     const result = await this.db
       .delete(memberTable)
       .where(eq(memberTable.id, id.toString()));
-    return "rowCount" in result ? (result as { rowCount: number }).rowCount > 0 : true;
+    return "rowCount" in result
+      ? (result as { rowCount: number }).rowCount > 0
+      : true;
   }
 
   async findByUserAndOrg(
@@ -61,7 +61,10 @@ export class DrizzleOrganizationMemberRepository
     organizationId: string,
   ): Promise<OrganizationMember | null> {
     const row = await this.db.query.member.findFirst({
-      where: and(eq(memberTable.userId, userId), eq(memberTable.organizationId, organizationId)),
+      where: and(
+        eq(memberTable.userId, userId),
+        eq(memberTable.organizationId, organizationId),
+      ),
     });
     return row ? toDomain(row) : null;
   }

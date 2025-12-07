@@ -23,10 +23,7 @@ router.get(
   async (c) => {
     const { user, activeOrgId } = c.var;
     const query = c.req.valid("query");
-    const organizationId = await resolveOrganizationId(
-      activeOrgId,
-      c.req.raw,
-    );
+    const organizationId = await resolveOrganizationId(activeOrgId, c.req.raw);
 
     const isOrgMember = await isMemberOf(user!.id, organizationId);
     if (!isOrgMember) {
@@ -62,10 +59,7 @@ router.post(
   async (c) => {
     const { user, activeOrgId } = c.var;
     const body = c.req.valid("json");
-    const organizationId = await resolveOrganizationId(
-      activeOrgId,
-      c.req.raw,
-    );
+    const organizationId = await resolveOrganizationId(activeOrgId, c.req.raw);
 
     const isOrgMember = await isMemberOf(user!.id, organizationId);
     if (!isOrgMember) {
@@ -120,10 +114,7 @@ router.patch(
   async (c) => {
     const { user, activeOrgId } = c.var;
     const body = c.req.valid("json");
-    const organizationId = await resolveOrganizationId(
-      activeOrgId,
-      c.req.raw,
-    );
+    const organizationId = await resolveOrganizationId(activeOrgId, c.req.raw);
 
     const isOrgMember = await isMemberOf(user!.id, organizationId);
     if (!isOrgMember) {
@@ -175,10 +166,7 @@ router.delete(
   async (c) => {
     const { user, activeOrgId } = c.var;
     const query = c.req.valid("query");
-    const organizationId = await resolveOrganizationId(
-      activeOrgId,
-      c.req.raw,
-    );
+    const organizationId = await resolveOrganizationId(activeOrgId, c.req.raw);
 
     const isOrgMember = await isMemberOf(user!.id, organizationId);
     if (!isOrgMember) {

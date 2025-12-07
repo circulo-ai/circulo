@@ -5,8 +5,9 @@ import { useSidebar } from "@/components/ui/sidebar";
 import { PanelHandle } from "@window-splitter/react";
 import { ComponentProps, useCallback, useEffect, useRef } from "react";
 
-interface ChatSidebarResizablePanelProps
-  extends ComponentProps<typeof ResizablePanel> {}
+interface ChatSidebarResizablePanelProps extends ComponentProps<
+  typeof ResizablePanel
+> {}
 
 export function ChatSidebarResizablePanel(
   props: ChatSidebarResizablePanelProps,

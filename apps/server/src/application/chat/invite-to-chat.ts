@@ -21,11 +21,15 @@ export type InviteToChatInput = {
   message?: string;
 };
 
-export type InviteToChatOutput = Result<{ invitationId: string; token: string }>;
+export type InviteToChatOutput = Result<{
+  invitationId: string;
+  token: string;
+}>;
 
-export class InviteToChat
-  implements UseCase<InviteToChatInput, InviteToChatOutput>
-{
+export class InviteToChat implements UseCase<
+  InviteToChatInput,
+  InviteToChatOutput
+> {
   constructor(
     private readonly chats: DrizzleChatRepository,
     private readonly invitations: DrizzleChatInvitationRepository,
@@ -61,7 +65,10 @@ export class InviteToChat
         Identifier.from(input.chatId),
       );
       if (existing) {
-        return Result.ok({ invitationId: existing.getId().toString(), token: existing.snapshot.token });
+        return Result.ok({
+          invitationId: existing.getId().toString(),
+          token: existing.snapshot.token,
+        });
       }
 
       const invitation = new ChatInvitation({

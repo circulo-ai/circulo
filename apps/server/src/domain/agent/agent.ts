@@ -30,7 +30,10 @@ export class Agent extends AggregateRoot<AgentProps> {
       throw new ValidationError("Agent name is required", "name");
     }
     if (!this.props.instructions.trim()) {
-      throw new ValidationError("Agent instructions are required", "instructions");
+      throw new ValidationError(
+        "Agent instructions are required",
+        "instructions",
+      );
     }
     if (!this.props.organizationId) {
       throw new ValidationError("organizationId is required", "organizationId");
@@ -51,7 +54,10 @@ export class Agent extends AggregateRoot<AgentProps> {
 
   updateInstructions(instructions: string) {
     if (!instructions.trim()) {
-      throw new ValidationError("Agent instructions are required", "instructions");
+      throw new ValidationError(
+        "Agent instructions are required",
+        "instructions",
+      );
     }
     if (instructions === this.props.instructions) return;
     this.props = { ...this.props, instructions };
@@ -70,13 +76,20 @@ export class Agent extends AggregateRoot<AgentProps> {
     this.touch();
   }
 
-  updateModel(config: { model?: string; maxTokens?: number | null; temperature?: number | null }) {
+  updateModel(config: {
+    model?: string;
+    maxTokens?: number | null;
+    temperature?: number | null;
+  }) {
     const next = { ...this.props, ...config };
     this.props = next;
     this.touch();
   }
 
-  updateDefaults(defaults: { toolIds?: string[]; knowledgeBaseIds?: string[] }) {
+  updateDefaults(defaults: {
+    toolIds?: string[];
+    knowledgeBaseIds?: string[];
+  }) {
     this.props = {
       ...this.props,
       defaultToolIds: defaults.toolIds ?? this.props.defaultToolIds ?? [],

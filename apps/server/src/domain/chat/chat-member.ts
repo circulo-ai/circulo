@@ -25,11 +25,17 @@ export class ChatMember extends Entity<ChatMemberProps> {
   }
 
   private ensureValid() {
-    if (!this.props.userId) throw new ValidationError("userId is required", "userId");
-    if (!this.props.chatId) throw new ValidationError("chatId is required", "chatId");
-    if (!this.props.role.trim()) throw new ValidationError("role is required", "role");
+    if (!this.props.userId)
+      throw new ValidationError("userId is required", "userId");
+    if (!this.props.chatId)
+      throw new ValidationError("chatId is required", "chatId");
+    if (!this.props.role.trim())
+      throw new ValidationError("role is required", "role");
     if (this.props.unreadCount < 0) {
-      throw new ValidationError("unreadCount cannot be negative", "unreadCount");
+      throw new ValidationError(
+        "unreadCount cannot be negative",
+        "unreadCount",
+      );
     }
   }
 
@@ -55,7 +61,12 @@ export class ChatMember extends Entity<ChatMemberProps> {
   }
 
   unpin() {
-    this.props = { ...this.props, isPinned: false, pinnedAt: null, pinOrder: null };
+    this.props = {
+      ...this.props,
+      isPinned: false,
+      pinnedAt: null,
+      pinOrder: null,
+    };
     this.touch();
   }
 
@@ -67,8 +78,10 @@ export class ChatMember extends Entity<ChatMemberProps> {
     this.props = {
       ...this.props,
       canInvite: permissions.canInvite ?? this.props.canInvite,
-      canManageAgents: permissions.canManageAgents ?? this.props.canManageAgents,
-      canManageKnowledge: permissions.canManageKnowledge ?? this.props.canManageKnowledge,
+      canManageAgents:
+        permissions.canManageAgents ?? this.props.canManageAgents,
+      canManageKnowledge:
+        permissions.canManageKnowledge ?? this.props.canManageKnowledge,
     };
     this.touch();
   }

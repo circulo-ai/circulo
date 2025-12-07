@@ -76,8 +76,11 @@ router.patch(
 
     const body = c.req.valid("json");
 
-    const updateData: { updatedAt: Date; name?: string; image?: string | null } =
-      { updatedAt: new Date() };
+    const updateData: {
+      updatedAt: Date;
+      name?: string;
+      image?: string | null;
+    } = { updatedAt: new Date() };
     if (body.name !== undefined) updateData.name = body.name;
     if (body.image !== undefined) updateData.image = body.image;
 

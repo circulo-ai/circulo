@@ -11,7 +11,7 @@ export function chunk<T>(data: T): StepResult<T> {
 export function error(
   message: string,
   errorType: ErrorType = "unknown",
-  retryable = false
+  retryable = false,
 ): StepResult<never> {
   const workflowError: WorkflowError = {
     type: errorType,
@@ -23,7 +23,7 @@ export function error(
 }
 
 export async function* streamStep<T>(
-  items: T[]
+  items: T[],
 ): AsyncGenerator<StepResult<T>, StepResult<T>, unknown> {
   for (const item of items) {
     yield chunk(item);

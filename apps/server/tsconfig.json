@@ -34,11 +34,9 @@
     "declarationMap": true,
     "sourceMap": true,
     "types": ["node"],
-    "isolatedModules": true,
+    "isolatedModules": true
   },
-  "references": [
-    { "path": "../../packages/types" }
-  ],
+  "references": [{ "path": "../../packages/types" }],
   "include": ["src/**/*"],
   "exclude": ["node_modules", "**/*.test.ts", "dist", "drizzle.config.ts"]
 }

@@ -248,7 +248,7 @@ class PostgresWorkflowStore implements WorkflowStore<Context, Input, Output> {
   }
 
   async loadWorkflow(
-    id: string
+    id: string,
   ): Promise<Workflow<Context, Input, Output> | null> {
     return db.findOne("workflows", { id });
   }
