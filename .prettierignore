@@ -1,0 +1,78 @@
+# ===============================
+# Dependencies & package manager caches
+# ===============================
+node_modules
+.pnpm-store
+
+# Lockfiles (don’t format / treat as generated)
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+bun.lock
+bun.lockb
+
+
+# ===============================
+# Build outputs & coverage
+# ===============================
+dist
+build
+out
+coverage
+
+# Framework / tool outputs
+.next
+.vercel
+.svelte-kit
+.nuxt
+storybook-static
+.vite
+.esbuild
+
+# Turborepo cache
+.turbo
+
+
+# ===============================
+# Database & generated code
+# ===============================
+**/migrations/**
+**/generated/**
+**/*.gen.*
+**/*.generated.*
+**/*-generated.*
+
+
+# ===============================
+# Logs
+# ===============================
+*.log
+*-debug.log*
+*-error.log*
+
+
+# ===============================
+# Minified / compiled / compressed assets
+# ===============================
+*.min.*
+*.map
+*.bundle.*
+*.chunk.*
+*.gz
+*.br
+
+
+# ===============================
+# OS / editor cruft
+# ===============================
+.DS_Store
+Thumbs.db
+*.swp
+
+
+# ===============================
+# Docs / static-site builds
+# ===============================
+**/.docusaurus
+**/site
+**/docs/.vitepress/dist

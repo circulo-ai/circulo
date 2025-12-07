@@ -1,6 +1,6 @@
 [install]
-# Use pnpm for package management
-auto = "disable"
+# Use Bun for package management
+auto = "enable"
 
 [test]
 preload = ["./test-setup.ts"]

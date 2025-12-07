@@ -5,7 +5,7 @@ Framework-agnostic Redis client utilities with connection reuse, namespacing, JS
 ## Install
 
 ```bash
-pnpm add @circulo-ai/redis ioredis
+bun add @circulo-ai/redis ioredis
 ```
 
 ## Quickstart
