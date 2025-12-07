@@ -46,6 +46,7 @@
         "concurrently": "^9.1.2",
         "drizzle-kit": "^0.31.4",
         "lint-staged": "16.0.0",
+        "prettier-plugin-organize-imports": "4.3.0",
         "turbo": "2.6.1"
     },
     "lint-staged": {

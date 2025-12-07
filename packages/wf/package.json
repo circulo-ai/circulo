@@ -9,7 +9,7 @@
         "build": "tsdown",
         "typecheck": "tsc --noEmit",
         "lint": "eslint src",
-        "test": "vitest run",
+        "test": "vitest run --passWithNoTests",
         "test:watch": "vitest",
         "test:coverage": "vitest run --coverage",
         "release": "pnpm build && npm publish --access public",
