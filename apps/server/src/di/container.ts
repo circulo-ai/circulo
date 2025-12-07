@@ -55,43 +55,72 @@ export const DI_TOKENS = {
   ChatRepository: createToken<DrizzleChatRepository>("ChatRepository"),
   MessageRepository: createToken<DrizzleMessageRepository>("MessageRepository"),
   AgentRepository: createToken<DrizzleAgentRepository>("AgentRepository"),
-  ChatMemberRepository: createToken<DrizzleChatMemberRepository>("ChatMemberRepository"),
-  ChatInvitationRepository: createToken<DrizzleChatInvitationRepository>("ChatInvitationRepository"),
-  ChatAgentLinkRepository: createToken<DrizzleChatAgentLinkRepository>("ChatAgentLinkRepository"),
-  ArtifactRepository: createToken<DrizzleArtifactRepository>("ArtifactRepository"),
-  SuggestionRepository: createToken<DrizzleSuggestionRepository>("SuggestionRepository"),
+  ChatMemberRepository: createToken<DrizzleChatMemberRepository>(
+    "ChatMemberRepository",
+  ),
+  ChatInvitationRepository: createToken<DrizzleChatInvitationRepository>(
+    "ChatInvitationRepository",
+  ),
+  ChatAgentLinkRepository: createToken<DrizzleChatAgentLinkRepository>(
+    "ChatAgentLinkRepository",
+  ),
+  ArtifactRepository:
+    createToken<DrizzleArtifactRepository>("ArtifactRepository"),
+  SuggestionRepository: createToken<DrizzleSuggestionRepository>(
+    "SuggestionRepository",
+  ),
   UserRepository: createToken<DrizzleUserRepository>("UserRepository"),
-  OrganizationRepository: createToken<DrizzleOrganizationRepository>("OrganizationRepository"),
-  OrganizationMemberRepository: createToken<DrizzleOrganizationMemberRepository>(
-    "OrganizationMemberRepository",
+  OrganizationRepository: createToken<DrizzleOrganizationRepository>(
+    "OrganizationRepository",
   ),
-  VoteRepository: createToken<import("@/infrastructure/drizzle").DrizzleVoteRepository>(
-    "VoteRepository",
-  ),
+  OrganizationMemberRepository:
+    createToken<DrizzleOrganizationMemberRepository>(
+      "OrganizationMemberRepository",
+    ),
+  VoteRepository:
+    createToken<import("@/infrastructure/drizzle").DrizzleVoteRepository>(
+      "VoteRepository",
+    ),
   UnitOfWork: createToken<DrizzleUnitOfWork>("UnitOfWork"),
   RateLimiter: createToken<RateLimiter>("RateLimiter"),
-  DomainEventPublisher: createToken<DomainEventPublisher>("DomainEventPublisher"),
+  DomainEventPublisher: createToken<DomainEventPublisher>(
+    "DomainEventPublisher",
+  ),
   CreateChatUseCase: createToken<CreateChat>("CreateChatUseCase"),
   RenameChatUseCase: createToken<RenameChat>("RenameChatUseCase"),
   PostMessageUseCase: createToken<PostMessage>("PostMessageUseCase"),
-  ChangeChatVisibilityUseCase: createToken<ChangeChatVisibility>("ChangeChatVisibilityUseCase"),
+  ChangeChatVisibilityUseCase: createToken<ChangeChatVisibility>(
+    "ChangeChatVisibilityUseCase",
+  ),
   DeleteChatUseCase: createToken<DeleteChat>("DeleteChatUseCase"),
   InviteToChatUseCase: createToken<InviteToChat>("InviteToChatUseCase"),
-  AcceptChatInvitationUseCase: createToken<AcceptChatInvitation>("AcceptChatInvitationUseCase"),
+  AcceptChatInvitationUseCase: createToken<AcceptChatInvitation>(
+    "AcceptChatInvitationUseCase",
+  ),
   AddChatMemberUseCase: createToken<AddChatMember>("AddChatMemberUseCase"),
-  RemoveChatMemberUseCase: createToken<RemoveChatMember>("RemoveChatMemberUseCase"),
+  RemoveChatMemberUseCase: createToken<RemoveChatMember>(
+    "RemoveChatMemberUseCase",
+  ),
   UpdateChatMemberPermissionsUseCase: createToken<UpdateChatMemberPermissions>(
     "UpdateChatMemberPermissionsUseCase",
   ),
-  LinkAgentToChatUseCase: createToken<LinkAgentToChat>("LinkAgentToChatUseCase"),
-  ToggleAgentLinkUseCase: createToken<ToggleAgentLink>("ToggleAgentLinkUseCase"),
+  LinkAgentToChatUseCase: createToken<LinkAgentToChat>(
+    "LinkAgentToChatUseCase",
+  ),
+  ToggleAgentLinkUseCase: createToken<ToggleAgentLink>(
+    "ToggleAgentLinkUseCase",
+  ),
   UpdateAgentLinkOverridesUseCase: createToken<UpdateAgentLinkOverrides>(
     "UpdateAgentLinkOverridesUseCase",
   ),
   CreateArtifactUseCase: createToken<CreateArtifact>("CreateArtifactUseCase"),
   UpdateArtifactUseCase: createToken<UpdateArtifact>("UpdateArtifactUseCase"),
-  CreateSuggestionUseCase: createToken<CreateSuggestion>("CreateSuggestionUseCase"),
-  ResolveSuggestionUseCase: createToken<ResolveSuggestion>("ResolveSuggestionUseCase"),
+  CreateSuggestionUseCase: createToken<CreateSuggestion>(
+    "CreateSuggestionUseCase",
+  ),
+  ResolveSuggestionUseCase: createToken<ResolveSuggestion>(
+    "ResolveSuggestionUseCase",
+  ),
   SetVoteUseCase: createToken<SetVote>("SetVoteUseCase"),
 } as const;
 
@@ -122,7 +151,10 @@ export function buildRootProvider(): ServiceProvider {
   services.addGlobalSingleton(DI_TOKENS.Redis, () => getRedisClient(), {
     disposePriority: 10,
   });
-  services.addSingleton(DI_TOKENS.DomainEventPublisher, () => new DomainEventPublisher());
+  services.addSingleton(
+    DI_TOKENS.DomainEventPublisher,
+    () => new DomainEventPublisher(),
+  );
 
   services.addScoped(
     DI_TOKENS.UnitOfWork,
@@ -175,7 +207,8 @@ export function buildRootProvider(): ServiceProvider {
   });
   services.addScoped(DI_TOKENS.VoteRepository, (resolver) => {
     const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    const { DrizzleVoteRepository } = require("@/infrastructure/drizzle") as typeof import("@/infrastructure/drizzle");
+    const { DrizzleVoteRepository } =
+      require("@/infrastructure/drizzle") as typeof import("@/infrastructure/drizzle");
     return new DrizzleVoteRepository(uow.client);
   });
 
@@ -234,11 +267,14 @@ export function buildRootProvider(): ServiceProvider {
     return new RemoveChatMember(members, uow);
   });
 
-  services.addScoped(DI_TOKENS.UpdateChatMemberPermissionsUseCase, (resolver) => {
-    const members = resolver.resolve(DI_TOKENS.ChatMemberRepository);
-    const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    return new UpdateChatMemberPermissions(members, uow);
-  });
+  services.addScoped(
+    DI_TOKENS.UpdateChatMemberPermissionsUseCase,
+    (resolver) => {
+      const members = resolver.resolve(DI_TOKENS.ChatMemberRepository);
+      const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
+      return new UpdateChatMemberPermissions(members, uow);
+    },
+  );
 
   services.addScoped(DI_TOKENS.LinkAgentToChatUseCase, (resolver) => {
     const links = resolver.resolve(DI_TOKENS.ChatAgentLinkRepository);

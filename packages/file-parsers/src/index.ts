@@ -3,9 +3,7 @@ import path from "path";
 import { createLogger, type Logger } from "./logger";
 import type { FileParseResult, FileParser, SupportedFileType } from "./types";
 
-let parserInstancesPromise:
-  | Promise<Record<string, FileParser>>
-  | null = null;
+let parserInstancesPromise: Promise<Record<string, FileParser>> | null = null;
 
 type ParserLoaders = {
   [K in SupportedFileType]?: () => Promise<FileParser>;
@@ -175,9 +173,7 @@ export function createFileParser(config: FileParserConfig = {}) {
     );
   }
 
-  async function isSupportedFileType(
-    extension: string,
-  ): Promise<boolean> {
+  async function isSupportedFileType(extension: string): Promise<boolean> {
     try {
       const parsers = await getParserInstances(logger);
       return Object.keys(parsers).includes(normalizeExtension(extension));

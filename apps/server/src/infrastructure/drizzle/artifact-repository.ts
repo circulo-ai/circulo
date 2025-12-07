@@ -65,6 +65,8 @@ export class DrizzleArtifactRepository implements Repository<Artifact> {
     const result = await this.db
       .delete(artifactTable)
       .where(eq(artifactTable.id, id.toString()));
-    return "rowCount" in result ? (result as { rowCount: number }).rowCount > 0 : true;
+    return "rowCount" in result
+      ? (result as { rowCount: number }).rowCount > 0
+      : true;
   }
 }

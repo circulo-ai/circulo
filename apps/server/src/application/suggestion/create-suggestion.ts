@@ -19,9 +19,10 @@ export type CreateSuggestionInput = {
 
 export type CreateSuggestionOutput = Result<{ suggestionId: string }>;
 
-export class CreateSuggestion
-  implements UseCase<CreateSuggestionInput, CreateSuggestionOutput>
-{
+export class CreateSuggestion implements UseCase<
+  CreateSuggestionInput,
+  CreateSuggestionOutput
+> {
   constructor(
     private readonly suggestions: DrizzleSuggestionRepository,
     private readonly uow: UnitOfWork,
@@ -33,9 +34,15 @@ export class CreateSuggestion
     const docCheck = Guard.isUuid(input.documentId, "documentId");
     if (!docCheck.succeeded) return Result.fail(docCheck.message);
 
-    const originalCheck = Guard.againstEmptyString(input.originalText, "originalText");
+    const originalCheck = Guard.againstEmptyString(
+      input.originalText,
+      "originalText",
+    );
     if (!originalCheck.succeeded) return Result.fail(originalCheck.message);
-    const suggestedCheck = Guard.againstEmptyString(input.suggestedText, "suggestedText");
+    const suggestedCheck = Guard.againstEmptyString(
+      input.suggestedText,
+      "suggestedText",
+    );
     if (!suggestedCheck.succeeded) return Result.fail(suggestedCheck.message);
 
     return this.uow.transaction(async () => {

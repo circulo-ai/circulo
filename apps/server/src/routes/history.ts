@@ -76,7 +76,7 @@ router.get(
       chatsPage.chats.map((chat) => ({
         ...chat,
         isPinned: pinMap.get(chat.id)?.isPinned ?? false,
-      pinOrder: pinMap.get(chat.id)?.pinOrder ?? undefined,
+        pinOrder: pinMap.get(chat.id)?.pinOrder ?? undefined,
       }));
 
     return c.json({ chats: enriched, hasMore: chatsPage.hasMore });

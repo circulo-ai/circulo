@@ -52,6 +52,8 @@ export class DrizzleOrganizationRepository implements Repository<Organization> {
     const result = await this.db
       .delete(organizationTable)
       .where(eq(organizationTable.id, id.toString()));
-    return "rowCount" in result ? (result as { rowCount: number }).rowCount > 0 : true;
+    return "rowCount" in result
+      ? (result as { rowCount: number }).rowCount > 0
+      : true;
   }
 }

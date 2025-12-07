@@ -83,6 +83,8 @@ export class DrizzleChatMemberRepository implements Repository<ChatMember> {
     const result = await this.db
       .delete(chatMemberTable)
       .where(eq(chatMemberTable.id, id.toString()));
-    return "rowCount" in result ? (result as { rowCount: number }).rowCount > 0 : true;
+    return "rowCount" in result
+      ? (result as { rowCount: number }).rowCount > 0
+      : true;
   }
 }

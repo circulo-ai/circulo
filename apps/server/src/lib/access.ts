@@ -20,7 +20,7 @@ export async function canAccessFeature(params: {
     resource,
     action,
     organizationId,
-    session
+    session,
   );
 
   if (!hasPermissionCheck) {
@@ -66,13 +66,13 @@ export async function requireFeatureAccess(params: {
       insufficient_permissions:
         "You don't have permission to perform this action",
       subscription_required: `This feature requires a ${params.requiredPlans?.join(
-        " or "
+        " or ",
       )} plan`,
       no_organization: "No organization context",
     };
 
     throw new Error(
-      messages[result.reason as keyof typeof messages] || "Access denied"
+      messages[result.reason as keyof typeof messages] || "Access denied",
     );
   }
 }
@@ -92,14 +92,14 @@ export async function canUserCreateTeamOrg(userId: string): Promise<boolean> {
     .from(schema.organization)
     .innerJoin(
       schema.member,
-      eq(schema.member.organizationId, schema.organization.id)
+      eq(schema.member.organizationId, schema.organization.id),
     )
     .where(
       and(
         eq(schema.member.userId, userId),
         eq(schema.member.role, "owner"),
-        sql`${schema.organization.metadata}->>'type' = 'personal'`
-      )
+        sql`${schema.organization.metadata}->>'type' = 'personal'`,
+      ),
     )
     .limit(1);
 
@@ -167,10 +167,10 @@ export async function getOrgLimits(
   return {
     maxAgents: maxAgents?.unlimited
       ? "unlimited"
-      : maxAgents?.included_usage ?? 3,
+      : (maxAgents?.included_usage ?? 3),
     apiCalls: apiCalls?.unlimited
       ? "unlimited"
-      : apiCalls?.included_usage ?? 1000,
+      : (apiCalls?.included_usage ?? 1000),
     currentApiCalls: apiCalls?.usage ?? 0,
     canCreateTeamOrg:
       createTeamOrg?.included_usage !== undefined &&

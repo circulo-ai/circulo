@@ -61,6 +61,8 @@ export class DrizzleChatAgentLinkRepository implements Repository<ChatAgentLink>
     const result = await this.db
       .delete(chatAgentTable)
       .where(eq(chatAgentTable.id, id.toString()));
-    return "rowCount" in result ? (result as { rowCount: number }).rowCount > 0 : true;
+    return "rowCount" in result
+      ? (result as { rowCount: number }).rowCount > 0
+      : true;
   }
 }

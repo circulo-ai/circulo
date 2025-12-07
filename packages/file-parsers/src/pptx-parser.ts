@@ -24,7 +24,10 @@ export class PptxParser implements FileParser {
       (resolve, reject) => {
         (officeParser as any).parseOfficeAsync(
           buffer,
-          { contentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation" },
+          {
+            contentType:
+              "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+          },
           (err: unknown, data: any) => {
             if (err) {
               reject(err);

@@ -19,9 +19,10 @@ export type CreateArtifactInput = {
 
 export type CreateArtifactOutput = Result<{ artifactId: string }>;
 
-export class CreateArtifact
-  implements UseCase<CreateArtifactInput, CreateArtifactOutput>
-{
+export class CreateArtifact implements UseCase<
+  CreateArtifactInput,
+  CreateArtifactOutput
+> {
   constructor(
     private readonly artifacts: DrizzleArtifactRepository,
     private readonly uow: UnitOfWork,

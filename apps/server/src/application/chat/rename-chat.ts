@@ -17,9 +17,7 @@ export type RenameChatInput = {
 
 export type RenameChatOutput = Result<void>;
 
-export class RenameChat
-  implements UseCase<RenameChatInput, RenameChatOutput>
-{
+export class RenameChat implements UseCase<RenameChatInput, RenameChatOutput> {
   constructor(
     private readonly chats: DrizzleChatRepository,
     private readonly uow: UnitOfWork,
@@ -38,7 +36,9 @@ export class RenameChat
 
       chat.rename(input.title);
       await this.chats.save(chat);
-      await Promise.all(chat.pullDomainEvents().map((evt) => this.publisher.publish(evt)));
+      await Promise.all(
+        chat.pullDomainEvents().map((evt) => this.publisher.publish(evt)),
+      );
       return Result.ok();
     });
   }

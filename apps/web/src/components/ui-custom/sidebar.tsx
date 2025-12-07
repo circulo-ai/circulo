@@ -35,8 +35,9 @@ export function CustomSidebar({ className, ...props }: CustomSidebarProps) {
   );
 }
 
-interface CustomSidebarHeaderProps
-  extends ComponentProps<typeof SidebarHeader> {}
+interface CustomSidebarHeaderProps extends ComponentProps<
+  typeof SidebarHeader
+> {}
 
 export function CustomSidebarHeader({
   className,
@@ -76,8 +77,9 @@ export function CustomSidebarInset({
 
 // TODO make a component out of the shadow
 
-interface CustomSidebarMenuButtonProps
-  extends ComponentProps<typeof SidebarMenuButton> {}
+interface CustomSidebarMenuButtonProps extends ComponentProps<
+  typeof SidebarMenuButton
+> {}
 
 export function CustomSidebarMenuButton({
   className,
@@ -96,8 +98,9 @@ export function CustomSidebarMenuButton({
   );
 }
 
-interface CustomSidebarMenuSkeletonProps
-  extends ComponentProps<typeof SidebarMenuSkeleton> {}
+interface CustomSidebarMenuSkeletonProps extends ComponentProps<
+  typeof SidebarMenuSkeleton
+> {}
 
 export function CustomSidebarMenuSkeleton({
   className,
@@ -118,8 +121,9 @@ export function CustomSidebarMenuSkeleton({
   );
 }
 
-interface CustomSidebarGroupActionProps
-  extends ComponentProps<typeof SidebarGroupAction> {}
+interface CustomSidebarGroupActionProps extends ComponentProps<
+  typeof SidebarGroupAction
+> {}
 
 export function CustomSidebarGroupAction({
   className,
@@ -159,8 +163,9 @@ export function CustomSidebarMenuAvatar({
   );
 }
 
-interface CustomSidebarContextMenuProps
-  extends ComponentProps<typeof ContextMenu> {
+interface CustomSidebarContextMenuProps extends ComponentProps<
+  typeof ContextMenu
+> {
   isPinned: boolean;
   onPinChange: (isPinned: boolean) => void;
 }

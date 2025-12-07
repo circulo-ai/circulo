@@ -87,6 +87,8 @@ export class DrizzleAgentRepository implements Repository<Agent> {
       .update(agentTable)
       .set({ isArchived: true, updatedAt: new Date() })
       .where(eq(agentTable.id, id.toString()));
-    return "rowCount" in result ? (result as { rowCount: number }).rowCount > 0 : true;
+    return "rowCount" in result
+      ? (result as { rowCount: number }).rowCount > 0
+      : true;
   }
 }

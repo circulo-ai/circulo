@@ -17,9 +17,10 @@ export type UpdateArtifactInput = {
 
 export type UpdateArtifactOutput = Result<void>;
 
-export class UpdateArtifact
-  implements UseCase<UpdateArtifactInput, UpdateArtifactOutput>
-{
+export class UpdateArtifact implements UseCase<
+  UpdateArtifactInput,
+  UpdateArtifactOutput
+> {
   constructor(
     private readonly artifacts: DrizzleArtifactRepository,
     private readonly uow: UnitOfWork,

@@ -1,9 +1,9 @@
-import { createHonoFileRoutes } from '@circulo-ai/upload/hono';
-import { storageManager } from '@/lib/storage/config';
-import { requireAuth } from '@/middleware/auth';
-import { getSession } from '@/lib/auth';
-import { checkHybridAuth } from '@/lib/auth/hybrid';
-import type { AppEnv } from '@/lib/create-app';
+import { createHonoFileRoutes } from "@circulo-ai/upload/hono";
+import { storageManager } from "@/lib/storage/config";
+import { requireAuth } from "@/middleware/auth";
+import { getSession } from "@/lib/auth";
+import { checkHybridAuth } from "@/lib/auth/hybrid";
+import type { AppEnv } from "@/lib/create-app";
 
 const fileRoutes = createHonoFileRoutes<AppEnv>(
   {

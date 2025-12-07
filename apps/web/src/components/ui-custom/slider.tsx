@@ -3,7 +3,8 @@ import { Slider } from "../ui/slider";
 import { InputComponentProps } from "./controlled-input";
 
 interface SliderInputProps
-  extends Omit<
+  extends
+    Omit<
       ComponentProps<typeof Slider>,
       "value" | "onChange" | "onBlur" | "ref"
     >,

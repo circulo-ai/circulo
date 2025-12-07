@@ -59,7 +59,7 @@ export class InMemoryMetrics implements MetricsCollector {
   recordGauge(
     metric: string,
     value: number,
-    tags: Record<string, string> = {}
+    tags: Record<string, string> = {},
   ): void {
     if (!this.gauges.has(metric)) {
       this.gauges.set(metric, []);
@@ -74,7 +74,7 @@ export class InMemoryMetrics implements MetricsCollector {
   private recordHistogram(
     metric: string,
     value: number,
-    tags: Record<string, string>
+    tags: Record<string, string>,
   ): void {
     if (!this.histograms.has(metric)) {
       this.histograms.set(metric, []);

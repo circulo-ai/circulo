@@ -2,7 +2,11 @@ import { createRouter } from "@/lib/create-app";
 import { requireAuth } from "@/middleware/auth";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { BadRequestError, ForbiddenError, NotFoundError } from "@/lib/server/errors";
+import {
+  BadRequestError,
+  ForbiddenError,
+  NotFoundError,
+} from "@/lib/server/errors";
 import { getActiveOrganizationId } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
 import { DI_TOKENS, type RequestContainer } from "@/di/container";
@@ -20,12 +24,24 @@ router.patch(
   zValidator("json", visibilitySchema),
   async (c) => {
     const { id, visibility } = c.req.valid("json");
-    const { session, activeOrgId, di } = c.var as typeof c.var & { di: RequestContainer };
-    const activeOrganizationId = activeOrgId ?? (await getActiveOrganizationId(c.req.raw));
-    if (!activeOrganizationId) throw new ForbiddenError("No active organization");
+    const { session, activeOrgId, di } = c.var as typeof c.var & {
+      di: RequestContainer;
+    };
+    const activeOrganizationId =
+      activeOrgId ?? (await getActiveOrganizationId(c.req.raw));
+    if (!activeOrganizationId)
+      throw new ForbiddenError("No active organization");
 
-    const canUpdate = await hasPermission("chat", "update", activeOrganizationId, session as any);
-    if (!canUpdate) throw new ForbiddenError("You don't have permission to update chat visibility");
+    const canUpdate = await hasPermission(
+      "chat",
+      "update",
+      activeOrganizationId,
+      session as any,
+    );
+    if (!canUpdate)
+      throw new ForbiddenError(
+        "You don't have permission to update chat visibility",
+      );
 
     const useCase = di.resolve(DI_TOKENS.ChangeChatVisibilityUseCase);
     const result = await useCase.execute({ id, visibility });

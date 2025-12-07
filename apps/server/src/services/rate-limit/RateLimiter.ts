@@ -26,7 +26,10 @@ export class RateLimiter {
     private readonly redis: CirculoRedis | null,
   ) {}
 
-  private getLimitForPlan(plan: RateLimitPlan, bucket: RateLimitBucket): number {
+  private getLimitForPlan(
+    plan: RateLimitPlan,
+    bucket: RateLimitBucket,
+  ): number {
     const config = RATE_LIMITS[plan] ?? RATE_LIMITS[DEFAULT_PLAN];
     return config[bucket];
   }

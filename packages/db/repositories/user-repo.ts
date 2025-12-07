@@ -30,7 +30,7 @@ export const userRepo = {
 
   async update(
     id: string,
-    data: Partial<typeof user.$inferInsert>
+    data: Partial<typeof user.$inferInsert>,
   ): Promise<User | undefined> {
     const [row] = await db
       .update(user)

@@ -35,11 +35,16 @@ export class ChatAgentLink extends Entity<ChatAgentLinkProps> {
     this.touch();
   }
 
-  updateOverrides(overrides: { instructions?: string | null; temperature?: number | null }) {
+  updateOverrides(overrides: {
+    instructions?: string | null;
+    temperature?: number | null;
+  }) {
     this.props = {
       ...this.props,
-      customInstructions: overrides.instructions ?? this.props.customInstructions ?? null,
-      customTemperature: overrides.temperature ?? this.props.customTemperature ?? null,
+      customInstructions:
+        overrides.instructions ?? this.props.customInstructions ?? null,
+      customTemperature:
+        overrides.temperature ?? this.props.customTemperature ?? null,
     };
     this.touch();
   }

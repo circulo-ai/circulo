@@ -37,7 +37,10 @@ const parseNumber = (value: unknown, fallback: number): number => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-export const RATE_LIMIT_WINDOW_MS = parseNumber(env.RATE_LIMIT_WINDOW_MS, 60_000);
+export const RATE_LIMIT_WINDOW_MS = parseNumber(
+  env.RATE_LIMIT_WINDOW_MS,
+  60_000,
+);
 
 const API_ENDPOINT_LIMITS: Record<RateLimitPlan, number> = {
   free: 60,

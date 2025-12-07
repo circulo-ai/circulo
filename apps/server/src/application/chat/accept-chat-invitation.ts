@@ -15,18 +15,24 @@ export type AcceptChatInvitationInput = {
   userId: string;
 };
 
-export type AcceptChatInvitationOutput = Result<{ chatId: string; memberId: string }>;
+export type AcceptChatInvitationOutput = Result<{
+  chatId: string;
+  memberId: string;
+}>;
 
-export class AcceptChatInvitation
-  implements UseCase<AcceptChatInvitationInput, AcceptChatInvitationOutput>
-{
+export class AcceptChatInvitation implements UseCase<
+  AcceptChatInvitationInput,
+  AcceptChatInvitationOutput
+> {
   constructor(
     private readonly invitations: DrizzleChatInvitationRepository,
     private readonly members: DrizzleChatMemberRepository,
     private readonly uow: UnitOfWork,
   ) {}
 
-  async execute(input: AcceptChatInvitationInput): Promise<AcceptChatInvitationOutput> {
+  async execute(
+    input: AcceptChatInvitationInput,
+  ): Promise<AcceptChatInvitationOutput> {
     return this.uow.transaction(async () => {
       const invitation = await this.invitations.findByToken(input.token);
       if (!invitation) throw new NotFoundError("Chat invitation");
@@ -53,7 +59,10 @@ export class AcceptChatInvitation
       });
       await this.members.save(member);
 
-      return Result.ok({ chatId: snap.chatId.toString(), memberId: member.getId().toString() });
+      return Result.ok({
+        chatId: snap.chatId.toString(),
+        memberId: member.getId().toString(),
+      });
     });
   }
 }

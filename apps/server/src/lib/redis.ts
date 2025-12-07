@@ -5,7 +5,11 @@ const logger = createLogger("Redis");
 
 let cachedClient: CirculoRedis | null | undefined;
 
-function getLogger(): (level: "info" | "warn" | "error", message: string, meta?: Record<string, unknown>) => void {
+function getLogger(): (
+  level: "info" | "warn" | "error",
+  message: string,
+  meta?: Record<string, unknown>,
+) => void {
   return (level, message, meta) => {
     const log = (logger as any)[level];
 

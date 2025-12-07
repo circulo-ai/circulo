@@ -16,10 +16,7 @@ const router = createRouter();
 
 router.get("/messages/test", async (c) => {
   const result = await db.transaction(async (uow) => {
-    const recentChats = await uow
-      .select()
-      .from(chat)
-      .limit(5);
+    const recentChats = await uow.select().from(chat).limit(5);
 
     return { recentChats };
   });
@@ -65,9 +62,7 @@ router.delete(
         session as any,
       );
       if (!canUpdate) {
-        throw new ForbiddenError(
-          "You don't have permission to edit this chat",
-        );
+        throw new ForbiddenError("You don't have permission to edit this chat");
       }
     }
 

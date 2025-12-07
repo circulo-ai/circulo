@@ -58,7 +58,7 @@ router.get("/users/me/settings", async (c) => {
 
     const userSettings = result[0];
 
-    if(!userSettings) {
+    if (!userSettings) {
       return c.json({ data: defaultSettings }, 200);
     }
 

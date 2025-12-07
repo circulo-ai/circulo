@@ -1,9 +1,11 @@
 import type { Workflow, WorkflowStore, WorkflowFilter, Lock } from "../models";
 import { generateId } from "../utils/id";
 
-export class InMemoryWorkflowStore<TContext, TInput, TOutput>
-  implements WorkflowStore<TContext, TInput, TOutput>
-{
+export class InMemoryWorkflowStore<
+  TContext,
+  TInput,
+  TOutput,
+> implements WorkflowStore<TContext, TInput, TOutput> {
   private workflows = new Map<string, Workflow<TContext, TInput, TOutput>>();
   private locks = new Map<string, Lock>();
   private readonly holderId: string;
@@ -18,7 +20,7 @@ export class InMemoryWorkflowStore<TContext, TInput, TOutput>
   }
 
   async loadWorkflow(
-    id: string
+    id: string,
   ): Promise<Workflow<TContext, TInput, TOutput> | null> {
     const wf = this.workflows.get(id);
     return wf ? structuredClone(wf) : null;
@@ -26,7 +28,7 @@ export class InMemoryWorkflowStore<TContext, TInput, TOutput>
 
   async updateWorkflow(
     wf: Workflow<TContext, TInput, TOutput>,
-    expectedVersion: number
+    expectedVersion: number,
   ): Promise<boolean> {
     const existing = this.workflows.get(wf.id);
     if (!existing) {
@@ -50,7 +52,7 @@ export class InMemoryWorkflowStore<TContext, TInput, TOutput>
   }
 
   async listWorkflows(
-    filter?: WorkflowFilter
+    filter?: WorkflowFilter,
   ): Promise<Workflow<TContext, TInput, TOutput>[]> {
     let results = Array.from(this.workflows.values());
 
@@ -61,7 +63,7 @@ export class InMemoryWorkflowStore<TContext, TInput, TOutput>
     if (filter?.tags) {
       results = results.filter((wf) => {
         return Object.entries(filter.tags!).every(
-          ([key, value]) => wf.tags[key] === value
+          ([key, value]) => wf.tags[key] === value,
         );
       });
     }

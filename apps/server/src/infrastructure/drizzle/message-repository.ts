@@ -68,6 +68,8 @@ export class DrizzleMessageRepository implements Repository<Message> {
       .update(messageTable)
       .set({ isDeleted: true, deletedAt: new Date() })
       .where(eq(messageTable.id, id.toString()));
-    return "rowCount" in result ? (result as { rowCount: number }).rowCount > 0 : true;
+    return "rowCount" in result
+      ? (result as { rowCount: number }).rowCount > 0
+      : true;
   }
 }

@@ -23,7 +23,7 @@ export type SubscriptionInfo = {
  * the customer_id should be the organization ID
  */
 export async function getSubscriptionForOrg(
-  organizationId: string
+  organizationId: string,
 ): Promise<SubscriptionInfo | null> {
   try {
     const getCustomer = await autumn.customers.get(organizationId);
@@ -53,7 +53,7 @@ export async function getSubscriptionForOrg(
  */
 export async function orgHasPlan(
   organizationId: string,
-  requiredPlans: string[]
+  requiredPlans: string[],
 ): Promise<boolean> {
   const subscription = await getSubscriptionForOrg(organizationId);
   if (!subscription || !subscription.plan) return false;
@@ -65,7 +65,7 @@ export async function orgHasPlan(
  * (requires pro plan or higher on their personal org)
  */
 export async function canCreateTeamOrg(
-  personalOrgId: string
+  personalOrgId: string,
 ): Promise<boolean> {
   return orgHasPlan(personalOrgId, ["pro", "team", "enterprise"]);
 }
