@@ -1,170 +1,74 @@
-import {
-  createErrorResponse,
-  createFileResponse,
-  FileNotFoundError,
-  findLocalFile,
-  getContentType,
-} from "@/routes/files/utils";
-import { checkHybridAuth } from "@/lib/auth/hybrid";
-import { createLogger } from "@/lib/logs/console/logger";
-import { isUsingCloudStorage } from "@/lib/uploads";
-import type { StorageContext } from "@/lib/uploads/core/config-resolver";
-import { downloadFile } from "@/lib/uploads/core/storage-service";
-import { readFile } from "fs/promises";
-import { createRouter } from "@/lib/create-app";
+import { createRouter } from '@/lib/create-app';
+import { checkHybridAuth } from '@/lib/auth/hybrid';
+import { createLogger } from '@/lib/logs/console/logger';
+import { storageManager, type AppStorageContext } from '@/lib/storage/config';
 
-const logger = createLogger("FilesServeAPI");
-
+const logger = createLogger('FileServeAPI');
 const router = createRouter();
 
-router.get("/files/serve/*", async (c) => {
+const CONTENT_TYPE_MAP: Record<string, string> = {
+  pdf: 'application/pdf',
+  txt: 'text/plain',
+  csv: 'text/csv',
+  json: 'application/json',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+};
+
+function getContentType(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+  return CONTENT_TYPE_MAP[ext] || 'application/octet-stream';
+}
+
+router.get('/files/serve/*', async (c) => {
   try {
-    const wildcard = c.req.param("*") || "";
-    const pathSegments = wildcard.split("/").filter(Boolean);
+    const wildcard = c.req.param('*') || '';
+    const key = decodeURIComponent(wildcard);
 
-    if (!pathSegments || pathSegments.length === 0) {
-      throw new FileNotFoundError("No file path provided");
+    if (!key) {
+      return c.json({ error: 'No file key provided' }, 400);
     }
 
-    logger.info("File serve request:", { path: pathSegments });
-
-    const authResult = await checkHybridAuth(c.req.raw, {
-      requireChatId: false,
-    });
-
+    // Check authentication
+    const authResult = await checkHybridAuth(c.req.raw, { requireChatId: false });
     if (!authResult.success) {
-      logger.warn("Unauthorized file access attempt", {
-        path: pathSegments,
-        error: authResult.error,
-      });
-      return c.json({ error: "Unauthorized" }, 401);
+      logger.warn(`Unauthorized file access: ${key}`);
+      return c.json({ error: 'Unauthorized' }, 401);
     }
 
-    const userId = authResult.userId;
-    const fullPath = pathSegments.join("/");
-    const isS3Path = pathSegments[0] === "s3";
-    const isBlobPath = pathSegments[0] === "blob";
-    const isCloudPath = isS3Path || isBlobPath;
-    const cloudKey = isCloudPath ? pathSegments.slice(1).join("/") : fullPath;
+    const contextInput = c.req.query('context');
+    const context: AppStorageContext = contextInput && 
+      storageManager.hasContext(contextInput as AppStorageContext)
+        ? (contextInput as AppStorageContext)
+        : 'general';
 
-    const contextParam = c.req.query("context");
-    const legacyBucketType = c.req.query("bucket");
+    logger.info(`Serving file from ${context}: ${key}`);
 
-    if (isUsingCloudStorage() || isCloudPath) {
-      return await handleCloudProxy(
-        cloudKey,
-        contextParam,
-        legacyBucketType,
-        userId,
-      );
-    }
+    const fileBuffer = await storageManager.download({ key, context });
+    const filename = key.split('/').pop() || 'download';
+    const contentType = getContentType(filename);
 
-    return await handleLocalFile(fullPath, userId);
+    logger.info(`File served: ${key} (${fileBuffer.length} bytes)`);
+
+    return new Response(fileBuffer, {
+      status: 200,
+      headers: {
+        'Content-Type': contentType,
+        'Content-Disposition': `inline; filename="${filename}"`,
+        'Cache-Control': 'public, max-age=31536000',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    });
   } catch (error) {
-    logger.error("Error serving file:", error);
-
-    if (error instanceof FileNotFoundError) {
-      return createErrorResponse(error);
-    }
-
-    return createErrorResponse(
-      error instanceof Error ? error : new Error("Failed to serve file"),
+    logger.error('File serve error:', error);
+    return c.json(
+      { error: error instanceof Error ? error.message : 'File not found' },
+      404
     );
   }
 });
-
-async function handleLocalFile(
-  filename: string,
-  userId?: string,
-): Promise<Response> {
-  try {
-    const filePath = findLocalFile(filename);
-
-    if (!filePath) {
-      throw new FileNotFoundError(`File not found: ${filename}`);
-    }
-
-    const fileBuffer = await readFile(filePath);
-    const contentType = getContentType(filename);
-
-    logger.info("Local file served", {
-      userId,
-      filename,
-      size: fileBuffer.length,
-    });
-
-    return createFileResponse({
-      buffer: fileBuffer,
-      contentType,
-      filename,
-    });
-  } catch (error) {
-    logger.error("Error reading local file:", error);
-    throw error;
-  }
-}
-
-/**
- * Infer storage context from file key pattern
- */
-function inferContextFromKey(key: string): StorageContext {
-  // KB files always start with 'kb/' prefix
-  if (key.startsWith("kb/")) {
-    return "knowledge-base";
-  }
-
-  // Organization files: UUID-like ID followed by timestamp pattern
-  // Pattern: {uuid}/{timestamp}-{random}-{filename}
-  if (key.match(/^[a-f0-9-]{36}\/\d+-[a-z0-9]+-/)) {
-    return "organization";
-  }
-
-  return "general";
-}
-
-async function handleCloudProxy(
-  cloudKey: string,
-  contextParam?: string | null,
-  legacyBucketType?: string | null,
-  userId?: string,
-): Promise<Response> {
-  try {
-    let context: StorageContext;
-
-    if (contextParam) {
-      context = contextParam as StorageContext;
-      logger.info(`Using explicit context: ${context} for key: ${cloudKey}`);
-    } else {
-      context = inferContextFromKey(cloudKey);
-      logger.info(`Inferred context: ${context} from key pattern: ${cloudKey}`);
-    }
-
-    let fileBuffer: Buffer;
-
-    fileBuffer = await downloadFile({
-      key: cloudKey,
-      context,
-    });
-
-    const originalFilename = cloudKey.split("/").pop() || "download";
-    const contentType = getContentType(originalFilename);
-
-    logger.info("Cloud file served", {
-      userId,
-      key: cloudKey,
-      size: fileBuffer.length,
-      context,
-    });
-
-    return createFileResponse({
-      buffer: fileBuffer,
-      contentType,
-      filename: originalFilename,
-    });
-  } catch (error) {
-    logger.error("Error downloading from cloud storage:", error);
-    throw error;
-  }
-}
 
 export default router;

@@ -1,17 +1,12 @@
-import { createErrorResponse } from "@/routes/files/utils";
-import { createRouter } from "@/lib/create-app";
-import { createLogger } from "@/lib/logs/console/logger";
-import type { StorageContext } from "@/lib/uploads/core/config-resolver";
-import {
-  generatePresignedDownloadUrl,
-  hasCloudStorage,
-} from "@/lib/uploads/core/storage-service";
-import { getBaseUrl } from "@/lib/urls/utils";
-import { requireAuth } from "@/middleware/auth";
-import { zValidator } from "@hono/zod-validator";
-import { z } from "zod";
+import { createRouter } from '@/lib/create-app';
+import { createLogger } from '@/lib/logs/console/logger';
+import { requireAuth } from '@/middleware/auth';
+import { storageManager, type AppStorageContext } from '@/lib/storage/config';
+import { zValidator } from '@hono/zod-validator';
+import { z } from 'zod';
 
-const logger = createLogger("FileDownload");
+const logger = createLogger('FileDownloadAPI');
+const router = createRouter();
 
 const bodySchema = z.object({
   key: z.string(),
@@ -19,70 +14,50 @@ const bodySchema = z.object({
   context: z.string().optional(),
 });
 
-const router = createRouter();
+router.post('/files/download', requireAuth, zValidator('json', bodySchema), async (c) => {
+  try {
+    const { key, name, context: contextInput } = c.req.valid('json');
 
-router.post(
-  "/files/download",
-  requireAuth,
-  zValidator("json", bodySchema),
-  async (c) => {
-    try {
-      const body = c.req.valid("json");
-      const { key, name, context } = body;
+    const context: AppStorageContext = contextInput && 
+      storageManager.hasContext(contextInput as AppStorageContext)
+        ? (contextInput as AppStorageContext)
+        : 'general';
 
-      if (!key) {
-        return createErrorResponse(new Error("File key is required"), 400);
-      }
+    logger.info(`Generating download URL for ${context}: ${key}`);
 
-      logger.info(`Generating download URL for file: ${name || key}`);
-
-      const storageContext: StorageContext = (context as StorageContext) || "general";
-
-      if (hasCloudStorage()) {
-        try {
-          const downloadUrl = await generatePresignedDownloadUrl(
-            key,
-            storageContext,
-            5 * 60,
-          );
-
-          logger.info(
-            `Generated download URL for ${storageContext} file: ${key}`,
-          );
-
-          return c.json({
-            downloadUrl,
-            expiresIn: 300,
-            fileName: name || key.split("/").pop() || "download",
-          });
-        } catch (error) {
-          logger.error(`Failed to generate presigned URL for ${key}:`, error);
-          return createErrorResponse(
-            error instanceof Error
-              ? error
-              : new Error("Failed to generate download URL"),
-            500,
-          );
-        }
-      } else {
-        const downloadUrl = `${getBaseUrl()}/api/files/serve/${encodeURIComponent(key)}?context=${storageContext}`;
-
-        logger.info(`Using local storage path for file: ${key}`);
+    if (storageManager.supportsPresignedUrls(context)) {
+      try {
+        const downloadUrl = await storageManager.generatePresignedDownloadUrl({
+          key,
+          context,
+          expirationSeconds: 5 * 60, // 5 minutes
+        });
 
         return c.json({
           downloadUrl,
-          expiresIn: null,
-          fileName: name || key.split("/").pop() || "download",
+          expiresIn: 300,
+          fileName: name || key.split('/').pop() || 'download',
         });
+      } catch (error) {
+        logger.error(`Failed to generate presigned URL: ${error}`);
+        return c.json({ error: 'Failed to generate download URL' }, 500);
       }
-    } catch (error) {
-      logger.error("Error in file download endpoint:", error);
-      return createErrorResponse(
-        error instanceof Error ? error : new Error("Internal server error"),
-        500,
-      );
     }
-  },
-);
+
+    // Local storage fallback
+    const downloadUrl = `/api/files/serve/${encodeURIComponent(key)}`;
+    return c.json({
+      downloadUrl,
+      expiresIn: null,
+      fileName: name || key.split('/').pop() || 'download',
+    });
+  } catch (error) {
+    logger.error('Download error:', error);
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Download failed' },
+      500
+    );
+  }
+});
 
 export default router;

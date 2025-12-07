@@ -1,101 +1,37 @@
-import {
-  createErrorResponse,
-  createSuccessResponse,
-  extractBlobKey,
-  extractFilename,
-  extractS3Key,
-  InvalidRequestError,
-  isBlobPath,
-  isCloudPath,
-  isS3Path,
-} from "@/routes/files/utils";
-import { createRouter } from "@/lib/create-app";
-import { createLogger } from "@/lib/logs/console/logger";
-import type { StorageContext } from "@/lib/uploads/core/config-resolver";
-import { deleteFile } from "@/lib/uploads/core/storage-service";
-import { requireAuth } from "@/middleware/auth";
+import { createRouter } from '@/lib/create-app';
+import { createLogger } from '@/lib/logs/console/logger';
+import { requireAuth } from '@/middleware/auth';
+import { storageManager, type AppStorageContext } from '@/lib/storage/config';
 
-const logger = createLogger("FilesDeleteAPI");
-
+const logger = createLogger('FileDeleteAPI');
 const router = createRouter();
 
-router.post("/files/delete", requireAuth, async (c) => {
+router.post('/files/delete', requireAuth, async (c) => {
   try {
-    const requestData = await c.req.json();
-    const { filePath, context } = requestData;
+    const { key, context: contextInput } = await c.req.json();
 
-    logger.info("File delete request received:", { filePath, context });
-
-    if (!filePath) {
-      throw new InvalidRequestError("No file path provided");
+    if (!key) {
+      return c.json({ error: 'File key is required' }, 400);
     }
 
-    try {
-      const key = extractStorageKey(filePath);
+    const context: AppStorageContext = contextInput && 
+      storageManager.hasContext(contextInput as AppStorageContext)
+        ? (contextInput as AppStorageContext)
+        : 'general';
 
-      const storageContext: StorageContext =
-        context || inferContextFromKey(key);
+    logger.info(`Deleting file from ${context}: ${key}`);
 
-      logger.info(`Deleting file with key: ${key}, context: ${storageContext}`);
+    await storageManager.delete({ key, context });
 
-      await deleteFile({
-        key,
-        context: storageContext,
-      });
-
-      logger.info(`File successfully deleted: ${key}`);
-
-      return createSuccessResponse({
-        success: true,
-        message: "File deleted successfully",
-      });
-    } catch (error) {
-      logger.error("Error deleting file:", error);
-      return createErrorResponse(
-        error instanceof Error ? error : new Error("Failed to delete file"),
-      );
-    }
+    logger.info(`Successfully deleted: ${key}`);
+    return c.json({ success: true, message: 'File deleted successfully' });
   } catch (error) {
-    logger.error("Error parsing request:", error);
-    return createErrorResponse(
-      error instanceof Error ? error : new Error("Invalid request"),
+    logger.error('Delete error:', error);
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Delete failed' },
+      500
     );
   }
 });
-
-function extractStorageKey(filePath: string): string {
-  if (isS3Path(filePath)) {
-    return extractS3Key(filePath);
-  }
-
-  if (isBlobPath(filePath)) {
-    return extractBlobKey(filePath);
-  }
-
-  if (filePath.startsWith("/api/files/serve/")) {
-    const pathWithoutQuery = filePath.split("?")[0];
-    return decodeURIComponent(
-      pathWithoutQuery.substring("/api/files/serve/".length),
-    );
-  }
-
-  if (!isCloudPath(filePath)) {
-    return extractFilename(filePath);
-  }
-
-  return filePath;
-}
-
-function inferContextFromKey(key: string): StorageContext {
-  if (key.startsWith("kb/")) {
-    return "knowledge-base";
-  }
-
-  if (key.match(/^\d+-[a-z0-9]+-/)) {
-    return "general";
-  }
-
-  return "general";
-}
 
 export default router;

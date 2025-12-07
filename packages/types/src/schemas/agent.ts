@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { LLM_MODELS } from "../types/models";
 
-export const getQuerySchema = z.object({
+export const getAgentQuerySchema = z.object({
   id: z.uuid().optional(),
   search: z.string().optional(),
   includeArchived: z.coerce.boolean().optional().default(false),
@@ -22,11 +22,11 @@ export const baseAgentSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).nullable().optional(),
 });
 
-export const createBodySchema = baseAgentSchema.extend({
+export const createAgentBodySchema = baseAgentSchema.extend({
   id: z.uuid().optional(),
 });
 
-export const updateBodySchema = baseAgentSchema
+export const updateAgentBodySchema = baseAgentSchema
   .partial()
   .extend({
     id: z.uuid(),
@@ -39,7 +39,7 @@ export const updateBodySchema = baseAgentSchema
     { message: "At least one field must be provided to update" }
   );
 
-export const deleteQuerySchema = z.object({
+export const deleteAgentQuerySchema = z.object({
   id: z.uuid(),
   hard: z.coerce.boolean().optional().default(false),
 });

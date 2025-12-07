@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const UUIDSchema = z.string().uuid();
+export const UUIDSchema = z.uuid();
 export type UUID = z.infer<typeof UUIDSchema>;
 
 export const TimestampSchema = z.object({
