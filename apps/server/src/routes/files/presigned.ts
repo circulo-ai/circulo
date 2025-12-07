@@ -1,184 +1,120 @@
-import { createErrorResponse } from "@/routes/files/utils";
-import { getSession } from "@/lib/auth";
-import { createRouter } from "@/lib/create-app";
-import { createLogger } from "@/lib/logs/console/logger";
-import type { StorageContext } from "@/lib/uploads/core/config-resolver";
-import { USE_BLOB_STORAGE } from "@/lib/uploads/core/setup";
-import {
-  generatePresignedDownloadUrl,
-  generatePresignedUploadUrl,
-  hasCloudStorage,
-} from "@/lib/uploads/core/storage-service";
-import { validateFileType } from "@/lib/uploads/utils/validation";
-import { requireAuth } from "@/middleware/auth";
-import { zValidator } from "@hono/zod-validator";
-import { z } from "zod";
-import type { StatusCode } from "hono/utils/http-status";
 
-const logger = createLogger("PresignedUploadAPI");
+import { createRouter } from '@/lib/create-app';
+import { getSession } from '@/lib/auth';
+import { createLogger } from '@/lib/logs/console/logger';
+import { requireAuth } from '@/middleware/auth';
+import { validateFileType, validateFileSize, MAX_FILE_SIZE } from '@circulo-ai/upload';
+import { storageManager, type AppStorageContext } from '@/lib/storage/config';
+import { zValidator } from '@hono/zod-validator';
+import { z } from 'zod';
 
-const bodySchema = z.object({
-  fileName: z.string().min(1, "fileName is required"),
-  contentType: z.string().min(1, "contentType is required"),
-  fileSize: z.number().positive("fileSize must be a positive number"),
-  userId: z.string().optional(),
-  chatId: z.string().optional(),
-});
-
-class PresignedUrlError extends Error {
-  constructor(
-    message: string,
-    public code: string,
-    public statusCode: StatusCode = 400,
-  ) {
-    super(message);
-    this.name = "PresignedUrlError";
-  }
-}
-
-class ValidationError extends PresignedUrlError {
-  constructor(message: string) {
-    super(message, "VALIDATION_ERROR", 400);
-  }
-}
-
+const logger = createLogger('PresignedUrlAPI');
 const router = createRouter();
 
-router.post(
-  "/files/presigned",
-  requireAuth,
-  zValidator("json", bodySchema),
-  async (c) => {
-    try {
-      const session = await getSession(c.req.raw);
-      if (!session?.user?.id) {
-        return c.json({ error: "Unauthorized" }, 401);
-      }
+const bodySchema = z.object({
+  fileName: z.string().min(1),
+  contentType: z.string().min(1),
+  fileSize: z.number().positive(),
+});
 
-      const data = c.req.valid("json");
-      const { fileName, contentType, fileSize } = data;
+router.post('/files/presigned', requireAuth, zValidator('json', bodySchema), async (c) => {
+  try {
+    const session = await getSession(c.req.raw);
+    if (!session?.user?.id) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
 
-      const MAX_FILE_SIZE = 100 * 1024 * 1024;
-      if (fileSize > MAX_FILE_SIZE) {
-        throw new ValidationError(
-          `File size (${fileSize} bytes) exceeds maximum allowed size (${MAX_FILE_SIZE} bytes)`,
-        );
-      }
+    const { fileName, contentType, fileSize } = c.req.valid('json');
+    const contextInput = c.req.query('type') || c.req.query('context');
 
-      const uploadTypeParam = c.req.query("type");
-      const uploadType: StorageContext =
-        uploadTypeParam === "knowledge-base"
-          ? "knowledge-base"
-          : uploadTypeParam === "chat"
-            ? "chat"
-            : uploadTypeParam === "profile-pictures"
-              ? "profile-pictures"
-              : "general";
+    const context: AppStorageContext = contextInput && 
+      storageManager.hasContext(contextInput as AppStorageContext)
+        ? (contextInput as AppStorageContext)
+        : 'general';
 
-      if (uploadType === "knowledge-base") {
-        const fileValidationError = validateFileType(fileName, contentType);
-        if (fileValidationError) {
-          throw new ValidationError(`${fileValidationError.message}`);
-        }
-      }
+    // Validate file size
+    const sizeError = validateFileSize(fileSize, MAX_FILE_SIZE);
+    if (sizeError) {
+      return c.json({ error: sizeError.message }, 400);
+    }
 
-      const sessionUserId = session.user.id;
-
-      if (!hasCloudStorage()) {
-        logger.info(
-          `Local storage detected - presigned URL not available for ${fileName}, client will use API fallback`,
-        );
-        return c.json({
-          fileName,
-          presignedUrl: "",
-          fileInfo: {
-            path: "",
-            key: "",
-            name: fileName,
-            size: fileSize,
-            type: contentType,
+    // Validate file type for knowledge-base
+    if (context === 'knowledge-base') {
+      const typeError = validateFileType(fileName, contentType);
+      if (typeError) {
+        return c.json(
+          {
+            error: typeError.message,
+            code: typeError.code,
+            supportedTypes: typeError.supportedTypes,
           },
-          directUploadSupported: false,
-        });
-      }
-
-      logger.info(`Generating ${uploadType} presigned URL for ${fileName}`);
-
-      const presignedUrlResponse = await generatePresignedUploadUrl({
-        fileName,
-        contentType,
-        fileSize,
-        context: uploadType,
-        userId: sessionUserId,
-        expirationSeconds: 3600,
-      });
-
-      let finalPath: string;
-
-      try {
-        const downloadUrl = await generatePresignedDownloadUrl(
-          presignedUrlResponse.key,
-          uploadType,
-          24 * 60 * 60,
+          400
         );
-        finalPath = downloadUrl;
-        logger.info(`Generated presigned download URL for ${fileName}`);
-      } catch (error) {
-        logger.warn(
-          `Failed to generate presigned download URL, using serve endpoint:`,
-          error,
-        );
-        finalPath = `/api/files/serve/${USE_BLOB_STORAGE ? "blob" : "s3"}/${encodeURIComponent(presignedUrlResponse.key)}?context=${uploadType}`;
       }
+    }
 
+    // Check if provider supports presigned URLs
+    if (!storageManager.supportsPresignedUrls(context)) {
+      logger.info(`Provider for ${context} doesn't support presigned URLs`);
       return c.json({
         fileName,
-        presignedUrl: presignedUrlResponse.url,
+        presignedUrl: '',
         fileInfo: {
-          path: finalPath,
-          key: presignedUrlResponse.key,
+          path: '',
+          key: '',
           name: fileName,
           size: fileSize,
           type: contentType,
         },
-        uploadHeaders: presignedUrlResponse.uploadHeaders,
-        directUploadSupported: true,
+        directUploadSupported: false,
+      });
+    }
+
+    logger.info(`Generating presigned upload URL for ${context}: ${fileName}`);
+
+    const result = await storageManager.generatePresignedUploadUrl({
+      fileName,
+      contentType,
+      fileSize,
+      context,
+      expirationSeconds: 3600,
+      metadata: {
+        userId: session.user.id,
+      },
+    });
+
+    // Try to generate download URL
+    let downloadUrl: string | undefined;
+    try {
+      downloadUrl = await storageManager.generatePresignedDownloadUrl({
+        key: result.key,
+        context,
+        expirationSeconds: 24 * 60 * 60,
       });
     } catch (error) {
-      logger.error("Error generating presigned URL:", error);
-
-      if (error instanceof PresignedUrlError) {
-        c.status(error.statusCode);
-        return c.json(
-          {
-            error: error.message,
-            code: error.code,
-            directUploadSupported: false,
-          }
-        );
-      }
-
-      return createErrorResponse(
-        error instanceof Error
-          ? error
-          : new Error("Failed to generate presigned URL"),
-      );
+      logger.warn(`Failed to generate download URL: ${error}`);
     }
-  },
-);
 
-router.options("/files/presigned", (c) =>
-  c.json(
-    {},
-    {
-      status: 200,
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    return c.json({
+      fileName,
+      presignedUrl: result.url,
+      fileInfo: {
+        path: downloadUrl || `/api/files/serve/${encodeURIComponent(result.key)}`,
+        key: result.key,
+        name: fileName,
+        size: fileSize,
+        type: contentType,
       },
-    },
-  ),
-);
+      uploadHeaders: result.uploadHeaders,
+      directUploadSupported: true,
+    });
+  } catch (error) {
+    logger.error('Presigned URL error:', error);
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to generate URL' },
+      500
+    );
+  }
+});
 
 export default router;

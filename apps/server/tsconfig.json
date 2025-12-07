@@ -3,6 +3,7 @@
     "verbatimModuleSyntax": true,
     "paths": {
       "@/*": ["./src/*"],
+      "@circulo-ai/upload": ["../../packages/upload/src"],
       "@circulo-ai/core": ["../../packages/core/src"],
       "@circulo-ai/di": ["../../packages/di/src"],
       "@circulo-ai/file-parsers": ["../../packages/file-parsers/src"],
@@ -32,8 +33,11 @@
     "declarationMap": true,
     "sourceMap": true,
     "types": ["node"],
-    "isolatedModules": true
+    "isolatedModules": true,
   },
+  "references": [
+    { "path": "../../packages/types" }
+  ],
   "include": ["src/**/*"],
   "exclude": ["node_modules", "**/*.test.ts", "dist", "drizzle.config.ts"]
 }

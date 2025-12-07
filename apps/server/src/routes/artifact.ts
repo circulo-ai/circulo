@@ -12,7 +12,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 
 const querySchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
 });
 
 const bodySchema = z.object({

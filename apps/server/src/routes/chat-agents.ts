@@ -16,7 +16,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 
 const paramsSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
 });
 
 const getQuerySchema = z.object({
@@ -24,7 +24,7 @@ const getQuerySchema = z.object({
 });
 
 const postBodySchema = z.object({
-  agentId: z.string().uuid(),
+  agentId: z.uuid(),
   isEnabled: z.coerce.boolean().optional().default(true),
   customInstructions: z.string().nullable().optional(),
   customTemperature: z.coerce
@@ -38,7 +38,7 @@ const postBodySchema = z.object({
 
 const patchBodySchema = z
   .object({
-    agentId: z.string().uuid(),
+    agentId: z.uuid(),
     isEnabled: z.boolean().optional(),
     customInstructions: z.string().nullable().optional(),
     customTemperature: z.coerce
@@ -58,7 +58,7 @@ const patchBodySchema = z
   );
 
 const deleteQuerySchema = z.object({
-  agentId: z.string().uuid(),
+  agentId: z.uuid(),
 });
 
 async function getChatContext(

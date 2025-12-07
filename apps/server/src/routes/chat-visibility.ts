@@ -10,7 +10,7 @@ import { DI_TOKENS, type RequestContainer } from "@/di/container";
 const router = createRouter();
 
 const visibilitySchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
   visibility: z.enum(["private", "public"]),
 });
 

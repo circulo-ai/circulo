@@ -131,14 +131,14 @@ router.post(
           const finalPath = `/api/files/serve/${storagePrefix}/${encodeURIComponent(urlResponse.key)}?context=${uploadType}`;
 
           return {
-            fileName: files[index].fileName,
+            fileName: files[index]!.fileName,
             presignedUrl: urlResponse.url,
             fileInfo: {
               path: finalPath,
               key: urlResponse.key,
-              name: files[index].fileName,
-              size: files[index].fileSize,
-              type: files[index].contentType,
+              name: files[index]!.fileName,
+              size: files[index]!.fileSize,
+              type: files[index]!.contentType,
             },
             uploadHeaders: urlResponse.uploadHeaders,
             directUploadSupported: true,

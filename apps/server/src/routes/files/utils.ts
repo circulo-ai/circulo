@@ -108,7 +108,11 @@ export function extractStorageKey(
 ): string {
   const prefix = `/api/files/serve/${storageType}/`;
   if (path.includes(prefix)) {
-    return decodeURIComponent(path.split(prefix)[1]);
+    const parts = path.split(prefix);
+    if(parts.length >= 2)  {
+      return decodeURIComponent(parts[1]!);
+    }
+    throw new Error("Invalid file path");
   }
   return path;
 }
@@ -291,7 +295,7 @@ export function createFileResponse(file: FileResponse): Response {
     file.contentType,
   );
 
-  return new Response(file.buffer as BodyInit, {
+  return new Response(file.buffer, {
     status: 200,
     headers: {
       "Content-Type": contentType,

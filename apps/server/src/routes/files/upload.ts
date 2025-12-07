@@ -1,119 +1,113 @@
-import { createErrorResponse, InvalidRequestError } from "@/routes/files/utils";
-import { getSession } from "@/lib/auth";
-import { createRouter } from "@/lib/create-app";
-import { createLogger } from "@/lib/logs/console/logger";
-import {
-  generatePresignedDownloadUrl,
-  hasCloudStorage,
-  uploadFile,
-} from "@/lib/uploads/core/storage-service";
-import { requireAuth } from "@/middleware/auth";
+import { createRouter } from '@/lib/create-app';
+import { getSession } from '@/lib/auth';
+import { createLogger } from '@/lib/logs/console/logger';
+import { requireAuth } from '@/middleware/auth';
+import { validateFileType, validateFileSize, MAX_FILE_SIZE } from '@circulo-ai/upload';
+import { storageManager, type AppStorageContext } from '@/lib/storage/config';
+
+const logger = createLogger('FileUploadAPI');
+const router = createRouter();
 
 const ALLOWED_EXTENSIONS = new Set([
-  "pdf",
-  "doc",
-  "docx",
-  "txt",
-  "md",
-  "png",
-  "jpg",
-  "jpeg",
-  "gif",
-  "csv",
-  "xlsx",
-  "xls",
-  "json",
-  "yaml",
-  "yml",
+  'pdf', 'doc', 'docx', 'txt', 'md', 'png', 'jpg', 'jpeg',
+  'gif', 'csv', 'xlsx', 'xls', 'json', 'yaml', 'yml',
 ]);
 
 function validateFileExtension(filename: string): boolean {
-  const extension = filename.split(".").pop()?.toLowerCase();
-  if (!extension) return false;
-  return ALLOWED_EXTENSIONS.has(extension);
+  const extension = filename.split('.').pop()?.toLowerCase();
+  return extension ? ALLOWED_EXTENSIONS.has(extension) : false;
 }
 
-const logger = createLogger("FilesUploadAPI");
-const router = createRouter();
-
-router.post("/files/upload", requireAuth, async (c) => {
+router.post('/files/upload', requireAuth, async (c) => {
   try {
     const session = await getSession(c.req.raw);
     if (!session?.user?.id) {
-      return c.json({ error: "Unauthorized" }, 401);
+      return c.json({ error: 'Unauthorized' }, 401);
     }
 
     const formData = await c.req.raw.formData();
-    const files = formData.getAll("file") as File[];
-    const contextInput = formData.get("context");
-    const context =
-      typeof contextInput === "string" &&
-      ["general", "knowledge-base", "organization", "chat", "profile-pictures"].includes(
-        contextInput,
-      )
-        ? (contextInput as
-            | "general"
-            | "knowledge-base"
-            | "organization"
-            | "chat"
-            | "profile-pictures")
-        : "general";
+    const files = formData.getAll('file') as File[];
+    const contextInput = formData.get('context');
+
+    const context: AppStorageContext =
+      typeof contextInput === 'string' &&
+      storageManager.hasContext(contextInput as AppStorageContext)
+        ? (contextInput as AppStorageContext)
+        : 'general';
 
     if (!files || files.length === 0) {
-      throw new InvalidRequestError("No files provided");
+      return c.json({ error: 'No files provided' }, 400);
     }
-
-    const usingCloudStorage = hasCloudStorage();
-    logger.info(
-      `Using storage mode: ${usingCloudStorage ? "Cloud" : "Local"} for file upload`,
-    );
 
     const uploadResults = [];
 
     for (const file of files) {
-      const originalName = file.name;
-
-      if (!validateFileExtension(originalName)) {
-        const extension =
-          originalName.split(".").pop()?.toLowerCase() || "unknown";
-        throw new InvalidRequestError(
-          `File type '${extension}' is not allowed. Allowed types: ${Array.from(
-            ALLOWED_EXTENSIONS,
-          ).join(", ")}`,
+      // Validate extension
+      if (!validateFileExtension(file.name)) {
+        const extension = file.name.split('.').pop()?.toLowerCase() || 'unknown';
+        return c.json(
+          {
+            error: `File type '${extension}' is not allowed. Allowed: ${Array.from(ALLOWED_EXTENSIONS).join(', ')}`,
+          },
+          400
         );
+      }
+
+      // Validate size
+      const sizeError = validateFileSize(file.size, MAX_FILE_SIZE);
+      if (sizeError) {
+        return c.json({ error: sizeError.message }, 400);
+      }
+
+      // Validate file type for knowledge-base
+      if (context === 'knowledge-base') {
+        const typeError = validateFileType(file.name, file.type);
+        if (typeError) {
+          return c.json(
+            {
+              error: typeError.message,
+              code: typeError.code,
+              supportedTypes: typeError.supportedTypes,
+            },
+            400
+          );
+        }
       }
 
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
 
       try {
-        logger.info(`Uploading file (${context} context): ${originalName}`);
+        logger.info(`Uploading file to ${context}: ${file.name}`);
 
-        const fileInfo = await uploadFile({
+        const fileInfo = await storageManager.upload({
           file: buffer,
-          fileName: originalName,
+          fileName: file.name,
           contentType: file.type,
           context,
+          metadata: {
+            userId: session.user.id,
+            uploadSource: 'web',
+          },
         });
 
+        // Generate download URL if supported
         let downloadUrl: string | undefined;
-        if (hasCloudStorage()) {
+        if (storageManager.supportsPresignedUrls(context)) {
           try {
-            downloadUrl = await generatePresignedDownloadUrl(
-              fileInfo.key,
+            downloadUrl = await storageManager.generatePresignedDownloadUrl({
+              key: fileInfo.key,
               context,
-              24 * 60 * 60,
-            );
+              expirationSeconds: 24 * 60 * 60,
+            });
           } catch (error) {
-            logger.warn(
-              `Failed to generate presigned URL for ${originalName}:`,
-              error,
-            );
+            logger.warn(`Failed to generate presigned URL: ${error}`);
           }
         }
 
-        const uploadResult = {
-          name: originalName,
+        uploadResults.push({
+          id: fileInfo.key,
+          name: file.name,
           size: buffer.length,
           type: file.type,
           key: fileInfo.key,
@@ -122,36 +116,23 @@ router.post("/files/upload", requireAuth, async (c) => {
           uploadedAt: new Date().toISOString(),
           expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
           context,
-        };
+        });
 
         logger.info(`Successfully uploaded: ${fileInfo.key}`);
-        uploadResults.push(uploadResult);
       } catch (error) {
-        logger.error(`Error uploading ${originalName}:`, error);
+        logger.error(`Error uploading ${file.name}:`, error);
         throw error;
       }
     }
 
-    if (uploadResults.length === 1) {
-      return c.json(uploadResults[0]);
-    }
-    return c.json({ files: uploadResults });
+    return c.json(uploadResults.length === 1 ? uploadResults[0] : { files: uploadResults });
   } catch (error) {
-    logger.error("Error in file upload:", error);
-    return createErrorResponse(
-      error instanceof Error ? error : new Error("File upload failed"),
+    logger.error('File upload error:', error);
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Upload failed' },
+      500
     );
   }
 });
-
-router.options("/files/upload", () =>
-  new Response(null, {
-    status: 204,
-    headers: {
-      "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-    },
-  }),
-);
 
 export default router;

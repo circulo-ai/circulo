@@ -39,9 +39,11 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { getBaseUrl } from "@/lib/urls/utils";
 import { rateLimit } from "@/middleware/rate-limit";
+import { Scalar } from "@scalar/hono-api-reference";
 
 const app = createApp();
 const NODE_ENV = env.NODE_ENV ?? "development";
+const OPENAPI_PATH = "/openapi.json";
 
 // Middlewares (register before routes)
 app.use("*", logger());
@@ -77,6 +79,29 @@ app.use("*", corsMiddleware); // apply globally so preflight never 404s
 if (NODE_ENV !== "development") {
   app.use("/api/*", rateLimit());
 }
+
+const apiBaseUrl = `${getBaseUrl().replace(/\/$/, "")}/api`;
+
+app.doc(OPENAPI_PATH, {
+  openapi: "3.1.0",
+  info: {
+    title: "Circulo API",
+    version: "1.0.0",
+  },
+  servers: [
+    {
+      url: apiBaseUrl,
+      description: "Circulo API Server",
+    },
+  ],
+});
+
+app.get(
+  "/reference",
+  Scalar({
+    url: OPENAPI_PATH,
+  }),
+);
 
 const routes = [
   autumn,
@@ -124,7 +149,6 @@ app.onError((err, c) => {
     return err.toResponse();
   }
 
-  console.error(err);
   return c.json({ message: "Internal server error" }, 500);
 });
 

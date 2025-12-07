@@ -16,7 +16,7 @@ function normalizeUrl(url: string): string {
  * Prefers the frontend URL, then falls back to the backend URL, then a sensible default.
  */
 export function getBaseUrl(): string {
-  const appUrl = getEnv("NEXT_PUBLIC_APP_URL") || getEnv("BETTER_AUTH_URL");
+  const appUrl = getEnv("BETTER_AUTH_URL");
   if (appUrl) {
     return normalizeUrl(appUrl);
   }
