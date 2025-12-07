@@ -4,24 +4,13 @@
     "description": "Production-quality, framework-agnostic TypeScript workflow orchestration runtime with event-sourced execution and strongly-typed DSL",
     "type": "module",
     "private": true,
-    "main": "./dist/index.js",
-    "types": "./dist/index.d.ts",
-    "exports": {
-        ".": {
-            "types": "./dist/index.d.ts",
-            "import": "./dist/index.js"
-        }
-    },
-    "files": [
-        "dist",
-        "src"
-    ],
     "scripts": {
-        "build": "tsc",
-        "test": "node --loader ts-node/esm tests/basic-workflow.test.ts",
-        "test:bun": "bun run tests/basic-workflow.test.ts",
-        "test:deno": "deno run --allow-all tests/basic-workflow.test.ts",
-        "typecheck": "tsc --noEmit"
+        "dev": "tsdown --watch",
+        "build": "tsdown",
+        "test": "vitest",
+        "typecheck": "tsc --noEmit",
+        "lint": "eslint src",
+        "prepublishOnly": "pnpm build"
     },
     "keywords": [
         "workflow",
@@ -38,7 +27,8 @@
     "license": "MIT",
     "devDependencies": {
         "@types/node": "^20.0.0",
-        "typescript": "^5.3.0"
+        "tsdown": "^0.17.0",
+        "typescript": "^5.9.3"
     },
     "engines": {
         "node": ">=18.0.0"
