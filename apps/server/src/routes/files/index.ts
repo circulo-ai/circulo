@@ -9,11 +9,8 @@ const fileRoutes = createHonoFileRoutes<AppEnv>(
   {
     storageManager,
     maxFileSize: 100 * 1024 * 1024,
-    serveUrlBuilder: (key: string, context: string): string => {
-      // This matches your previous behavior where you had a storage prefix in the URL.
-      // If you later switch to blob for some contexts, you can make this conditional.
-      const storagePrefix = 's3';
-
+    serveUrlBuilder: (key: string, context: string) => {
+      const storagePrefix = "s3";
       return `/api/files/serve/${storagePrefix}/${encodeURIComponent(
         key,
       )}?context=${encodeURIComponent(context)}`;
@@ -24,9 +21,9 @@ const fileRoutes = createHonoFileRoutes<AppEnv>(
       const session = await getSession(c.req.raw);
 
       const metadata: Record<string, string> = {};
-
       const userId = session?.user?.id;
-      if (typeof userId === 'string' && userId.length > 0) {
+
+      if (typeof userId === "string" && userId.length > 0) {
         metadata.userId = userId;
       }
 
@@ -45,11 +42,9 @@ const fileRoutes = createHonoFileRoutes<AppEnv>(
             const authResult = await checkHybridAuth(c.req.raw, {
               requireChatId: false,
             });
-
             if (!authResult.success) {
-              return c.json({ error: 'Unauthorized' } as const, 401);
+              return c.json({ error: "Unauthorized" } as const, 401);
             }
-
             await next();
           },
         ],
