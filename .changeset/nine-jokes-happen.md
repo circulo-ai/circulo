@@ -4,4 +4,4 @@
 "@circulo-ai/wf": minor
 ---
 
-Minor updates
+Minor updates.
