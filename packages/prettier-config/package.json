@@ -2,5 +2,9 @@
   "name": "@circulo-ai/prettier-config",
   "version": "0.0.0",
   "private": true,
-  "main": "prettier.config.ts"
+  "main": "prettier.config.ts",
+  "devDependencies": {
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
 }
