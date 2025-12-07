@@ -860,6 +860,10 @@ importers:
         version: 5.9.3
 
   packages/upload:
+    dependencies:
+      '@vercel/blob':
+        specifier: ^2.0.0
+        version: 2.0.0
     devDependencies:
       '@aws-sdk/client-s3':
         specifier: ^3.645.0
