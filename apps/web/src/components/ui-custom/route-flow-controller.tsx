@@ -23,16 +23,22 @@ interface LeveledRoute extends Route {
   children?: LeveledRoute[];
 }
 
+interface CurrentRoute<T = unknown> {
+  // TODO how to expose T?
+  id: string;
+  context?: T[];
+}
+
 interface RouteFlowControllerContext {
   levelById: Map<string, number>;
-  currentRouteId: string;
-  setCurrentRouteId: Dispatch<SetStateAction<string>>;
+  currentRoute: CurrentRoute;
+  setCurrentRoute: Dispatch<SetStateAction<CurrentRoute>>;
 }
 
 const defaultRouteFlowControllerContext: RouteFlowControllerContext = {
   levelById: new Map<string, number>(),
-  currentRouteId: "",
-  setCurrentRouteId: () => {},
+  currentRoute: { id: "" },
+  setCurrentRoute: () => {},
 };
 
 const RouteFlowControllerContext = createContext(
@@ -44,7 +50,7 @@ interface RouteFlowControllerProps {
 }
 
 export function RouteFlowController({ route }: RouteFlowControllerProps) {
-  const [currentRouteId, setCurrentRouteId] = useState(route.id);
+  const [currentRoute, setCurrentRoute] = useState({ id: route.id });
 
   const leveledRoute = useMemo(() => annotateRouteLevels(route), [route]);
 
@@ -62,8 +68,8 @@ export function RouteFlowController({ route }: RouteFlowControllerProps) {
     <RouteFlowControllerContext.Provider
       value={{
         levelById,
-        currentRouteId,
-        setCurrentRouteId,
+        currentRoute,
+        setCurrentRoute,
       }}
     >
       <RouteFlowView leveledRoute={leveledRoute} />
@@ -72,13 +78,15 @@ export function RouteFlowController({ route }: RouteFlowControllerProps) {
 }
 
 interface RouteFlowViewContext {
-  redirect: Dispatch<SetStateAction<string>>;
+  redirect: Dispatch<SetStateAction<CurrentRoute>>;
+  currentRoute: CurrentRoute;
   isCurrentRoute: boolean;
   isBehindCurrent: boolean;
 }
 
 const defaultRouteFlowViewContext: RouteFlowViewContext = {
   redirect: () => {},
+  currentRoute: { id: "" },
   isCurrentRoute: false,
   isBehindCurrent: false,
 };
@@ -90,13 +98,13 @@ interface RouteFlowViewProps {
 }
 
 function RouteFlowView({ leveledRoute }: RouteFlowViewProps) {
-  const { levelById, currentRouteId, setCurrentRouteId } = useContext(
+  const { levelById, currentRoute, setCurrentRoute } = useContext(
     RouteFlowControllerContext,
   );
 
   const currentLevel = useMemo(
-    () => levelById.get(currentRouteId) ?? 0,
-    [levelById, currentRouteId],
+    () => levelById.get(currentRoute.id) ?? 0,
+    [levelById, currentRoute.id],
   );
 
   const isBehindCurrent = useMemo(
@@ -105,8 +113,8 @@ function RouteFlowView({ leveledRoute }: RouteFlowViewProps) {
   );
 
   const isCurrentRoute = useMemo(
-    () => currentRouteId === leveledRoute.id,
-    [currentRouteId, leveledRoute.id],
+    () => currentRoute.id === leveledRoute.id,
+    [currentRoute.id, leveledRoute.id],
   );
 
   const RouteView = useMemo(() => leveledRoute.view, [leveledRoute.view]);
@@ -114,7 +122,12 @@ function RouteFlowView({ leveledRoute }: RouteFlowViewProps) {
   return (
     <>
       <RouteFlowViewContext.Provider
-        value={{ redirect: setCurrentRouteId, isCurrentRoute, isBehindCurrent }}
+        value={{
+          redirect: setCurrentRoute,
+          currentRoute,
+          isCurrentRoute,
+          isBehindCurrent,
+        }}
       >
         <RouteView />
       </RouteFlowViewContext.Provider>

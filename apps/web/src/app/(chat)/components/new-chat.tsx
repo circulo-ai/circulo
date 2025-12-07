@@ -78,7 +78,7 @@ import z from "zod";
 const route: Route = {
   id: "select-agents",
   view: SelectAgents,
-  children: [{ id: "new-agent", view: NewAgent }],
+  children: [{ id: "agent-form", view: AgentForm }],
 };
 
 interface NewChatProps {
@@ -177,7 +177,7 @@ function SelectAgents() {
         <Tooltip disableHoverableContent>
           <TooltipTrigger asChild>
             <Button
-              onClick={() => redirect("new-agent")}
+              onClick={() => redirect({ id: "agent-form" })}
               variant="primary"
               size="icon"
               rounded="full"
@@ -234,6 +234,8 @@ function SelectableAgent({
   selectedAgentIds,
   setSelectedAgentIds,
 }: SelectableAgentProps) {
+  const { redirect } = useRouteFlowViewContext();
+
   const agentRef = useRef<HTMLButtonElement>(null);
   const animationLockRef = useRef(false);
 
@@ -320,7 +322,9 @@ function SelectableAgent({
             <CustomContextMenuItem>
               <Eye /> View
             </CustomContextMenuItem>
-            <CustomContextMenuItem>
+            <CustomContextMenuItem
+              onClick={() => redirect({ id: "agent-form", context: [agent] })}
+            >
               <Pencil /> Edit
             </CustomContextMenuItem>
             <ContextMenuSeparator />
@@ -364,8 +368,8 @@ function SelectableAgent({
 
 type NewAgentRequest = z.input<typeof createBodySchema>;
 
-function NewAgent() {
-  const { redirect } = useRouteFlowViewContext();
+function AgentForm() {
+  const { redirect, currentRoute } = useRouteFlowViewContext();
 
   const formId = useId();
 
@@ -384,9 +388,15 @@ function NewAgent() {
   });
 
   const goBack = useCallback(() => {
-    redirect("select-agents");
+    redirect({ id: "select-agents" });
     form.reset();
   }, [redirect, form]);
+
+  // TODO when closing the route, the context is reset immediately (it should be debounced)
+  const isNewAgent = useMemo(
+    () => !currentRoute.context,
+    [currentRoute.context],
+  );
 
   return (
     <RouteViewLayout>
@@ -399,7 +409,7 @@ function NewAgent() {
       >
         <RouteViewHeader title="New Agent" onBack={goBack}>
           <Submit variant="primary" form={formId} rounded="full">
-            Add
+            {isNewAgent ? "Add" : "Save"}
           </Submit>
         </RouteViewHeader>
         <CustomScrollArea className="h-full overflow-auto">
