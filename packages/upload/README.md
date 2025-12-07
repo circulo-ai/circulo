@@ -1,102 +1,10 @@
-// src/index.ts
-
-// Core types
-export type {
-FileInfo,
-FileMetadata,
-UploadOptions,
-DownloadOptions,
-DeleteOptions,
-PresignedUploadUrlOptions,
-PresignedDownloadUrlOptions,
-PresignedUrlResponse,
-S3UploadPart,
-AzureUploadPart,
-UploadPart,
-MultipartInitResponse,
-MultipartPartUrl,
-MultipartInitOptions,
-MultipartPartUrlsOptions,
-MultipartCompleteOptions,
-MultipartAbortOptions,
-MultipartCompleteResponse,
-ContentType,
-FileValidationError,
-SupportedDocumentExtension,
-SupportedAudioExtension,
-SupportedVideoExtension,
-SupportedMediaExtension,
-} from './types/core.js';
-
-export {
-SUPPORTED_DOCUMENT_EXTENSIONS,
-SUPPORTED_AUDIO_EXTENSIONS,
-SUPPORTED_VIDEO_EXTENSIONS,
-MAX_FILE_SIZE,
-} from './types/core.js';
-
-// Provider interfaces and base classes
-export { StorageProvider, BaseStorageProvider } from './providers/base.js';
-
-// Provider implementations
-export { S3StorageProvider, type S3Config } from './providers/s3.js';
-export {
-AzureBlobStorageProvider,
-type AzureBlobConfig,
-} from './providers/azure-blob.js';
-export {
-LocalStorageProvider,
-type LocalStorageConfig,
-} from './providers/local.js';
-
-// Storage manager
-export {
-StorageManager,
-type StorageManagerConfig,
-type ContextualUploadOptions,
-type ContextualDownloadOptions,
-type ContextualDeleteOptions,
-type ContextualPresignedUploadUrlOptions,
-type ContextualPresignedDownloadUrlOptions,
-type ContextualMultipartInitOptions,
-type ContextualMultipartPartUrlsOptions,
-type ContextualMultipartCompleteOptions,
-type ContextualMultipartAbortOptions,
-} from './storage-manager.js';
-
-// Utilities
-export {
-getContentType,
-isSupportedMimeType,
-getFileExtension,
-getMimeTypeFromExtension,
-validateFileType,
-validateFileSize,
-formatFileSize,
-MIME_TYPE_MAPPING,
-SUPPORTED_MIME_TYPES,
-SUPPORTED_AUDIO_MIME_TYPES,
-SUPPORTED_VIDEO_MIME_TYPES,
-} from './utils/validation.js';
-
-export {
-sanitizeFilename,
-isValidUrl,
-bufferToBase64,
-base64ToBuffer,
-} from './utils/security.js';
-
-// ============================================================================
-// README.md
-// ============================================================================
-
 # @circulo-ai/upload
 
 Universal file upload library with support for AWS S3, Azure Blob Storage, and local file system.
 
 ## Features
 
-- 🌐 **Multi-provider support**: AWS S3, Azure Blob, Local storage
+- 🌐 **Multi-provider support**: AWS S3, Azure Blob, Local storage, Vercel Blob
 - 🪣 **Multi-bucket/container**: Organize files across different storage contexts
 - 📦 **Multipart uploads**: Large file support with resumable uploads
 - 🔐 **Presigned URLs**: Direct client-to-storage uploads
@@ -110,7 +18,7 @@ Universal file upload library with support for AWS S3, Azure Blob Storage, and l
 npm install @circulo-ai/upload
 
 # Install the storage provider(s) you need:
-npm install @aws-sdk/client-s3 @aws-sdk/s3-request-presigner  # For S3
+npm install @aws-sdk/client-s3 @aws-sdk/s3-request-presigner    # For S3
 npm install @azure/storage-blob                                 # For Azure Blob
 # Local storage has no dependencies
 ```
@@ -246,6 +154,38 @@ const local = new LocalStorageProvider({
   // Optional: Custom serve base URL
   serveBaseUrl: "/api/files",
 });
+```
+#### Vercel Blob
+
+```typescript
+import { VercelBlobStorageProvider } from "your-package";
+import type { NextRequest } from "next/server";
+
+const storage = new VercelBlobStorageProvider({
+  // Often unnecessary on Vercel; SDK uses BLOB_READ_WRITE_TOKEN by default
+  // token: process.env.BLOB_READ_WRITE_TOKEN,
+  pathPrefix: "uploads",
+  multipart: true, // let Vercel handle big uploads
+});
+
+export async function POST(req: NextRequest) {
+  const form = await req.formData();
+  const file = form.get("file");
+  if (!(file instanceof File)) {
+    return new Response("file is required", { status: 400 });
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  const info = await storage.upload({
+    file: buffer,
+    fileName: file.name,
+    contentType: file.type,
+  });
+
+  return Response.json(info);
+}
+
 ```
 
 ### StorageManager
