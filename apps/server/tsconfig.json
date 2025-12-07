@@ -4,6 +4,7 @@
     "paths": {
       "@/*": ["./src/*"],
       "@circulo-ai/upload": ["../../packages/upload/src"],
+      "@circulo-ai/upload/hono": ["../../packages/upload/src/routes/hono.ts"],
       "@circulo-ai/core": ["../../packages/core/src"],
       "@circulo-ai/di": ["../../packages/di/src"],
       "@circulo-ai/file-parsers": ["../../packages/file-parsers/src"],

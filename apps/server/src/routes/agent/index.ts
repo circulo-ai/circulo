@@ -1,20 +1,18 @@
 import { agentRepo } from "@/db/repositories";
 import { getUserRole, hasPermission, isMemberOf } from "@/lib/permissions";
 import { createRouter } from "@/lib/create-app";
-import {
-  BadRequestError,
-  ForbiddenError,
-  NotFoundError,
-} from "@/lib/server/errors";
 import { requireAuth } from "@/middleware/auth";
 import { zValidator } from "@hono/zod-validator";
 import {
+  BadRequestError,
   createAgentBodySchema,
   deleteAgentQuerySchema,
+  ForbiddenError,
   getAgentQuerySchema,
   updateAgentBodySchema,
 } from "@circulo-ai/types";
 import { resolveOrganizationId } from "../utils";
+import { NotFoundError } from "@circulo-ai/core";
 
 const router = createRouter();
 
