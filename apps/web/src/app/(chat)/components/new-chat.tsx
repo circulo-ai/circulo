@@ -22,6 +22,7 @@ import {
 } from "@/components/ui-custom/route-flow-controller";
 import { CustomScrollArea } from "@/components/ui-custom/scroll-area";
 import { SelectInput } from "@/components/ui-custom/select";
+import { SliderInput } from "@/components/ui-custom/slider";
 import { Submit } from "@/components/ui-custom/submit";
 import { AnimatedList } from "@/components/ui/animated-list";
 import { Button } from "@/components/ui/button";
@@ -378,6 +379,7 @@ function NewAgent() {
     defaultValues: {
       name: "",
       instructions: "",
+      temperature: 70,
     },
   });
 
@@ -430,7 +432,9 @@ function NewAgent() {
               name={"model" satisfies Path<NewAgentRequest>}
               description="More models coming soon"
               className="mx-4 w-auto"
-              inputStyle="horizontal"
+              errorPosition="before-input"
+              orientation="horizontal"
+              inputStyle="no-input-group"
               inputComponent={SelectInput} // TODO replace with combobox
               inputProps={{
                 // TODO get from endpoint
@@ -498,6 +502,15 @@ function NewAgent() {
                   },
                 ],
               }}
+            />
+            <ControlledInput
+              name={"temperature" satisfies Path<NewAgentRequest>}
+              description="How creative?"
+              className="mx-4 w-auto"
+              errorPosition="before-input"
+              inputStyle="no-input-group"
+              inputComponent={SliderInput}
+              inputProps={{ min: 1, max: 100 }} // TODO min should be zero, but it doesn't work well that way
             />
           </FieldGroup>
         </CustomScrollArea>

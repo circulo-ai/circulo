@@ -7,7 +7,7 @@ import {
   useCallback,
   useState,
 } from "react";
-import { Spinner } from "../ui/spinner";
+import { Spinner } from "../ui/spinner"; // TODO prevent relative imports
 
 interface EnhancedImageProps extends ComponentProps<typeof Image> {}
 
@@ -51,3 +51,7 @@ export function EnhancedImage({
     </>
   );
 }
+
+// TODO a div wrapper with the same width and height
+// TODO make its states controllable so it can be used in the file input component
+// TODO use data-state

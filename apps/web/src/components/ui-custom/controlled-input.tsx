@@ -8,7 +8,6 @@ import {
   ComponentProps,
   FC,
   FocusEventHandler,
-  Fragment,
   ReactNode,
   Ref,
   useCallback,
@@ -60,7 +59,8 @@ interface ControlledInputProps<
   addons?: ReactNode;
   inputComponent: FC<ExtendedInputComponentProps>;
   inputProps?: ExtendedInputComponentProps;
-  inputStyle?: "vertical" | "horizontal" | "unstyled";
+  inputStyle?: "default" | "no-input-group" | "unstyled";
+  errorPosition?: "before-input" | "after-input";
 }
 
 export function ControlledInput<
@@ -74,7 +74,9 @@ export function ControlledInput<
   addons,
   inputComponent: InputComponent,
   inputProps = {} as ExtendedInputComponentProps,
-  inputStyle = "vertical",
+  inputStyle = "default",
+  orientation = "vertical",
+  errorPosition = "after-input",
   id: explicitId,
   className,
   ...props
@@ -100,27 +102,9 @@ export function ControlledInput<
             saveAsNumber={saveAsNumber}
             inputComponent={InputComponent}
           />
-        ) : inputStyle === "vertical" ? (
-          // TODO could write less by combining the cases
-          <CustomField data-invalid={invalid} className={className} {...props}>
-            <FieldLabel htmlFor={id}>{title}</FieldLabel>
-            {description && <FieldDescription>{description}</FieldDescription>}
-            <CustomInputGroup>
-              <FormInputAdapter<T, ExtendedInputComponentProps>
-                id={id}
-                field={field}
-                invalid={invalid}
-                inputProps={inputProps}
-                saveAsNumber={saveAsNumber}
-                inputComponent={InputComponent}
-              />
-              {addons}
-            </CustomInputGroup>
-            {invalid && <FieldError errors={[error]} />}
-          </CustomField>
-        ) : inputStyle === "horizontal" ? (
+        ) : (
           <CustomField
-            orientation="horizontal"
+            orientation={orientation}
             data-invalid={invalid}
             className={className}
             {...props}
@@ -130,19 +114,36 @@ export function ControlledInput<
               {description && (
                 <FieldDescription>{description}</FieldDescription>
               )}
-              {invalid && <FieldError errors={[error]} />}
+              {errorPosition === "before-input" && invalid && (
+                <FieldError errors={[error]} />
+              )}
             </FieldContent>
-            <FormInputAdapter<T, ExtendedInputComponentProps>
-              id={id}
-              field={field}
-              invalid={invalid}
-              inputProps={inputProps}
-              saveAsNumber={saveAsNumber}
-              inputComponent={InputComponent}
-            />
+            {inputStyle === "no-input-group" ? (
+              <FormInputAdapter<T, ExtendedInputComponentProps>
+                id={id}
+                field={field}
+                invalid={invalid}
+                inputProps={inputProps}
+                saveAsNumber={saveAsNumber}
+                inputComponent={InputComponent}
+              />
+            ) : (
+              <CustomInputGroup>
+                <FormInputAdapter<T, ExtendedInputComponentProps>
+                  id={id}
+                  field={field}
+                  invalid={invalid}
+                  inputProps={inputProps}
+                  saveAsNumber={saveAsNumber}
+                  inputComponent={InputComponent}
+                />
+                {addons}
+              </CustomInputGroup>
+            )}
+            {errorPosition === "after-input" && invalid && (
+              <FieldError errors={[error]} />
+            )}
           </CustomField>
-        ) : (
-          <Fragment />
         )
       }
     />
@@ -198,9 +199,9 @@ const FormInputAdapter = <
                 ? 0
                 : extractNumberFromInput(e)
               : extractDigitsOnly(e)
-            : typeof e === "string"
-              ? e
-              : e.target.value,
+            : typeof e === "object"
+              ? e.target.value
+              : e,
         )
       }
       {...inputProps}

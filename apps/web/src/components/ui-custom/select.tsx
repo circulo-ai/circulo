@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+import { InputComponentProps } from "./controlled-input";
 
 interface Option {
   value: string;
@@ -41,11 +42,8 @@ interface OptionSeparatorWithKey extends OptionSeparator {
 }
 
 interface SelectInputProps
-  extends Omit<
-      ComponentProps<"input">,
-      "placeholder" | "defaultValue" | "value" | "dir"
-    >,
-    Pick<ComponentProps<typeof Select>, "defaultValue" | "value" | "dir"> {
+  extends Omit<ComponentProps<typeof Select>, "value">,
+    InputComponentProps {
   options?: (Option | OptionGroup | OptionSeparator)[];
   placeholder?: ReactNode;
 }
@@ -55,11 +53,13 @@ export function SelectInput({
   placeholder = "Select",
   "aria-invalid": invalid,
   onChange,
+  value,
   id,
   ...props
 }: SelectInputProps) {
   return (
     <Select
+      value={value as string | undefined}
       onValueChange={onChange as ((value: string) => void) | undefined}
       {...props}
     >
