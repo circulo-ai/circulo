@@ -7,7 +7,7 @@ on:
       - backend
       - master
     paths:
-      - '.changeset/**'
+      - ".changeset/**"
 
 permissions:
   contents: write
@@ -19,32 +19,31 @@ jobs:
   version:
     name: Create Version PR
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          run_install: false
-      
+          bun-version: "1.3.4"
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'pnpm'
-      
+          node-version: "20"
+
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      
+        run: bun install --frozen-lockfile
+
       - name: Create Release Pull Request
         uses: changesets/action@v1
         with:
-          version: pnpm changeset version
-          commit: 'chore: version packages'
-          title: 'chore: version packages'
+          version: bunx changeset version
+          commit: "chore: version packages"
+          title: "chore: version packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

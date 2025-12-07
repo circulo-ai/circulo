@@ -20,7 +20,7 @@
     "dev": "tsc -p tsconfig.json --watch",
     "build": "tsc -p tsconfig.json",
     "type-check": "tsc --noEmit -p tsconfig.json",
-    "prepack": "pnpm build"
+    "prepack": "bun build"
   },
   "dependencies": {
     "cheerio": "^1.1.2",

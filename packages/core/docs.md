@@ -5,7 +5,7 @@ Framework-agnostic primitives to keep your domain and application layers clean. 
 ## Installation
 
 ```bash
-pnpm add @circulo-ai/core
+bun add @circulo-ai/core
 ```
 
 ## Layer Mapping
@@ -144,7 +144,7 @@ class RenameChat implements UseCase<RenameChatInput, RenameChatOutput> {
   constructor(
     private readonly chats: Repository<Chat>,
     private readonly uow: UnitOfWork,
-    private readonly publisher: DomainEventPublisher
+    private readonly publisher: DomainEventPublisher,
   ) {}
 
   async execute(input: RenameChatInput): Promise<RenameChatOutput> {
@@ -162,7 +162,7 @@ class RenameChat implements UseCase<RenameChatInput, RenameChatOutput> {
       await this.chats.save(chat);
 
       await Promise.all(
-        chat.pullDomainEvents().map((evt) => this.publisher.publish(evt))
+        chat.pullDomainEvents().map((evt) => this.publisher.publish(evt)),
       );
       return Result.ok();
     });
@@ -187,7 +187,7 @@ class PrismaUnitOfWork implements UnitOfWork<Prisma.TransactionClient> {
   constructor(private readonly prisma: PrismaClient) {}
 
   async transaction<TResult>(
-    work: (scope: Prisma.TransactionClient) => Promise<TResult>
+    work: (scope: Prisma.TransactionClient) => Promise<TResult>,
   ) {
     return this.prisma.$transaction(async (tx) => work(tx));
   }
@@ -233,7 +233,7 @@ Exports are gathered in `@circulo-ai/core` root entrypoint:
 
 ```ts
 // Domain
-Entity,
+(Entity,
   AggregateRoot,
   Identifier,
   ValueObject,
@@ -248,5 +248,5 @@ Entity,
   UseCase,
   Result,
   // Utilities
-  Guard;
+  Guard);
 ```

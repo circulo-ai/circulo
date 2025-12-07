@@ -7,6 +7,7 @@ import {
   CustomContextMenuItem,
 } from "@/components/ui-custom/context-menu";
 import { ControlledInput } from "@/components/ui-custom/controlled-input";
+import { EnhancedImage } from "@/components/ui-custom/enhanced-image";
 import { CustomForm } from "@/components/ui-custom/form";
 import {
   CustomInputGroup,
@@ -20,6 +21,8 @@ import {
   useRouteFlowViewContext,
 } from "@/components/ui-custom/route-flow-controller";
 import { CustomScrollArea } from "@/components/ui-custom/scroll-area";
+import { SelectInput } from "@/components/ui-custom/select";
+import { SliderInput } from "@/components/ui-custom/slider";
 import { Submit } from "@/components/ui-custom/submit";
 import { AnimatedList } from "@/components/ui/animated-list";
 import { Button } from "@/components/ui/button";
@@ -57,7 +60,6 @@ import {
   Pencil,
   Plus,
 } from "lucide-react";
-import Image from "next/image";
 import {
   ComponentProps,
   Dispatch,
@@ -68,7 +70,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useForm } from "react-hook-form";
+import { Path, useForm } from "react-hook-form";
 import useSWR, { Key } from "swr";
 import useSWRMutation from "swr/mutation";
 import z from "zod";
@@ -76,7 +78,7 @@ import z from "zod";
 const route: Route = {
   id: "select-agents",
   view: SelectAgents,
-  children: [{ id: "new-agent", view: NewAgent }],
+  children: [{ id: "agent-form", view: AgentForm }],
 };
 
 interface NewChatProps {
@@ -175,7 +177,7 @@ function SelectAgents() {
         <Tooltip disableHoverableContent>
           <TooltipTrigger asChild>
             <Button
-              onClick={() => redirect("new-agent")}
+              onClick={() => redirect({ id: "agent-form" })}
               variant="primary"
               size="icon"
               rounded="full"
@@ -232,6 +234,8 @@ function SelectableAgent({
   selectedAgentIds,
   setSelectedAgentIds,
 }: SelectableAgentProps) {
+  const { redirect } = useRouteFlowViewContext();
+
   const agentRef = useRef<HTMLButtonElement>(null);
   const animationLockRef = useRef(false);
 
@@ -276,9 +280,15 @@ function SelectableAgent({
                   isSelected && "bg-teal-50/5",
                 )}
               >
-                <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-teal-50/15">
+                <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-teal-50/15">
                   {agent.avatarUrl && (
-                    <Image src={agent.avatarUrl} alt={agent.name} />
+                    <EnhancedImage
+                      src={agent.avatarUrl}
+                      alt={agent.name}
+                      width={48}
+                      height={48}
+                      className="size-full object-cover"
+                    />
                   )}
                   {!agent.avatarUrl && <Bot />}
                 </div>
@@ -312,7 +322,9 @@ function SelectableAgent({
             <CustomContextMenuItem>
               <Eye /> View
             </CustomContextMenuItem>
-            <CustomContextMenuItem>
+            <CustomContextMenuItem
+              onClick={() => redirect({ id: "agent-form", context: [agent] })}
+            >
               <Pencil /> Edit
             </CustomContextMenuItem>
             <ContextMenuSeparator />
@@ -356,8 +368,8 @@ function SelectableAgent({
 
 type NewAgentRequest = z.input<typeof createBodySchema>;
 
-function NewAgent() {
-  const { redirect } = useRouteFlowViewContext();
+function AgentForm() {
+  const { redirect, currentRoute } = useRouteFlowViewContext();
 
   const formId = useId();
 
@@ -371,13 +383,20 @@ function NewAgent() {
     defaultValues: {
       name: "",
       instructions: "",
+      temperature: 70,
     },
   });
 
   const goBack = useCallback(() => {
-    redirect("select-agents");
+    redirect({ id: "select-agents" });
     form.reset();
   }, [redirect, form]);
+
+  // TODO when closing the route, the context is reset immediately (it should be debounced)
+  const isNewAgent = useMemo(
+    () => !currentRoute.context,
+    [currentRoute.context],
+  );
 
   return (
     <RouteViewLayout>
@@ -390,33 +409,118 @@ function NewAgent() {
       >
         <RouteViewHeader title="New Agent" onBack={goBack}>
           <Submit variant="primary" form={formId} rounded="full">
-            Add
+            {isNewAgent ? "Add" : "Save"}
           </Submit>
         </RouteViewHeader>
         <CustomScrollArea className="h-full overflow-auto">
-          <FieldGroup className="mt-7">
-            <ControlledInput<NewAgentRequest>
+          <FieldGroup className="my-7">
+            <ControlledInput
+              name={"avatarUrl" satisfies Path<NewAgentRequest>}
+              className="mx-auto"
+              inputStyle="unstyled"
               inputComponent={FileInput}
-              name="avatarUrl"
-              unstyled
             />
-            <ControlledInput<NewAgentRequest>
+            <ControlledInput
+              name={"name" satisfies Path<NewAgentRequest>}
+              className="mx-4 w-auto"
               inputComponent={CustomInputGroupInput}
-              name="name"
               inputProps={{ placeholder: "Steve Jobs, Elon Musk, etc" }}
-              className="mx-4 w-auto"
             />
-            <ControlledInput<NewAgentRequest>
+            <ControlledInput
+              name={"description" satisfies Path<NewAgentRequest>}
+              className="mx-4 w-auto"
               inputComponent={CustomInputGroupInput}
-              name="description"
-              inputProps={{ placeholder: "Optional" }}
-              className="mx-4 w-auto"
+              inputProps={{ placeholder: "Made in Circulo, etc" }}
             />
-            <ControlledInput<NewAgentRequest>
-              inputComponent={InputGroupTextarea}
-              name="instructions"
-              inputProps={{ placeholder: "Be friendly, Be harsh, etc" }}
+            <ControlledInput
+              name={"instructions" satisfies Path<NewAgentRequest>}
               className="mx-4 w-auto"
+              inputComponent={InputGroupTextarea}
+              inputProps={{ placeholder: "Be friendly, Be harsh, etc" }}
+            />
+            <ControlledInput
+              name={"model" satisfies Path<NewAgentRequest>}
+              description="More models coming soon"
+              className="mx-4 w-auto"
+              errorPosition="before-input"
+              orientation="horizontal"
+              inputStyle="no-input-group"
+              inputComponent={SelectInput} // TODO replace with combobox
+              inputProps={{
+                // TODO get from endpoint
+                options: [
+                  {
+                    type: "group",
+                    label: "OpenAI",
+                    options: [
+                      { value: "gpt-4.1", label: "GPT-4.1", type: "single" },
+                      {
+                        value: "gpt-4.1-mini",
+                        label: "GPT-4.1 Mini",
+                        type: "single",
+                      },
+                      {
+                        value: "gpt-4.1-nano",
+                        label: "GPT-4.1 Nano",
+                        type: "single",
+                      },
+                    ],
+                  },
+                  { type: "separator" },
+                  {
+                    type: "group",
+                    label: "Anthropic",
+                    options: [
+                      {
+                        value: "claude-opus-4-5",
+                        label: "Claude Opus 4.5",
+                        type: "single",
+                      },
+                      {
+                        value: "claude-sonnet-4-5",
+                        label: "Claude Sonnet 4.5",
+                        type: "single",
+                      },
+                      {
+                        value: "claude-haiku-4-5",
+                        label: "Claude Haiku 4.5",
+                        type: "single",
+                      },
+                    ],
+                  },
+                  { type: "separator" },
+                  {
+                    type: "group",
+                    label: "Google (Gemini)",
+                    options: [
+                      {
+                        value: "gemini-3-pro",
+                        label: "Gemini 3 Pro",
+                        type: "single",
+                      },
+                      {
+                        value: "gemini-2.5-pro",
+                        label: "Gemini 2.5 Pro",
+                        type: "single",
+                      },
+                      {
+                        value: "gemini-2.5-flash",
+                        label: "Gemini 2.5 Flash",
+                        type: "single",
+                      },
+                    ],
+                  },
+                ],
+              }}
+            />
+            <ControlledInput
+              name={"temperature" satisfies Path<NewAgentRequest>}
+              description="How creative?"
+              className="mx-4 w-auto"
+              errorPosition="before-input"
+              inputStyle="no-input-group"
+              inputComponent={SliderInput}
+              inputProps={{ min: 1, max: 100 }} // TODO min should be zero, but it doesn't work well that way
             />
           </FieldGroup>
         </CustomScrollArea>

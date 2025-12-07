@@ -13,7 +13,7 @@ Clean-architecture and DDD primitives for building framework-agnostic services. 
 ## Install
 
 ```bash
-pnpm add @circulo-ai/core
+bun add @circulo-ai/core
 ```
 
 ## Quick Start
@@ -54,13 +54,14 @@ class Account extends AggregateRoot<AccountProps> {
   }
 }
 
-class CreditAccount
-  implements UseCase<{ id: string; amount: number }, Result<void>>
-{
+class CreditAccount implements UseCase<
+  { id: string; amount: number },
+  Result<void>
+> {
   constructor(
     private readonly accounts: Repository<Account>,
     private readonly uow: UnitOfWork,
-    private readonly publisher: DomainEventPublisher
+    private readonly publisher: DomainEventPublisher,
   ) {}
   async execute(input: { id: string; amount: number }) {
     return this.uow.transaction(async () => {
@@ -69,7 +70,7 @@ class CreditAccount
       account.deposit(input.amount);
       await this.accounts.save(account);
       await Promise.all(
-        account.pullDomainEvents().map((evt) => this.publisher.publish(evt))
+        account.pullDomainEvents().map((evt) => this.publisher.publish(evt)),
       );
       return Result.ok();
     });
@@ -91,6 +92,6 @@ class CreditAccount
 ## Developing
 
 ```bash
-pnpm -C packages/core type-check
-pnpm -C packages/core build
+bun --cwd packages/core run type-check
+bun --cwd packages/core run build
 ```

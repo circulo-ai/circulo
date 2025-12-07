@@ -7,7 +7,7 @@ on:
       - master
       - backend
     paths:
-      - 'packages/*/package.json'
+      - "packages/*/package.json"
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -18,19 +18,13 @@ jobs:
     outputs:
       packages: ${{ steps.detect.outputs.packages }}
       has_packages: ${{ steps.detect.outputs.has_packages }}
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          registry-url: "https://registry.npmjs.org/"
-      
+
       - name: Detect public packages
         id: detect
         run: |
@@ -41,16 +35,16 @@ jobs:
               cat "$1" | jq -r ".name"
             fi
           ' sh {} \; | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          
+
           echo "packages=$PUBLIC_PACKAGES" >> $GITHUB_OUTPUT
-          
+
           # Check if we have any packages to publish
           if [ "$PUBLIC_PACKAGES" = "[]" ] || [ -z "$PUBLIC_PACKAGES" ]; then
             echo "has_packages=false" >> $GITHUB_OUTPUT
           else
             echo "has_packages=true" >> $GITHUB_OUTPUT
           fi
-          
+
           echo "Public packages detected: $PUBLIC_PACKAGES"
 
   publish:
@@ -58,28 +52,27 @@ jobs:
     needs: detect-publishable
     if: needs.detect-publishable.outputs.has_packages == 'true'
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          run_install: false
-      
+          bun-version: "1.3.4"
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'pnpm'
-          registry-url: 'https://registry.npmjs.org'
-      
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      
+        run: bun install --frozen-lockfile
+
       - name: Build public packages
         run: |
           # Build only packages that are not private
@@ -90,11 +83,11 @@ jobs:
               
               if [ "$PRIVATE" = "false" ]; then
                 echo "Building $PKG_NAME..."
-                pnpm --filter "$PKG_NAME" build
+                (cd "$pkg" && bun run build)
               fi
             fi
           done
-      
+
       - name: Run tests for public packages
         run: |
           for pkg in packages/*; do
@@ -105,20 +98,20 @@ jobs:
               
               if [ "$PRIVATE" = "false" ] && [ -n "$HAS_TEST" ]; then
                 echo "Testing $PKG_NAME..."
-                pnpm --filter "$PKG_NAME" test
+                (cd "$pkg" && bun run test)
               fi
             fi
           done
-      
+
       - name: Publish to npm
         uses: changesets/action@v1
         with:
-          publish: pnpm changeset publish
+          publish: bunx changeset publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-      
+
       - name: Post-publish summary
         if: always()
         run: |
