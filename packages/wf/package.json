@@ -28,7 +28,8 @@
     "devDependencies": {
         "@types/node": "^20.0.0",
         "tsdown": "^0.17.0",
-        "typescript": "^5.9.3"
+        "typescript": "^5.9.3",
+        "vitest": "^4.0.15"
     },
     "engines": {
         "node": ">=18.0.0"
