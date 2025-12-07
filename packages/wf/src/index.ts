@@ -20,7 +20,7 @@ export * from "./models";
 // Implementations
 export { InMemoryWorkflowStore } from "./store/memory-workflow-store";
 export { InMemoryEventStore } from "./store/memory-event-store";
-export { InMemoryEventBus } from "./pubsub/memory-event-bus";
+export { InMemoryEventBus } from "./store/memory-event-bus";
 export { ConsoleLogger } from "./utils/logger";
 export { InMemoryMetrics } from "./utils/metrics";
 
