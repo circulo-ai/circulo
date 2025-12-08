@@ -20,10 +20,12 @@
       "outputs": []
     },
     "format": {
-      "outputs": []
+      "outputs": [],
+      "cache": false
     },
     "format:check": {
-      "outputs": []
+      "outputs": [],
+      "cache": false
     },
     "lint": {
       "outputs": []

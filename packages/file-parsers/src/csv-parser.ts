@@ -1,0 +1,164 @@
+import { parse, type Options } from "csv-parse";
+import { createReadStream, existsSync } from "fs";
+import { Readable } from "stream";
+import { createLogger, type Logger } from "./logger";
+import type { FileParseResult, FileParser } from "./types";
+import { sanitizeTextForUTF8 } from "./utils";
+
+const CONFIG = {
+  MAX_PREVIEW_ROWS: 1000,
+  MAX_SAMPLE_ROWS: 100,
+  MAX_ERRORS: 100,
+  STREAM_CHUNK_SIZE: 16384,
+};
+
+export class CsvParser implements FileParser {
+  constructor(private readonly logger: Logger = createLogger("CsvParser")) {}
+
+  async parseFile(filePath: string): Promise<FileParseResult> {
+    if (!filePath) {
+      throw new Error("No file path provided");
+    }
+
+    if (!existsSync(filePath)) {
+      throw new Error(`File not found: ${filePath}`);
+    }
+
+    const stream = createReadStream(filePath, {
+      highWaterMark: CONFIG.STREAM_CHUNK_SIZE,
+    });
+
+    return this.parseStream(stream);
+  }
+
+  async parseBuffer(buffer: Buffer): Promise<FileParseResult> {
+    const bufferSize = buffer.length;
+    this.logger.info(
+      `Parsing CSV buffer, size: ${bufferSize} bytes (${(bufferSize / 1024 / 1024).toFixed(2)} MB)`,
+    );
+
+    const stream = Readable.from(buffer, {
+      highWaterMark: CONFIG.STREAM_CHUNK_SIZE,
+    });
+
+    return this.parseStream(stream);
+  }
+
+  private parseStream(
+    inputStream: NodeJS.ReadableStream,
+  ): Promise<FileParseResult> {
+    return new Promise((resolve, reject) => {
+      let rowCount = 0;
+      let errorCount = 0;
+      let headers: string[] = [];
+      let processedContent = "";
+      const sampledRows: unknown[] = [];
+      const errors: string[] = [];
+      let firstRowProcessed = false;
+      let aborted = false;
+
+      const parserOptions: Options = {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+        relax_column_count: true,
+        relax_quotes: true,
+        skip_records_with_error: true,
+        raw: false,
+        cast: false,
+      };
+      const parser = parse(parserOptions);
+
+      parser.on("readable", () => {
+        let record;
+        while ((record = parser.read()) !== null && !aborted) {
+          rowCount++;
+
+          if (!firstRowProcessed && record) {
+            headers = Object.keys(record).map((h) =>
+              sanitizeTextForUTF8(String(h)),
+            );
+            processedContent = `${headers.join(", ")}\n`;
+            firstRowProcessed = true;
+          }
+
+          if (rowCount <= CONFIG.MAX_PREVIEW_ROWS) {
+            try {
+              const cleanValues = Object.values(record).map((v: unknown) =>
+                sanitizeTextForUTF8(String(v ?? "")),
+              );
+              processedContent += `${cleanValues.join(", ")}\n`;
+
+              if (rowCount <= CONFIG.MAX_SAMPLE_ROWS) {
+                sampledRows.push(record);
+              }
+            } catch (err) {
+              this.logger.warn(`Error processing row ${rowCount}:`, err);
+            }
+          }
+
+          if (rowCount % 10000 === 0) {
+            this.logger.info(`Processed ${rowCount} rows...`);
+          }
+        }
+      });
+
+      parser.on("skip", (err: any) => {
+        errorCount++;
+
+        if (errorCount <= 5) {
+          const errorMsg = `Row ${err.lines || rowCount}: ${err.message || "Unknown error"}`;
+          errors.push(errorMsg);
+          this.logger.warn("CSV skip:", errorMsg);
+        }
+
+        if (errorCount >= CONFIG.MAX_ERRORS) {
+          aborted = true;
+          parser.destroy();
+          reject(
+            new Error(
+              `Too many errors (${errorCount}). File may be corrupted.`,
+            ),
+          );
+        }
+      });
+
+      parser.on("error", (err: Error) => {
+        this.logger.error("CSV parser error:", err);
+        reject(new Error(`CSV parsing failed: ${err.message}`));
+      });
+
+      parser.on("end", () => {
+        if (!aborted) {
+          if (rowCount > CONFIG.MAX_PREVIEW_ROWS) {
+            processedContent += `\n[... ${rowCount.toLocaleString()} total rows, showing first ${CONFIG.MAX_PREVIEW_ROWS} ...]\n`;
+          }
+
+          this.logger.info(
+            `CSV parsing complete: ${rowCount} rows, ${errorCount} errors`,
+          );
+
+          resolve({
+            content: sanitizeTextForUTF8(processedContent),
+            metadata: {
+              rowCount,
+              headers,
+              errorCount,
+              errors: errors.slice(0, 10),
+              truncated: rowCount > CONFIG.MAX_PREVIEW_ROWS,
+              sampledData: sampledRows,
+            },
+          });
+        }
+      });
+
+      inputStream.on("error", (err) => {
+        this.logger.error("Input stream error:", err);
+        parser.destroy();
+        reject(new Error(`Stream error: ${err.message}`));
+      });
+
+      inputStream.pipe(parser);
+    });
+  }
+}

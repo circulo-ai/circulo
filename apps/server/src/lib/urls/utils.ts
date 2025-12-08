@@ -1,7 +1,9 @@
 import { getEnv } from "@/lib/env";
 import { isProd } from "@/lib/environment";
 
-const DEFAULT_APP_URL = isProd ? "https://circulo-ai.com" : "http://localhost:3002";
+const DEFAULT_APP_URL = isProd
+  ? "https://circulo-ai.com"
+  : "http://localhost:3002";
 
 function normalizeUrl(url: string): string {
   if (url.startsWith("http://") || url.startsWith("https://")) {
@@ -16,7 +18,7 @@ function normalizeUrl(url: string): string {
  * Prefers the frontend URL, then falls back to the backend URL, then a sensible default.
  */
 export function getBaseUrl(): string {
-  const appUrl = getEnv("NEXT_PUBLIC_APP_URL") || getEnv("BETTER_AUTH_URL");
+  const appUrl = getEnv("BETTER_AUTH_URL");
   if (appUrl) {
     return normalizeUrl(appUrl);
   }

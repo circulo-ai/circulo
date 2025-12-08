@@ -10,7 +10,7 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { ArrowUpIcon, PaperclipIcon, StopIcon } from "@/components/icons/icons";
 import { Agent, ChatAgent } from "@/db";
-import { useUploadManager } from "@/hooks/use-upload-manager";
+import { useUploadTaskManager } from "@/hooks/use-upload-task-manager";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { cn } from "@/lib/utils";
@@ -110,28 +110,30 @@ function PureMultimodalInput({
   };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const uploadManager = useUploadManager({
-    defaultContext: "chat",
+  const uploadManager = useUploadTaskManager({
+    defaultStorageContext: "chat",
   });
 
   // Sync successful uploads into parent attachment state
   useEffect(() => {
-    const completed = uploadManager.items.filter(
-      (item) => item.status === "success" && item.url,
+    const completedTasks = uploadManager.uploadTasks.filter(
+      (task) => task.status === "success" && task.url,
     );
 
     setAttachments((prev) => {
-      const map = new Map(prev.map((a) => [a.url, a]));
-      completed.forEach((item) => {
-        map.set(item.url!, {
-          url: item.url!,
-          name: item.file.name,
-          contentType: item.file.type,
+      const map = new Map(
+        prev.map((attachment) => [attachment.url, attachment]),
+      );
+      completedTasks.forEach((task) => {
+        map.set(task.url!, {
+          url: task.url!,
+          name: task.file.name,
+          contentType: task.file.type,
         });
       });
       return Array.from(map.values());
     });
-  }, [uploadManager.items, setAttachments]);
+  }, [uploadManager.uploadTasks, setAttachments]);
 
   const submitForm = useCallback(() => {
     window.history.pushState({}, "", `/chat/${chatId}`);
@@ -152,7 +154,7 @@ function PureMultimodalInput({
       ],
     });
 
-    uploadManager.clear();
+    uploadManager.resetAllUploadTasks();
     setAttachments([]);
     setLocalStorageInput("");
     resetHeight();
@@ -178,7 +180,7 @@ function PureMultimodalInput({
     async (event: ChangeEvent<HTMLInputElement>) => {
       const files = Array.from(event.target.files || []);
       if (files.length > 0) {
-        uploadManager.addFiles(files, "chat");
+        uploadManager.enqueueUploads(files, "chat");
       }
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -207,7 +209,7 @@ function PureMultimodalInput({
         if (file) files.push(file);
       }
       if (files.length > 0) {
-        uploadManager.addFiles(files, "chat");
+        uploadManager.enqueueUploads(files, "chat");
       }
     },
     [uploadManager],
@@ -226,11 +228,11 @@ function PureMultimodalInput({
     <div className={cn("relative flex w-full flex-col gap-4", className)}>
       {messages.length === 0 &&
         attachments.length === 0 &&
-        uploadManager.items.every(
-          (item) =>
-            item.status !== "queued" &&
-            item.status !== "preparing" &&
-            item.status !== "uploading",
+        uploadManager.uploadTasks.every(
+          (task) =>
+            task.status !== "queued" &&
+            task.status !== "preparing" &&
+            task.status !== "uploading",
         ) && (
           <SuggestedActions
             chatId={chatId}
@@ -261,7 +263,7 @@ function PureMultimodalInput({
           className="contents"
         >
           {(attachments.length > 0 ||
-            uploadManager.items.some(
+            uploadManager.uploadTasks.some(
               (item) =>
                 item.status === "queued" ||
                 item.status === "preparing" ||
@@ -276,11 +278,11 @@ function PureMultimodalInput({
                   attachment={attachment}
                   key={attachment.url}
                   onRemove={() => {
-                    const match = uploadManager.items.find(
+                    const match = uploadManager.uploadTasks.find(
                       (item) => item.url === attachment.url,
                     );
                     if (match) {
-                      uploadManager.remove(match.id);
+                      uploadManager.removeUploadTask(match.id);
                     } else {
                       setAttachments((current) =>
                         current.filter((a) => a.url !== attachment.url),
@@ -293,7 +295,7 @@ function PureMultimodalInput({
                 />
               ))}
 
-              {uploadManager.items
+              {uploadManager.uploadTasks
                 .filter(
                   (item) =>
                     item.status === "queued" ||
@@ -362,7 +364,7 @@ function PureMultimodalInput({
                 className="size-8 rounded-full bg-teal-50 text-background transition-colors duration-200 hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground"
                 disabled={
                   (input.trim().length === 0 && attachments.length === 0) ||
-                  uploadManager.items.some(
+                  uploadManager.uploadTasks.some(
                     (item) =>
                       item.status === "queued" ||
                       item.status === "preparing" ||

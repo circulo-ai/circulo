@@ -1,9 +1,6 @@
 import { chatRepo, voteRepo } from "@/db/repositories";
 import { createRouter } from "@/lib/create-app";
-import {
-  ForbiddenError,
-  NotFoundError,
-} from "@/lib/server/errors";
+import { ForbiddenError, NotFoundError } from "@/lib/server/errors";
 import { requireAuth } from "@/middleware/auth";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";

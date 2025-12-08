@@ -1,25 +1,38 @@
-import { getChatRepository, getMessageRepository } from "@/di/resolvers";
+import { db } from "@/db";
+import { chat } from "@/db/schema/chat";
 import { getActiveOrganizationId } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
 import { createRouter } from "@/lib/create-app";
+import { hasPermission } from "@/lib/permissions";
 import { ForbiddenError, NotFoundError } from "@/lib/server/errors";
 import { requireAuth } from "@/middleware/auth";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 
 const paramsSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
 });
 
 const router = createRouter();
+
+router.get("/messages/test", async (c) => {
+  const result = await db.transaction(async (uow) => {
+    const recentChats = await uow.select().from(chat).limit(5);
+
+    return { recentChats };
+  });
+
+  return c.json({ message: result });
+});
 
 router.delete(
   "/messages/:id/trailing",
   requireAuth,
   zValidator("param", paramsSchema),
   async (c) => {
-    const messageRepository = getMessageRepository(c);
-    const chatRepository = getChatRepository(c);
+    const {
+      ChatRepository: chatRepository,
+      MessageRepository: messageRepository,
+    } = c.di;
 
     const { user, activeOrgId, session } = c.var;
     const { id } = c.req.valid("param");
@@ -49,9 +62,7 @@ router.delete(
         session as any,
       );
       if (!canUpdate) {
-        throw new ForbiddenError(
-          "You don't have permission to edit this chat",
-        );
+        throw new ForbiddenError("You don't have permission to edit this chat");
       }
     }
 

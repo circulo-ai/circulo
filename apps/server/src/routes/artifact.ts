@@ -1,7 +1,7 @@
 import { artifactRepo } from "@/db/repositories";
 import { chatRepo } from "@/db/repositories/chat-repo";
-import { isMemberOf } from "@/lib/permissions";
 import { createRouter } from "@/lib/create-app";
+import { isMemberOf } from "@/lib/permissions";
 import {
   BadRequestError,
   ForbiddenError,
@@ -12,7 +12,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 
 const querySchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
 });
 
 const bodySchema = z.object({

@@ -12,7 +12,12 @@ import { toQueryString } from "./utils";
 
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
-export const getFetcher = (method: Method = "GET", options?: RequestInit) => {
+type FetcherOptions = RequestInit & { raw?: boolean };
+
+export const getFetcher = (
+  method: Method = "GET",
+  options?: FetcherOptions,
+) => {
   const requests = {
     GET: { fn: getRequest, hasBody: false as const },
     POST: { fn: postRequest, hasBody: true as const },
@@ -22,14 +27,19 @@ export const getFetcher = (method: Method = "GET", options?: RequestInit) => {
   };
 
   const { fn, hasBody } = requests[method];
+  const { raw, ...init } = options ?? {};
 
   return async <T>(
     url: [string, Record<string, unknown>] | string,
     body?: { arg?: unknown },
   ): Promise<T> => {
     const normalUrl = normalizeUrl(url);
-    if (hasBody) return fn<T>(normalUrl, body?.arg, options);
-    return fn<T>(normalUrl, options);
+    if (raw) {
+      if (hasBody) return fn<T>(normalUrl, body?.arg ?? init.body, init);
+      return fn<T>(normalUrl, init);
+    }
+    if (hasBody) return fn<T>(normalUrl, body?.arg, init);
+    return fn<T>(normalUrl, init);
   };
 
   function normalizeUrl(url: [string, Record<string, unknown>] | string) {

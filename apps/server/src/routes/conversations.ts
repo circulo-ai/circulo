@@ -18,8 +18,7 @@ router.get(
   requireAuth,
   zValidator("query", querySchema),
   async (c) => {
-    const { limit, startingAfter, endingBefore, search } =
-      c.req.valid("query");
+    const { limit, startingAfter, endingBefore, search } = c.req.valid("query");
 
     if (startingAfter && endingBefore) {
       return c.json({ error: "Bad request" }, 400);

@@ -14,8 +14,10 @@ import { useChatHistoryStore } from "@/stores/use-chat-history-store";
 import { Bot, MessagesSquare, Pencil, Users } from "lucide-react";
 import { ComponentProps } from "react";
 
-interface ChatSidebarAddActionProps
-  extends Omit<ComponentProps<typeof DropdownMenu>, "children"> {}
+interface ChatSidebarAddActionProps extends Omit<
+  ComponentProps<typeof DropdownMenu>,
+  "children"
+> {}
 
 export function ChatSidebarAddAction(props: ChatSidebarAddActionProps) {
   const { open } = useSidebar();

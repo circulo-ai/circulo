@@ -1,34 +1,29 @@
 import { agentRepo } from "@/db/repositories";
-import { getUserRole, hasPermission, isMemberOf } from "@/lib/permissions";
 import { createRouter } from "@/lib/create-app";
+import { getUserRole, isMemberOf } from "@/lib/permissions";
+import { requireAuth } from "@/middleware/auth";
+import { NotFoundError } from "@circulo-ai/core";
 import {
   BadRequestError,
+  createAgentBodySchema,
+  deleteAgentQuerySchema,
   ForbiddenError,
-  NotFoundError,
-} from "@/lib/server/errors";
-import { requireAuth } from "@/middleware/auth";
+  getAgentQuerySchema,
+  updateAgentBodySchema,
+} from "@circulo-ai/types";
 import { zValidator } from "@hono/zod-validator";
-import {
-  createBodySchema,
-  deleteQuerySchema,
-  getQuerySchema,
-  updateBodySchema,
-} from "./schema";
-import { resolveOrganizationId } from "./utils";
+import { resolveOrganizationId } from "../utils";
 
 const router = createRouter();
 
 router.get(
   "/agent",
   requireAuth,
-  zValidator("query", getQuerySchema),
+  zValidator("query", getAgentQuerySchema),
   async (c) => {
     const { user, activeOrgId } = c.var;
     const query = c.req.valid("query");
-    const organizationId = await resolveOrganizationId(
-      activeOrgId,
-      c.req.raw,
-    );
+    const organizationId = await resolveOrganizationId(activeOrgId, c.req.raw);
 
     const isOrgMember = await isMemberOf(user!.id, organizationId);
     if (!isOrgMember) {
@@ -60,14 +55,11 @@ router.get(
 router.post(
   "/agent",
   requireAuth,
-  zValidator("json", createBodySchema),
+  zValidator("json", createAgentBodySchema),
   async (c) => {
     const { user, activeOrgId } = c.var;
     const body = c.req.valid("json");
-    const organizationId = await resolveOrganizationId(
-      activeOrgId,
-      c.req.raw,
-    );
+    const organizationId = await resolveOrganizationId(activeOrgId, c.req.raw);
 
     const isOrgMember = await isMemberOf(user!.id, organizationId);
     if (!isOrgMember) {
@@ -118,14 +110,11 @@ function assertCanManageAgent(
 router.patch(
   "/agent",
   requireAuth,
-  zValidator("json", updateBodySchema),
+  zValidator("json", updateAgentBodySchema),
   async (c) => {
     const { user, activeOrgId } = c.var;
     const body = c.req.valid("json");
-    const organizationId = await resolveOrganizationId(
-      activeOrgId,
-      c.req.raw,
-    );
+    const organizationId = await resolveOrganizationId(activeOrgId, c.req.raw);
 
     const isOrgMember = await isMemberOf(user!.id, organizationId);
     if (!isOrgMember) {
@@ -173,14 +162,11 @@ router.patch(
 router.delete(
   "/agent",
   requireAuth,
-  zValidator("query", deleteQuerySchema),
+  zValidator("query", deleteAgentQuerySchema),
   async (c) => {
     const { user, activeOrgId } = c.var;
     const query = c.req.valid("query");
-    const organizationId = await resolveOrganizationId(
-      activeOrgId,
-      c.req.raw,
-    );
+    const organizationId = await resolveOrganizationId(activeOrgId, c.req.raw);
 
     const isOrgMember = await isMemberOf(user!.id, organizationId);
     if (!isOrgMember) {

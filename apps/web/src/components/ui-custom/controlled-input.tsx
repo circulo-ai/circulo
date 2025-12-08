@@ -12,68 +12,171 @@ import {
   Ref,
   useCallback,
   useId,
+  useMemo,
 } from "react";
 import {
   Controller,
-  ControllerFieldState,
+  ControllerRenderProps,
   FieldValues,
   Path,
   useFormContext,
 } from "react-hook-form";
-import { Field, FieldDescription, FieldError, FieldLabel } from "../ui/field";
+import {
+  FieldContent,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "../ui/field";
+import { CustomField } from "./field";
 import { CustomInputGroup } from "./input-group";
 
-export interface InputComponentProps
-  extends Pick<
-    ComponentProps<"input">,
-    | "id"
-    | "aria-invalid"
-    | "value"
-    | "onChange"
-    | "onBlur"
-    | "disabled"
-    | "name"
-    | "ref"
-  > {
+export interface InputComponentProps extends Pick<
+  ComponentProps<"input">,
+  | "id"
+  | "aria-invalid"
+  | "value"
+  | "onChange"
+  | "onBlur"
+  | "disabled"
+  | "name"
+  | "ref"
+  | "type"
+> {
   onChange?: ChangeEventHandler;
   onBlur?: FocusEventHandler;
   ref?: Ref<any>;
-  context: {
-    fieldState: ControllerFieldState;
-  };
 }
 
-interface ControlledInputProps<T extends FieldValues>
-  extends ComponentProps<typeof Field> {
+interface ControlledInputProps<
+  T extends FieldValues,
+  ExtendedInputComponentProps extends InputComponentProps,
+> extends ComponentProps<typeof CustomField> {
   name: Path<T>;
   title?: string;
   description?: string;
   saveAsNumber?: boolean;
-  inputProps?: ComponentProps<"input">;
   addons?: ReactNode;
-  inputComponent: FC<InputComponentProps>;
+  inputComponent: FC<ExtendedInputComponentProps>;
+  inputProps?: ExtendedInputComponentProps;
+  inputStyle?: "default" | "no-input-group" | "unstyled";
+  errorPosition?: "before-input" | "after-input";
 }
 
-export const ControlledInput = <T extends FieldValues>({
+export function ControlledInput<
+  T extends FieldValues,
+  ExtendedInputComponentProps extends InputComponentProps,
+>({
   name,
-  title,
+  title: rawTitle,
   description,
-  saveAsNumber,
-  inputProps,
+  saveAsNumber = false,
   addons,
   inputComponent: InputComponent,
+  inputProps = {} as ExtendedInputComponentProps,
+  inputStyle = "default",
+  orientation = "vertical",
+  errorPosition = "after-input",
+  id: explicitId,
+  className,
   ...props
-}: ControlledInputProps<T>) => {
-  const id = useId();
+}: ControlledInputProps<T, ExtendedInputComponentProps>) {
+  const implicitId = useId();
+  const id = useMemo(() => explicitId ?? implicitId, [explicitId, implicitId]);
+  const title = useMemo(() => rawTitle ?? camelToTitle(name), [rawTitle, name]);
 
   const { control } = useFormContext();
 
+  return (
+    <Controller
+      name={name}
+      control={control}
+      render={({ field, fieldState: { invalid, error } }) =>
+        inputStyle === "unstyled" ? (
+          <FormInputAdapter<T, ExtendedInputComponentProps>
+            id={id}
+            field={field}
+            invalid={invalid}
+            className={className}
+            inputProps={inputProps}
+            saveAsNumber={saveAsNumber}
+            inputComponent={InputComponent}
+          />
+        ) : (
+          <CustomField
+            orientation={orientation}
+            data-invalid={invalid}
+            className={className}
+            {...props}
+          >
+            <FieldContent>
+              <FieldLabel htmlFor={id}>{title}</FieldLabel>
+              {description && (
+                <FieldDescription>{description}</FieldDescription>
+              )}
+              {errorPosition === "before-input" && invalid && (
+                <FieldError errors={[error]} />
+              )}
+            </FieldContent>
+            {inputStyle === "no-input-group" ? (
+              <FormInputAdapter<T, ExtendedInputComponentProps>
+                id={id}
+                field={field}
+                invalid={invalid}
+                inputProps={inputProps}
+                saveAsNumber={saveAsNumber}
+                inputComponent={InputComponent}
+              />
+            ) : (
+              <CustomInputGroup>
+                <FormInputAdapter<T, ExtendedInputComponentProps>
+                  id={id}
+                  field={field}
+                  invalid={invalid}
+                  inputProps={inputProps}
+                  saveAsNumber={saveAsNumber}
+                  inputComponent={InputComponent}
+                />
+                {addons}
+              </CustomInputGroup>
+            )}
+            {errorPosition === "after-input" && invalid && (
+              <FieldError errors={[error]} />
+            )}
+          </CustomField>
+        )
+      }
+    />
+  );
+}
+
+const FormInputAdapter = <
+  T extends FieldValues,
+  ExtendedInputComponentProps extends InputComponentProps,
+>({
+  id,
+  field: { value, onChange, ...field },
+  invalid,
+  className,
+  inputProps,
+  saveAsNumber,
+  inputComponent: InputComponent,
+}: {
+  id: string;
+  field: ControllerRenderProps<FieldValues, Path<T>>;
+  invalid: boolean;
+  className?: string;
+  inputProps: ExtendedInputComponentProps;
+  saveAsNumber: boolean;
+  inputComponent: FC<ExtendedInputComponentProps>;
+}) => {
+  // TODO convert to a utility
   const extractDigitsOnly = useCallback(
     (e: ChangeEvent<HTMLInputElement>) =>
       convertPersianToEnglishNumbers(e.target.value).replace(/\D/g, ""),
     [],
   );
 
+  // TODO convert to a utility
   const extractNumberFromInput = useCallback(
     (event: ChangeEvent<HTMLInputElement>) =>
       parseInt(extractDigitsOnly(event)),
@@ -81,38 +184,29 @@ export const ControlledInput = <T extends FieldValues>({
   );
 
   return (
-    <Controller
-      name={name}
-      control={control}
-      render={({ field: { value, onChange, ...field }, fieldState }) => (
-        <Field data-invalid={fieldState.invalid} {...props}>
-          <FieldLabel htmlFor={id}>{title ?? camelToTitle(name)}</FieldLabel>
-          {description && <FieldDescription>{description}</FieldDescription>}
-          <CustomInputGroup>
-            <InputComponent
-              id={id}
-              aria-invalid={fieldState.invalid}
-              context={{ fieldState }}
-              value={value ?? ""}
-              onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                onChange(
-                  inputProps?.type === "number"
-                    ? saveAsNumber
-                      ? isNaN(extractNumberFromInput(e))
-                        ? 0
-                        : extractNumberFromInput(e)
-                      : extractDigitsOnly(e)
-                    : e.target.value,
-                )
-              }
-              {...inputProps}
-              {...field}
-            />
-            {addons}
-          </CustomInputGroup>
-          {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-        </Field>
-      )}
+    <InputComponent
+      id={id} // TODO pass these props only if InputComponent accepts them
+      aria-invalid={invalid}
+      className={className}
+      value={value ?? ""}
+      onChange={(e: ChangeEvent<HTMLInputElement>) =>
+        onChange(
+          // TODO make this more readable
+          inputProps?.type === "number"
+            ? saveAsNumber
+              ? isNaN(extractNumberFromInput(e))
+                ? 0
+                : extractNumberFromInput(e)
+              : extractDigitsOnly(e)
+            : typeof e === "object"
+              ? e.target.value
+              : e,
+        )
+      }
+      {...inputProps}
+      {...field}
     />
   );
 };
+
+// TODO make it type safe

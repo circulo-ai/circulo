@@ -1,7 +1,7 @@
-import { createMiddleware } from "hono/factory";
-import type { Context } from "hono";
 import { auth } from "@/lib/auth";
 import type { AppEnv } from "@/lib/create-app";
+import type { Context } from "hono";
+import { createMiddleware } from "hono/factory";
 
 // Infer Better Auth session type
 type SessionResponse = Awaited<ReturnType<typeof auth.api.getSession>>;

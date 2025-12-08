@@ -4,8 +4,8 @@ import {
   chatMemberRepo,
   chatRepo,
 } from "@/db/repositories";
-import { getUserRole, hasPermission, isMemberOf } from "@/lib/permissions";
 import { createRouter } from "@/lib/create-app";
+import { hasPermission, isMemberOf } from "@/lib/permissions";
 import {
   BadRequestError,
   ForbiddenError,
@@ -16,7 +16,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 
 const paramsSchema = z.object({
-  id: z.string().uuid(),
+  id: z.uuid(),
 });
 
 const getQuerySchema = z.object({
@@ -24,7 +24,7 @@ const getQuerySchema = z.object({
 });
 
 const postBodySchema = z.object({
-  agentId: z.string().uuid(),
+  agentId: z.uuid(),
   isEnabled: z.coerce.boolean().optional().default(true),
   customInstructions: z.string().nullable().optional(),
   customTemperature: z.coerce
@@ -38,7 +38,7 @@ const postBodySchema = z.object({
 
 const patchBodySchema = z
   .object({
-    agentId: z.string().uuid(),
+    agentId: z.uuid(),
     isEnabled: z.boolean().optional(),
     customInstructions: z.string().nullable().optional(),
     customTemperature: z.coerce
@@ -58,7 +58,7 @@ const patchBodySchema = z
   );
 
 const deleteQuerySchema = z.object({
-  agentId: z.string().uuid(),
+  agentId: z.uuid(),
 });
 
 async function getChatContext(
@@ -132,11 +132,7 @@ router.get(
     const params = c.req.valid("param");
     const query = c.req.valid("query");
 
-    const { chat } = await getChatContext(
-      params.id,
-      user!.id,
-      activeOrgId,
-    );
+    const { chat } = await getChatContext(params.id, user!.id, activeOrgId);
 
     const agents = await chatAgentRepo.findForChat(chat.id, {
       includeDisabled: query.includeDisabled,
@@ -177,10 +173,7 @@ router.post(
       throw new ForbiddenError("Agent belongs to a different organization");
     }
 
-    const existing = await chatAgentRepo.findAgentInChat(
-      body.agentId,
-      chat.id,
-    );
+    const existing = await chatAgentRepo.findAgentInChat(body.agentId, chat.id);
     const normalizedTemp = normalizeTemperature(body.customTemperature);
 
     if (existing) {

@@ -1,97 +1,97 @@
-# @circulo/core
+# @circulo-ai/core
 
-A framework-agnostic domain + application toolbox inspired by clean architecture and DDD. It provides primitives for entities, value objects, domain events, errors, repositories, unit-of-work, and use-cases—without pulling in any runtime dependencies.
+Clean-architecture and DDD primitives for building framework-agnostic services. Ships only types and tiny helpers: entities, value objects, domain events, errors, repositories, unit-of-work, use cases, results, and guards without runtime dependencies.
 
-## What's Inside
+## Features
 
-- **Entities / Aggregate Roots**: Base classes with identity, timestamps, and domain-event accumulation.
-- **Value Objects**: Immutable value wrapper base and a GUID-like `Identifier`.
-- **Domain Events**: Event contracts and an in-memory publisher.
-- **Errors**: `DomainError`, `ValidationError`, `NotFoundError`.
-- **Contracts**: `Repository<T>`, `UnitOfWork<TScope>`, `UseCase<TRequest, TResponse>`.
-- **Application Helpers**: `Result<T>` for success/failure and `Guard` utilities.
+- **Domain building blocks**: `Entity`, `AggregateRoot`, `ValueObject`, `Identifier`, domain errors.
+- **Eventing**: Lightweight `DomainEvent` contract and in-memory `DomainEventPublisher`.
+- **Application contracts**: `UseCase<TReq, TRes>`, `Result<T>` for explicit success/failure.
+- **Boundaries**: `Repository<T>` and `UnitOfWork<TScope>` to keep persistence at the edges.
+- **Utilities**: `Guard` helpers for simple argument checks.
 
 ## Install
 
 ```bash
-pnpm add @circulo/core
+bun add @circulo-ai/core
 ```
 
-## Usage
-
-### Entities & Value Objects
+## Quick Start
 
 ```ts
-import { Entity, Identifier, ValidationError } from "@circulo/core";
+import {
+  AggregateRoot,
+  DomainEventPublisher,
+  Identifier,
+  NotFoundError,
+  Repository,
+  Result,
+  UnitOfWork,
+  UseCase,
+  ValidationError,
+} from "@circulo-ai/core";
 
-type UserProps = { id: Identifier; name: string };
+type AccountProps = { id: Identifier; balance: number };
 
-class User extends Entity<UserProps> {
-  constructor(private props: UserProps) {
+class Account extends AggregateRoot<AccountProps> {
+  constructor(private props: AccountProps) {
     super(props);
-    if (!props.name.trim()) throw new ValidationError("Name required", "name");
   }
-  get name() {
-    return this.props.name;
+  deposit(amount: number) {
+    if (amount <= 0)
+      throw new ValidationError("Amount must be positive", "amount");
+    this.props = { ...this.props, balance: this.props.balance + amount };
+    this.touch();
+    this.addDomainEvent({
+      name: "AccountCredited",
+      occurredOn: new Date(),
+      aggregateId: this.aggregateId.toString(),
+      payload: { amount },
+    });
   }
-}
-
-const user = new User({ id: Identifier.create(), name: "Ada" });
-```
-
-### Domain Events
-
-```ts
-import { DomainEventPublisher } from "@circulo/core";
-
-const publisher = new DomainEventPublisher();
-publisher.subscribe("UserRegistered", async (evt) => console.log(evt.payload));
-await publisher.publish({
-  name: "UserRegistered",
-  occurredOn: new Date(),
-  aggregateId: "123",
-  payload: { email: "hi@example.com" },
-});
-```
-
-### Use Cases
-
-```ts
-import { UseCase, Result } from "@circulo/core";
-
-type Input = { email: string };
-type Output = Result<void>;
-
-class RegisterUser implements UseCase<Input, Output> {
-  async execute(input: Input): Promise<Output> {
-    if (!input.email.includes("@")) return Result.fail("Invalid email");
-    // persist...
-    return Result.ok();
+  get balance() {
+    return this.props.balance;
   }
 }
-```
 
-### Unit of Work Contract
-
-```ts
-import type { UnitOfWork } from "@circulo/core";
-
-async function doStuff(uow: UnitOfWork) {
-  return uow.transaction(async (scope) => {
-    // use scope-bound repositories here
-  });
+class CreditAccount implements UseCase<
+  { id: string; amount: number },
+  Result<void>
+> {
+  constructor(
+    private readonly accounts: Repository<Account>,
+    private readonly uow: UnitOfWork,
+    private readonly publisher: DomainEventPublisher,
+  ) {}
+  async execute(input: { id: string; amount: number }) {
+    return this.uow.transaction(async () => {
+      const account = await this.accounts.getById(Identifier.from(input.id));
+      if (!account) throw new NotFoundError("Account", input.id);
+      account.deposit(input.amount);
+      await this.accounts.save(account);
+      await Promise.all(
+        account.pullDomainEvents().map((evt) => this.publisher.publish(evt)),
+      );
+      return Result.ok();
+    });
+  }
 }
 ```
 
-## Design Notes
+## Clean Architecture Fit
 
-- No framework/runtime deps; pure TypeScript types and helpers.
-- Serializable errors and events keep adapters thin.
-- Entities do not depend on persistence or transport concerns.
+- Domain stays pure: no framework imports or IO concerns in entities/value objects.
+- Application orchestrates: use cases coordinate transactions, repositories, and event dispatch.
+- Infrastructure plugs in at the edges: implement `Repository`/`UnitOfWork` with your ORM, HTTP, or message adapters.
+- Explicit errors and `Result` simplify transport mapping (HTTP codes, gRPC statuses, etc.).
+
+## Documentation
+
+- Full developer guide and patterns: [`packages/core/docs.md`](./docs.md)
 
 ## Developing
 
 ```bash
-pnpm -C packages/core type-check
-pnpm -C packages/core build
+bun --cwd packages/core run type-check
+bun --cwd packages/core run build
 ```

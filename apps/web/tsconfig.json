@@ -10,7 +10,7 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "react-jsx",
+    "jsx": "preserve",
     "incremental": true,
     "target": "ESNext",
     "plugins": [
@@ -27,9 +27,10 @@
       "@/db/*": ["../../packages/db/*"],
       "#/*": ["./public/*"],
       "@circulo/db": ["../../packages/db"],
-      "@circulo/db/*": ["../../packages/db/*"],
+      "@circulo/db/*": ["../../packages/db/*"]
     }
   },
+  "references": [{ "path": "../../packages/types" }],
   "include": [
     "next-env.d.ts",
     "**/*.ts",
@@ -37,7 +38,8 @@
     ".types/**/*.ts",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "trigger.config.ts"
-, "../server/drizzle.config.ts"  ],
+    "trigger.config.ts",
+    "../server/drizzle.config.ts"
+  ],
   "exclude": ["node_modules"]
 }

@@ -114,7 +114,7 @@ export const auth = betterAuth({
               {
                 userId: user.id,
                 error,
-              }
+              },
             );
           }
         },
@@ -279,7 +279,7 @@ export const auth = betterAuth({
                     Authorization: `Bearer ${tokens.accessToken}`,
                     "User-Agent": "sim-studio",
                   },
-                }
+                },
               );
 
               if (!profileResponse.ok) {
@@ -288,7 +288,7 @@ export const auth = betterAuth({
                   statusText: profileResponse.statusText,
                 });
                 throw new Error(
-                  `Failed to fetch GitHub profile: ${profileResponse.statusText}`
+                  `Failed to fetch GitHub profile: ${profileResponse.statusText}`,
                 );
               }
 
@@ -302,7 +302,7 @@ export const auth = betterAuth({
                       Authorization: `Bearer ${tokens.accessToken}`,
                       "User-Agent": "sim-studio",
                     },
-                  }
+                  },
                 );
 
                 if (emailsResponse.ok) {
@@ -314,7 +314,7 @@ export const auth = betterAuth({
                         primary: boolean;
                         email: string;
                         verified: boolean;
-                      }) => email.primary
+                      }) => email.primary,
                     ) || emails[0];
                   if (primaryEmail) {
                     profile.email = primaryEmail.email;
@@ -635,7 +635,7 @@ export const auth = betterAuth({
                 name: "Wealthbox User",
                 email: `${uniqueId.replace(
                   /[^a-zA-Z0-9]/g,
-                  ""
+                  "",
                 )}@wealthbox.user`,
                 emailVerified: false,
                 createdAt: now,
@@ -670,8 +670,8 @@ export const auth = betterAuth({
                   const decodedToken = JSON.parse(
                     Buffer.from(
                       tokens.idToken.split(".")[1],
-                      "base64"
-                    ).toString()
+                      "base64",
+                    ).toString(),
                   );
                   if (decodedToken.sub) {
                     userId = decodedToken.sub;
@@ -724,7 +724,7 @@ export const auth = betterAuth({
                   headers: {
                     Authorization: `Bearer ${tokens.accessToken}`,
                   },
-                }
+                },
               );
 
               if (!response.ok) {
@@ -844,7 +844,7 @@ export const auth = betterAuth({
                   headers: {
                     Authorization: `Bearer ${tokens.accessToken}`,
                   },
-                }
+                },
               );
 
               if (!response.ok) {
@@ -997,7 +997,7 @@ export const auth = betterAuth({
                     Authorization: `Bearer ${tokens.accessToken}`,
                     "Notion-Version": "2022-06-28",
                   },
-                }
+                },
               );
 
               if (!response.ok) {
@@ -1054,7 +1054,7 @@ export const auth = betterAuth({
                     Authorization: `Bearer ${tokens.accessToken}`,
                     "User-Agent": "sim-studio/1.0",
                   },
-                }
+                },
               );
 
               if (!response.ok) {
@@ -1124,7 +1124,7 @@ export const auth = betterAuth({
                   body: errorText,
                 });
                 throw new Error(
-                  `Linear API error: ${response.status} ${response.statusText}`
+                  `Linear API error: ${response.status} ${response.statusText}`,
                 );
               }
 
@@ -1193,8 +1193,8 @@ export const auth = betterAuth({
                   const decodedToken = JSON.parse(
                     Buffer.from(
                       tokens.idToken.split(".")[1],
-                      "base64"
-                    ).toString()
+                      "base64",
+                    ).toString(),
                   );
                   if (decodedToken.sub) {
                     userId = decodedToken.sub;
@@ -1242,15 +1242,15 @@ export const auth = betterAuth({
             .from(schema.organization)
             .innerJoin(
               schema.member,
-              eq(schema.member.organizationId, schema.organization.id)
+              eq(schema.member.organizationId, schema.organization.id),
             )
             .where(
               and(
                 eq(schema.member.userId, user.id),
                 eq(schema.member.role, "owner"),
                 // Check for personal org type in metadata
-                sql`${schema.organization.metadata}->>'type' = 'personal'`
-              )
+                sql`${schema.organization.metadata}->>'type' = 'personal'`,
+              ),
             )
             .limit(1);
 
@@ -1310,12 +1310,12 @@ export const auth = betterAuth({
     defaultCookieAttributes: {
       sameSite: "none",
       secure: true,
-      partitioned: true // New browser standards will mandate this for foreign cookies
+      partitioned: true, // New browser standards will mandate this for foreign cookies
     },
     crossSubDomainCookies: {
-      enabled: true
-    }
-  }
+      enabled: true,
+    },
+  },
 });
 
 export type AuthType = {

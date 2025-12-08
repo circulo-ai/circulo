@@ -1,6 +1,6 @@
-import { codeDocumentHandler } from "@/artifacts/code/server";
-import { sheetDocumentHandler } from "@/artifacts/sheet/server";
-import { textDocumentHandler } from "@/artifacts/text/server";
+import { codeDocumentHandler } from "@/application/artifact/handlers/code/server";
+import { sheetDocumentHandler } from "@/application/artifact/handlers/sheet/server";
+import { textDocumentHandler } from "@/application/artifact/handlers/text/server";
 import { artifactRepo } from "@/db/repositories";
 import type { ArtifactKind, Document } from "@/db/schema";
 import type { UIMessageStreamWriter } from "ai";
@@ -42,7 +42,9 @@ export function createDocumentHandler<T extends ArtifactKind>(config: {
 }): DocumentHandler<T> {
   return {
     kind: config.kind,
-    onCreateDocument: async function onCreateDocument(args: CreateDocumentCallbackProps) {
+    onCreateDocument: async function onCreateDocument(
+      args: CreateDocumentCallbackProps,
+    ) {
       const draftContent = await config.onCreateDocument({
         id: args.id,
         title: args.title,
@@ -62,7 +64,9 @@ export function createDocumentHandler<T extends ArtifactKind>(config: {
 
       return;
     },
-    onUpdateDocument: async function onUpdateDocument(args: UpdateDocumentCallbackProps) {
+    onUpdateDocument: async function onUpdateDocument(
+      args: UpdateDocumentCallbackProps,
+    ) {
       const draftContent = await config.onUpdateDocument({
         document: args.document,
         description: args.description,

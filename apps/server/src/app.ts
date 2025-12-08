@@ -1,50 +1,40 @@
+import createApp from "@/lib/create-app";
+import { env } from "@/lib/env";
+import { getBaseUrl } from "@/lib/urls/utils";
+import { rateLimit } from "@/middleware/rate-limit";
+import agent from "@/routes/agent";
+import artifact from "@/routes/artifact";
 import auth from "@/routes/auth";
 import authSocketToken from "@/routes/auth-socket-token";
-import conversations from "@/routes/conversations";
-import artifact from "@/routes/artifact";
-import agent from "@/routes/agent";
 import autumn from "@/routes/autumn";
-import chatPin from "@/routes/chat-pin";
-import chatAgents from "@/routes/chat-agents";
-import chatStream from "@/routes/chat-stream";
 import chat from "@/routes/chat";
+import chatAgents from "@/routes/chat-agents";
+import chatPin from "@/routes/chat-pin";
+import chatStream from "@/routes/chat-stream";
 import chatVisibility from "@/routes/chat-visibility";
-import fileDelete from "@/routes/files/delete";
-import fileDownload from "@/routes/files/download";
-import filePresigned from "@/routes/files/presigned";
-import filePresignedBatch from "@/routes/files/presigned-batch";
-import fileUpload from "@/routes/files/upload";
-import fileMultipart from "@/routes/files/multipart";
-import fileParse from "@/routes/files/parse";
-import fileServe from "@/routes/files/serve";
+import conversations from "@/routes/conversations";
+import files from "@/routes/files";
 import history from "@/routes/history";
 import messages from "@/routes/messages";
 import suggestions from "@/routes/suggestions";
-import oauthConnections from "@/routes/oauth/connections";
-import oauthDisconnect from "@/routes/oauth/disconnect";
-import oauthCredentials from "@/routes/oauth/credentials";
-import oauthToken from "@/routes/oauth/token";
-import oauthMicrosoftFiles from "@/routes/oauth/microsoft-files";
-import oauthMicrosoftFile from "@/routes/oauth/microsoft-file";
 import userProfile from "@/routes/users/profile";
 import userSettings from "@/routes/users/settings";
 import userUnsubscribe from "@/routes/users/unsubscribe";
 import vote from "@/routes/vote";
-import { HttpError } from "@/lib/server/errors";
-import createApp from "@/lib/create-app";
-import { requestId } from "hono/request-id";
-import { prettyJSON } from "hono/pretty-json";
+import { HttpError } from "@circulo-ai/types";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
-import { inngestRouter } from "@/lib/inngest/handler";
-import { getBaseUrl } from "@/lib/urls/utils";
+import { prettyJSON } from "hono/pretty-json";
+import { requestId } from "hono/request-id";
 
 const app = createApp();
+const NODE_ENV = env.NODE_ENV ?? "development";
+const OPENAPI_PATH = "/openapi.json";
 
 // Middlewares (register before routes)
 app.use("*", logger());
 app.use("*", requestId());
-app.use("*", prettyJSON());
+app.use(prettyJSON());
 const allowedOrigins = [
   getBaseUrl(),
   "http://localhost:3000",
@@ -71,6 +61,11 @@ const corsMiddleware = cors({
 });
 app.use("*", corsMiddleware); // apply globally so preflight never 404s
 
+// Skip rate limiting in development (or when NODE_ENV is unset) to avoid throttling local reloads
+if (NODE_ENV !== "development") {
+  app.use("/api/*", rateLimit());
+}
+
 const routes = [
   autumn,
   auth,
@@ -82,21 +77,8 @@ const routes = [
   chatStream,
   chat,
   chatVisibility,
-  fileDelete,
-  fileDownload,
-  filePresigned,
-  filePresignedBatch,
-  fileUpload,
-  fileMultipart,
-  fileParse,
-  fileServe,
+  files,
   messages,
-  oauthConnections,
-  oauthDisconnect,
-  oauthCredentials,
-  oauthToken,
-  oauthMicrosoftFiles,
-  oauthMicrosoftFile,
   conversations,
   history,
   suggestions,
@@ -112,15 +94,11 @@ routes.forEach((route) => {
 
 export type AppType = (typeof routes)[number];
 
-// Inngest handler (dev/prod)
-app.use("/api/inngest/*", inngestRouter);
-
 app.onError((err, c) => {
   if (err instanceof HttpError) {
     return err.toResponse();
   }
 
-  console.error(err);
   return c.json({ message: "Internal server error" }, 500);
 });
 

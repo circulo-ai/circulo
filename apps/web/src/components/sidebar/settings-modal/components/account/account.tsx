@@ -3,8 +3,8 @@
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { UploadDropzone } from "@/components/uploads";
-import { useUploadManager } from "@/hooks/use-upload-manager";
+import { FileInput } from "@/components/uploads/file-input";
+import { useUploadTaskManager } from "@/hooks/use-upload-task-manager";
 import { signOut, useSession } from "@/lib/auth-client";
 import { useBrandConfig } from "@/lib/branding/branding";
 import { createLogger } from "@/lib/logs/console/logger";
@@ -38,25 +38,26 @@ export function Account(_props: AccountProps) {
 
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  const uploadManager = useUploadManager({
-    defaultContext: "profile-pictures",
-    onItemFinish: async (item) => {
-      if (item.status === "success") {
+  const uploadManager = useUploadTaskManager({
+    defaultStorageContext: "profile-pictures",
+    onTaskComplete: async (task) => {
+      if (task.status === "success") {
         try {
-          await updateUserImage(item.url || null);
+          await updateUserImage(task.url || null);
           setUploadError(null);
         } catch (_err) {
           setUploadError("Failed to update profile picture");
         }
-      } else if (item.status === "error") {
-        setUploadError(item.error || "Failed to upload profile picture");
+      } else if (task.status === "error") {
+        setUploadError(task.error || "Failed to upload profile picture");
       }
     },
   });
 
   const activeProfileImage =
-    uploadManager.items.find((i) => i.status === "success")?.url ||
-    uploadManager.items.find((i) => i.status === "uploading")?.url ||
+    uploadManager.uploadTasks.find((task) => task.status === "success")?.url ||
+    uploadManager.uploadTasks.find((task) => task.status === "uploading")
+      ?.url ||
     userImage;
 
   const updateUserImage = async (imageUrl: string | null) => {
@@ -224,17 +225,15 @@ export function Account(_props: AccountProps) {
             <div className="flex items-center gap-4">
               {/* Profile Picture Upload */}
               <div className="relative">
-                <UploadDropzone
+                <FileInput
                   className="h-12 w-12 rounded-full!"
-                  accept={["image/png", "image/jpeg", "image/jpg"]}
-                  maxSizeMb={5}
+                  accept="image/png, image/jpeg, image/jpg"
                   multiple={false}
-                  disabled={uploadManager.isUploading}
-                  onFiles={(files) => {
-                    uploadManager.clear();
-                    uploadManager.addFiles(files, "profile-pictures");
+                  disabled={uploadManager.hasActiveUploads}
+                  onChange={() => {
+                    // TODO implement
                   }}
-                  renderContent={({ isDragging }) => (
+                  customComponent={({}) => (
                     <div className="group relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#802FFF] transition-all hover:opacity-80">
                       {(() => {
                         const imageUrl =
@@ -248,7 +247,7 @@ export function Account(_props: AccountProps) {
                             loader={({ src }) => src}
                             unoptimized
                             className={`h-full w-full object-cover transition-opacity duration-300 ${
-                              uploadManager.isUploading
+                              uploadManager.hasActiveUploads
                                 ? "opacity-50"
                                 : "opacity-100"
                             }`}
@@ -260,12 +259,12 @@ export function Account(_props: AccountProps) {
 
                       <div
                         className={`absolute inset-0 flex items-center justify-center rounded-full bg-black/50 transition-opacity ${
-                          uploadManager.isUploading || isDragging
+                          uploadManager.hasActiveUploads
                             ? "opacity-100"
                             : "opacity-0 group-hover:opacity-100"
                         }`}
                       >
-                        {uploadManager.isUploading ? (
+                        {uploadManager.hasActiveUploads ? (
                           <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
                         ) : (
                           <Camera className="h-5 w-5 text-white" />
@@ -288,14 +287,14 @@ export function Account(_props: AccountProps) {
               </div>
             </div>
 
-            {/* {uploadManager.items.length > 0 && (
+            {/* {uploadManager.uploadTasks.length > 0 && (
               <UploadList
-                items={uploadManager.items}
-                onCancel={uploadManager.cancel}
-                onRetry={uploadManager.retry}
+                items={uploadManager.uploadTasks}
+                onCancel={uploadManager.cancelUploadTask}
+                onRetry={uploadManager.retryUploadTask}
                 onRemove={(id) => {
-                  uploadManager.remove(id);
-                  if (uploadManager.items.length === 0) {
+                  uploadManager.removeUploadTask(id);
+                  if (uploadManager.uploadTasks.length === 0) {
                     void updateUserImage(null);
                   }
                 }}

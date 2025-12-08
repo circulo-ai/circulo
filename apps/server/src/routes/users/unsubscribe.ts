@@ -1,3 +1,4 @@
+import { createRouter } from "@/lib/create-app";
 import type { EmailType } from "@/lib/email/mailer";
 import {
   getEmailPreferences,
@@ -6,7 +7,6 @@ import {
   updateEmailPreferences,
   verifyUnsubscribeToken,
 } from "@/lib/email/unsubscribe";
-import { createRouter } from "@/lib/create-app";
 import { createLogger } from "@/lib/logs/console/logger";
 import { generateRequestId } from "@/lib/server-utils";
 import { zValidator } from "@hono/zod-validator";
@@ -35,10 +35,7 @@ router.get("/users/me/settings/unsubscribe", async (c) => {
 
     if (!email || !token) {
       logger.warn(`[${requestId}] Missing email or token in GET request`);
-      return c.json(
-        { error: "Missing email or token parameter" },
-        400,
-      );
+      return c.json({ error: "Missing email or token parameter" }, 400);
     }
 
     const tokenVerification = verifyUnsubscribeToken(email, token);
@@ -46,10 +43,7 @@ router.get("/users/me/settings/unsubscribe", async (c) => {
       logger.warn(
         `[${requestId}] Invalid unsubscribe token for email: ${email}`,
       );
-      return c.json(
-        { error: "Invalid or expired unsubscribe link" },
-        400,
-      );
+      return c.json({ error: "Invalid or expired unsubscribe link" }, 400);
     }
 
     const emailType = tokenVerification.emailType as EmailType;
@@ -73,10 +67,7 @@ router.get("/users/me/settings/unsubscribe", async (c) => {
       `[${requestId}] Error processing unsubscribe GET request:`,
       error,
     );
-    return c.json(
-      { error: "Internal server error" },
-      500,
-    );
+    return c.json({ error: "Internal server error" }, 500);
   }
 });
 
@@ -94,10 +85,7 @@ router.post(
         logger.warn(
           `[${requestId}] Invalid unsubscribe token for email: ${email}`,
         );
-        return c.json(
-          { error: "Invalid or expired unsubscribe link" },
-          400,
-        );
+        return c.json({ error: "Invalid or expired unsubscribe link" }, 400);
       }
 
       const emailType = tokenVerification.emailType as EmailType;
@@ -144,10 +132,7 @@ router.post(
         logger.error(
           `[${requestId}] Failed to update unsubscribe preferences for: ${email}`,
         );
-        return c.json(
-          { error: "Failed to process unsubscribe request" },
-          500,
-        );
+        return c.json({ error: "Failed to process unsubscribe request" }, 500);
       }
 
       logger.info(
@@ -169,10 +154,7 @@ router.post(
         `[${requestId}] Error processing unsubscribe POST request:`,
         error,
       );
-      return c.json(
-        { error: "Internal server error" },
-        500,
-      );
+      return c.json({ error: "Internal server error" }, 500);
     }
   },
 );

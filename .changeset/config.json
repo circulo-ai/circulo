@@ -7,5 +7,18 @@
   "baseBranch": "master",
   "updateInternalDependencies": "patch",
   "access": "public",
-  "ignore": []
+  "ignore": [
+    "web",
+    "server",
+    "@circulo/db",
+    "@circulo-ai/redis",
+    "@circulo-ai/prettier-config",
+    "@circulo-ai/types",
+    "@circulo-ai/wf"
+  ],
+  "privatePackages": {
+    "version": true,
+    "tag": true,
+    "changelog": false
+  }
 }
