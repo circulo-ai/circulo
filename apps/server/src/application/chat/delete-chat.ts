@@ -1,11 +1,11 @@
+import type { DrizzleChatRepository } from "@/infrastructure/drizzle/chat-repository";
 import {
   Guard,
   Identifier,
   Result,
-  type UseCase,
   type UnitOfWork,
+  type UseCase,
 } from "@circulo-ai/core";
-import type { DrizzleChatRepository } from "@/infrastructure/drizzle/chat-repository";
 
 export type DeleteChatInput = { id: string };
 export type DeleteChatOutput = Result<void>;

@@ -1,7 +1,7 @@
-import { eq, and } from "drizzle-orm";
-import { vote as voteTable } from "@/db/schema/chat";
 import type { DbInstance } from "@/db";
+import { vote as voteTable } from "@/db/schema/chat";
 import { Vote } from "@/domain/vote/vote";
+import { and, eq } from "drizzle-orm";
 
 export class DrizzleVoteRepository {
   constructor(private readonly db: DbInstance) {}

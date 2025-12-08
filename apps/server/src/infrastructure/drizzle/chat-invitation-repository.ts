@@ -1,8 +1,8 @@
-import { Identifier, type Repository } from "@circulo-ai/core";
-import { eq, and } from "drizzle-orm";
-import { chatInvitation as chatInvitationTable } from "@/db/schema/chat";
 import type { DbInstance } from "@/db";
+import { chatInvitation as chatInvitationTable } from "@/db/schema/chat";
 import { ChatInvitation } from "@/domain/chat/chat-invitation";
+import { Identifier, type Repository } from "@circulo-ai/core";
+import { and, eq } from "drizzle-orm";
 
 function toDomain(
   row: typeof chatInvitationTable.$inferSelect,

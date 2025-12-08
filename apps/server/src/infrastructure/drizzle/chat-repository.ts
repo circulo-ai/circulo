@@ -1,8 +1,8 @@
+import type { DbInstance } from "@/db";
+import { chat as chatTable } from "@/db/schema/chat";
+import { Chat } from "@/domain/chat/chat";
 import { Identifier, type Repository } from "@circulo-ai/core";
 import { eq } from "drizzle-orm";
-import { chat as chatTable } from "@/db/schema/chat";
-import type { DbInstance } from "@/db";
-import { Chat } from "@/domain/chat/chat";
 
 function toDomain(row: typeof chatTable.$inferSelect): Chat {
   return new Chat({

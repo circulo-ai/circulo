@@ -1,7 +1,7 @@
 import { artifactRepo } from "@/db/repositories";
 import { chatRepo } from "@/db/repositories/chat-repo";
-import { isMemberOf } from "@/lib/permissions";
 import { createRouter } from "@/lib/create-app";
+import { isMemberOf } from "@/lib/permissions";
 import {
   BadRequestError,
   ForbiddenError,

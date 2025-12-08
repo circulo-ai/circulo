@@ -1,4 +1,4 @@
-import type { StepResult, WorkflowError, ErrorType } from "../models/workflow";
+import type { ErrorType, StepResult, WorkflowError } from "../models/workflow";
 
 export function complete<T>(data: T): StepResult<T> {
   return { type: "complete", data };

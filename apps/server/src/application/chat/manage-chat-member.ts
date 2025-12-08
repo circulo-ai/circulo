@@ -1,13 +1,13 @@
+import { ChatMember } from "@/domain/chat/chat-member";
+import type { DrizzleChatMemberRepository } from "@/infrastructure/drizzle/chat-member-repository";
 import {
   Guard,
   Identifier,
   NotFoundError,
   Result,
-  type UseCase,
   type UnitOfWork,
+  type UseCase,
 } from "@circulo-ai/core";
-import { ChatMember } from "@/domain/chat/chat-member";
-import type { DrizzleChatMemberRepository } from "@/infrastructure/drizzle/chat-member-repository";
 
 export type AddChatMemberInput = {
   chatId: string;

@@ -1,14 +1,14 @@
 import type { AppEnv } from "@/lib/create-app";
+import type { RateLimiter } from "@/services/rate-limit";
 import {
   DEFAULT_PLAN,
   type RateLimitBucket,
   type RateLimitDecision,
   type RateLimitPlan,
 } from "@/services/rate-limit";
-import type { RateLimiter } from "@/services/rate-limit";
-import { createMiddleware } from "hono/factory";
-import type { Context } from "hono";
 import { RateLimitError } from "@circulo-ai/types";
+import type { Context } from "hono";
+import { createMiddleware } from "hono/factory";
 
 type KeyResolver = (
   c: Context<AppEnv>,

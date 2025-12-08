@@ -1,12 +1,12 @@
+import { Artifact } from "@/domain/artifact/artifact";
+import type { DrizzleArtifactRepository } from "@/infrastructure/drizzle/artifact-repository";
 import {
   Guard,
   Identifier,
   Result,
-  type UseCase,
   type UnitOfWork,
+  type UseCase,
 } from "@circulo-ai/core";
-import { Artifact } from "@/domain/artifact/artifact";
-import type { DrizzleArtifactRepository } from "@/infrastructure/drizzle/artifact-repository";
 
 export type CreateArtifactInput = {
   id: string;

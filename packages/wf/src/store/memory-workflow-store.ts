@@ -1,4 +1,4 @@
-import type { Workflow, WorkflowStore, WorkflowFilter, Lock } from "../models";
+import type { Lock, Workflow, WorkflowFilter, WorkflowStore } from "../models";
 import { generateId } from "../utils/id";
 
 export class InMemoryWorkflowStore<

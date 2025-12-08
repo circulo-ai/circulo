@@ -1,4 +1,4 @@
-import type { MetricsCollector, ErrorType } from "../models";
+import type { ErrorType, MetricsCollector } from "../models";
 
 interface MetricValue {
   value: number;

@@ -1,21 +1,19 @@
-import { DI_TOKENS } from "@/di/container";
-import { getActiveOrganizationId } from "@/lib/auth";
 import { titlePrompt } from "@/lib/ai/prompts";
 import { myProvider } from "@/lib/ai/providers";
-import { getTextFromMessage, getTextFromMessages } from "@/lib/utils";
-import { hasPermission, isMemberOf } from "@/lib/permissions";
+import { getActiveOrganizationId } from "@/lib/auth";
 import { createRouter } from "@/lib/create-app";
+import { hasPermission, isMemberOf } from "@/lib/permissions";
 import {
   BadRequestError,
   ForbiddenError,
-  NotFoundError,
-  RateLimitError,
   HttpError,
+  RateLimitError,
 } from "@/lib/server/errors";
-import { requireAuth } from "@/middleware/auth";
 import { type ChatMessage } from "@/lib/types";
-import { generateText, safeValidateUIMessages } from "ai";
+import { getTextFromMessage, getTextFromMessages } from "@/lib/utils";
+import { requireAuth } from "@/middleware/auth";
 import { zValidator } from "@hono/zod-validator";
+import { generateText, safeValidateUIMessages } from "ai";
 import { z } from "zod";
 
 const deleteQuerySchema = z.object({

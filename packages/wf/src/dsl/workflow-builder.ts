@@ -1,9 +1,9 @@
 import type {
+  ErrorType,
   Step,
   StepResult,
   WorkflowContext,
   WorkflowDefinition,
-  ErrorType,
 } from "../models";
 import { generateId } from "../utils/id";
 

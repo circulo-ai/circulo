@@ -5,11 +5,7 @@ export function getGlobalPrettierConfig({
   ...config
 }: Config = {}): Config {
   return {
-    plugins: [
-      "prettier-plugin-organize-imports",
-      ...(plugins ?? []),
-      "prettier-plugin-merge",
-    ],
+    plugins: ["prettier-plugin-organize-imports", ...(plugins ?? [])],
     ...config,
   };
 }
