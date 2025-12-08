@@ -3,15 +3,15 @@ import { myProvider } from "@/lib/ai/providers";
 import { getActiveOrganizationId } from "@/lib/auth";
 import { createRouter } from "@/lib/create-app";
 import { hasPermission, isMemberOf } from "@/lib/permissions";
+import { type ChatMessage } from "@/lib/types";
+import { getTextFromMessage, getTextFromMessages } from "@/lib/utils";
+import { requireAuth } from "@/middleware/auth";
 import {
   BadRequestError,
   ForbiddenError,
   HttpError,
   RateLimitError,
-} from "@/lib/server/errors";
-import { type ChatMessage } from "@/lib/types";
-import { getTextFromMessage, getTextFromMessages } from "@/lib/utils";
-import { requireAuth } from "@/middleware/auth";
+} from "@circulo-ai/types";
 import { zValidator } from "@hono/zod-validator";
 import { generateText, safeValidateUIMessages } from "ai";
 import { z } from "zod";

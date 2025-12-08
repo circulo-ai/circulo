@@ -6,12 +6,12 @@ import {
 } from "@/db/repositories";
 import { createRouter } from "@/lib/create-app";
 import { hasPermission, isMemberOf } from "@/lib/permissions";
+import { requireAuth } from "@/middleware/auth";
 import {
   BadRequestError,
   ForbiddenError,
   NotFoundError,
-} from "@/lib/server/errors";
-import { requireAuth } from "@/middleware/auth";
+} from "@circulo-ai/types";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 

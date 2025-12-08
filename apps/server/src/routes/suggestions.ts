@@ -1,7 +1,7 @@
 import { suggestionRepo } from "@/db/repositories";
 import { createRouter } from "@/lib/create-app";
-import { ForbiddenError } from "@/lib/server/errors";
 import { requireAuth } from "@/middleware/auth";
+import { ForbiddenError } from "@circulo-ai/types";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 
