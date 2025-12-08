@@ -1,8 +1,8 @@
 import { agentRepo } from "@/db/repositories";
-import { getUserRole, hasPermission, isMemberOf } from "@/lib/permissions";
 import { createRouter } from "@/lib/create-app";
+import { getUserRole, isMemberOf } from "@/lib/permissions";
 import { requireAuth } from "@/middleware/auth";
-import { zValidator } from "@hono/zod-validator";
+import { NotFoundError } from "@circulo-ai/core";
 import {
   BadRequestError,
   createAgentBodySchema,
@@ -11,8 +11,8 @@ import {
   getAgentQuerySchema,
   updateAgentBodySchema,
 } from "@circulo-ai/types";
+import { zValidator } from "@hono/zod-validator";
 import { resolveOrganizationId } from "../utils";
-import { NotFoundError } from "@circulo-ai/core";
 
 const router = createRouter();
 
@@ -23,10 +23,7 @@ router.get(
   async (c) => {
     const { user, activeOrgId } = c.var;
     const query = c.req.valid("query");
-    const organizationId = await resolveOrganizationId(
-      activeOrgId,
-      c.req.raw,
-    );
+    const organizationId = await resolveOrganizationId(activeOrgId, c.req.raw);
 
     const isOrgMember = await isMemberOf(user!.id, organizationId);
     if (!isOrgMember) {
@@ -62,10 +59,7 @@ router.post(
   async (c) => {
     const { user, activeOrgId } = c.var;
     const body = c.req.valid("json");
-    const organizationId = await resolveOrganizationId(
-      activeOrgId,
-      c.req.raw,
-    );
+    const organizationId = await resolveOrganizationId(activeOrgId, c.req.raw);
 
     const isOrgMember = await isMemberOf(user!.id, organizationId);
     if (!isOrgMember) {
@@ -120,10 +114,7 @@ router.patch(
   async (c) => {
     const { user, activeOrgId } = c.var;
     const body = c.req.valid("json");
-    const organizationId = await resolveOrganizationId(
-      activeOrgId,
-      c.req.raw,
-    );
+    const organizationId = await resolveOrganizationId(activeOrgId, c.req.raw);
 
     const isOrgMember = await isMemberOf(user!.id, organizationId);
     if (!isOrgMember) {
@@ -175,10 +166,7 @@ router.delete(
   async (c) => {
     const { user, activeOrgId } = c.var;
     const query = c.req.valid("query");
-    const organizationId = await resolveOrganizationId(
-      activeOrgId,
-      c.req.raw,
-    );
+    const organizationId = await resolveOrganizationId(activeOrgId, c.req.raw);
 
     const isOrgMember = await isMemberOf(user!.id, organizationId);
     if (!isOrgMember) {

@@ -1,6 +1,6 @@
-import { Guard, Result, type UseCase, type UnitOfWork } from "@circulo-ai/core";
 import { Vote } from "@/domain/vote/vote";
 import { DrizzleVoteRepository } from "@/infrastructure/drizzle/vote-repository";
+import { Guard, Result, type UnitOfWork, type UseCase } from "@circulo-ai/core";
 
 export type SetVoteInput = {
   chatId: string;

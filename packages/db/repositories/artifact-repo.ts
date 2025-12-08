@@ -121,8 +121,8 @@ export const artifactRepo = {
         .where(
           and(
             eq(suggestion.documentId, id),
-            gt(suggestion.createdAt, timestamp)
-          )
+            gt(suggestion.createdAt, timestamp),
+          ),
         );
 
       return await db
@@ -152,8 +152,8 @@ export const artifactRepo = {
       conditions.push(
         or(
           ilike(artifact.title, `%${filters.search}%`),
-          ilike(artifact.content, `%${filters.search}%`)
-        )!
+          ilike(artifact.content, `%${filters.search}%`),
+        )!,
       );
     }
 
@@ -167,7 +167,7 @@ export const artifactRepo = {
 
   async findForChat(
     chatId: string,
-    opts?: { kind?: ArtifactKind; limit?: number }
+    opts?: { kind?: ArtifactKind; limit?: number },
   ) {
     const conditions = [eq(artifact.chatId, chatId)];
     if (opts?.kind) {
@@ -183,7 +183,7 @@ export const artifactRepo = {
 
   async findForUser(
     userId: string,
-    opts?: { kind?: ArtifactKind; limit?: number }
+    opts?: { kind?: ArtifactKind; limit?: number },
   ) {
     const conditions = [eq(artifact.userId, userId)];
     if (opts?.kind) {

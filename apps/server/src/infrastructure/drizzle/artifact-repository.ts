@@ -1,8 +1,8 @@
+import type { DbInstance } from "@/db";
+import { artifact as artifactTable } from "@/db/schema/chat";
+import { Artifact } from "@/domain/artifact/artifact";
 import { Identifier, type Repository } from "@circulo-ai/core";
 import { eq } from "drizzle-orm";
-import { artifact as artifactTable } from "@/db/schema/chat";
-import type { DbInstance } from "@/db";
-import { Artifact } from "@/domain/artifact/artifact";
 
 function toDomain(row: typeof artifactTable.$inferSelect): Artifact {
   return new Artifact({
@@ -65,6 +65,8 @@ export class DrizzleArtifactRepository implements Repository<Artifact> {
     const result = await this.db
       .delete(artifactTable)
       .where(eq(artifactTable.id, id.toString()));
-    return "rowCount" in result ? (result as { rowCount: number }).rowCount > 0 : true;
+    return "rowCount" in result
+      ? (result as { rowCount: number }).rowCount > 0
+      : true;
   }
 }

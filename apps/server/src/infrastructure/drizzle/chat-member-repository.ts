@@ -1,8 +1,8 @@
+import type { DbInstance } from "@/db";
+import { chatMember as chatMemberTable } from "@/db/schema/chat";
+import { ChatMember } from "@/domain/chat/chat-member";
 import { Identifier, type Repository } from "@circulo-ai/core";
 import { eq } from "drizzle-orm";
-import { chatMember as chatMemberTable } from "@/db/schema/chat";
-import type { DbInstance } from "@/db";
-import { ChatMember } from "@/domain/chat/chat-member";
 
 function toDomain(row: typeof chatMemberTable.$inferSelect): ChatMember {
   return new ChatMember({
@@ -83,6 +83,8 @@ export class DrizzleChatMemberRepository implements Repository<ChatMember> {
     const result = await this.db
       .delete(chatMemberTable)
       .where(eq(chatMemberTable.id, id.toString()));
-    return "rowCount" in result ? (result as { rowCount: number }).rowCount > 0 : true;
+    return "rowCount" in result
+      ? (result as { rowCount: number }).rowCount > 0
+      : true;
   }
 }

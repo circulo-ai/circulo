@@ -46,3 +46,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 
 // TODO button active style
 // TODO prettier: https://chatgpt.com/c/69338b4a-b524-8328-879b-13bb0bda08a8
+// TODO stylelint
+// TODO global eslint, stylelint...
+// TODO eslint-config-prettier
+// TODO try to move the prettier dependencies to the packages/prettier-config
+// TODO rename the prettier-config package to prettier (or configs)

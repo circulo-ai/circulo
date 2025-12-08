@@ -1,14 +1,14 @@
 import { getSubscriptionForOrg } from "@/lib/billing/autumn";
 import { createLogger } from "@/lib/logs/console/logger";
 import type { CirculoRedis } from "@circulo-ai/redis";
-import { DEFAULT_PLAN, RATE_LIMITS, RATE_LIMIT_WINDOW_MS } from "./types";
+import type { RateLimitStore } from "./store";
 import type {
   RateLimitBucket,
   RateLimitDecision,
   RateLimitPlan,
   RateLimitRequest,
 } from "./types";
-import type { RateLimitStore } from "./store";
+import { DEFAULT_PLAN, RATE_LIMITS, RATE_LIMIT_WINDOW_MS } from "./types";
 
 const logger = createLogger("RateLimiter");
 const PLAN_CACHE_TTL_SECONDS = 300;
@@ -26,7 +26,10 @@ export class RateLimiter {
     private readonly redis: CirculoRedis | null,
   ) {}
 
-  private getLimitForPlan(plan: RateLimitPlan, bucket: RateLimitBucket): number {
+  private getLimitForPlan(
+    plan: RateLimitPlan,
+    bucket: RateLimitBucket,
+  ): number {
     const config = RATE_LIMITS[plan] ?? RATE_LIMITS[DEFAULT_PLAN];
     return config[bucket];
   }

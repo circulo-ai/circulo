@@ -1,8 +1,8 @@
-import { Identifier, type Repository } from "@circulo-ai/core";
-import { eq } from "drizzle-orm";
+import type { DbInstance } from "@/db";
 import { user as userTable } from "@/db/schema/auth";
 import { User } from "@/domain/user/user";
-import type { DbInstance } from "@/db";
+import { Identifier, type Repository } from "@circulo-ai/core";
+import { eq } from "drizzle-orm";
 
 function toDomain(row: typeof userTable.$inferSelect): User {
   return new User({
@@ -52,7 +52,11 @@ export class DrizzleUserRepository implements Repository<User> {
   }
 
   async deleteById(id: Identifier): Promise<boolean> {
-    const result = await this.db.delete(userTable).where(eq(userTable.id, id.toString()));
-    return "rowCount" in result ? (result as { rowCount: number }).rowCount > 0 : true;
+    const result = await this.db
+      .delete(userTable)
+      .where(eq(userTable.id, id.toString()));
+    return "rowCount" in result
+      ? (result as { rowCount: number }).rowCount > 0
+      : true;
   }
 }

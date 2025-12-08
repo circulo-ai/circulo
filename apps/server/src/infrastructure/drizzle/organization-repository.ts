@@ -1,8 +1,8 @@
+import type { DbInstance } from "@/db";
+import { organization as organizationTable } from "@/db/schema/auth";
+import { Organization } from "@/domain/organization/organization";
 import { Identifier, type Repository } from "@circulo-ai/core";
 import { eq } from "drizzle-orm";
-import { organization as organizationTable } from "@/db/schema/auth";
-import type { DbInstance } from "@/db";
-import { Organization } from "@/domain/organization/organization";
 
 function toDomain(row: typeof organizationTable.$inferSelect): Organization {
   return new Organization({
@@ -52,6 +52,8 @@ export class DrizzleOrganizationRepository implements Repository<Organization> {
     const result = await this.db
       .delete(organizationTable)
       .where(eq(organizationTable.id, id.toString()));
-    return "rowCount" in result ? (result as { rowCount: number }).rowCount > 0 : true;
+    return "rowCount" in result
+      ? (result as { rowCount: number }).rowCount > 0
+      : true;
   }
 }

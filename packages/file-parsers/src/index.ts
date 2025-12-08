@@ -3,9 +3,7 @@ import path from "path";
 import { createLogger, type Logger } from "./logger";
 import type { FileParseResult, FileParser, SupportedFileType } from "./types";
 
-let parserInstancesPromise:
-  | Promise<Record<string, FileParser>>
-  | null = null;
+let parserInstancesPromise: Promise<Record<string, FileParser>> | null = null;
 
 type ParserLoaders = {
   [K in SupportedFileType]?: () => Promise<FileParser>;
@@ -175,9 +173,7 @@ export function createFileParser(config: FileParserConfig = {}) {
     );
   }
 
-  async function isSupportedFileType(
-    extension: string,
-  ): Promise<boolean> {
+  async function isSupportedFileType(extension: string): Promise<boolean> {
     try {
       const parsers = await getParserInstances(logger);
       return Object.keys(parsers).includes(normalizeExtension(extension));
@@ -196,15 +192,15 @@ export const parseFile = defaultParser.parseFile;
 export const parseBuffer = defaultParser.parseBuffer;
 export const isSupportedFileType = defaultParser.isSupportedFileType;
 
-export type { FileParseResult, FileParser, SupportedFileType } from "./types";
-export { PdfParser } from "./pdf-parser";
 export { CsvParser } from "./csv-parser";
 export { DocParser } from "./doc-parser";
 export { DocxParser } from "./docx-parser";
-export { MdParser } from "./md-parser";
-export { TxtParser } from "./txt-parser";
 export { HtmlParser } from "./html-parser";
-export { XlsxParser } from "./xlsx-parser";
-export { PptxParser } from "./pptx-parser";
 export { parseJSON, parseJSONBuffer } from "./json-parser";
+export { MdParser } from "./md-parser";
+export { PdfParser } from "./pdf-parser";
+export { PptxParser } from "./pptx-parser";
+export { TxtParser } from "./txt-parser";
+export type { FileParseResult, FileParser, SupportedFileType } from "./types";
+export { XlsxParser } from "./xlsx-parser";
 export { parseYAML, parseYAMLBuffer } from "./yaml-parser";

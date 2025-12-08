@@ -78,9 +78,11 @@ export async function beginTransaction(): Promise<{
   tx: PostgresTransaction;
   db: DbInstance;
 }> {
-  const rawTx = await (getDbClient() as unknown as {
-    begin(): Promise<unknown>;
-  }).begin();
+  const rawTx = await (
+    getDbClient() as unknown as {
+      begin(): Promise<unknown>;
+    }
+  ).begin();
   const tx = rawTx as PostgresTransaction;
   const db = drizzle(tx, { schema }) as DbInstance;
   return { tx, db };

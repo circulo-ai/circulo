@@ -1,8 +1,8 @@
 import { readFile } from "fs/promises";
 import mammoth from "mammoth";
+import { createLogger, type Logger } from "./logger";
 import type { FileParseResult, FileParser } from "./types";
 import { sanitizeTextForUTF8 } from "./utils";
-import { createLogger, type Logger } from "./logger";
 
 export class DocxParser implements FileParser {
   constructor(private readonly logger: Logger = createLogger("DocxParser")) {}

@@ -1,8 +1,8 @@
+import type { DbInstance } from "@/db";
+import { chatAgent as chatAgentTable } from "@/db/schema/chat";
+import { ChatAgentLink } from "@/domain/chat/chat-agent-link";
 import { Identifier, type Repository } from "@circulo-ai/core";
 import { eq } from "drizzle-orm";
-import { chatAgent as chatAgentTable } from "@/db/schema/chat";
-import type { DbInstance } from "@/db";
-import { ChatAgentLink } from "@/domain/chat/chat-agent-link";
 
 function toDomain(row: typeof chatAgentTable.$inferSelect): ChatAgentLink {
   return new ChatAgentLink({
@@ -61,6 +61,8 @@ export class DrizzleChatAgentLinkRepository implements Repository<ChatAgentLink>
     const result = await this.db
       .delete(chatAgentTable)
       .where(eq(chatAgentTable.id, id.toString()));
-    return "rowCount" in result ? (result as { rowCount: number }).rowCount > 0 : true;
+    return "rowCount" in result
+      ? (result as { rowCount: number }).rowCount > 0
+      : true;
   }
 }

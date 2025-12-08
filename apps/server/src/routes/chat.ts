@@ -1,21 +1,19 @@
-import { DI_TOKENS } from "@/di/container";
-import { getActiveOrganizationId } from "@/lib/auth";
 import { titlePrompt } from "@/lib/ai/prompts";
 import { myProvider } from "@/lib/ai/providers";
-import { getTextFromMessage, getTextFromMessages } from "@/lib/utils";
-import { hasPermission, isMemberOf } from "@/lib/permissions";
+import { getActiveOrganizationId } from "@/lib/auth";
 import { createRouter } from "@/lib/create-app";
+import { hasPermission, isMemberOf } from "@/lib/permissions";
 import {
   BadRequestError,
   ForbiddenError,
-  NotFoundError,
-  RateLimitError,
   HttpError,
+  RateLimitError,
 } from "@/lib/server/errors";
-import { requireAuth } from "@/middleware/auth";
 import { type ChatMessage } from "@/lib/types";
-import { generateText, safeValidateUIMessages } from "ai";
+import { getTextFromMessage, getTextFromMessages } from "@/lib/utils";
+import { requireAuth } from "@/middleware/auth";
 import { zValidator } from "@hono/zod-validator";
+import { generateText, safeValidateUIMessages } from "ai";
 import { z } from "zod";
 
 const deleteQuerySchema = z.object({
@@ -55,7 +53,11 @@ router.post(
   zValidator("json", createChatSchema),
   async (c) => {
     try {
-      const { id, message, visibility: selectedVisibilityType } = c.req.valid("json");
+      const {
+        id,
+        message,
+        visibility: selectedVisibilityType,
+      } = c.req.valid("json");
       const { user, session } = c.var;
       const di = c.di;
       const activeOrgId = c.get("activeOrgId");
@@ -77,7 +79,9 @@ router.post(
         session as any,
       );
       if (!canCreate) {
-        throw new ForbiddenError("You don't have permission to create chats in this organization");
+        throw new ForbiddenError(
+          "You don't have permission to create chats in this organization",
+        );
       }
 
       const title = await generateTitleFromUserMessages({ messages });
@@ -93,7 +97,9 @@ router.post(
         visibility: selectedVisibilityType,
       });
       if (chatResult.isFailure) {
-        throw new BadRequestError(chatResult.getError() ?? "Unable to create chat");
+        throw new BadRequestError(
+          chatResult.getError() ?? "Unable to create chat",
+        );
       }
 
       for (const msg of messages) {
@@ -104,7 +110,9 @@ router.post(
           content: getTextFromMessage(msg),
         });
         if (messageResult.isFailure) {
-          throw new BadRequestError(messageResult.getError() ?? "Unable to post message");
+          throw new BadRequestError(
+            messageResult.getError() ?? "Unable to post message",
+          );
         }
       }
 
@@ -162,7 +170,9 @@ router.delete(
 
     const result = await di.DeleteChatUseCase.execute({ id });
     if (result.isFailure) {
-      return new BadRequestError(result.getError() ?? "Unable to delete chat").toResponse();
+      return new BadRequestError(
+        result.getError() ?? "Unable to delete chat",
+      ).toResponse();
     }
     return c.json({ success: true }, 200);
   },

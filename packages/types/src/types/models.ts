@@ -12,7 +12,7 @@ export const supportingLanguageModels = {
 export type SupportedModels = keyof typeof supportingLanguageModels;
 
 export const LLM_MODELS = Object.keys(
-  supportingLanguageModels
+  supportingLanguageModels,
 ) as SupportedModels[];
 
 export const defaultModel: SupportedModels = "gemini-2.5-flash";

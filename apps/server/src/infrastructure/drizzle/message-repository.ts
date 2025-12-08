@@ -1,8 +1,8 @@
+import type { DbInstance } from "@/db";
+import { message as messageTable } from "@/db/schema/chat";
+import { Message } from "@/domain/message/message";
 import { Identifier, type Repository } from "@circulo-ai/core";
 import { eq } from "drizzle-orm";
-import { message as messageTable } from "@/db/schema/chat";
-import type { DbInstance } from "@/db";
-import { Message } from "@/domain/message/message";
 
 function toDomain(row: typeof messageTable.$inferSelect): Message {
   return new Message({
@@ -68,6 +68,8 @@ export class DrizzleMessageRepository implements Repository<Message> {
       .update(messageTable)
       .set({ isDeleted: true, deletedAt: new Date() })
       .where(eq(messageTable.id, id.toString()));
-    return "rowCount" in result ? (result as { rowCount: number }).rowCount > 0 : true;
+    return "rowCount" in result
+      ? (result as { rowCount: number }).rowCount > 0
+      : true;
   }
 }

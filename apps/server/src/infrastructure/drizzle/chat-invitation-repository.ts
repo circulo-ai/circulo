@@ -1,10 +1,12 @@
-import { Identifier, type Repository } from "@circulo-ai/core";
-import { eq, and } from "drizzle-orm";
-import { chatInvitation as chatInvitationTable } from "@/db/schema/chat";
 import type { DbInstance } from "@/db";
+import { chatInvitation as chatInvitationTable } from "@/db/schema/chat";
 import { ChatInvitation } from "@/domain/chat/chat-invitation";
+import { Identifier, type Repository } from "@circulo-ai/core";
+import { and, eq } from "drizzle-orm";
 
-function toDomain(row: typeof chatInvitationTable.$inferSelect): ChatInvitation {
+function toDomain(
+  row: typeof chatInvitationTable.$inferSelect,
+): ChatInvitation {
   return new ChatInvitation({
     id: Identifier.from(row.id),
     chatId: Identifier.from(row.chatId),
@@ -21,7 +23,9 @@ function toDomain(row: typeof chatInvitationTable.$inferSelect): ChatInvitation 
   });
 }
 
-function toRow(entity: ChatInvitation): typeof chatInvitationTable.$inferInsert {
+function toRow(
+  entity: ChatInvitation,
+): typeof chatInvitationTable.$inferInsert {
   const snap = entity.snapshot;
   return {
     id: snap.id.toString(),
@@ -71,7 +75,9 @@ export class DrizzleChatInvitationRepository implements Repository<ChatInvitatio
     const result = await this.db
       .delete(chatInvitationTable)
       .where(eq(chatInvitationTable.id, id.toString()));
-    return "rowCount" in result ? (result as { rowCount: number }).rowCount > 0 : true;
+    return "rowCount" in result
+      ? (result as { rowCount: number }).rowCount > 0
+      : true;
   }
 
   async findByToken(token: string): Promise<ChatInvitation | null> {
@@ -81,7 +87,10 @@ export class DrizzleChatInvitationRepository implements Repository<ChatInvitatio
     return row ? toDomain(row) : null;
   }
 
-  async findPendingByEmail(email: string, chatId: Identifier): Promise<ChatInvitation | null> {
+  async findPendingByEmail(
+    email: string,
+    chatId: Identifier,
+  ): Promise<ChatInvitation | null> {
     const row = await this.db.query.chatInvitation.findFirst({
       where: and(
         eq(chatInvitationTable.email, email),

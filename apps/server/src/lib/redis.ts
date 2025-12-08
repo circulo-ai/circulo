@@ -1,11 +1,15 @@
-import { createRedis, type CirculoRedis } from "@circulo-ai/redis";
 import { createLogger } from "@/lib/logs/console/logger";
+import { createRedis, type CirculoRedis } from "@circulo-ai/redis";
 
 const logger = createLogger("Redis");
 
 let cachedClient: CirculoRedis | null | undefined;
 
-function getLogger(): (level: "info" | "warn" | "error", message: string, meta?: Record<string, unknown>) => void {
+function getLogger(): (
+  level: "info" | "warn" | "error",
+  message: string,
+  meta?: Record<string, unknown>,
+) => void {
   return (level, message, meta) => {
     const log = (logger as any)[level];
 

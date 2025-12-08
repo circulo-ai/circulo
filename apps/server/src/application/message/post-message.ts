@@ -1,14 +1,14 @@
+import { Message } from "@/domain/message/message";
+import type { DrizzleChatRepository } from "@/infrastructure/drizzle/chat-repository";
+import type { DrizzleMessageRepository } from "@/infrastructure/drizzle/message-repository";
 import {
   Guard,
   Identifier,
   NotFoundError,
   Result,
-  type UseCase,
   type UnitOfWork,
+  type UseCase,
 } from "@circulo-ai/core";
-import { Message } from "@/domain/message/message";
-import type { DrizzleChatRepository } from "@/infrastructure/drizzle/chat-repository";
-import type { DrizzleMessageRepository } from "@/infrastructure/drizzle/message-repository";
 
 export type PostMessageInput = {
   id: string;
@@ -19,9 +19,10 @@ export type PostMessageInput = {
 
 export type PostMessageOutput = Result<{ messageId: string }>;
 
-export class PostMessage
-  implements UseCase<PostMessageInput, PostMessageOutput>
-{
+export class PostMessage implements UseCase<
+  PostMessageInput,
+  PostMessageOutput
+> {
   constructor(
     private readonly chats: DrizzleChatRepository,
     private readonly messages: DrizzleMessageRepository,

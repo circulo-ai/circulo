@@ -1,7 +1,9 @@
 import { ComponentProps } from "react";
 
-interface PhoneNumberProps
-  extends Omit<ComponentProps<"a">, "href" | "children"> {
+interface PhoneNumberProps extends Omit<
+  ComponentProps<"a">,
+  "href" | "children"
+> {
   number: string;
 }
 

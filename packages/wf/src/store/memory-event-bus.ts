@@ -46,7 +46,7 @@ export class InMemoryEventBus<TOutput> implements EventBus<TOutput> {
             } catch (err) {
               console.error("Event callback error:", err);
             }
-          })
+          }),
         );
       }
     } finally {

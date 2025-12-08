@@ -1,4 +1,4 @@
-import type { WorkflowEvent, EventStore } from "../models";
+import type { EventStore, WorkflowEvent } from "../models";
 
 export class InMemoryEventStore<TOutput> implements EventStore<TOutput> {
   private events: WorkflowEvent<TOutput>[] = [];
@@ -20,7 +20,7 @@ export class InMemoryEventStore<TOutput> implements EventStore<TOutput> {
 
   async list(
     workflowId: string,
-    fromTimestamp?: number
+    fromTimestamp?: number,
   ): Promise<WorkflowEvent<TOutput>[]> {
     return this.events
       .filter((e) => {

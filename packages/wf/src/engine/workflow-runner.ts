@@ -1,22 +1,22 @@
 import type {
-  Workflow,
-  Step,
-  StepResult,
-  WorkflowContext,
-  WorkflowEvent,
-  WorkflowEventType,
-  WorkflowEventPayload,
-  WorkflowError,
   ErrorType,
-  Logger,
-  MetricsCollector,
-  Lock,
-  WorkflowStore,
   EventBus,
   EventStore,
+  Lock,
+  Logger,
+  MetricsCollector,
+  Step,
+  StepResult,
+  Workflow,
+  WorkflowContext,
+  WorkflowError,
+  WorkflowEvent,
+  WorkflowEventPayload,
+  WorkflowEventType,
+  WorkflowStore,
 } from "../models";
-import { generateId } from "../utils/id";
 import { exponentialBackoff } from "../utils/backoff";
+import { generateId } from "../utils/id";
 
 interface RunnerConfig {
   defaultTimeout?: number;
@@ -40,12 +40,12 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
     private eventBus: EventBus<TOutput>,
     private logger: Logger,
     private metrics: MetricsCollector,
-    private config: RunnerConfig = {}
+    private config: RunnerConfig = {},
   ) {}
 
   async run(
     workflowId: string,
-    transform?: (output: unknown) => TOutput | Promise<TOutput>
+    transform?: (output: unknown) => TOutput | Promise<TOutput>,
   ): Promise<void> {
     const lock = await this.acquireWorkflowLock(workflowId);
     if (!lock) {
@@ -151,7 +151,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
   private async executeWorkflow(
     workflow: Workflow<TContext, TInput, TOutput>,
     signal: AbortSignal,
-    transform?: (output: unknown) => TOutput | Promise<TOutput>
+    transform?: (output: unknown) => TOutput | Promise<TOutput>,
   ): Promise<void> {
     const startTime = Date.now();
 
@@ -229,7 +229,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
           input,
           ctx,
           signal,
-          stepLogger
+          stepLogger,
         );
 
         if (result.type === "error") {
@@ -287,7 +287,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
                 compensationErr as Error,
                 {
                   stepId: step.id,
-                }
+                },
               );
             }
           }
@@ -339,7 +339,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
     workflow: Workflow<TContext, TInput, TOutput>,
     step: Step<TContext, unknown, unknown>,
     _error: WorkflowError,
-    signal: AbortSignal
+    signal: AbortSignal,
   ): Promise<void> {
     workflow.retryCount++;
     const backoff = step.backoff ?? exponentialBackoff;
@@ -365,7 +365,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
 
   private async failWorkflow(
     workflow: Workflow<TContext, TInput, TOutput>,
-    error: WorkflowError
+    error: WorkflowError,
   ): Promise<void> {
     workflow.state = "failed";
     workflow.error = error;
@@ -390,7 +390,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
     input: TStepInput,
     ctx: WorkflowContext<TContext>,
     signal: AbortSignal,
-    logger: Logger
+    logger: Logger,
   ): Promise<StepResult<TStepOutput>> {
     const timeout = step.timeout ?? this.config.defaultTimeout;
 
@@ -404,7 +404,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
           step.id,
           timeout,
           signal,
-          logger
+          logger,
         );
       } else {
         return await this.executePromiseStep(result, timeout, signal);
@@ -412,7 +412,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
     } catch (err) {
       const error = this.classifyError(
         err as Error,
-        step as Step<TContext, unknown, unknown>
+        step as Step<TContext, unknown, unknown>,
       );
       return { type: "error", error };
     }
@@ -421,7 +421,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
   private async executePromiseStep<TStepOutput>(
     promise: Promise<StepResult<TStepOutput>>,
     timeout: number | undefined,
-    signal: AbortSignal
+    signal: AbortSignal,
   ): Promise<StepResult<TStepOutput>> {
     if (timeout) {
       const timeoutPromise = this.sleep(timeout, signal).then(() => {
@@ -448,7 +448,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
     stepId: string,
     timeout: number | undefined,
     signal: AbortSignal,
-    logger: Logger
+    logger: Logger,
   ): Promise<StepResult<TStepOutput>> {
     const startTime = Date.now();
 
@@ -489,7 +489,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
 
   private createContext(
     workflow: Workflow<TContext, TInput, TOutput>,
-    logger: Logger
+    logger: Logger,
   ): WorkflowContext<TContext> {
     return {
       workflow: {
@@ -519,7 +519,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
 
   private classifyError(
     err: Error,
-    step: Step<TContext, unknown, unknown>
+    step: Step<TContext, unknown, unknown>,
   ): WorkflowError {
     const errorType = step.errorClassifier
       ? step.errorClassifier(err)
@@ -548,7 +548,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
   }
 
   private isWorkflowTimedOut(
-    workflow: Workflow<TContext, TInput, TOutput>
+    workflow: Workflow<TContext, TInput, TOutput>,
   ): boolean {
     if (!workflow.maxExecutionTime || !workflow.executionStartedAt) {
       return false;
@@ -557,7 +557,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
   }
 
   private applyContextUpdates(
-    workflow: Workflow<TContext, TInput, TOutput>
+    workflow: Workflow<TContext, TInput, TOutput>,
   ): void {
     const updates = this.contextUpdates.get(workflow.id);
     if (updates) {
@@ -567,7 +567,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
   }
 
   private applyStepAppends(
-    workflow: Workflow<TContext, TInput, TOutput>
+    workflow: Workflow<TContext, TInput, TOutput>,
   ): void {
     const appends = this.stepAppends.get(workflow.id);
     if (appends && appends.length > 0) {
@@ -578,19 +578,19 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
 
   private async updateWorkflowState(
     workflow: Workflow<TContext, TInput, TOutput>,
-    state: Workflow<TContext, TInput, TOutput>["state"]
+    state: Workflow<TContext, TInput, TOutput>["state"],
   ): Promise<boolean> {
     workflow.state = state;
     return this.updateWorkflowWithVersion(workflow);
   }
 
   private async updateWorkflowWithVersion(
-    workflow: Workflow<TContext, TInput, TOutput>
+    workflow: Workflow<TContext, TInput, TOutput>,
   ): Promise<boolean> {
     const currentVersion = workflow.version;
     const success = await this.workflowStore.updateWorkflow(
       workflow,
-      currentVersion
+      currentVersion,
     );
 
     if (!success) {
@@ -606,7 +606,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
   private async emitEvent<P extends WorkflowEventPayload<TOutput>>(
     workflowId: string,
     eventType: WorkflowEventType,
-    payload: P
+    payload: P,
   ): Promise<void> {
     const event: WorkflowEvent<TOutput> = {
       id: generateId("evt"),
@@ -643,7 +643,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
 
   private async releaseWorkflowLock(
     workflowId: string,
-    lock: Lock
+    lock: Lock,
   ): Promise<void> {
     this.stopLockRenewal(workflowId);
     await this.workflowStore.releaseLock(lock);
@@ -677,7 +677,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
   }
 
   private isAsyncGenerator<T>(
-    value: Promise<T> | AsyncGenerator<T, T, unknown>
+    value: Promise<T> | AsyncGenerator<T, T, unknown>,
   ): value is AsyncGenerator<T, T, unknown> {
     return (
       typeof value === "object" &&

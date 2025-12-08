@@ -1,15 +1,15 @@
+import { Chat } from "@/domain/chat/chat";
+import type { DrizzleChatRepository } from "@/infrastructure/drizzle/chat-repository";
+import type { DrizzleOrganizationMemberRepository } from "@/infrastructure/drizzle/organization-member-repository";
 import {
   Guard,
   Identifier,
   NotFoundError,
   Result,
   type DomainEventPublisher,
-  type UseCase,
   type UnitOfWork,
+  type UseCase,
 } from "@circulo-ai/core";
-import { Chat } from "@/domain/chat/chat";
-import type { DrizzleChatRepository } from "@/infrastructure/drizzle/chat-repository";
-import type { DrizzleOrganizationMemberRepository } from "@/infrastructure/drizzle/organization-member-repository";
 
 export type CreateChatInput = {
   id: string;
@@ -21,9 +21,7 @@ export type CreateChatInput = {
 
 export type CreateChatOutput = Result<{ chatId: string }>;
 
-export class CreateChat
-  implements UseCase<CreateChatInput, CreateChatOutput>
-{
+export class CreateChat implements UseCase<CreateChatInput, CreateChatOutput> {
   constructor(
     private readonly chats: DrizzleChatRepository,
     private readonly members: DrizzleOrganizationMemberRepository,
@@ -35,7 +33,10 @@ export class CreateChat
     const idCheck = Guard.isUuid(input.id, "id");
     if (!idCheck.succeeded) return Result.fail(idCheck.message);
 
-    const orgCheck = Guard.againstEmptyString(input.organizationId, "organizationId");
+    const orgCheck = Guard.againstEmptyString(
+      input.organizationId,
+      "organizationId",
+    );
     if (!orgCheck.succeeded) return Result.fail(orgCheck.message);
 
     const titleCheck = Guard.againstEmptyString(input.title, "title");
@@ -60,7 +61,9 @@ export class CreateChat
       });
 
       await this.chats.save(chat);
-      await Promise.all(chat.pullDomainEvents().map((evt) => this.publisher.publish(evt)));
+      await Promise.all(
+        chat.pullDomainEvents().map((evt) => this.publisher.publish(evt)),
+      );
 
       return Result.ok({ chatId: chat.aggregateId.toString() });
     });

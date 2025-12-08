@@ -1,14 +1,14 @@
 import type {
+  HealthCheck,
+  Logger,
   Workflow,
-  WorkflowEvent,
   WorkflowDefinition,
   WorkflowEngineConfig,
-  HealthCheck,
+  WorkflowEvent,
   WorkflowFilter,
-  Logger,
 } from "../models";
-import { WorkflowRunner } from "./workflow-runner";
 import { generateId } from "../utils/id";
+import { WorkflowRunner } from "./workflow-runner";
 
 export class WorkflowEngine<TContext, TInput, TOutput> {
   private runner: WorkflowRunner<TContext, TInput, TOutput>;
@@ -34,7 +34,7 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
         defaultRetries: config.defaultRetries,
         lockTTL: config.lockTTL,
         lockRenewInterval: config.lockRenewInterval,
-      }
+      },
     );
 
     if (config.enableHealthCheck) {
@@ -44,12 +44,12 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
 
   async createWorkflow(
     definition: WorkflowDefinition<TContext, TInput, TOutput>,
-    input: TInput
+    input: TInput,
   ): Promise<string> {
     // Check idempotency
     if (definition.idempotencyKey) {
       const existingWorkflowId = this.idempotencyCache.get(
-        definition.idempotencyKey
+        definition.idempotencyKey,
       );
       if (existingWorkflowId) {
         this.logger.info("Returning existing workflow for idempotency key", {
@@ -73,7 +73,7 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
           {
             idempotencyKey: definition.idempotencyKey,
             workflowId,
-          }
+          },
         );
         return workflowId;
       }
@@ -140,7 +140,7 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
 
   async run(
     workflowId: string,
-    transform?: (output: unknown) => TOutput | Promise<TOutput>
+    transform?: (output: unknown) => TOutput | Promise<TOutput>,
   ): Promise<void> {
     if (this.shutdownRequested) {
       throw new Error("Engine is shutting down");
@@ -165,12 +165,12 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
 
   private async executeWorkflow(
     workflowId: string,
-    transform?: (output: unknown) => TOutput | Promise<TOutput>
+    transform?: (output: unknown) => TOutput | Promise<TOutput>,
   ): Promise<void> {
     this.runningWorkflows.add(workflowId);
     this.config.metrics.recordGauge(
       "workflow.active",
-      this.runningWorkflows.size
+      this.runningWorkflows.size,
     );
 
     try {
@@ -184,7 +184,7 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
       this.runningWorkflows.delete(workflowId);
       this.config.metrics.recordGauge(
         "workflow.active",
-        this.runningWorkflows.size
+        this.runningWorkflows.size,
       );
 
       this.processQueue().catch((err) => {
@@ -238,20 +238,20 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
   }
 
   async getWorkflow(
-    workflowId: string
+    workflowId: string,
   ): Promise<Workflow<TContext, TInput, TOutput> | null> {
     return this.config.workflowStore.loadWorkflow(workflowId);
   }
 
   async listWorkflows(
-    filter?: WorkflowFilter
+    filter?: WorkflowFilter,
   ): Promise<Workflow<TContext, TInput, TOutput>[]> {
     return this.config.workflowStore.listWorkflows(filter);
   }
 
   async getEvents(
     workflowId: string,
-    fromTimestamp?: number
+    fromTimestamp?: number,
   ): Promise<WorkflowEvent<TOutput>[]> {
     return this.config.eventStore.list(workflowId, fromTimestamp);
   }
@@ -271,13 +271,13 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
 
   subscribe(
     workflowId: string,
-    callback: (event: WorkflowEvent<TOutput>) => void | Promise<void>
+    callback: (event: WorkflowEvent<TOutput>) => void | Promise<void>,
   ): () => void {
     return this.config.eventBus.subscribe(workflowId, callback);
   }
 
   subscribeAll(
-    callback: (event: WorkflowEvent<TOutput>) => void | Promise<void>
+    callback: (event: WorkflowEvent<TOutput>) => void | Promise<void>,
   ): () => void {
     return this.config.eventBus.subscribeAll(callback);
   }
@@ -317,15 +317,15 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
       const health = await this.getHealth();
       this.config.metrics.recordGauge(
         "workflow.queue.size",
-        this.workflowQueue.length
+        this.workflowQueue.length,
       );
       this.config.metrics.recordGauge(
         "workflow.active",
-        health.details.activeWorkflows
+        health.details.activeWorkflows,
       );
       this.config.metrics.recordGauge(
         "workflow.failed",
-        health.details.failedWorkflows
+        health.details.failedWorkflows,
       );
     }, 30000);
   }

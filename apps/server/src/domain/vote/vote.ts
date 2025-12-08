@@ -1,4 +1,4 @@
-import { ValueObject, ValidationError } from "@circulo-ai/core";
+import { ValidationError, ValueObject } from "@circulo-ai/core";
 
 export type VoteProps = {
   chatId: string;
@@ -13,9 +13,12 @@ export class Vote extends ValueObject<VoteProps> {
   }
 
   static create(props: VoteProps): Vote {
-    if (!props.chatId) throw new ValidationError("chatId is required", "chatId");
-    if (!props.messageId) throw new ValidationError("messageId is required", "messageId");
-    if (!props.userId) throw new ValidationError("userId is required", "userId");
+    if (!props.chatId)
+      throw new ValidationError("chatId is required", "chatId");
+    if (!props.messageId)
+      throw new ValidationError("messageId is required", "messageId");
+    if (!props.userId)
+      throw new ValidationError("userId is required", "userId");
     return new Vote(props);
   }
 

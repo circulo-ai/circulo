@@ -1,6 +1,8 @@
 import type { WorkflowEvent } from "./workflow";
 
-export type EventCallback<TOutput> = (evt: WorkflowEvent<TOutput>) => void | Promise<void>;
+export type EventCallback<TOutput> = (
+  evt: WorkflowEvent<TOutput>,
+) => void | Promise<void>;
 export type Unsubscribe = () => void;
 
 export interface EventBus<TOutput> {

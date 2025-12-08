@@ -1,8 +1,8 @@
+import type { DbInstance } from "@/db";
+import { agent as agentTable } from "@/db/schema/agent";
+import { Agent } from "@/domain/agent/agent";
 import { Identifier, type Repository } from "@circulo-ai/core";
 import { eq } from "drizzle-orm";
-import { agent as agentTable } from "@/db/schema/agent";
-import type { DbInstance } from "@/db";
-import { Agent } from "@/domain/agent/agent";
 
 function toDomain(row: typeof agentTable.$inferSelect): Agent {
   return new Agent({
@@ -87,6 +87,8 @@ export class DrizzleAgentRepository implements Repository<Agent> {
       .update(agentTable)
       .set({ isArchived: true, updatedAt: new Date() })
       .where(eq(agentTable.id, id.toString()));
-    return "rowCount" in result ? (result as { rowCount: number }).rowCount > 0 : true;
+    return "rowCount" in result
+      ? (result as { rowCount: number }).rowCount > 0
+      : true;
   }
 }

@@ -1,15 +1,15 @@
 import type {
+  ErrorType,
   Step,
   StepResult,
   WorkflowContext,
   WorkflowDefinition,
-  ErrorType,
 } from "../models";
 import { generateId } from "../utils/id";
 
 type StepExecutor<TContext, TInput, TOutput> = (
   input: TInput,
-  ctx: WorkflowContext<TContext>
+  ctx: WorkflowContext<TContext>,
 ) =>
   | Promise<StepResult<TOutput>>
   | AsyncGenerator<StepResult<TOutput>, StepResult<TOutput>, unknown>;
@@ -22,7 +22,7 @@ export interface StepConfig<TContext, TInput, TOutput> {
   errorClassifier?: (error: Error) => ErrorType;
   compensation?: (
     input: TInput,
-    ctx: WorkflowContext<TContext>
+    ctx: WorkflowContext<TContext>,
   ) => Promise<void>;
 }
 
@@ -49,7 +49,7 @@ export class WorkflowBuilder<TContext, TInput = unknown, TOutput = unknown> {
   }
 
   context(
-    initialContext: TContext
+    initialContext: TContext,
   ): WorkflowBuilder<TContext, TInput, TOutput> {
     this.contextValue = initialContext;
     return this;
@@ -57,7 +57,7 @@ export class WorkflowBuilder<TContext, TInput = unknown, TOutput = unknown> {
 
   step<TStepName extends string, TStepInput, TStepOutput>(
     name: TStepName,
-    config: StepConfig<TContext, TStepInput, TStepOutput>
+    config: StepConfig<TContext, TStepInput, TStepOutput>,
   ): WorkflowBuilder<TContext, TStepInput, TStepOutput> {
     const step: Step<TContext, TStepInput, TStepOutput> = {
       id: generateId("step"),
@@ -80,14 +80,14 @@ export class WorkflowBuilder<TContext, TInput = unknown, TOutput = unknown> {
   }
 
   validate(
-    validator: (input: TInput) => boolean | Promise<boolean>
+    validator: (input: TInput) => boolean | Promise<boolean>,
   ): WorkflowBuilder<TContext, TInput, TOutput> {
     this.validatorFn = validator;
     return this;
   }
 
   transform(
-    transformer: (output: unknown) => TOutput | Promise<TOutput>
+    transformer: (output: unknown) => TOutput | Promise<TOutput>,
   ): WorkflowBuilder<TContext, TInput, TOutput> {
     this.transformFn = transformer;
     return this;
@@ -99,14 +99,14 @@ export class WorkflowBuilder<TContext, TInput = unknown, TOutput = unknown> {
   }
 
   tags(
-    tags: Record<string, string>
+    tags: Record<string, string>,
   ): WorkflowBuilder<TContext, TInput, TOutput> {
     this.tagsValue = tags;
     return this;
   }
 
   metadata(
-    metadata: Record<string, unknown>
+    metadata: Record<string, unknown>,
   ): WorkflowBuilder<TContext, TInput, TOutput> {
     this.metadataValue = metadata;
     return this;

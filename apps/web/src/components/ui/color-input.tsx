@@ -2,8 +2,10 @@ import { cn } from "@/lib/utils";
 import * as React from "react";
 import { Input } from "./input";
 
-interface ColorInputProps
-  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange"> {
+interface ColorInputProps extends Omit<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  "onChange"
+> {
   value?: string;
   onChange?: (value: string) => void;
 }
