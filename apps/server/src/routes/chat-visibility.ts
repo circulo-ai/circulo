@@ -2,14 +2,10 @@ import { createRouter } from "@/lib/create-app";
 import { requireAuth } from "@/middleware/auth";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import {
-  BadRequestError,
-  ForbiddenError,
-  NotFoundError,
-} from "@/lib/server/errors";
 import { getActiveOrganizationId } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
 import { DI_TOKENS, type RequestContainer } from "@/di/container";
+import { BadRequestError, ForbiddenError, NotFoundError } from "@circulo-ai/types";
 
 const router = createRouter();
 
