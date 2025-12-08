@@ -1,8 +1,8 @@
+import type { DbInstance } from "@/db";
+import { suggestion as suggestionTable } from "@/db/schema/chat";
+import { Suggestion } from "@/domain/suggestion/suggestion";
 import { Identifier, type Repository } from "@circulo-ai/core";
 import { eq } from "drizzle-orm";
-import { suggestion as suggestionTable } from "@/db/schema/chat";
-import type { DbInstance } from "@/db";
-import { Suggestion } from "@/domain/suggestion/suggestion";
 
 function toDomain(row: typeof suggestionTable.$inferSelect): Suggestion {
   return new Suggestion({

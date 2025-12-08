@@ -1,5 +1,5 @@
-import { createRedis, type CirculoRedis } from "@circulo-ai/redis";
 import { createLogger } from "@/lib/logs/console/logger";
+import { createRedis, type CirculoRedis } from "@circulo-ai/redis";
 
 const logger = createLogger("Redis");
 

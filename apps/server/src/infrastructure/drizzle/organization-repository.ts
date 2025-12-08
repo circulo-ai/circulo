@@ -1,8 +1,8 @@
+import type { DbInstance } from "@/db";
+import { organization as organizationTable } from "@/db/schema/auth";
+import { Organization } from "@/domain/organization/organization";
 import { Identifier, type Repository } from "@circulo-ai/core";
 import { eq } from "drizzle-orm";
-import { organization as organizationTable } from "@/db/schema/auth";
-import type { DbInstance } from "@/db";
-import { Organization } from "@/domain/organization/organization";
 
 function toDomain(row: typeof organizationTable.$inferSelect): Organization {
   return new Organization({

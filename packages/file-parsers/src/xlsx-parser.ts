@@ -1,8 +1,8 @@
 import { existsSync } from "fs";
 import * as XLSX from "xlsx";
-import type { FileParseResult, FileParser } from "./types";
-import { sanitizeTextForUTF8, sanitizeTextArray } from "./utils";
 import { createLogger, type Logger } from "./logger";
+import type { FileParseResult, FileParser } from "./types";
+import { sanitizeTextArray, sanitizeTextForUTF8 } from "./utils";
 
 export class XlsxParser implements FileParser {
   constructor(private readonly logger: Logger = createLogger("XlsxParser")) {}

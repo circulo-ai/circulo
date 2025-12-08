@@ -1,12 +1,12 @@
+import { db } from "@/db";
+import { chat } from "@/db/schema/chat";
 import { getActiveOrganizationId } from "@/lib/auth";
-import { hasPermission } from "@/lib/permissions";
 import { createRouter } from "@/lib/create-app";
+import { hasPermission } from "@/lib/permissions";
 import { ForbiddenError, NotFoundError } from "@/lib/server/errors";
 import { requireAuth } from "@/middleware/auth";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { chat } from "@/db/schema/chat";
-import { db } from "@/db";
 
 const paramsSchema = z.object({
   id: z.uuid(),

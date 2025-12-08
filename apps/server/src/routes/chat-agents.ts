@@ -4,8 +4,8 @@ import {
   chatMemberRepo,
   chatRepo,
 } from "@/db/repositories";
-import { getUserRole, hasPermission, isMemberOf } from "@/lib/permissions";
 import { createRouter } from "@/lib/create-app";
+import { hasPermission, isMemberOf } from "@/lib/permissions";
 import {
   BadRequestError,
   ForbiddenError,

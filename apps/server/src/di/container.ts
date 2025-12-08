@@ -1,19 +1,24 @@
 import {
-  ServiceCollection,
-  type ServiceProvider,
-  createToken,
-} from "@circulo-ai/di";
+  AcceptChatInvitation,
+  AddChatMember,
+  ChangeChatVisibility,
+  CreateArtifact,
+  CreateChat,
+  CreateSuggestion,
+  DeleteChat,
+  InviteToChat,
+  LinkAgentToChat,
+  PostMessage,
+  RemoveChatMember,
+  RenameChat,
+  ResolveSuggestion,
+  SetVote,
+  ToggleAgentLink,
+  UpdateAgentLinkOverrides,
+  UpdateArtifact,
+  UpdateChatMemberPermissions,
+} from "@/application";
 import { getDb, type DbInstance } from "@/db";
-import { getRedisClient } from "@/lib/redis";
-import type { CirculoRedis } from "@circulo-ai/redis";
-import {
-  CompositeRateLimitStore,
-  DatabaseRateLimitStore,
-  RateLimiter,
-  RedisRateLimitStore,
-} from "@/services/rate-limit";
-import { createLogger } from "@/lib/logs/console/logger";
-import { DrizzleUnitOfWork } from "./uow";
 import {
   DrizzleAgentRepository,
   DrizzleArtifactRepository,
@@ -27,27 +32,22 @@ import {
   DrizzleSuggestionRepository,
   DrizzleUserRepository,
 } from "@/infrastructure/drizzle";
+import { createLogger } from "@/lib/logs/console/logger";
+import { getRedisClient } from "@/lib/redis";
+import {
+  CompositeRateLimitStore,
+  DatabaseRateLimitStore,
+  RateLimiter,
+  RedisRateLimitStore,
+} from "@/services/rate-limit";
 import { DomainEventPublisher } from "@circulo-ai/core";
 import {
-  AcceptChatInvitation,
-  ChangeChatVisibility,
-  CreateArtifact,
-  CreateChat,
-  CreateSuggestion,
-  DeleteChat,
-  InviteToChat,
-  LinkAgentToChat,
-  PostMessage,
-  RenameChat,
-  ResolveSuggestion,
-  SetVote,
-  ToggleAgentLink,
-  UpdateAgentLinkOverrides,
-  UpdateArtifact,
-  AddChatMember,
-  RemoveChatMember,
-  UpdateChatMemberPermissions,
-} from "@/application";
+  createToken,
+  ServiceCollection,
+  type ServiceProvider,
+} from "@circulo-ai/di";
+import type { CirculoRedis } from "@circulo-ai/redis";
+import { DrizzleUnitOfWork } from "./uow";
 
 export const DI_TOKENS = {
   Db: createToken<DbInstance>("Db"),

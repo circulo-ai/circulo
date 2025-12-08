@@ -1,14 +1,13 @@
+import { ChatMember } from "@/domain/chat/chat-member";
+import type { DrizzleChatInvitationRepository } from "@/infrastructure/drizzle/chat-invitation-repository";
+import type { DrizzleChatMemberRepository } from "@/infrastructure/drizzle/chat-member-repository";
 import {
   Identifier,
   NotFoundError,
   Result,
-  type UseCase,
   type UnitOfWork,
+  type UseCase,
 } from "@circulo-ai/core";
-import { ChatInvitation } from "@/domain/chat/chat-invitation";
-import { ChatMember } from "@/domain/chat/chat-member";
-import type { DrizzleChatInvitationRepository } from "@/infrastructure/drizzle/chat-invitation-repository";
-import type { DrizzleChatMemberRepository } from "@/infrastructure/drizzle/chat-member-repository";
 
 export type AcceptChatInvitationInput = {
   token: string;

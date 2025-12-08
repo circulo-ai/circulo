@@ -1,13 +1,13 @@
+import type { DrizzleChatRepository } from "@/infrastructure/drizzle/chat-repository";
 import {
   Guard,
   Identifier,
   NotFoundError,
   Result,
   type DomainEventPublisher,
-  type UseCase,
   type UnitOfWork,
+  type UseCase,
 } from "@circulo-ai/core";
-import type { DrizzleChatRepository } from "@/infrastructure/drizzle/chat-repository";
 
 export type ChangeChatVisibilityInput = {
   id: string;

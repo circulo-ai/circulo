@@ -1,12 +1,12 @@
+import { ChatAgentLink } from "@/domain/chat/chat-agent-link";
+import type { DrizzleChatAgentLinkRepository } from "@/infrastructure/drizzle/chat-agent-link-repository";
 import {
   Guard,
   Identifier,
   Result,
-  type UseCase,
   type UnitOfWork,
+  type UseCase,
 } from "@circulo-ai/core";
-import { ChatAgentLink } from "@/domain/chat/chat-agent-link";
-import type { DrizzleChatAgentLinkRepository } from "@/infrastructure/drizzle/chat-agent-link-repository";
 
 export type LinkAgentInput = {
   id?: string;

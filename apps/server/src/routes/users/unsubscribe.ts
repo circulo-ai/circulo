@@ -1,3 +1,4 @@
+import { createRouter } from "@/lib/create-app";
 import type { EmailType } from "@/lib/email/mailer";
 import {
   getEmailPreferences,
@@ -6,7 +7,6 @@ import {
   updateEmailPreferences,
   verifyUnsubscribeToken,
 } from "@/lib/email/unsubscribe";
-import { createRouter } from "@/lib/create-app";
 import { createLogger } from "@/lib/logs/console/logger";
 import { generateRequestId } from "@/lib/server-utils";
 import { zValidator } from "@hono/zod-validator";

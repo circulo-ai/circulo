@@ -1,4 +1,4 @@
-import type { WorkflowEvent, EventStore } from "../models";
+import type { EventStore, WorkflowEvent } from "../models";
 
 export class InMemoryEventStore<TOutput> implements EventStore<TOutput> {
   private events: WorkflowEvent<TOutput>[] = [];

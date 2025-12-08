@@ -1,7 +1,7 @@
+import type { DbInstance } from "@/db";
 import { userRateLimits } from "@/db/schema";
 import { createLogger } from "@/lib/logs/console/logger";
 import type { CirculoRedis } from "@circulo-ai/redis";
-import type { DbInstance } from "@/db";
 import { eq, sql } from "drizzle-orm";
 import type { RateLimitBucket, RateLimitState } from "./types";
 

@@ -1,7 +1,7 @@
+import type { Logger } from "./logger";
+import type { MetricsCollector } from "./metrics";
 import type { EventBus } from "./pubsub";
 import type { EventStore, WorkflowStore } from "./store";
-import type { MetricsCollector } from "./metrics";
-import type { Logger } from "./logger";
 import type { Step } from "./workflow";
 
 export interface WorkflowEngineConfig<TContext, TInput, TOutput> {

@@ -1,6 +1,6 @@
-import { getSubscriptionForOrg, orgHasPlan } from "@/lib/billing/autumn";
 import { getSession, type SessionResponse } from "@/lib/auth";
-import { type Action, type Resource, hasPermission } from "@/lib/permissions";
+import { getSubscriptionForOrg, orgHasPlan } from "@/lib/billing/autumn";
+import { hasPermission, type Action, type Resource } from "@/lib/permissions";
 
 /**
  * Check if user has both permission AND the org has the feature

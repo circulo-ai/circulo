@@ -1,7 +1,7 @@
 import { readFile } from "fs/promises";
+import { createLogger, type Logger } from "./logger";
 import type { FileParseResult, FileParser } from "./types";
 import { sanitizeTextForUTF8 } from "./utils";
-import { createLogger, type Logger } from "./logger";
 
 export class PdfParser implements FileParser {
   constructor(private readonly logger: Logger = createLogger("PdfParser")) {}

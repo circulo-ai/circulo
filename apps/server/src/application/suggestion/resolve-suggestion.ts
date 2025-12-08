@@ -1,12 +1,12 @@
+import type { DrizzleSuggestionRepository } from "@/infrastructure/drizzle/suggestion-repository";
 import {
   Guard,
   Identifier,
   NotFoundError,
   Result,
-  type UseCase,
   type UnitOfWork,
+  type UseCase,
 } from "@circulo-ai/core";
-import type { DrizzleSuggestionRepository } from "@/infrastructure/drizzle/suggestion-repository";
 
 export type ResolveSuggestionInput = { id: string; resolved: boolean };
 export type ResolveSuggestionOutput = Result<void>;

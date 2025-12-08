@@ -1,4 +1,4 @@
-import type { Logger, LogLevel, LogContext } from "../models";
+import type { LogContext, Logger, LogLevel } from "../models";
 
 export class ConsoleLogger implements Logger {
   constructor(
