@@ -13,7 +13,7 @@ export const baseAgentSchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
   instructions: z.string().min(1, "Instructions are required"),
-  avatarUrl: z.url().optional(),
+  avatarUrl: z.url().or(z.string().startsWith("/")).optional(),
   model: z.enum(LLM_MODELS),
   maxTokens: z.coerce.number().int().positive().optional(),
   temperature: z.coerce.number().int().min(0).max(100).optional(),

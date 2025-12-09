@@ -2,12 +2,12 @@ import { artifactRepo } from "@/db/repositories";
 import { chatRepo } from "@/db/repositories/chat-repo";
 import { createRouter } from "@/lib/create-app";
 import { isMemberOf } from "@/lib/permissions";
+import { requireAuth } from "@/middleware/auth";
 import {
   BadRequestError,
   ForbiddenError,
   NotFoundError,
-} from "@/lib/server/errors";
-import { requireAuth } from "@/middleware/auth";
+} from "@circulo-ai/types";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 

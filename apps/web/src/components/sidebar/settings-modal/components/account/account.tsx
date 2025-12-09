@@ -229,6 +229,9 @@ export function Account(_props: AccountProps) {
                   className="h-12 w-12 rounded-full!"
                   accept="image/png, image/jpeg, image/jpg"
                   multiple={false}
+                  useUploadTaskManagerProps={{
+                    defaultStorageContext: "profile-pictures",
+                  }}
                   disabled={uploadManager.hasActiveUploads}
                   onChange={() => {
                     // TODO implement

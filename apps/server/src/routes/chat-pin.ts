@@ -1,8 +1,8 @@
 import { db } from "@/db";
 import { chatMember } from "@/db/schema/chat";
 import { createRouter } from "@/lib/create-app";
-import { ForbiddenError } from "@/lib/server/errors";
 import { requireAuth } from "@/middleware/auth";
+import { ForbiddenError } from "@circulo-ai/types";
 import { and, eq, gte, sql } from "drizzle-orm";
 import { z } from "zod";
 

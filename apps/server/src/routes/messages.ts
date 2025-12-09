@@ -3,8 +3,8 @@ import { chat } from "@/db/schema/chat";
 import { getActiveOrganizationId } from "@/lib/auth";
 import { createRouter } from "@/lib/create-app";
 import { hasPermission } from "@/lib/permissions";
-import { ForbiddenError, NotFoundError } from "@/lib/server/errors";
 import { requireAuth } from "@/middleware/auth";
+import { ForbiddenError, NotFoundError } from "@circulo-ai/types";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 
