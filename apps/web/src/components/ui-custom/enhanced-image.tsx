@@ -32,6 +32,7 @@ export function EnhancedImage({
     (event) => {
       onError?.(event);
       setIsError(true);
+      setIsLoading(false);
     },
     [onError],
   );
@@ -45,9 +46,13 @@ export function EnhancedImage({
         {...props}
       />
 
-      <Spinner {...getGhostProps({ isGhost: !isLoading })} />
+      <Spinner
+        {...getGhostProps({ isGhost: !isLoading, className: "size-5" })}
+      />
 
-      <ImageOff {...getGhostProps({ isGhost: !isError })} />
+      <ImageOff
+        {...getGhostProps({ isGhost: !isError, className: "size-5" })}
+      />
     </>
   );
 }
@@ -55,3 +60,4 @@ export function EnhancedImage({
 // TODO a div wrapper with the same width and height
 // TODO make its states controllable so it can be used in the file input component
 // TODO use data-state
+// TODO dynamic error state

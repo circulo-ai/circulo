@@ -1,5 +1,5 @@
 import { getActiveOrganizationId } from "@/lib/auth";
-import { BadRequestError } from "@/lib/server/errors";
+import { BadRequestError } from "@circulo-ai/types";
 
 export async function resolveOrganizationId(
   activeOrganizationId?: string,

@@ -1,6 +1,5 @@
+import { LLM_MODELS, defaultModel } from "@/lib/ai/providers";
 import { z } from "zod";
-
-const LLM_MODELS = ["gemini-2.5-flash"] as const;
 
 export const getQuerySchema = z.object({
   id: z.uuid().optional(),
@@ -14,8 +13,8 @@ export const baseAgentSchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
   instructions: z.string().min(1, "Instructions are required"),
-  avatarUrl: z.url().optional(),
-  model: z.enum(LLM_MODELS).optional(),
+  avatarUrl: z.url().or(z.string().startsWith("/")).optional(),
+  model: z.enum(LLM_MODELS).default(defaultModel),
   maxTokens: z.coerce.number().int().positive().optional(),
   temperature: z.coerce.number().int().min(0).max(100).optional(),
   defaultToolIds: z.array(z.string()).optional(),

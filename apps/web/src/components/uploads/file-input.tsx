@@ -34,10 +34,15 @@ interface CustomComponentProps {
 
 interface FileInputProps extends ComponentProps<"input"> {
   customComponent?: FC<CustomComponentProps>;
+  useUploadTaskManagerProps?: Parameters<typeof useUploadTaskManager>[0];
 }
 
 export function FileInput({
   customComponent: CustomComponent = DefaultComponent,
+  useUploadTaskManagerProps: {
+    onTaskComplete,
+    ...otherUseUploadTaskManagerProps
+  } = {},
   onChange,
   value,
   className,
@@ -54,11 +59,14 @@ export function FileInput({
   const { uploadTasks, hasActiveUploads, enqueueUploads, resetAllUploadTasks } =
     useUploadTaskManager({
       onTaskComplete: (task) => {
-        if (task.url && onChange)
+        onTaskComplete?.(task);
+        const stablePath = task.path ?? task.url ?? task.downloadUrl;
+        if (stablePath && onChange)
           onChange({
-            target: { value: task.url },
+            target: { value: stablePath },
           } as ChangeEvent<HTMLInputElement>);
       },
+      ...otherUseUploadTaskManagerProps,
     });
 
   useEffect(() => {
@@ -69,6 +77,11 @@ export function FileInput({
   const lastTask: UploadTask | undefined = useMemo(
     () => uploadTasks[uploadTasks.length - 1],
     [uploadTasks],
+  );
+
+  const displayUrl = useMemo(
+    () => lastTask?.downloadUrl ?? lastTask?.url,
+    [lastTask],
   );
 
   const reset = useCallback(() => {
@@ -127,7 +140,7 @@ export function FileInput({
         {...props}
       />
       <CustomComponent
-        url={lastTask?.url}
+        url={displayUrl}
         isDragOver={isDragOver}
         disabled={disabled}
         isLoading={isLoading}

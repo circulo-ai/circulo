@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 
 export interface UseStorageAssetOptions {
   /**
-   * Full serve path (e.g., `/api/files/serve/s3/<key>?context=profile-pictures`).
+   * Full serve path (e.g., `/api/files/serve/<key>?context=profile-pictures`).
    */
   path?: string;
   /**

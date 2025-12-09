@@ -1,6 +1,6 @@
 [install]
 # Use Bun for package management
-auto = "enable"
+auto = true
 
 [test]
 preload = ["./test-setup.ts"]
