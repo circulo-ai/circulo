@@ -347,14 +347,6 @@
     "packages/types": {
       "name": "@circulo-ai/types",
       "version": "0.0.0",
-      "devDependencies": {
-        "tsdown": "^0.17.0",
-        "typescript": "^5.9.3",
-        "zod": "^4.1.13",
-      },
-      "peerDependencies": {
-        "zod": "^4.1.13",
-      },
     },
     "packages/upload": {
       "name": "@circulo-ai/upload",
