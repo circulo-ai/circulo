@@ -1,4 +1,4 @@
-import type { Chat } from "@/db";
+import type { Chat } from "@circulo-ai/db";
 
 export type ChatHistoryItem = Chat & {
   isPinned: boolean;

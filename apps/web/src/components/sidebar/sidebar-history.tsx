@@ -17,9 +17,9 @@ import {
   SidebarMenu,
   useSidebar,
 } from "@/components/ui/sidebar";
-import type { Chat } from "@/db/schema";
 import { User } from "@/providers/session-provider";
 import type { GetChatHistoryResponse } from "@/types/history";
+import type { Chat } from "@circulo-ai/db/schema";
 import { isToday, isYesterday, subMonths, subWeeks } from "date-fns";
 import { motion } from "framer-motion";
 import { useParams, useRouter } from "next/navigation";

@@ -1,5 +1,5 @@
-import type { Agent, ChatAgentWithAgent } from "@/db";
 import { myProvider } from "@/lib/ai/providers";
+import type { Agent, ChatAgentWithAgent } from "@circulo-ai/db";
 import { streamText } from "ai";
 
 export function createAgentFromDefinition(agent: Agent) {

@@ -1,5 +1,5 @@
-import { Document, Message } from "@/db/schema";
 import { ChatMessage } from "@/lib/types";
+import { Document, Message } from "@circulo-ai/db/schema";
 import { UIMessage } from "ai";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
