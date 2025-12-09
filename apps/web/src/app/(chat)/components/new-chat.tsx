@@ -290,7 +290,7 @@ function SelectableAgent({
                       className="size-full object-cover"
                     />
                   )}
-                  {!agent.avatarUrl && <Bot />}
+                  {!agent.avatarUrl && <Bot className="size-5" />}
                 </div>
 
                 <div
@@ -382,7 +382,9 @@ function AgentForm() {
     resolver: zodResolver(createBodySchema),
     defaultValues: {
       name: "",
+      description: "",
       instructions: "",
+      model: "gemini-2.5-flash",
       temperature: 70,
     },
   });
@@ -419,6 +421,11 @@ function AgentForm() {
               className="mx-auto"
               inputStyle="unstyled"
               inputComponent={FileInput}
+              inputProps={{
+                useUploadTaskManagerProps: {
+                  defaultStorageContext: "profile-pictures",
+                },
+              }}
             />
             <ControlledInput
               name={"name" satisfies Path<NewAgentRequest>}

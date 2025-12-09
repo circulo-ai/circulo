@@ -1,6 +1,7 @@
 import { getSession } from "@/lib/auth";
 import { checkHybridAuth } from "@/lib/auth/hybrid";
 import type { AppEnv } from "@/lib/create-app";
+import { createRouter } from "@/lib/create-app";
 import { storageManager } from "@/lib/storage/config";
 import { requireAuth } from "@/middleware/auth";
 import { createHonoFileRoutes } from "@circulo-ai/upload/hono";
@@ -10,8 +11,7 @@ const fileRoutes = createHonoFileRoutes<AppEnv>(
     storageManager,
     maxFileSize: 100 * 1024 * 1024,
     serveUrlBuilder: (key: string, context: string) => {
-      const storagePrefix = "s3";
-      return `/api/files/serve/${storagePrefix}/${encodeURIComponent(
+      return `/api/files/serve/${encodeURIComponent(
         key,
       )}?context=${encodeURIComponent(context)}`;
     },
@@ -53,4 +53,8 @@ const fileRoutes = createHonoFileRoutes<AppEnv>(
   },
 );
 
-export default fileRoutes;
+const router = createRouter();
+
+router.route("/files", fileRoutes);
+
+export default router;

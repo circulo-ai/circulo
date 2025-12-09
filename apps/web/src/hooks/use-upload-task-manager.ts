@@ -7,6 +7,7 @@ import useSWRMutation from "swr/mutation";
 
 import { getFetcher } from "@/lib/swr";
 
+// TODO use the shared type
 type StorageContext =
   | "general"
   | "knowledge-base"
@@ -16,6 +17,7 @@ type StorageContext =
 
 interface PresignUploadResponse {
   presignedUrl?: string;
+  downloadUrl?: string;
   fileInfo?: {
     path?: string;
     key?: string;
@@ -40,6 +42,8 @@ interface UploadManagerOptions {
 interface UploadResult {
   key?: string;
   url?: string;
+  path?: string;
+  downloadUrl?: string;
 }
 
 export type UploadState =
@@ -58,6 +62,8 @@ export interface UploadTask {
   file: File;
   id: string;
   key?: string;
+  path?: string;
+  downloadUrl?: string;
   metadata?: Record<string, string>;
   progress: number; // 0-100
   startedAt?: number;
@@ -165,12 +171,9 @@ export function useUploadTaskManager({
 
       const formData = new FormData();
       formData.append("file", task.file);
+      formData.append("context", task.context);
 
-      const response: {
-        url?: string;
-        path?: string;
-        key?: string;
-      } = await getFetcher("POST", {
+      const response: UploadResult = await getFetcher("POST", {
         headers: uploadRequestHeaders,
         raw: true,
         signal,
@@ -178,7 +181,12 @@ export function useUploadTaskManager({
         arg: formData,
       });
 
-      return { url: response.url ?? response.path, key: response.key };
+      return {
+        url: response.downloadUrl ?? response.url ?? response.path,
+        path: response.path,
+        key: response.key,
+        downloadUrl: response.downloadUrl,
+      };
     },
     { revalidate: false },
   );
@@ -213,11 +221,11 @@ export function useUploadTaskManager({
           return;
         }
 
-        if (!presignData.fileInfo?.path) {
+        if (!presignData.fileInfo?.path && !presignData.downloadUrl) {
           reject(
             new Error(
-              "Presign response missing readable file path (fileInfo.path). " +
-                "Backend must return a stable GET/public URL.",
+              "Presign response missing readable file path (fileInfo.path) or downloadUrl. " +
+                "Backend must return a usable GET URL.",
             ),
           );
           return;
@@ -252,8 +260,10 @@ export function useUploadTaskManager({
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) {
             resolve({
-              url: fileInfo.path,
-              key: fileInfo.key,
+              url: fileInfo?.path,
+              path: fileInfo?.path,
+              key: fileInfo?.key,
+              downloadUrl: presignData.downloadUrl,
             });
           } else {
             reject(
@@ -331,7 +341,9 @@ export function useUploadTaskManager({
           status: "success",
           progress: 100,
           bytesSent: state.file.size,
-          url: result.url,
+          url: result.path ?? result.url ?? result.downloadUrl,
+          path: result.path ?? result.url ?? result.downloadUrl,
+          downloadUrl: result.downloadUrl,
           key: result.key,
           completedAt: Date.now(),
         }));

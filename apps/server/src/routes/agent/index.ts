@@ -66,33 +66,42 @@ router.post(
       throw new ForbiddenError("You don't have access to this organization");
     }
 
-    const [existing] = await agentRepo.findByOrganization({
-      organizationId,
-    });
-
-    if (existing && existing.name === body.name) {
+    const existing = await agentRepo.findByName(organizationId, body.name);
+    if (existing) {
       throw new BadRequestError(
-        "An agent with the same name exists in current organization!",
+        "An agent with the same name exists in this organization",
       );
     }
 
-    const agent = await agentRepo.create({
-      id: body.id,
-      organizationId,
-      createdBy: user!.id,
-      name: body.name,
-      description: body.description,
-      instructions: body.instructions,
-      avatarUrl: body.avatarUrl,
-      model: body.model,
-      maxTokens: body.maxTokens,
-      temperature: body.temperature,
-      defaultToolIds: body.defaultToolIds ?? [],
-      defaultKnowledgeBaseIds: body.defaultKnowledgeBaseIds ?? [],
-      metadata: body.metadata ?? undefined,
-    });
+    try {
+      const agent = await agentRepo.create({
+        id: body.id,
+        organizationId,
+        createdBy: user!.id,
+        name: body.name,
+        description: body.description,
+        instructions: body.instructions,
+        avatarUrl: body.avatarUrl,
+        model: body.model,
+        maxTokens: body.maxTokens,
+        temperature: body.temperature,
+        defaultToolIds: body.defaultToolIds ?? [],
+        defaultKnowledgeBaseIds: body.defaultKnowledgeBaseIds ?? [],
+        metadata: body.metadata ?? undefined,
+      });
 
-    return c.json(agent, 201);
+      return c.json(agent, 201);
+    } catch (error) {
+      const message =
+        error instanceof Error &&
+        "code" in error &&
+        (error as any).code === "23505"
+          ? "An agent with the same name exists in this organization"
+          : error instanceof Error
+            ? error.message
+            : "Unable to create agent";
+      throw new BadRequestError(message);
+    }
   },
 );
 

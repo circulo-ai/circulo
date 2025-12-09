@@ -100,4 +100,16 @@ export const agentRepo = {
       );
     return result[0]?.count ?? 0;
   },
+
+  async findByName(
+    organizationId: string,
+    name: string,
+  ): Promise<Agent | undefined> {
+    return db.query.agent.findFirst({
+      where: and(
+        eq(agent.organizationId, organizationId),
+        eq(agent.name, name),
+      ),
+    });
+  },
 };
