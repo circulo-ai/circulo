@@ -43,11 +43,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { FileInput } from "@/components/uploads/file-input";
-import { Agent } from "@/db";
-import { createBodySchema } from "@/lib/schemas/agent";
 import { getFetcher } from "@/lib/swr";
 import { cn } from "@/lib/utils";
 import { useChatHistoryStore } from "@/stores/use-chat-history-store";
+import { Agent } from "@circulo-ai/db";
+import { createAgentBodySchema } from "@circulo-ai/types/schemas/agent";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ArrowUp,
@@ -366,7 +366,7 @@ function SelectableAgent({
   );
 }
 
-type NewAgentRequest = z.input<typeof createBodySchema>;
+type NewAgentRequest = z.input<typeof createAgentBodySchema>;
 
 function AgentForm() {
   const { redirect, currentRoute } = useRouteFlowViewContext();
@@ -379,7 +379,7 @@ function AgentForm() {
   );
 
   const form = useForm<NewAgentRequest>({
-    resolver: zodResolver(createBodySchema),
+    resolver: zodResolver(createAgentBodySchema),
     defaultValues: {
       name: "",
       description: "",

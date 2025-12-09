@@ -26,7 +26,7 @@
     "@azure/communication-email": "^1.1.0",
     "@azure/storage-blob": "^12.29.1",
     "@better-auth/stripe": "^1.4.3",
-    "@circulo/db": "workspace:*",
+    "@circulo-ai/db": "workspace:*",
     "@codemirror/lang-python": "^6.2.1",
     "@codemirror/state": "^6.5.2",
     "@codemirror/theme-one-dark": "^6.1.3",
