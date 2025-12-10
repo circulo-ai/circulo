@@ -19,7 +19,7 @@
     "lint": "bunx biome check --write --unsafe .",
     "lint:check": "bunx biome check --unsafe .",
     "check": "bunx biome check --files-ignore-unknown=true",
-    "type-check": "turbo run type-check",
+    "typecheck": "turbo run typecheck",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "bun build && changeset publish"

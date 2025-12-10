@@ -30,7 +30,7 @@
     "lint": {
       "outputs": []
     },
-    "type-check": {
+    "typecheck": {
       "outputs": []
     }
   }

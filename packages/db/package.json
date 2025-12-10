@@ -30,7 +30,7 @@
     "db:push": "npx drizzle-kit push --config=./drizzle.config.ts",
     "db:migrate": "npx drizzle-kit migrate --config=./drizzle.config.ts",
     "db:studio": "npx drizzle-kit studio --config=./drizzle.config.ts",
-    "type-check": "tsc --noEmit"
+    "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
     "drizzle-orm": "^0.44.5",
