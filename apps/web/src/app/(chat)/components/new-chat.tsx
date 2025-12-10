@@ -430,6 +430,9 @@ function AgentForm() {
     redirect({ id: "select-agents" });
     addForm.reset();
     editForm.reset();
+    // TODO implement a tooltip that says "you have unsaved changes" when isDirty, here
+    // it also has a "remember my choice" checkbox
+    // make it a component that wraps a button
   }, [redirect, addForm, editForm]);
 
   return (
