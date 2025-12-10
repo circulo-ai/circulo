@@ -71,3 +71,5 @@ start-collector.sh
 .vscode
 
 .note.md
+packages/types/**/*.d.ts
+packages/types/**/*.d.ts.map

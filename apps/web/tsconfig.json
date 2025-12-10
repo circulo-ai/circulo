@@ -34,8 +34,7 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "trigger.config.ts",
-    "../server/drizzle.config.ts",
-    "../../packages/**/*"
+    "../server/drizzle.config.ts"
   ],
   "exclude": ["node_modules"]
 }
