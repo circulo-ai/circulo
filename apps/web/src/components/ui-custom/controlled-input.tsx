@@ -154,7 +154,7 @@ const FormInputAdapter = <
   ExtendedInputComponentProps extends InputComponentProps,
 >({
   id,
-  field: { onChange, ...field },
+  field: { onChange, value, ...field },
   invalid,
   className,
   inputProps,
@@ -188,6 +188,7 @@ const FormInputAdapter = <
       id={id} // TODO pass these props only if InputComponent accepts them
       aria-invalid={invalid}
       className={className}
+      value={value ?? ""}
       onChange={(e: ChangeEvent<HTMLInputElement>) =>
         onChange(
           // TODO make this more readable

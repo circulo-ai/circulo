@@ -312,7 +312,7 @@ function SelectableAgent({
                     {agent.name}
                   </div>
                   <div className="w-full truncate text-start text-xs text-foreground/75">
-                    {agent.description ?? "Isn't described"}
+                    {agent.description || "Isn't described"}
                   </div>
                 </div>
 
@@ -389,9 +389,6 @@ function AgentForm() {
 
   const defaultValues = useMemo(
     () => ({
-      name: "",
-      description: "",
-      instructions: "",
       model: defaultModel,
       temperature: 70,
     }),
