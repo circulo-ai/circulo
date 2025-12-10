@@ -59,7 +59,6 @@ import {
   Bot,
   Check,
   CircleFadingArrowUp,
-  Eye,
   Mic,
   Paperclip,
   Pencil,
@@ -325,13 +324,10 @@ function SelectableAgent({
           </ContextMenuTrigger>
 
           <CustomContextMenuContent>
-            <CustomContextMenuItem>
-              <Eye /> View
-            </CustomContextMenuItem>
             <CustomContextMenuItem
               onClick={() => redirect({ id: "agent-form", context: [agent] })}
             >
-              <Pencil /> Edit
+              <Pencil /> Edit / View
             </CustomContextMenuItem>
             <ContextMenuSeparator />
             <CustomContextMenuItem disabled inset>
@@ -374,6 +370,7 @@ function SelectableAgent({
 
 type NewAgentRequest = z.input<typeof createAgentBodySchema>;
 type EditAgentRequest = z.input<typeof updateAgentBodySchema>;
+type AgentRequest = NewAgentRequest | EditAgentRequest;
 
 function AgentForm() {
   const { redirect, currentRoute } = useRouteFlowViewContext();
@@ -438,7 +435,7 @@ function AgentForm() {
   return (
     <RouteViewLayout>
       {isNewAgent ? (
-        <CustomForm<NewAgentRequest>
+        <CustomForm
           key="new-agent"
           id={formId}
           form={addForm}
@@ -453,7 +450,7 @@ function AgentForm() {
           />
         </CustomForm>
       ) : (
-        <CustomForm<EditAgentRequest>
+        <CustomForm
           key="edit-agent"
           id={formId}
           form={editForm}
@@ -485,7 +482,10 @@ function AgentFormContent({
 }: AgentFormContentProps) {
   return (
     <>
-      <RouteViewHeader title="New Agent" onBack={goBack}>
+      <RouteViewHeader
+        title={isNewAgent ? "New Agent" : "Edit Agent"}
+        onBack={goBack}
+      >
         <Submit variant="primary" form={formId} rounded="full">
           {isNewAgent ? "Add" : "Save"}
         </Submit>
@@ -493,9 +493,7 @@ function AgentFormContent({
       <CustomScrollArea className="h-full overflow-auto">
         <FieldGroup className="my-7">
           <ControlledInput
-            name={
-              "avatarUrl" satisfies Path<NewAgentRequest | EditAgentRequest>
-            }
+            name={"avatarUrl" satisfies Path<AgentRequest>}
             className="mx-auto"
             inputStyle="unstyled"
             inputComponent={FileInput}
@@ -506,29 +504,25 @@ function AgentFormContent({
             }}
           />
           <ControlledInput
-            name={"name" satisfies Path<NewAgentRequest | EditAgentRequest>}
+            name={"name" satisfies Path<AgentRequest>}
             className="mx-4 w-auto"
             inputComponent={CustomInputGroupInput}
             inputProps={{ placeholder: "Steve Jobs, Elon Musk, etc" }}
           />
           <ControlledInput
-            name={
-              "description" satisfies Path<NewAgentRequest | EditAgentRequest>
-            }
+            name={"description" satisfies Path<AgentRequest>}
             className="mx-4 w-auto"
             inputComponent={CustomInputGroupInput}
             inputProps={{ placeholder: "Made in Circulo, etc" }}
           />
           <ControlledInput
-            name={
-              "instructions" satisfies Path<NewAgentRequest | EditAgentRequest>
-            }
+            name={"instructions" satisfies Path<AgentRequest>}
             className="mx-4 w-auto"
             inputComponent={InputGroupTextarea}
             inputProps={{ placeholder: "Be friendly, Be harsh, etc" }}
           />
           <ControlledInput
-            name={"model" satisfies Path<NewAgentRequest | EditAgentRequest>}
+            name={"model" satisfies Path<AgentRequest>}
             description="More models coming soon"
             className="mx-4 w-auto"
             errorPosition="before-input"
@@ -603,9 +597,7 @@ function AgentFormContent({
             }}
           />
           <ControlledInput
-            name={
-              "temperature" satisfies Path<NewAgentRequest | EditAgentRequest>
-            }
+            name={"temperature" satisfies Path<AgentRequest>}
             description="How creative?"
             className="mx-4 w-auto"
             errorPosition="before-input"
