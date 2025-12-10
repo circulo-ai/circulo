@@ -205,6 +205,7 @@ function SelectAgents() {
           <PageSpinner />
         )}
         {data && (
+          // TODO needs better performance when too many agents
           <AnimatedList
             itemElement="div"
             ids={data.map((agent) => agent.id)}
