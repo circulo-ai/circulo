@@ -1,6 +1,6 @@
 import type { ArtifactKind } from "@/components/artifacts/artifact";
 import { Suggestion as PreviewSuggestion } from "@/components/suggestion";
-import type { Suggestion } from "@/db/schema";
+import type { Suggestion } from "@circulo-ai/db/schema";
 import type { Node } from "prosemirror-model";
 import { Plugin, PluginKey } from "prosemirror-state";
 import {

@@ -11,7 +11,7 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "dev:stack": "concurrently -k -s first -n db,server,web \"bun --filter @circulo/db dev\" \"bun --filter server dev\" \"bun --filter web dev\"",
+    "dev:stack": "concurrently -k -s first -n db,server,web \"bun --filter @circulo-ai/db dev\" \"bun --filter server dev\" \"bun --filter web dev\"",
     "dev:server": "bun --filter server dev",
     "test": "turbo run test",
     "format": "bun prettier . --write",

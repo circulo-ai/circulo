@@ -13,24 +13,19 @@
     "jsx": "preserve",
     "incremental": true,
     "target": "ESNext",
-    "plugins": [
-      {
-        "name": "next"
-      },
-      {
-        "name": "workflow"
-      }
-    ],
+    "plugins": [{ "name": "next" }],
+    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@/db": ["../../packages/db"],
-      "@/db/*": ["../../packages/db/*"],
       "#/*": ["./public/*"],
-      "@circulo/db": ["../../packages/db"],
-      "@circulo/db/*": ["../../packages/db/*"]
+      "@/db": ["../../packages/db/index.ts"], // TODO replace with @circulo-ai/db
+      "@/db/*": ["../../packages/db/*"], // replace with @circulo-ai/db/*
+      "@circulo-ai/db": ["../../packages/db"],
+      "@circulo-ai/db/*": ["../../packages/db/*"],
+      "@circulo-ai/types": ["../../packages/types/src"],
+      "@circulo-ai/types/*": ["../../packages/types/src/*"]
     }
   },
-  "references": [{ "path": "../../packages/types" }],
   "include": [
     "next-env.d.ts",
     "**/*.ts",

@@ -10,7 +10,7 @@ import {
   RedoIcon,
   UndoIcon,
 } from "@/components/icons/icons";
-import type { Suggestion } from "@/db/schema";
+import type { Suggestion } from "@circulo-ai/db/schema";
 import { toast } from "sonner";
 
 type TextArtifactMetadata = {

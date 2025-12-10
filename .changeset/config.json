@@ -10,7 +10,7 @@
   "ignore": [
     "web",
     "server",
-    "@circulo/db",
+    "@circulo-ai/db",
     "@circulo-ai/redis",
     "@circulo-ai/prettier-config",
     "@circulo-ai/types",

@@ -3,8 +3,8 @@ import { notFound } from "next/navigation";
 
 import { Chat } from "@/components/chat";
 import { DataStreamHandler } from "@/components/data-stream-handler";
-import { chatRepo, messageRepo } from "@/db/repositories";
 import { convertToUIMessages } from "@/lib/utils";
+import { chatRepo, messageRepo } from "@circulo-ai/db/repositories";
 
 export default async function Page(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;

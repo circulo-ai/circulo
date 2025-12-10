@@ -1,4 +1,4 @@
-import type { ArtifactKind } from "@/db/schema";
+import type { ArtifactKind } from "@circulo-ai/db/schema";
 
 type GeoLike = {
   latitude: number;

@@ -1,6 +1,6 @@
 "use client";
 
-import type { Suggestion } from "@/db";
+import type { Suggestion } from "@circulo-ai/db";
 import { python } from "@codemirror/lang-python";
 import { EditorState, Transaction } from "@codemirror/state";
 import { oneDark } from "@codemirror/theme-one-dark";

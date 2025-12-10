@@ -2,8 +2,9 @@
   "compilerOptions": {
     "target": "ESNext",
     "module": "ESNext",
-    "moduleResolution": "Bundler",
+    "moduleResolution": "bundler",
     "declaration": true,
+    "declarationMap": true,
     "outDir": "./dist",
     "rootDir": ".",
     "strict": false,
@@ -11,11 +12,13 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
+    "preserveSymlinks": true,
+    "types": ["node"],
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
-      "@/db": ["./index.ts"],
-      "@/db/*": ["./*"],
+      "@/db": ["./index.ts"], // TODO replace with @circulo-ai/db
+      "@/db/*": ["./*"], // replace with @circulo-ai/db/*
       "@/lib/types": ["./lib/types.ts"]
     }
   },
