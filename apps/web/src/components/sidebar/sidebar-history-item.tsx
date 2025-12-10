@@ -21,8 +21,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import type { Chat } from "@/db/schema";
 import { useChatVisibility } from "@/hooks/api/chats/use-chat-visibility";
+import type { Chat } from "@circulo-ai/db/schema";
 import Link from "next/link";
 import { memo } from "react";
 

@@ -2,7 +2,7 @@ import { useStorageAsset } from "@/components/storage/use-storage-asset";
 import type { AnchorHTMLAttributes, ImgHTMLAttributes, ReactNode } from "react";
 
 export interface StorageAssetProps {
-  /** Full serve path (e.g., `/api/files/serve/s3/<key>?context=profile-pictures`). */
+  /** Full serve path (e.g., `/api/files/serve/<key>?context=profile-pictures`). */
   path?: string;
   /** Storage key (will be combined with context and serve prefix). */
   key?: string;

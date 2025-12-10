@@ -1,20 +1,22 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
+    "composite": true,
+    "target": "ESNext",
     "module": "ESNext",
-    "lib": ["ES2020"],
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
     "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "composite": true,
-    "declaration": true,
-    "declarationMap": true,
-    "outDir": "./dist"
+    "baseUrl": ".",
+    "paths": {
+      "@circulo-ai/types": ["./src/index.ts"],
+      "@circulo-ai/types/*": ["./src/*"]
+    }
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules"]
+  "include": ["./src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
 }

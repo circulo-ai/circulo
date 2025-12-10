@@ -89,7 +89,7 @@ const nextConfig: NextConfig = {
     "@t3-oss/env-core",
     "@react-email/components",
     "@react-email/render",
-    "@circulo/db",
+    "@circulo-ai/types",
   ],
   ...(isDev && {
     allowedDevOrigins: [

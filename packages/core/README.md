@@ -92,6 +92,6 @@ class CreditAccount implements UseCase<
 ## Developing
 
 ```bash
-bun --cwd packages/core run type-check
+bun --cwd packages/core run typecheck
 bun --cwd packages/core run build
 ```

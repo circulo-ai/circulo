@@ -13,7 +13,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { Vote } from "@/db/schema";
 import { useArtifactSelector } from "@/hooks/api/chats/use-artifact";
 import { useChatVisibility } from "@/hooks/api/chats/use-chat-visibility";
 import { ApiRequestError } from "@/lib/api/client";
@@ -27,6 +26,7 @@ import type { AppUsage } from "@/lib/usage";
 import { generateUUID } from "@/lib/utils";
 import { useChatHistoryStore } from "@/stores/use-chat-history-store";
 import { useChat } from "@ai-sdk/react";
+import type { Vote } from "@circulo-ai/db/schema";
 import { WorkflowChatTransport } from "@workflow/ai";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";

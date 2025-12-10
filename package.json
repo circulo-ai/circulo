@@ -11,7 +11,7 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "dev:stack": "concurrently -k -s first -n db,server,web \"bun --filter @circulo/db dev\" \"bun --filter server dev\" \"bun --filter web dev\"",
+    "dev:stack": "concurrently -k -s first -n db,server,web \"bun --filter @circulo-ai/db dev\" \"bun --filter server dev\" \"bun --filter web dev\"",
     "dev:server": "bun --filter server dev",
     "test": "turbo run test",
     "format": "bun prettier . --write",
@@ -19,7 +19,7 @@
     "lint": "bunx biome check --write --unsafe .",
     "lint:check": "bunx biome check --unsafe .",
     "check": "bunx biome check --files-ignore-unknown=true",
-    "type-check": "turbo run type-check",
+    "typecheck": "turbo run typecheck",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "bun build && changeset publish"

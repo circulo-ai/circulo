@@ -1,8 +1,8 @@
 import { PreviewMessage, ThinkingMessage } from "@/components/messages/message";
-import type { Vote } from "@/db/schema";
 import { useMessages } from "@/hooks/api/chats/use-messages";
 import type { ChatMessage } from "@/lib/types";
 import type { UseChatHelpers } from "@ai-sdk/react";
+import type { Vote } from "@circulo-ai/db/schema";
 import equal from "fast-deep-equal";
 import { AnimatePresence, motion } from "framer-motion";
 import { memo } from "react";

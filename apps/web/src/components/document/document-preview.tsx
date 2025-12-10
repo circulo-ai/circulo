@@ -7,9 +7,9 @@ import {
   ImageIcon,
   LoaderIcon,
 } from "@/components/icons/icons";
-import type { Document } from "@/db/schema";
 import { useArtifact } from "@/hooks/api/chats/use-artifact";
 import { cn } from "@/lib/utils";
+import type { Document } from "@circulo-ai/db/schema";
 import equal from "fast-deep-equal";
 import {
   type MouseEvent,

@@ -6,7 +6,6 @@ import { EditorState } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { memo, useEffect, useRef } from "react";
 
-import type { Suggestion } from "@/db/schema";
 import {
   documentSchema,
   handleTransaction,
@@ -22,6 +21,7 @@ import {
   suggestionsPlugin,
   suggestionsPluginKey,
 } from "@/lib/editor/suggestions";
+import type { Suggestion } from "@circulo-ai/db/schema";
 
 type EditorProps = {
   content: string;

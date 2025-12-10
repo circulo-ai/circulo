@@ -4,10 +4,10 @@ import {
 } from "@/components/ai-elements/conversation";
 import { useDataStream } from "@/components/data-stream-provider";
 import { Greeting } from "@/components/greeting";
-import type { Vote } from "@/db/schema";
 import { useMessages } from "@/hooks/api/chats/use-messages";
 import type { ChatMessage } from "@/lib/types";
 import type { UseChatHelpers } from "@ai-sdk/react";
+import type { Vote } from "@circulo-ai/db/schema";
 import equal from "fast-deep-equal";
 import { AnimatePresence } from "framer-motion";
 import { ArrowDownIcon } from "lucide-react";

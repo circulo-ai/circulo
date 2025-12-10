@@ -172,7 +172,7 @@ export function RouteViewHeader({
           <ArrowLeft />
         </Button>
       )}
-      {title && <h2 className="font-medium">{title}</h2>}
+      {title && <h2 className="line-clamp-1 font-medium">{title}</h2>}
       <div className="grow" />
       {children}
     </header>

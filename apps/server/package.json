@@ -26,7 +26,7 @@
     "@circulo-ai/di": "workspace:^",
     "@circulo-ai/file-parsers": "workspace:^",
     "@circulo-ai/redis": "workspace:^",
-    "@circulo/db": "workspace:^",
+    "@circulo-ai/db": "workspace:^",
     "@e2b/code-interpreter": "^2.3.1",
     "@hono/node-server": "^1.19.6",
     "@hono/standard-validator": "^0.2.0",

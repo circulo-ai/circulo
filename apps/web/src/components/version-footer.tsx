@@ -1,9 +1,9 @@
 "use client";
 
 import { LoaderIcon } from "@/components/icons/icons";
-import type { Document } from "@/db/schema";
 import { useArtifact } from "@/hooks/api/chats/use-artifact";
 import { getDocumentTimestampByIndex } from "@/lib/utils";
+import type { Document } from "@circulo-ai/db/schema";
 import { isAfter } from "date-fns";
 import { motion } from "framer-motion";
 import { useState } from "react";

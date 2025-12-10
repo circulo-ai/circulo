@@ -43,18 +43,22 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { FileInput } from "@/components/uploads/file-input";
-import { Agent } from "@/db";
-import { createBodySchema } from "@/lib/schemas/agent";
+import { deepReplace } from "@/lib/deep-replace";
 import { getFetcher } from "@/lib/swr";
 import { cn } from "@/lib/utils";
 import { useChatHistoryStore } from "@/stores/use-chat-history-store";
+import { Agent } from "@circulo-ai/db";
+import {
+  createAgentBodySchema,
+  defaultModel,
+  updateAgentBodySchema,
+} from "@circulo-ai/types";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ArrowUp,
   Bot,
   Check,
   CircleFadingArrowUp,
-  Eye,
   Mic,
   Paperclip,
   Pencil,
@@ -65,6 +69,7 @@ import {
   Dispatch,
   SetStateAction,
   useCallback,
+  useEffect,
   useId,
   useMemo,
   useRef,
@@ -290,7 +295,7 @@ function SelectableAgent({
                       className="size-full object-cover"
                     />
                   )}
-                  {!agent.avatarUrl && <Bot />}
+                  {!agent.avatarUrl && <Bot className="size-5" />}
                 </div>
 
                 <div
@@ -319,13 +324,10 @@ function SelectableAgent({
           </ContextMenuTrigger>
 
           <CustomContextMenuContent>
-            <CustomContextMenuItem>
-              <Eye /> View
-            </CustomContextMenuItem>
             <CustomContextMenuItem
               onClick={() => redirect({ id: "agent-form", context: [agent] })}
             >
-              <Pencil /> Edit
+              <Pencil /> Edit / View
             </CustomContextMenuItem>
             <ContextMenuSeparator />
             <CustomContextMenuItem disabled inset>
@@ -366,31 +368,12 @@ function SelectableAgent({
   );
 }
 
-type NewAgentRequest = z.input<typeof createBodySchema>;
+type NewAgentRequest = z.input<typeof createAgentBodySchema>;
+type EditAgentRequest = z.input<typeof updateAgentBodySchema>;
+type AgentRequest = NewAgentRequest | EditAgentRequest;
 
 function AgentForm() {
   const { redirect, currentRoute } = useRouteFlowViewContext();
-
-  const formId = useId();
-
-  const { trigger } = useSWRMutation<any, any, Key, NewAgentRequest>(
-    "/api/agent",
-    getFetcher("POST"),
-  );
-
-  const form = useForm<NewAgentRequest>({
-    resolver: zodResolver(createBodySchema),
-    defaultValues: {
-      name: "",
-      instructions: "",
-      temperature: 70,
-    },
-  });
-
-  const goBack = useCallback(() => {
-    redirect({ id: "select-agents" });
-    form.reset();
-  }, [redirect, form]);
 
   // TODO when closing the route, the context is reset immediately (it should be debounced)
   const isNewAgent = useMemo(
@@ -398,134 +381,233 @@ function AgentForm() {
     [currentRoute.context],
   );
 
+  const currentAgent = useMemo(() => {
+    const agent = currentRoute.context?.[0] as Agent | undefined;
+    if (!agent) return undefined;
+    return deepReplace(agent, null, undefined, { depthLimit: 1 });
+  }, [currentRoute.context]);
+
+  const defaultValues = useMemo(
+    () => ({
+      name: "",
+      description: "",
+      instructions: "",
+      model: defaultModel,
+      temperature: 70,
+    }),
+    [],
+  );
+
+  const formId = useId();
+
+  const addForm = useForm<NewAgentRequest>({
+    resolver: zodResolver(createAgentBodySchema),
+    defaultValues,
+  });
+
+  const editForm = useForm<EditAgentRequest>({
+    resolver: zodResolver(updateAgentBodySchema),
+    defaultValues,
+  });
+
+  const { trigger: newAgent } = useSWRMutation<any, any, Key, NewAgentRequest>(
+    "/api/agent",
+    getFetcher("POST"),
+  );
+
+  const { trigger: editAgent } = useSWRMutation<
+    any,
+    any,
+    Key,
+    EditAgentRequest
+  >("/api/agent", getFetcher("PATCH"));
+
+  useEffect(() => {
+    if (currentAgent) editForm.reset(currentAgent);
+  }, [currentAgent, editForm]);
+
+  const goBack = useCallback(() => {
+    redirect({ id: "select-agents" });
+    addForm.reset();
+    editForm.reset();
+  }, [redirect, addForm, editForm]);
+
   return (
     <RouteViewLayout>
-      <CustomForm<NewAgentRequest>
-        id={formId}
-        swr={{ trigger }}
-        form={form}
-        onSubmit={goBack}
-        className="flex h-full flex-col"
-      >
-        <RouteViewHeader title="New Agent" onBack={goBack}>
-          <Submit variant="primary" form={formId} rounded="full">
-            {isNewAgent ? "Add" : "Save"}
-          </Submit>
-        </RouteViewHeader>
-        <CustomScrollArea className="h-full overflow-auto">
-          <FieldGroup className="my-7">
-            <ControlledInput
-              name={"avatarUrl" satisfies Path<NewAgentRequest>}
-              className="mx-auto"
-              inputStyle="unstyled"
-              inputComponent={FileInput}
-            />
-            <ControlledInput
-              name={"name" satisfies Path<NewAgentRequest>}
-              className="mx-4 w-auto"
-              inputComponent={CustomInputGroupInput}
-              inputProps={{ placeholder: "Steve Jobs, Elon Musk, etc" }}
-            />
-            <ControlledInput
-              name={"description" satisfies Path<NewAgentRequest>}
-              className="mx-4 w-auto"
-              inputComponent={CustomInputGroupInput}
-              inputProps={{ placeholder: "Made in Circulo, etc" }}
-            />
-            <ControlledInput
-              name={"instructions" satisfies Path<NewAgentRequest>}
-              className="mx-4 w-auto"
-              inputComponent={InputGroupTextarea}
-              inputProps={{ placeholder: "Be friendly, Be harsh, etc" }}
-            />
-            <ControlledInput
-              name={"model" satisfies Path<NewAgentRequest>}
-              description="More models coming soon"
-              className="mx-4 w-auto"
-              errorPosition="before-input"
-              orientation="horizontal"
-              inputStyle="no-input-group"
-              inputComponent={SelectInput} // TODO replace with combobox
-              inputProps={{
-                // TODO get from endpoint
-                options: [
-                  {
-                    type: "group",
-                    label: "OpenAI",
-                    options: [
-                      { value: "gpt-4.1", label: "GPT-4.1", type: "single" },
-                      {
-                        value: "gpt-4.1-mini",
-                        label: "GPT-4.1 Mini",
-                        type: "single",
-                      },
-                      {
-                        value: "gpt-4.1-nano",
-                        label: "GPT-4.1 Nano",
-                        type: "single",
-                      },
-                    ],
-                  },
-                  { type: "separator" },
-                  {
-                    type: "group",
-                    label: "Anthropic",
-                    options: [
-                      {
-                        value: "claude-opus-4-5",
-                        label: "Claude Opus 4.5",
-                        type: "single",
-                      },
-                      {
-                        value: "claude-sonnet-4-5",
-                        label: "Claude Sonnet 4.5",
-                        type: "single",
-                      },
-                      {
-                        value: "claude-haiku-4-5",
-                        label: "Claude Haiku 4.5",
-                        type: "single",
-                      },
-                    ],
-                  },
-                  { type: "separator" },
-                  {
-                    type: "group",
-                    label: "Google (Gemini)",
-                    options: [
-                      {
-                        value: "gemini-3-pro",
-                        label: "Gemini 3 Pro",
-                        type: "single",
-                      },
-                      {
-                        value: "gemini-2.5-pro",
-                        label: "Gemini 2.5 Pro",
-                        type: "single",
-                      },
-                      {
-                        value: "gemini-2.5-flash",
-                        label: "Gemini 2.5 Flash",
-                        type: "single",
-                      },
-                    ],
-                  },
-                ],
-              }}
-            />
-            <ControlledInput
-              name={"temperature" satisfies Path<NewAgentRequest>}
-              description="How creative?"
-              className="mx-4 w-auto"
-              errorPosition="before-input"
-              inputStyle="no-input-group"
-              inputComponent={SliderInput}
-              inputProps={{ min: 1, max: 100 }} // TODO min should be zero, but it doesn't work well that way
-            />
-          </FieldGroup>
-        </CustomScrollArea>
-      </CustomForm>
+      {isNewAgent ? (
+        <CustomForm
+          key="new-agent"
+          id={formId}
+          form={addForm}
+          swr={{ trigger: newAgent }}
+          onSubmit={goBack}
+          className="flex h-full flex-col"
+        >
+          <AgentFormContent
+            isNewAgent={isNewAgent}
+            formId={formId}
+            goBack={goBack}
+          />
+        </CustomForm>
+      ) : (
+        <CustomForm
+          key="edit-agent"
+          id={formId}
+          form={editForm}
+          swr={{ trigger: editAgent }}
+          onSubmit={goBack}
+          className="flex h-full flex-col"
+        >
+          <AgentFormContent
+            isNewAgent={isNewAgent}
+            formId={formId}
+            goBack={goBack}
+          />
+        </CustomForm>
+      )}
     </RouteViewLayout>
+  );
+}
+
+interface AgentFormContentProps {
+  isNewAgent: boolean;
+  formId: string;
+  goBack: () => void;
+}
+
+function AgentFormContent({
+  isNewAgent,
+  formId,
+  goBack,
+}: AgentFormContentProps) {
+  return (
+    <>
+      <RouteViewHeader
+        title={isNewAgent ? "New Agent" : "Edit Agent"}
+        onBack={goBack}
+      >
+        <Submit variant="primary" form={formId} rounded="full">
+          {isNewAgent ? "Add" : "Save"}
+        </Submit>
+      </RouteViewHeader>
+      <CustomScrollArea className="h-full overflow-auto">
+        <FieldGroup className="my-7">
+          <ControlledInput
+            name={"avatarUrl" satisfies Path<AgentRequest>}
+            className="mx-auto"
+            inputStyle="unstyled"
+            inputComponent={FileInput}
+            inputProps={{
+              useUploadTaskManagerProps: {
+                defaultStorageContext: "profile-pictures",
+              },
+            }}
+          />
+          <ControlledInput
+            name={"name" satisfies Path<AgentRequest>}
+            className="mx-4 w-auto"
+            inputComponent={CustomInputGroupInput}
+            inputProps={{ placeholder: "Steve Jobs, Elon Musk, etc" }}
+          />
+          <ControlledInput
+            name={"description" satisfies Path<AgentRequest>}
+            className="mx-4 w-auto"
+            inputComponent={CustomInputGroupInput}
+            inputProps={{ placeholder: "Made in Circulo, etc" }}
+          />
+          <ControlledInput
+            name={"instructions" satisfies Path<AgentRequest>}
+            className="mx-4 w-auto"
+            inputComponent={InputGroupTextarea}
+            inputProps={{ placeholder: "Be friendly, Be harsh, etc" }}
+          />
+          <ControlledInput
+            name={"model" satisfies Path<AgentRequest>}
+            description="More models coming soon"
+            className="mx-4 w-auto"
+            errorPosition="before-input"
+            orientation="horizontal"
+            inputStyle="no-input-group"
+            inputComponent={SelectInput} // TODO replace with combobox
+            inputProps={{
+              // TODO get from endpoint
+              options: [
+                {
+                  type: "group",
+                  label: "OpenAI",
+                  options: [
+                    { value: "gpt-4.1", label: "GPT-4.1", type: "single" },
+                    {
+                      value: "gpt-4.1-mini",
+                      label: "GPT-4.1 Mini",
+                      type: "single",
+                    },
+                    {
+                      value: "gpt-4.1-nano",
+                      label: "GPT-4.1 Nano",
+                      type: "single",
+                    },
+                  ],
+                },
+                { type: "separator" },
+                {
+                  type: "group",
+                  label: "Anthropic",
+                  options: [
+                    {
+                      value: "claude-opus-4-5",
+                      label: "Claude Opus 4.5",
+                      type: "single",
+                    },
+                    {
+                      value: "claude-sonnet-4-5",
+                      label: "Claude Sonnet 4.5",
+                      type: "single",
+                    },
+                    {
+                      value: "claude-haiku-4-5",
+                      label: "Claude Haiku 4.5",
+                      type: "single",
+                    },
+                  ],
+                },
+                { type: "separator" },
+                {
+                  type: "group",
+                  label: "Google (Gemini)",
+                  options: [
+                    {
+                      value: "gemini-3-pro",
+                      label: "Gemini 3 Pro",
+                      type: "single",
+                    },
+                    {
+                      value: "gemini-2.5-pro",
+                      label: "Gemini 2.5 Pro",
+                      type: "single",
+                    },
+                    {
+                      value: "gemini-2.5-flash",
+                      label: "Gemini 2.5 Flash",
+                      type: "single",
+                    },
+                  ],
+                },
+              ],
+            }}
+          />
+          <ControlledInput
+            name={"temperature" satisfies Path<AgentRequest>}
+            description="How creative?"
+            className="mx-4 w-auto"
+            errorPosition="before-input"
+            inputStyle="no-input-group"
+            inputComponent={SliderInput}
+            inputProps={{ min: 1, max: 100 }} // TODO min should be zero, but it doesn't work well that way
+          />
+        </FieldGroup>
+      </CustomScrollArea>
+    </>
   );
 }
 

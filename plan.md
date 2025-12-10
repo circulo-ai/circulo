@@ -1,6 +1,6 @@
 # Clean Architecture Migration Plan (Server App)
 
-Goal: refactor `apps/server` to align with @circulo/core DDD/clean architecture while integrating Drizzle and existing DI.
+Goal: refactor `apps/server` to align with @circulo-ai/core DDD/clean architecture while integrating Drizzle and existing DI.
 
 ## Milestones
 
@@ -36,7 +36,7 @@ Goal: refactor `apps/server` to align with @circulo/core DDD/clean architecture 
 
 ## Milestone 2 Notes (Domain layer scaffolded)
 
-- Added domain aggregates/entities/value objects in `apps/server/src/domain` using @circulo/core primitives:
+- Added domain aggregates/entities/value objects in `apps/server/src/domain` using @circulo-ai/core primitives:
   - Chat aggregate with rename/visibility changes and domain events (`chat/chat.ts`, `chat/events.ts`).
   - Message entity with edit capability (`message/message.ts`).
   - User aggregate with org membership updates (`user/user.ts`).
@@ -56,7 +56,7 @@ Goal: refactor `apps/server` to align with @circulo/core DDD/clean architecture 
 - Added Drizzle-based repositories that accept UoW-scoped `DbInstance` and map rows to domain models:
   - Chat, Message, Agent, ChatMember, ChatInvitation, ChatAgentLink, Artifact, Suggestion, User, Organization.
 - Repositories live under `apps/server/src/infrastructure/drizzle` with per-aggregate mappers and a barrel export for DI wiring.
-- All repos implement `Repository<T>` from @circulo/core and perform upsert-style persistence while preserving domain types (`Identifier`, value objects).
+- All repos implement `Repository<T>` from @circulo-ai/core and perform upsert-style persistence while preserving domain types (`Identifier`, value objects).
 
 ## Milestone 4 Notes (UoW/eventing)
 
