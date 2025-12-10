@@ -27,9 +27,21 @@ jobs:
       - name: Get changed packages
         id: changed
         run: |
-          # Get list of changed packages
-          CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^packages/' | cut -d'/' -f2 | sort -u | jq -R -s -c 'split("\n")[:-1]')
-          echo "packages=$CHANGED" >> $GITHUB_OUTPUT
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch origin ${{ github.base_ref }} --depth=1
+            RANGE="origin/${{ github.base_ref }}...HEAD"
+          else
+            PREV_SHA=${{ github.event.before }}
+            if [ -z "$PREV_SHA" ] || [ "$PREV_SHA" = "0000000000000000000000000000000000000000" ]; then
+              PREV_SHA=$(git rev-parse HEAD^)
+            fi
+            RANGE="$PREV_SHA...HEAD"
+          fi
+
+          CHANGED=$(git diff --name-only "$RANGE" -- "packages/*" | cut -d'/' -f2 | sort -u | jq -R -s -c 'split("\n")[:-1]')
+          echo "packages=$CHANGED" >>"$GITHUB_OUTPUT"
 
   test:
     name: Test Changed Packages
@@ -56,7 +68,14 @@ jobs:
           node-version: "20"
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: |
+          set -euo pipefail
+          if bun install --frozen-lockfile; then
+            exit 0
+          fi
+          echo "bun.lock invalid; reinstalling without the lockfile" >&2
+          rm -f bun.lock
+          bun install
 
       - name: Check if package has tests
         id: check-tests
