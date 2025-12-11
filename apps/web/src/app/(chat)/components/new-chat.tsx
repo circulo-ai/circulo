@@ -205,6 +205,7 @@ function SelectAgents() {
           <PageSpinner />
         )}
         {data && (
+          // TODO needs better performance when too many agents
           <AnimatedList
             itemElement="div"
             ids={data.map((agent) => agent.id)}
@@ -312,7 +313,7 @@ function SelectableAgent({
                     {agent.name}
                   </div>
                   <div className="w-full truncate text-start text-xs text-foreground/75">
-                    {agent.description ?? "Isn't described"}
+                    {agent.description || "Isn't described"}
                   </div>
                 </div>
 
@@ -389,9 +390,6 @@ function AgentForm() {
 
   const defaultValues = useMemo(
     () => ({
-      name: "",
-      description: "",
-      instructions: "",
       model: defaultModel,
       temperature: 70,
     }),
@@ -430,6 +428,9 @@ function AgentForm() {
     redirect({ id: "select-agents" });
     addForm.reset();
     editForm.reset();
+    // TODO implement a tooltip that says "you have unsaved changes" when isDirty, here
+    // it also has a "remember my choice" checkbox
+    // make it a component that wraps a button
   }, [redirect, addForm, editForm]);
 
   return (

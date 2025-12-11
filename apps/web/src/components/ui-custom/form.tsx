@@ -1,5 +1,6 @@
 "use client";
 
+import { useNormalizeEmptyFields } from "@/hooks/use-normalize-empty-fields";
 import { ComponentProps } from "react";
 import {
   FieldValues,
@@ -28,6 +29,7 @@ export function CustomForm<
   onSubmit,
   ...props
 }: CustomFormProps<Input, Output>) {
+  useNormalizeEmptyFields(form);
   return (
     <FormProvider<Input> {...form}>
       <RHForm<Input>

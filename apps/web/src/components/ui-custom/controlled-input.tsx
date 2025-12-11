@@ -154,7 +154,7 @@ const FormInputAdapter = <
   ExtendedInputComponentProps extends InputComponentProps,
 >({
   id,
-  field: { value, onChange, ...field },
+  field: { onChange, value, ...field },
   invalid,
   className,
   inputProps,
