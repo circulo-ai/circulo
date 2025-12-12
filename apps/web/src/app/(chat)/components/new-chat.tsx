@@ -49,6 +49,7 @@ import { deepReplace } from "@/lib/deep-replace";
 import { getFetcher } from "@/lib/swr";
 import { cn } from "@/lib/utils";
 import { useChatHistoryStore } from "@/stores/use-chat-history-store";
+import { useChat } from "@ai-sdk/react";
 import { Agent } from "@circulo-ai/db";
 import {
   createAgentBodySchema,
@@ -99,7 +100,7 @@ interface NewChatProps {
 }
 
 export function NewChat({ id }: NewChatProps) {
-  const { trigger } = useSWRMutation("/api/chat", getFetcher("POST"));
+  const { sendMessage } = useChat({ id });
 
   const { isChatLoading } = useChatHistoryStore();
 
@@ -151,7 +152,12 @@ export function NewChat({ id }: NewChatProps) {
               size="icon-md"
               variant="primary"
               className="rounded-full"
-              onClick={() => trigger()} // TODO use useChat
+              onClick={() =>
+                sendMessage({
+                  role: "user",
+                  parts: [{ type: "text", text: "Hello World!" }],
+                })
+              }
             >
               <ArrowUp />
             </InputGroupButton>
@@ -500,6 +506,7 @@ function AgentFormContent({
         title={isNewAgent ? "New Agent" : "Edit Agent"}
         onBack={goBack}
       >
+        {/* TODO move this to the end of the form */}
         <Submit variant="primary" form={formId} rounded="full">
           {isNewAgent ? "Add" : "Save"}
         </Submit>
