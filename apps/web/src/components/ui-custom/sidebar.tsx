@@ -178,7 +178,7 @@ export function CustomSidebarContextMenu({
 }: CustomSidebarContextMenuProps) {
   return (
     <ContextMenu {...props}>
-      <ContextMenuTrigger>{children}</ContextMenuTrigger>
+      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <CustomContextMenuContent>
         <CustomContextMenuItem onClick={() => onPinChange(!isPinned)}>
           {isPinned ? (

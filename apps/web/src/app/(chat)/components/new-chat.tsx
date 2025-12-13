@@ -25,7 +25,7 @@ import { SelectInput } from "@/components/ui-custom/select";
 import { SliderInput } from "@/components/ui-custom/slider";
 import { Submit } from "@/components/ui-custom/submit";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AnimatedList } from "@/components/ui/animated-list";
+import { AnimatedItem, AnimatedList } from "@/components/ui/animated-list";
 import { Button } from "@/components/ui/button";
 import {
   ContextMenu,
@@ -213,32 +213,23 @@ function SelectAgents() {
         </Tooltip>
       </div>
 
-      <CustomScrollArea className="overflow-auto *:*:block!">
-        {!data && (
-          // TODO skeleton
-          <PageSpinner />
-        )}
-        {data && (
-          // TODO needs better performance when too many agents
-          <AnimatedList
-            itemElement="div"
-            ids={data.map((agent) => agent.id)}
-            renderItem={(id) => {
-              // TODO optimize performance
-              const agent = data.find((agent) => agent.id === id);
-              if (!agent) return;
-              return (
-                <SelectableAgent
-                  key={id}
-                  agent={agent}
-                  selectedAgentIds={selectedAgentIds}
-                  setSelectedAgentIds={setSelectedAgentIds}
-                />
-              );
-            }}
-          />
-        )}
-      </CustomScrollArea>
+      <AnimatedList asChild>
+        <CustomScrollArea className="overflow-auto *:*:block!">
+          {!data && (
+            // TODO skeleton
+            <PageSpinner />
+          )}
+          {data?.map((agent) => (
+            <AnimatedItem key={agent.id} asChild>
+              <SelectableAgent
+                agent={agent}
+                selectedAgentIds={selectedAgentIds}
+                setSelectedAgentIds={setSelectedAgentIds}
+              />
+            </AnimatedItem>
+          ))}
+        </CustomScrollArea>
+      </AnimatedList>
     </RouteViewLayout>
   );
 }

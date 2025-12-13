@@ -11,7 +11,7 @@ const IdSlot = forwardRef<HTMLElement, SlotProps>(function IdSlot(
   { id: providedId, ...restProps },
   ref,
 ) {
-  const contextId = useContext(IdSlotContext);
+  const contextId = useContext(IdSlotContext); // TODO bug?
   const generatedId = useId();
   const stableId = useMemo(
     () => providedId ?? contextId ?? generatedId,
