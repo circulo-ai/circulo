@@ -25,7 +25,7 @@ export function RippleClient() {
   const withContainer = useCallback(
     (run: (container: HTMLButtonElement) => Cleanup): Cleanup => {
       const container = document.getElementById(id) as HTMLButtonElement | null;
-      if (container) run(container);
+      if (container) return run(container);
       else if (process.env.NODE_ENV !== "production")
         console.warn(
           `[RippleClient] Missing container (#${id}); skipping listener attachment.`,
