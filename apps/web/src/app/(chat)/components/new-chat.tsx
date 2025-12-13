@@ -45,6 +45,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { FileInput } from "@/components/uploads/file-input";
+import { useMergedRefs } from "@/hooks/use-merged-refs";
 import { deepReplace } from "@/lib/deep-replace";
 import { getFetcher } from "@/lib/swr";
 import { cn } from "@/lib/utils";
@@ -73,6 +74,7 @@ import {
 import {
   ComponentProps,
   Dispatch,
+  forwardRef,
   SetStateAction,
   useCallback,
   useEffect,
@@ -240,144 +242,149 @@ interface SelectableAgentProps {
   setSelectedAgentIds: Dispatch<SetStateAction<string[]>>;
 }
 
-function SelectableAgent({
-  agent,
-  selectedAgentIds,
-  setSelectedAgentIds,
-}: SelectableAgentProps) {
-  const { redirect } = useRouteFlowViewContext();
+const SelectableAgent = forwardRef<HTMLButtonElement, SelectableAgentProps>(
+  function SelectableAgent(
+    { agent, selectedAgentIds, setSelectedAgentIds },
+    ref,
+  ) {
+    const { redirect } = useRouteFlowViewContext();
 
-  const agentRef = useRef<HTMLButtonElement>(null);
-  const animationLockRef = useRef(false);
+    const innerAgentRef = useRef<HTMLButtonElement>(null);
+    const agentRef = useMergedRefs(ref, innerAgentRef);
+    const animationLockRef = useRef(false);
 
-  const [isTooltipOpen, setIsTooltipOpen] = useState(false); // TODO close after some time
+    const [isTooltipOpen, setIsTooltipOpen] = useState(false); // TODO close after some time
 
-  const isSelected = useMemo(
-    () => selectedAgentIds.includes(agent.id),
-    [selectedAgentIds, agent.id],
-  );
+    const isSelected = useMemo(
+      () => selectedAgentIds.includes(agent.id),
+      [selectedAgentIds, agent.id],
+    );
 
-  const handleSelect = useCallback(() => {
-    const nextIsSelected = !isSelected;
-    if (nextIsSelected) {
-      if (selectedAgentIds.length >= AGENT_SELECTION_LIMIT) {
-        const agentElement = agentRef.current as HTMLButtonElement | null;
-        if (animationLockRef.current === false && agentElement) {
-          animationLockRef.current = true;
-          agentElement.classList.add("animate-error");
-          setIsTooltipOpen(true);
-          // TODO cleanup
-          setTimeout(() => {
-            animationLockRef.current = false;
-            agentElement.classList.remove("animate-error");
-          }, 500);
-        }
-      } else
-        setSelectedAgentIds((ids) =>
-          ids.includes(agent.id) ? ids : [...ids, agent.id],
-        );
-    } else setSelectedAgentIds((ids) => ids.filter((id) => id !== agent.id));
-  }, [isSelected, selectedAgentIds.length, agent.id]);
+    const handleSelect = useCallback(() => {
+      const nextIsSelected = !isSelected;
+      if (nextIsSelected) {
+        if (selectedAgentIds.length >= AGENT_SELECTION_LIMIT) {
+          const agentElement = agentRef.current;
+          if (animationLockRef.current === false && agentElement) {
+            animationLockRef.current = true;
+            agentElement.classList.add("animate-error");
+            setIsTooltipOpen(true);
+            // TODO cleanup
+            setTimeout(() => {
+              animationLockRef.current = false;
+              agentElement.classList.remove("animate-error");
+            }, 500);
+          }
+        } else
+          setSelectedAgentIds((ids) =>
+            ids.includes(agent.id) ? ids : [...ids, agent.id],
+          );
+      } else setSelectedAgentIds((ids) => ids.filter((id) => id !== agent.id));
+    }, [isSelected, selectedAgentIds.length, agent.id]);
 
-  return (
-    <>
-      <ContextMenu>
-        <Tooltip open={isTooltipOpen}>
-          <ContextMenuTrigger asChild>
-            <TooltipTrigger asChild>
-              <Ripple
-                ref={agentRef}
-                onClick={handleSelect}
-                data-active={isSelected}
-                className="flex w-full items-center gap-2 px-3 py-2 transition-colors active:bg-teal-50/5 data-[active=true]:bg-teal-50/5"
-              >
-                <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-teal-50/15">
-                  {agent.avatarUrl && (
-                    <EnhancedImage
-                      src={agent.avatarUrl}
-                      alt={agent.name}
-                      width={48}
-                      height={48}
-                      className="size-full object-cover"
-                    />
-                  )}
-                  {!agent.avatarUrl && <Bot className="size-5" />}
-                </div>
-
-                <div
-                  className={cn(
-                    "absolute start-11 top-10 flex size-5 scale-0 items-center justify-center rounded-full border-3 border-sidebar bg-green-600 opacity-0 transition-all",
-                    isSelected && "scale-100 border-[#303131] opacity-100",
-                  )}
+    return (
+      <>
+        <ContextMenu>
+          <Tooltip open={isTooltipOpen}>
+            <ContextMenuTrigger asChild>
+              <TooltipTrigger asChild>
+                <Ripple
+                  ref={agentRef}
+                  onClick={handleSelect}
+                  data-active={isSelected}
+                  className="flex w-full items-center gap-2 bg-sidebar px-3 py-2 transition-colors active:bg-teal-50/5 data-[active=true]:bg-teal-50/5"
                 >
-                  <Check className="size-3" />
-                </div>
-
-                <div className="flex flex-col items-start gap-1 overflow-hidden">
-                  <div className="w-full truncate text-start text-sm font-medium">
-                    {agent.name}
+                  <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-teal-50/15">
+                    {agent.avatarUrl && (
+                      <EnhancedImage
+                        src={agent.avatarUrl}
+                        alt={agent.name}
+                        width={48}
+                        height={48}
+                        className="size-full object-cover"
+                      />
+                    )}
+                    {!agent.avatarUrl && <Bot className="size-5" />}
                   </div>
-                  <div className="w-full truncate text-start text-xs text-foreground/75">
-                    {agent.description || "Isn't described"}
+
+                  <div
+                    className={cn(
+                      "absolute start-11 top-10 flex size-5 scale-0 items-center justify-center rounded-full border-3 border-sidebar bg-green-600 opacity-0 transition-all",
+                      isSelected && "scale-100 border-[#303131] opacity-100",
+                    )}
+                  >
+                    <Check className="size-3" />
                   </div>
-                </div>
 
-                <div className="ms-auto truncate overflow-hidden rounded-full bg-teal-50/15 px-1 text-[0.625rem]">
-                  {agent.model}
-                </div>
-              </Ripple>
-            </TooltipTrigger>
-          </ContextMenuTrigger>
+                  <div className="flex flex-col items-start gap-1 overflow-hidden">
+                    <div className="w-full truncate text-start text-sm font-medium">
+                      {agent.name}
+                    </div>
+                    <div className="w-full truncate text-start text-xs text-foreground/75">
+                      {agent.description || "Isn't described"}
+                    </div>
+                  </div>
 
-          <CustomContextMenuContent>
-            <CustomContextMenuItem
-              onClick={() => redirect({ id: "agent-form", context: [agent] })}
-            >
-              <Pencil /> Edit / View
-            </CustomContextMenuItem>
-            <CustomContextMenuItem
-              onClick={() => redirect({ id: "remove-agent", context: [agent] })}
-            >
-              <Trash2 /> Remove
-            </CustomContextMenuItem>
-            <ContextMenuSeparator />
-            <CustomContextMenuItem disabled inset>
-              More features soon...
-            </CustomContextMenuItem>
-          </CustomContextMenuContent>
+                  <div className="ms-auto truncate overflow-hidden rounded-full bg-teal-50/15 px-1 text-[0.625rem]">
+                    {agent.model}
+                  </div>
+                </Ripple>
+              </TooltipTrigger>
+            </ContextMenuTrigger>
 
-          <TooltipContent
-            side="left"
-            className="flex items-center gap-2 p-2 pe-4"
-            onPointerDownOutside={() => setIsTooltipOpen(false)}
-            collisionPadding={8}
-          >
-            <Ripple asChild>
-              <Button
-                variant="secondary"
-                size="icon"
-                rounded="full"
-                className="relative animate-ping-with-shadow shadow-background/50 fill-mode-forwards repeat-1 [animation-delay:500ms]"
+            <CustomContextMenuContent>
+              <CustomContextMenuItem
+                onClick={() => redirect({ id: "agent-form", context: [agent] })}
               >
-                <CircleFadingArrowUp />
-              </Button>
-            </Ripple>
-            <div className="flex flex-col gap-1">
-              <h3 className="text-start font-medium">
-                Upgrade to Select More Agents
-              </h3>
-              <p className="text-start text-background/75">
-                Go to the plans page to upgrade
-              </p>
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </ContextMenu>
+                <Pencil /> Edit / View
+              </CustomContextMenuItem>
+              <CustomContextMenuItem
+                onClick={() =>
+                  redirect({ id: "remove-agent", context: [agent] })
+                }
+              >
+                <Trash2 /> Remove
+              </CustomContextMenuItem>
+              <ContextMenuSeparator />
+              <CustomContextMenuItem disabled inset>
+                More features soon...
+              </CustomContextMenuItem>
+            </CustomContextMenuContent>
 
-      <div className="h-0 border-b border-teal-50/15" />
-    </>
-  );
-}
+            <TooltipContent
+              side="left"
+              className="flex items-center gap-2 p-2 pe-4"
+              onPointerDownOutside={() => setIsTooltipOpen(false)}
+              collisionPadding={8}
+            >
+              <Ripple asChild>
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  rounded="full"
+                  className="relative animate-ping-with-shadow shadow-background/50 fill-mode-forwards repeat-1 [animation-delay:500ms]"
+                >
+                  <CircleFadingArrowUp />
+                </Button>
+              </Ripple>
+              <div className="flex flex-col gap-1">
+                <h3 className="text-start font-medium">
+                  Upgrade to Select More Agents
+                </h3>
+                <p className="text-start text-background/75">
+                  Go to the plans page to upgrade
+                </p>
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </ContextMenu>
+
+        <div className="h-0 border-b border-teal-50/15 last:hidden" />
+      </>
+    );
+  },
+);
+SelectableAgent.displayName = "SelectableAgent";
 
 type NewAgentRequest = z.input<typeof createAgentBodySchema>;
 type EditAgentRequest = z.input<typeof updateAgentBodySchema>;
