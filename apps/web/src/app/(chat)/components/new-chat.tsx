@@ -259,7 +259,7 @@ function SelectableAgent({
   const agentRef = useRef<HTMLButtonElement>(null);
   const animationLockRef = useRef(false);
 
-  const [isTooltipOpen, setIsTooltipOpen] = useState(false);
+  const [isTooltipOpen, setIsTooltipOpen] = useState(false); // TODO close after some time
 
   const isSelected = useMemo(
     () => selectedAgentIds.includes(agent.id),
@@ -281,7 +281,10 @@ function SelectableAgent({
             agentElement.classList.remove("animate-error");
           }, 500);
         }
-      } else setSelectedAgentIds((ids) => [...ids, agent.id]);
+      } else
+        setSelectedAgentIds((ids) =>
+          ids.includes(agent.id) ? ids : [...ids, agent.id],
+        );
     } else setSelectedAgentIds((ids) => ids.filter((id) => id !== agent.id));
   }, [isSelected, selectedAgentIds.length, agent.id]);
 
@@ -293,12 +296,9 @@ function SelectableAgent({
             <TooltipTrigger asChild>
               <Ripple
                 ref={agentRef}
-                disabled={false}
                 onClick={handleSelect}
-                className={cn(
-                  "flex w-full items-center gap-2 px-3 py-2 transition-colors",
-                  isSelected && "bg-teal-50/5",
-                )}
+                data-active={isSelected}
+                className="flex w-full items-center gap-2 px-3 py-2 transition-colors active:bg-teal-50/5 data-[active=true]:bg-teal-50/5"
               >
                 <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-teal-50/15">
                   {agent.avatarUrl && (

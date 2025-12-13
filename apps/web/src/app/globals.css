@@ -401,31 +401,42 @@
 }
 
 @theme {
-  --animate-ripple: ripple 1s forwards;
+  --default-transition-duration: 300ms;
+}
 
-  @keyframes ripple {
-    0% {
-      top: var(--initial-top);
-      left: var(--initial-left);
-      width: 0;
-      filter: blur(0px);
-    }
-    50% {
-      top: 50%;
-      left: 50%;
-      width: 100%;
-    }
-    100% {
-      top: 50%;
-      left: 50%;
-      width: 100%;
-      filter: blur(4px);
-    }
+@theme {
+  --animate-ripple: ripple var(--default-transition-duration)
+    cubic-bezier(0, 0, 0.2, 1) forwards;
+}
+
+@layer utilities {
+  .ripple-vars {
+    --ripple-from: translate3d(
+        calc(var(--ripple-initial-x) - 50%),
+        calc(var(--ripple-initial-y) - 50%),
+        0
+      )
+      scale(0);
+    --ripple-to: translate3d(
+        calc(var(--ripple-final-x) - 50%),
+        calc(var(--ripple-final-y) - 50%),
+        0
+      )
+      scale(1);
+  }
+}
+
+@keyframes ripple {
+  from {
+    transform: var(--ripple-from);
+  }
+  to {
+    transform: var(--ripple-to);
   }
 }
 
 @theme {
-  --animate-error: error 300ms;
+  --animate-error: error var(--default-transition-duration);
 
   @keyframes error {
     0% {

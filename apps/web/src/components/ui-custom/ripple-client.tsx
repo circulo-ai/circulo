@@ -1,117 +1,151 @@
 "use client";
 
-import Position from "@/types";
-import { CSSProperties, useCallback, useEffect, useState } from "react";
+import { nanoid } from "nanoid";
+import { CSSProperties, useCallback, useEffect, useRef, useState } from "react";
+import { useIdSlot } from "./IdSlot";
+
+type Cleanup = ReturnType<Parameters<typeof useEffect>[0]>;
 
 interface Ripple {
   id: string;
-  position: Position;
+  size: number;
+  initial: {
+    x: number;
+    y: number;
+  };
+  final: {
+    x: number;
+    y: number;
+  };
 }
 
-interface RippleClientProps {
-  id: string;
-  disabled?: boolean;
-}
+export function RippleClient() {
+  const id = useIdSlot();
 
-export function RippleClient({ id, disabled }: RippleClientProps) {
-  const [container, setContainer] = useState<HTMLElement | null>(null);
-
-  useEffect(() => {
-    setContainer(document.getElementById(id));
-  }, [id]);
+  const withContainer = useCallback(
+    (run: (container: HTMLButtonElement) => Cleanup): Cleanup => {
+      const container = document.getElementById(id) as HTMLButtonElement | null;
+      if (container) run(container);
+      else if (process.env.NODE_ENV !== "production")
+        console.warn(
+          `[RippleClient] Missing container (#${id}); skipping listener attachment.`,
+        );
+    },
+    [id],
+  );
 
   const [ripples, setRipples] = useState<Ripple[]>([]);
 
-  const addRipple = useCallback(
-    (e: PointerEvent) => {
-      const containersRect = container?.getBoundingClientRect();
-      if (containersRect)
+  const lastRippleIdRef = useRef<string | null>(null);
+
+  const enqueueRippleFromPointer = useCallback(
+    (event: PointerEvent) => {
+      if (event.defaultPrevented) return;
+      withContainer((container) => {
+        if (container.disabled) return;
+        const id = nanoid();
+        const containerRect = container.getBoundingClientRect();
         setRipples((ripples) => [
           ...ripples,
           {
-            id: Math.random().toString(),
-            position: {
-              x: e.pageX - containersRect.x,
-              y: e.pageY - containersRect.y,
+            id,
+            size: smallestEnclosingCircleDiameter(
+              containerRect.width,
+              containerRect.height,
+            ),
+            initial: {
+              x: event.clientX - containerRect.x,
+              y: event.clientY - containerRect.y,
+            },
+            final: {
+              x: containerRect.width / 2,
+              y: containerRect.height / 2,
             },
           },
         ]);
+        lastRippleIdRef.current = id;
+      });
     },
-    [container],
+    [withContainer],
   );
 
-  const pointerUpHandler = useCallback(() => {
-    const newestRipplesID = ripples[ripples.length - 1]?.id;
-    if (newestRipplesID) {
-      const newestRipple = document.getElementById(newestRipplesID);
-      if (newestRipple) newestRipple.style.opacity = "0";
+  const fadeLastRipple = useCallback(() => {
+    const lastRippleId = lastRippleIdRef.current;
+    if (lastRippleId) {
+      const lastRipple = document.getElementById(lastRippleId);
+      if (lastRipple) lastRipple.style.opacity = "0";
     }
-  }, [ripples]);
+  }, []);
+
+  const visibilityChangeHandler = useCallback(() => {
+    if (document.visibilityState === "hidden") fadeLastRipple();
+  }, [fadeLastRipple]);
 
   useEffect(() => {
-    if (!disabled) container?.removeAttribute("disabled");
-
-    container?.addEventListener("pointerdown", addRipple);
-    addEventListener("pointerup", pointerUpHandler);
-    return () => {
-      container?.removeEventListener("pointerdown", addRipple);
-      removeEventListener("pointerup", pointerUpHandler);
-    };
-  }, [addRipple, container, disabled, pointerUpHandler]);
-
-  useEffect(() => {
-    if (container) {
-      const config = { childList: true };
-      const observer = new MutationObserver((mutationList) => {
-        for (const mutation of mutationList)
-          if (mutation.type === "childList")
-            mutation.addedNodes.forEach((node) => {
-              // TODO check if the node has a ripple class name
-              function transitionEndHandler(e: Event) {
-                if ((e as TransitionEvent).propertyName === "opacity")
-                  setRipples((ripples) =>
-                    ripples.filter(
-                      (ripple) => ripple.id !== (node as Element).id,
-                    ),
-                  );
-
-                (node as Element).removeEventListener(
-                  "transitionend",
-                  transitionEndHandler,
-                );
-              }
-
-              (node as Element).addEventListener(
-                "transitionend",
-                transitionEndHandler,
-              );
-            });
-      });
-
-      observer.observe(container, config);
-
+    return withContainer((container) => {
+      container.addEventListener("pointerdown", enqueueRippleFromPointer);
+      addEventListener("pointerup", fadeLastRipple);
+      addEventListener("pointercancel", fadeLastRipple);
+      addEventListener("dragend", fadeLastRipple);
+      addEventListener("visibilitychange", visibilityChangeHandler);
+      addEventListener("pagehide", fadeLastRipple);
+      addEventListener("beforeunload", fadeLastRipple);
+      addEventListener("blur", fadeLastRipple);
       return () => {
-        observer.takeRecords();
-        observer.disconnect();
+        container.removeEventListener("pointerdown", enqueueRippleFromPointer);
+        removeEventListener("pointerup", fadeLastRipple);
+        removeEventListener("pointercancel", fadeLastRipple);
+        removeEventListener("dragend", fadeLastRipple);
+        removeEventListener("visibilitychange", visibilityChangeHandler);
+        removeEventListener("pagehide", fadeLastRipple);
+        removeEventListener("beforeunload", fadeLastRipple);
+        removeEventListener("blur", fadeLastRipple);
       };
-    }
-  }, [container]);
+    });
+  }, [
+    withContainer,
+    enqueueRippleFromPointer,
+    fadeLastRipple,
+    visibilityChangeHandler,
+  ]);
 
   return ripples.map((ripple) => (
-    <div
+    <span
       id={ripple.id}
       key={ripple.id}
-      className="ripple pointer-events-none absolute aspect-square -translate-x-1/2 -translate-y-1/2 animate-ripple rounded-full duration-1000"
+      aria-hidden="true"
+      onTransitionEnd={(event) => {
+        if (event.propertyName === "opacity")
+          setRipples((ripples) =>
+            ripples.filter(
+              (ripple) => ripple.id !== (event.target as HTMLSpanElement).id,
+            ),
+          );
+      }}
+      className="ripple ripple-vars pointer-events-none absolute top-0 left-0 animate-ripple rounded-full transition-opacity will-change-[transform,opacity]"
       style={
         {
-          "--initial-top": ripple.position.y.toString() + "px",
-          "--initial-left": ripple.position.x.toString() + "px",
+          width: ripple.size + "px",
+          height: ripple.size + "px",
+          "--ripple-initial-x": ripple.initial.x + "px",
+          "--ripple-initial-y": ripple.initial.y + "px",
+          "--ripple-final-x": ripple.final.x + "px",
+          "--ripple-final-y": ripple.final.y + "px",
         } as CSSProperties
       }
     />
   ));
 }
 
-// TODO add a proper timing function to the ripple animation
-// TODO rethink the logic
-// TODO when the mouse click is released outside the button, the ripple incorrectly remains visible
+function smallestEnclosingCircleDiameter(w: number, h: number) {
+  if (w === 0) return Math.abs(h);
+  if (h === 0) return Math.abs(w);
+
+  w = Math.abs(w);
+  h = Math.abs(h);
+
+  return Math.sqrt(w * w + h * h);
+}
+
+// TODO make it intractable with keyboard
+// TODO check on phone

@@ -21,6 +21,7 @@ export const buttonVariants = cva(
         highlightedText:
           "bg-teal-50/5 text-foreground/75 hover:text-foreground",
         primary: "bg-foreground text-background hover:bg-foreground/75",
+        none: "",
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",
