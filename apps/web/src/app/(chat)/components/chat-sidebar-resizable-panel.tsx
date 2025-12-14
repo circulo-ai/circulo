@@ -2,7 +2,7 @@
 
 import { ResizablePanel } from "@/components/ui/resizable";
 import { useSidebar } from "@/components/ui/sidebar";
-import { PanelHandle } from "@window-splitter/react";
+import { PanelHandle } from "@arshaan.abh/window-splitter-react";
 import { ComponentProps, useCallback, useEffect, useRef } from "react";
 
 interface ChatSidebarResizablePanelProps extends ComponentProps<

@@ -8,6 +8,7 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import BezierEasing from "bezier-easing";
 import { cookies } from "next/headers";
 import { ReactNode } from "react";
 import { ChatSidebarInside } from "./chat-sidebar-inside";
@@ -45,9 +46,10 @@ export async function ChatSidebar({ children }: { children: ReactNode }) {
           // isStaticAtRest // TODO can't use but it's a good prop, could make a pr to the library's repo to fix it
           collapsible
           collapsedSize="60px"
+          collapseAnimationOnPointer
           collapseAnimation={{
-            duration: 150,
-            easing: "ease-in-out",
+            duration: 300,
+            easing: BezierEasing(0.4, 0, 0.2, 1),
           }}
         >
           <CustomSidebar>

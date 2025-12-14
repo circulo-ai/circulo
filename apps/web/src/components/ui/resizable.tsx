@@ -1,6 +1,6 @@
 "use client";
 
-import * as ResizablePrimitive from "@window-splitter/react";
+import * as ResizablePrimitive from "@arshaan.abh/window-splitter-react";
 import { GripVerticalIcon } from "lucide-react";
 import * as React from "react";
 
