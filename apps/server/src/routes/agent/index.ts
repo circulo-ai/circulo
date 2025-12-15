@@ -6,6 +6,7 @@ import { NotFoundError } from "@circulo-ai/core";
 import {
   BadRequestError,
   createAgentBodySchema,
+  deleteAgentParamsSchema,
   deleteAgentQuerySchema,
   ForbiddenError,
   getAgentQuerySchema,
@@ -169,11 +170,13 @@ router.patch(
 );
 
 router.delete(
-  "/agent",
+  "/agent/:id",
   requireAuth,
+  zValidator("param", deleteAgentParamsSchema),
   zValidator("query", deleteAgentQuerySchema),
   async (c) => {
     const { user, activeOrgId } = c.var;
+    const params = c.req.valid("param");
     const query = c.req.valid("query");
     const organizationId = await resolveOrganizationId(activeOrgId, c.req.raw);
 
@@ -182,7 +185,7 @@ router.delete(
       throw new ForbiddenError("You don't have access to this organization");
     }
 
-    const existingAgent = await agentRepo.findById(query.id);
+    const existingAgent = await agentRepo.findById(params.id);
     if (!existingAgent || existingAgent.organizationId !== organizationId) {
       throw new NotFoundError("Agent not found");
     }
@@ -191,8 +194,8 @@ router.delete(
     assertCanManageAgent(existingAgent.createdBy, user!.id, role);
 
     const deletedAgent = query.hard
-      ? await agentRepo.delete(query.id)
-      : await agentRepo.archive(query.id);
+      ? await agentRepo.delete(params.id)
+      : await agentRepo.archive(params.id);
 
     return c.json(deletedAgent, 200);
   },
