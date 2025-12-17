@@ -16,6 +16,7 @@ export type WorkflowEventType =
   | "workflow.completed"
   | "workflow.failed"
   | "workflow.paused"
+  | "workflow.waiting"
   | "workflow.resumed"
   | "workflow.retrying";
 
@@ -48,6 +49,7 @@ export interface Workflow<TContext, TInput, TOutput> {
   createdAt: number;
   updatedAt: number;
   completedAt?: number;
+  resumeAt?: number;
   maxExecutionTime?: number;
   executionStartedAt?: number;
   retryCount: number;
@@ -55,11 +57,12 @@ export interface Workflow<TContext, TInput, TOutput> {
   metadata: Record<string, unknown>;
 }
 
-export type StepResultType = "chunk" | "complete" | "error";
+export type StepResultType = "chunk" | "complete" | "error" | "wait";
 
 export type StepResult<TOutput> =
   | { type: "chunk"; data: TOutput }
   | { type: "complete"; data: TOutput }
+  | { type: "wait"; until: number; data?: TOutput }
   | { type: "error"; error: WorkflowError };
 
 export interface Step<TContext, TInput, TOutput> {
@@ -104,6 +107,7 @@ export type WorkflowEventPayload<TOutput> =
   | { type: "completed"; output: TOutput; duration: number }
   | { type: "failed"; error: WorkflowError }
   | { type: "paused"; stepId: string }
+  | { type: "waiting"; stepId: string; resumeAt: number }
   | { type: "resumed"; stepId: string }
   | { type: "retrying"; stepId: string; attempt: number; delay: number };
 

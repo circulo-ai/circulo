@@ -17,6 +17,8 @@ export interface WorkflowEngineConfig<TContext, TInput, TOutput> {
   maxConcurrentWorkflows?: number;
   workflowTimeout?: number;
   enableHealthCheck?: boolean;
+  enableAutoResume?: boolean;
+  autoResumeIntervalMs?: number;
 }
 
 export interface WorkflowDefinition<TContext, TInput, TOutput> {

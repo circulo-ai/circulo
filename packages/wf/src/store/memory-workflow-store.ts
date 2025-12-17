@@ -15,15 +15,25 @@ export class InMemoryWorkflowStore<
     this.startLockCleanup();
   }
 
+  private cloneWorkflow(
+    wf: Workflow<TContext, TInput, TOutput>,
+  ): Workflow<TContext, TInput, TOutput> {
+    // Clone serializable parts deeply, but keep step functions intact via shallow copy
+    const { steps, ...rest } = wf;
+    const cloned = structuredClone(rest);
+    const clonedSteps = steps.map((step) => ({ ...step }));
+    return { ...cloned, steps: clonedSteps };
+  }
+
   async saveWorkflow(wf: Workflow<TContext, TInput, TOutput>): Promise<void> {
-    this.workflows.set(wf.id, structuredClone(wf));
+    this.workflows.set(wf.id, this.cloneWorkflow(wf));
   }
 
   async loadWorkflow(
     id: string,
   ): Promise<Workflow<TContext, TInput, TOutput> | null> {
     const wf = this.workflows.get(id);
-    return wf ? structuredClone(wf) : null;
+    return wf ? this.cloneWorkflow(wf) : null;
   }
 
   async updateWorkflow(
@@ -39,9 +49,12 @@ export class InMemoryWorkflowStore<
       return false;
     }
 
-    const updated = structuredClone(wf);
+    const updated = this.cloneWorkflow(wf);
     updated.version = expectedVersion + 1;
     updated.updatedAt = Date.now();
+    // keep caller's reference in sync for optimistic locking
+    wf.version = updated.version;
+    wf.updatedAt = updated.updatedAt;
     this.workflows.set(wf.id, updated);
     return true;
   }
@@ -76,11 +89,17 @@ export class InMemoryWorkflowStore<
       results = results.filter((wf) => wf.createdAt <= filter.createdBefore!);
     }
 
+    if (filter?.resumeBefore) {
+      results = results.filter(
+        (wf) => wf.resumeAt !== undefined && wf.resumeAt <= filter.resumeBefore!,
+      );
+    }
+
     if (filter?.limit) {
       results = results.slice(0, filter.limit);
     }
 
-    return results.map((wf) => structuredClone(wf));
+    return results.map((wf) => this.cloneWorkflow(wf));
   }
 
   async acquireLock(workflowId: string, ttl: number): Promise<Lock | null> {

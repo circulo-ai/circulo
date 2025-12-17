@@ -1,4 +1,5 @@
 import { AggregateRoot, Identifier, ValidationError } from "@circulo-ai/core";
+import { type SupportedModels } from "@circulo-ai/types";
 
 export type AgentProps = {
   id: Identifier;
@@ -8,7 +9,7 @@ export type AgentProps = {
   instructions: string;
   description?: string;
   avatarUrl?: string;
-  model: string;
+  model: SupportedModels;
   maxTokens?: number | null;
   temperature?: number | null;
   isArchived?: boolean;
@@ -77,7 +78,7 @@ export class Agent extends AggregateRoot<AgentProps> {
   }
 
   updateModel(config: {
-    model?: string;
+    model?: SupportedModels;
     maxTokens?: number | null;
     temperature?: number | null;
   }) {

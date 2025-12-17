@@ -21,6 +21,7 @@ export interface WorkflowFilter {
   tags?: Record<string, string>;
   createdAfter?: number;
   createdBefore?: number;
+  resumeBefore?: number;
   limit?: number;
 }
 

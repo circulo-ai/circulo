@@ -107,6 +107,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
     const workflow = await this.workflowStore.loadWorkflow(workflowId);
 
     if (workflow && workflow.state === "paused") {
+      workflow.resumeAt = undefined;
       const success = await this.updateWorkflowState(workflow, "running");
       if (success) {
         const currentStep = workflow.steps[workflow.currentStep];
@@ -135,6 +136,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
         retryable: false,
         timestamp: Date.now(),
       };
+      workflow.resumeAt = undefined;
       workflow.completedAt = Date.now();
 
       const success = await this.updateWorkflowWithVersion(workflow);
@@ -159,6 +161,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
       workflow.executionStartedAt = startTime;
     }
 
+    workflow.resumeAt = undefined;
     workflow.state = "running";
     await this.updateWorkflowWithVersion(workflow);
 
@@ -236,8 +239,46 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
           throw new Error(result.error.message);
         }
 
-        workflow.output = result.data as TOutput;
         const duration = Date.now() - stepStartTime;
+
+        if (result.type === "wait") {
+          if (result.data !== undefined) {
+            workflow.output = result.data as TOutput;
+          }
+
+          await this.emitEvent(workflow.id, "workflow.step.completed", {
+            type: "step.completed",
+            stepId: step.id,
+            data: (result.data ?? workflow.output) as TOutput,
+            duration,
+          });
+
+          this.metrics.recordStepSuccess(step.name);
+          this.metrics.recordStepDuration(step.name, duration);
+
+          this.applyContextUpdates(workflow);
+          this.applyStepAppends(workflow);
+
+          workflow.currentStep++;
+          workflow.retryCount = 0;
+          workflow.state = "paused";
+          workflow.resumeAt = result.until;
+          await this.updateWorkflowWithVersion(workflow);
+
+          await this.emitEvent(workflow.id, "workflow.waiting", {
+            type: "waiting",
+            stepId: step.id,
+            resumeAt: result.until,
+          });
+
+          stepLogger.info("Step requested wait", {
+            resumeAt: result.until,
+            duration,
+          });
+          return;
+        }
+
+        workflow.output = result.data as TOutput;
 
         await this.emitEvent(workflow.id, "workflow.step.completed", {
           type: "step.completed",
@@ -369,6 +410,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
   ): Promise<void> {
     workflow.state = "failed";
     workflow.error = error;
+    workflow.resumeAt = undefined;
     workflow.completedAt = Date.now();
     await this.updateWorkflowWithVersion(workflow);
 
