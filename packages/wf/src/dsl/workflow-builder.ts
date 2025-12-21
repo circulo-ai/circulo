@@ -108,9 +108,7 @@ export class WorkflowBuilder<TContext, TInput = never, TCurrent = never> {
   }
 
   validate(
-    validator: (
-      input: ResolveInput<TInput>,
-    ) => boolean | Promise<boolean>,
+    validator: (input: ResolveInput<TInput>) => boolean | Promise<boolean>,
   ): WorkflowBuilder<TContext, TInput, TCurrent> {
     this.validatorFn = validator;
     return this;

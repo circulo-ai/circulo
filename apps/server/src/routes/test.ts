@@ -8,8 +8,8 @@ import {
   InMemoryEventStore,
   InMemoryMetrics,
   InMemoryWorkflowStore,
-  WorkflowEngine,
   waitFor,
+  WorkflowEngine,
   type WorkflowEvent,
 } from "@circulo-ai/wf";
 
@@ -126,8 +126,7 @@ router.get("/test", async (c) => {
 });
 
 router.get("/test/stream", async (c) => {
-  const initial =
-    Number(new URL(c.req.url).searchParams.get("initial")) || 10;
+  const initial = Number(new URL(c.req.url).searchParams.get("initial")) || 10;
   const workflowId = await engine.createWorkflow(workflow, { initial });
   const encoder = new TextEncoder();
 

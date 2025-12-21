@@ -9,9 +9,9 @@ export {
   classifyValidationError,
   complete,
   error,
+  streamStep,
   waitFor,
   waitUntil,
-  streamStep,
 } from "./dsl/step-helpers";
 export { WorkflowBuilder, defineWorkflow } from "./dsl/workflow-builder";
 export type { StepConfig } from "./dsl/workflow-builder";

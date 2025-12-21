@@ -91,7 +91,8 @@ export class InMemoryWorkflowStore<
 
     if (filter?.resumeBefore) {
       results = results.filter(
-        (wf) => wf.resumeAt !== undefined && wf.resumeAt <= filter.resumeBefore!,
+        (wf) =>
+          wf.resumeAt !== undefined && wf.resumeAt <= filter.resumeBefore!,
       );
     }
 

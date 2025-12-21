@@ -41,7 +41,11 @@ bun add @circulo-ai/file-parsers
 ## Quick start
 
 ```typescript
-import { parseFile, parseBuffer, isSupportedFileType } from "@circulo-ai/file-parsers";
+import {
+  parseFile,
+  parseBuffer,
+  isSupportedFileType,
+} from "@circulo-ai/file-parsers";
 
 // Parse by path (extension auto-detected)
 const pdfResult = await parseFile("docs/report.pdf");
@@ -90,8 +94,8 @@ const pdfResult = await pdf.parseBuffer(myPdfBuffer);
 
 ## Behavior notes
 
-* CSV streaming: chunk size 16KB; skips malformed rows; logs first few errors; truncates preview after 1,000 rows while keeping counts.
-* Sanitization: sanitizeTextForUTF8 strips control chars, null bytes, replacement chars, and surrogate pairs to keep DB writes safe.
-* Extension handling: extensions are lowercased; parseBuffer expects values like "pdf" not ".pdf".
-* Error handling: missing files, empty buffers, and unsupported extensions throw descriptive errors; isSupportedFileType returns false on loader failures.
-* Approximate token count: many parsers set tokenCount = Math.floor(characterCount / 4) as a quick LLM sizing heuristic.
+- CSV streaming: chunk size 16KB; skips malformed rows; logs first few errors; truncates preview after 1,000 rows while keeping counts.
+- Sanitization: sanitizeTextForUTF8 strips control chars, null bytes, replacement chars, and surrogate pairs to keep DB writes safe.
+- Extension handling: extensions are lowercased; parseBuffer expects values like "pdf" not ".pdf".
+- Error handling: missing files, empty buffers, and unsupported extensions throw descriptive errors; isSupportedFileType returns false on loader failures.
+- Approximate token count: many parsers set tokenCount = Math.floor(characterCount / 4) as a quick LLM sizing heuristic.
