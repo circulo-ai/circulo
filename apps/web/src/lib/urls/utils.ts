@@ -20,7 +20,7 @@ export function getBaseUrl(): string {
     return `${protocol}${baseUrl}`;
   }
 
-  return "http://localhost:3000";
+  return "http://localhost:3001";
 }
 
 /**

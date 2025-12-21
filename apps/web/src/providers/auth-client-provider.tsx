@@ -1,6 +1,7 @@
 "use client";
 
 import { authClient } from "@/lib/auth-client";
+import { getBaseUrl } from "@/lib/urls/utils";
 import { AuthUIProvider } from "@daveyplate/better-auth-ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -27,6 +28,7 @@ export function AuthClientProvider({ children }: { children: ReactNode }) {
       }}
       navigate={router.push}
       replace={router.replace}
+      baseURL={getBaseUrl()}
       onSessionChange={() => {
         // Clear router cache (protected routes)
         router.refresh();
