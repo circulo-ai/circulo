@@ -1,5 +1,5 @@
 import { EnhancedLink } from "@/components/enhanced-link";
-import { WithRipple } from "@/components/ui-custom/ripple";
+import { Ripple } from "@/components/ui-custom/ripple";
 import {
   CustomSidebarMenuAvatar,
   CustomSidebarMenuButton,
@@ -54,21 +54,19 @@ export function ChatSidebarEmpty({
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
-          <WithRipple
-            component={EnhancedLink}
-            tabIndex={open ? undefined : -1}
-            componentProps={{
-              enableLinkStatus: false,
-              href: `/chat`,
-              className: cn("[&_.ripple]:bg-neutral-950/15"),
-              buttonProps: {
+          <Ripple tabIndex={open ? undefined : -1} asChild>
+            <EnhancedLink
+              enableLinkStatus={false}
+              href={`/chat`}
+              className={cn("[&>.base-ripple]:bg-neutral-950/15")}
+              buttonProps={{
                 size: "sm",
                 variant: "primary",
-              },
-            }}
-          >
-            <Plus /> Add Chat
-          </WithRipple>
+              }}
+            >
+              <Plus /> Add Chat
+            </EnhancedLink>
+          </Ripple>
         </EmptyContent>
       </Empty>
 
@@ -78,20 +76,18 @@ export function ChatSidebarEmpty({
           className="rounded-full p-0"
           asChild
         >
-          <WithRipple
-            component={EnhancedLink}
-            tabIndex={open ? -1 : undefined}
-            componentProps={{
-              enableLinkStatus: false,
-              asButton: false,
-              href: `/chat`,
-              className: cn("[&_.ripple]:bg-neutral-950/15"),
-            }}
-          >
-            <CustomSidebarMenuAvatar className="flex items-center justify-center bg-transparent">
-              <Plus className="size-4 text-background" />
-            </CustomSidebarMenuAvatar>
-          </WithRipple>
+          <Ripple tabIndex={open ? -1 : undefined} asChild>
+            <EnhancedLink
+              enableLinkStatus={false}
+              asButton={false}
+              href={`/chat`}
+              className={cn("[&>.base-ripple]:bg-neutral-950/15")}
+            >
+              <CustomSidebarMenuAvatar className="flex items-center justify-center bg-transparent">
+                <Plus className="size-4 text-background" />
+              </CustomSidebarMenuAvatar>
+            </EnhancedLink>
+          </Ripple>
         </CustomSidebarMenuButton>
       </SidebarMenuItem>
     </div>

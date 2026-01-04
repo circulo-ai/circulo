@@ -1,3 +1,4 @@
+@import "@base-ripple/react/styles.css";
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "@daveyplate/better-auth-ui/css";
@@ -398,41 +399,6 @@
       var(--color-slate-900),
       transparent
     );
-}
-
-@theme {
-  --default-transition-duration: 300ms;
-}
-
-@theme {
-  --animate-ripple: ripple var(--default-transition-duration)
-    cubic-bezier(0, 0, 0.2, 1) forwards;
-}
-
-@layer utilities {
-  .ripple-vars {
-    --ripple-from: translate3d(
-        calc(var(--ripple-initial-x) - 50%),
-        calc(var(--ripple-initial-y) - 50%),
-        0
-      )
-      scale(0);
-    --ripple-to: translate3d(
-        calc(var(--ripple-final-x) - 50%),
-        calc(var(--ripple-final-y) - 50%),
-        0
-      )
-      scale(1);
-  }
-}
-
-@keyframes ripple {
-  from {
-    transform: var(--ripple-from);
-  }
-  to {
-    transform: var(--ripple-to);
-  }
 }
 
 @theme {

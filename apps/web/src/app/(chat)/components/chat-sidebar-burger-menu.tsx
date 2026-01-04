@@ -4,7 +4,7 @@ import {
   CustomDropdownMenuContent,
   CustomDropdownMenuItem,
 } from "@/components/ui-custom/dropdown-menu";
-import { WithRipple } from "@/components/ui-custom/ripple";
+import { Ripple } from "@/components/ui-custom/ripple";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -39,16 +39,11 @@ export function ChatSidebarBurgerMenu() {
     <DropdownMenu>
       <CreateOrganizationDialog open={open} onOpenChange={setOpen} />
       <DropdownMenuTrigger asChild>
-        <WithRipple
-          component={Button}
-          componentProps={{
-            variant: "ghost-sidebar",
-            rounded: "full",
-            size: "icon",
-          }}
-        >
-          <TextAlignJustify />
-        </WithRipple>
+        <Button variant="ghost-sidebar" rounded="full" size="icon" asChild>
+          <Ripple>
+            <TextAlignJustify />
+          </Ripple>
+        </Button>
       </DropdownMenuTrigger>
       <CustomDropdownMenuContent sideOffset={8} align="start">
         <DropdownMenuGroup>

@@ -292,7 +292,7 @@ const SelectableAgent = forwardRef<HTMLButtonElement, SelectableAgentProps>(
                   ref={agentRef}
                   onClick={handleSelect}
                   data-active={isSelected}
-                  className="flex w-full items-center gap-2 bg-sidebar px-3 py-2 transition-colors active:bg-teal-50/5 data-[active=true]:bg-teal-50/5"
+                  className="flex w-full items-center gap-2 bg-sidebar px-3 py-2 transition-colors active:bg-teal-50/5! data-[active=true]:bg-teal-50/5"
                 >
                   <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-teal-50/15">
                     {agent.avatarUrl && (

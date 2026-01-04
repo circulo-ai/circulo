@@ -105,6 +105,7 @@
         "@aws-sdk/s3-request-presigner": "^3.940.0",
         "@azure/communication-email": "^1.1.0",
         "@azure/storage-blob": "^12.29.1",
+        "@base-ripple/react": "^1.0.2",
         "@better-auth/stripe": "^1.4.3",
         "@circulo-ai/db": "workspace:*",
         "@circulo-ai/types": "workspace:*",
@@ -597,6 +598,10 @@
     "@babel/traverse": ["@babel/traverse@7.28.5", "", { "dependencies": { "@babel/code-frame": "^7.27.1", "@babel/generator": "^7.28.5", "@babel/helper-globals": "^7.28.0", "@babel/parser": "^7.28.5", "@babel/template": "^7.27.2", "@babel/types": "^7.28.5", "debug": "^4.3.1" } }, "sha512-TCCj4t55U90khlYkVV/0TfkJkAkUg3jZFA3Neb7unZT8CPok7iiRfaX0F+WnqWqt7OxhOn0uBKXCw4lbL8W0aQ=="],
 
     "@babel/types": ["@babel/types@7.28.5", "", { "dependencies": { "@babel/helper-string-parser": "^7.27.1", "@babel/helper-validator-identifier": "^7.28.5" } }, "sha512-qQ5m48eI/MFLQ5PxQj4PFaprjyCTLI37ElWMmNs0K8Lk3dVeOdNpB3ks8jc7yM5CDmVC73eMVk/trk3fgmrUpA=="],
+
+    "@base-ripple/core": ["@base-ripple/core@1.0.2", "", {}, "sha512-RtyzaniTjDUH8UhuK++3fu7kh3tuuOSWjdQ2GPhEc9zoG/YOXIWESAvub1zu3t4Fiq0+X0cUZAwHO3WiRDe2hg=="],
+
+    "@base-ripple/react": ["@base-ripple/react@1.0.2", "", { "dependencies": { "@base-ripple/core": "1.0.2" }, "peerDependencies": { "react": ">=16.8 <20" } }, "sha512-rcVwsmqw+D0/euInfH2wk7DUVB96DGRe0YiISPkou5L5HrImXq9XyN2r+lt3iao7s361d6ge6AYa/b8oUd4FGQ=="],
 
     "@bcoe/v8-coverage": ["@bcoe/v8-coverage@0.2.3", "", {}, "sha512-0hYQ8SB4Db5zvZB4axdMHGwEaQjkZzFjQiN9LVYvIFB2nSUHW9tYpxWriPrWDASIxiaXax83REcLxuSdnGPZtw=="],
 

@@ -19,7 +19,7 @@ import {
   CustomContextMenuContent,
   CustomContextMenuItem,
 } from "./context-menu";
-import { WithRipple } from "./ripple";
+import { Ripple } from "./ripple";
 import { CustomSkeleton } from "./skeleton";
 
 interface CustomSidebarProps extends ComponentProps<typeof Sidebar> {}
@@ -131,18 +131,17 @@ export function CustomSidebarGroupAction({
   ...props
 }: CustomSidebarGroupActionProps) {
   return (
-    <WithRipple
-      className={cn("absolute right-2 bottom-2 mt-auto", className)}
-      component={SidebarGroupAction}
-      componentProps={{
-        className: cn(
-          "size-12 rounded-full bg-teal-700 transition-all group-data-[collapsible=icon]:flex hover:bg-teal-600 data-[state=open]:bg-teal-600",
-        ),
-      }}
-      {...props}
-    >
-      {children}
-    </WithRipple>
+    <Ripple asChild>
+      <SidebarGroupAction
+        className={cn(
+          "absolute right-2 bottom-2 mt-auto size-12 rounded-full bg-teal-700 transition-all group-data-[collapsible=icon]:flex hover:bg-teal-600 data-[state=open]:bg-teal-600",
+          className,
+        )}
+        {...props}
+      >
+        {children}
+      </SidebarGroupAction>
+    </Ripple>
   );
 }
 

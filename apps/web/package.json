@@ -26,6 +26,7 @@
     "@aws-sdk/s3-request-presigner": "^3.940.0",
     "@azure/communication-email": "^1.1.0",
     "@azure/storage-blob": "^12.29.1",
+    "@base-ripple/react": "^1.0.2",
     "@better-auth/stripe": "^1.4.3",
     "@circulo-ai/db": "workspace:*",
     "@circulo-ai/types": "workspace:*",
