@@ -19,6 +19,8 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
   private processing = false;
   private shutdownRequested = false;
   private idempotencyCache = new Map<string, string>(); // idempotencyKey -> workflowId
+  private resumeTimer?: ReturnType<typeof setInterval>;
+  private resumingDue = false;
 
   constructor(config: WorkflowEngineConfig<TContext, TInput, TOutput>) {
     this.config = config;
@@ -39,6 +41,10 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
 
     if (config.enableHealthCheck) {
       this.startHealthCheck();
+    }
+
+    if (config.enableAutoResume !== false) {
+      this.startAutoResume();
     }
   }
 
@@ -330,9 +336,51 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
     }, 30000);
   }
 
+  private startAutoResume(): void {
+    const interval = this.config.autoResumeIntervalMs ?? 1000;
+    this.resumeTimer = setInterval(() => {
+      this.resumeDueWorkflows().catch((err) => {
+        this.logger.error("Auto-resume scan failed", err as Error);
+      });
+    }, interval);
+  }
+
+  private stopAutoResume(): void {
+    if (this.resumeTimer) {
+      clearInterval(this.resumeTimer);
+      this.resumeTimer = undefined;
+    }
+  }
+
+  async resumeDueWorkflows(): Promise<void> {
+    if (this.resumingDue) return;
+
+    this.resumingDue = true;
+    try {
+      const now = Date.now();
+      const due = await this.config.workflowStore.listWorkflows({
+        state: "paused",
+        resumeBefore: now,
+      });
+
+      for (const wf of due) {
+        if (wf.resumeAt !== undefined && wf.resumeAt <= now) {
+          this.run(wf.id).catch((err) => {
+            this.logger.error("Failed to auto-resume workflow", err as Error, {
+              workflowId: wf.id,
+            });
+          });
+        }
+      }
+    } finally {
+      this.resumingDue = false;
+    }
+  }
+
   async shutdown(graceful = true): Promise<void> {
     this.logger.info("Shutting down workflow engine", { graceful });
     this.shutdownRequested = true;
+    this.stopAutoResume();
 
     if (graceful) {
       const timeout = 30000;

@@ -9,6 +9,7 @@
       "@circulo-ai/di": ["../../packages/di/src"],
       "@circulo-ai/file-parsers": ["../../packages/file-parsers/src"],
       "@circulo-ai/redis": ["../../packages/redis/src"],
+      "@circulo-ai/wf": ["../../packages/wf/src"],
       "@/db": ["../../packages/db/index.ts"],
       "@/db/*": ["../../packages/db/*"]
     },
@@ -36,7 +37,6 @@
     "types": ["node"],
     "isolatedModules": true
   },
-  "references": [{ "path": "../../packages/types" }],
   "include": ["src/**/*"],
   "exclude": ["node_modules", "**/*.test.ts", "dist", "drizzle.config.ts"]
 }

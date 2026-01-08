@@ -1,4 +1,4 @@
-# @workflow/orchestration
+# @circulo-ai/wf
 
 A production-quality, framework-agnostic TypeScript workflow orchestration runtime with event-sourced execution, streaming capabilities, and a strongly-typed declarative DSL.
 
@@ -17,11 +17,11 @@ A production-quality, framework-agnostic TypeScript workflow orchestration runti
 ## Installation
 
 ```bash
-npm install @workflow/orchestration
+npm install @circulo-ai/wf
 # or
-bun add @workflow/orchestration
+bun add @circulo-ai/wf
 # or
-deno add @workflow/orchestration
+deno add @circulo-ai/wf
 ```
 
 ## Quick Start
@@ -35,7 +35,7 @@ import {
   InMemoryWorkflowStore,
   InMemoryEventStore,
   InMemoryEventBus,
-} from "@workflow/orchestration";
+} from "@circulo-ai/wf";
 
 // Define your context type
 interface MyContext {
@@ -51,6 +51,8 @@ const engine = new WorkflowEngine({
 });
 
 // Define a workflow using the typed DSL
+// Input type can be inferred from the first step, or specified up front:
+// defineWorkflow<MyContext, { initial: number }>()
 const workflow = defineWorkflow<MyContext>()
   .context({ count: 0, messages: [] })
   .step("start", {

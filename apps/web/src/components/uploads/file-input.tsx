@@ -1,7 +1,4 @@
-import {
-  UploadTask,
-  useUploadTaskManager,
-} from "@/hooks/use-upload-task-manager";
+import { useUploadTaskManager } from "@/hooks/use-upload-task-manager";
 import { getGhostProps } from "@/lib/ghost";
 import { cn } from "@/lib/utils";
 import { ImageMinus, ImagePlus } from "lucide-react";
@@ -17,7 +14,6 @@ import {
   useCallback,
   useEffect,
   useId,
-  useMemo,
   useState,
 } from "react";
 import { Spinner } from "../ui/spinner";
@@ -56,40 +52,56 @@ export function FileInput({
   const [isLoaded, setIsLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const { uploadTasks, hasActiveUploads, enqueueUploads, resetAllUploadTasks } =
-    useUploadTaskManager({
-      onTaskComplete: (task) => {
-        onTaskComplete?.(task);
-        const stablePath = task.path ?? task.url ?? task.downloadUrl;
-        if (stablePath && onChange)
-          onChange({
-            target: { value: stablePath },
-          } as ChangeEvent<HTMLInputElement>);
-      },
-      ...otherUseUploadTaskManagerProps,
-    });
+  const {
+    uploadTasks,
+    hasActiveUploads,
+    enqueueUploads,
+    removeUploadTask,
+    cancelUploadTask,
+    resetAllUploadTasks,
+  } = useUploadTaskManager({
+    onTaskComplete: (task) => {
+      onTaskComplete?.(task);
+      const stablePath = task.path ?? task.url ?? task.downloadUrl;
+      if (stablePath && onChange)
+        onChange({
+          target: { value: stablePath },
+        } as ChangeEvent<HTMLInputElement>);
+    },
+    ...otherUseUploadTaskManagerProps,
+  });
+
+  // loading lifecycle: reset everything when value is cleared, mark loading while uploads are active, and stop loading once the image finishes.
+
+  useEffect(() => {
+    if (value) setIsLoading(true);
+    else {
+      setIsDragOver(false);
+      setIsLoaded(false);
+      setIsLoading(false);
+      uploadTasks.map((task) => {
+        removeUploadTask(task.id);
+        cancelUploadTask(task.id);
+      });
+      resetAllUploadTasks();
+    }
+  }, [value]);
 
   useEffect(() => {
     if (hasActiveUploads) setIsLoading(true);
-    else if (isLoaded) setIsLoading(false);
-  }, [hasActiveUploads, isLoaded]);
+  }, [hasActiveUploads]);
 
-  const lastTask: UploadTask | undefined = useMemo(
-    () => uploadTasks[uploadTasks.length - 1],
-    [uploadTasks],
+  useEffect(() => {
+    if (isLoaded) setIsLoading(false);
+  }, [isLoaded]);
+
+  const reset = useCallback(
+    () =>
+      onChange?.({
+        target: { value: "" },
+      } as ChangeEvent<HTMLInputElement>),
+    [onChange],
   );
-
-  const displayUrl = useMemo(
-    () => lastTask?.downloadUrl ?? lastTask?.url,
-    [lastTask],
-  );
-
-  const reset = useCallback(() => {
-    setIsLoaded(false);
-    setIsLoading(false);
-    // TODO reset the controlled state too
-    resetAllUploadTasks();
-  }, []);
 
   const handleDropOver: DragEventHandler<HTMLLabelElement> = useCallback(
     (e) => {
@@ -140,7 +152,7 @@ export function FileInput({
         {...props}
       />
       <CustomComponent
-        url={displayUrl}
+        url={normalizeValue(value)}
         isDragOver={isDragOver}
         disabled={disabled}
         isLoading={isLoading}
@@ -199,3 +211,10 @@ function DefaultComponent({
 
 // TODO global drag and drop
 // TODO when the form resets, this doesn't
+
+function normalizeValue(value: FileInputProps["value"]): string | undefined {
+  if (typeof value === "string") return value;
+  else if (typeof value === "number") return value.toString();
+  else if (Array.isArray(value)) return value[0];
+  else return undefined;
+}

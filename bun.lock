@@ -268,7 +268,7 @@
     },
     "packages/core": {
       "name": "@circulo-ai/core",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "devDependencies": {
         "@types/node": "^20.19.25",
         "typescript": "^5.9.3",
@@ -294,7 +294,7 @@
     },
     "packages/di": {
       "name": "@circulo-ai/di",
-      "version": "2.1.0",
+      "version": "2.1.1",
       "devDependencies": {
         "@types/node": "^20.19.25",
         "@vitest/coverage-v8": "^2.1.4",
@@ -311,7 +311,7 @@
     },
     "packages/file-parsers": {
       "name": "@circulo-ai/file-parsers",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "dependencies": {
         "cheerio": "^1.1.2",
         "csv-parse": "^6.1.0",
@@ -350,10 +350,13 @@
     "packages/types": {
       "name": "@circulo-ai/types",
       "version": "0.0.0",
+      "dependencies": {
+        "zod": "^4.1.13",
+      },
     },
     "packages/upload": {
       "name": "@circulo-ai/upload",
-      "version": "1.2.0",
+      "version": "1.4.1",
       "dependencies": {
         "@vercel/blob": "^2.0.0",
       },

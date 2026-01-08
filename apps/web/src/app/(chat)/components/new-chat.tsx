@@ -24,6 +24,7 @@ import { CustomScrollArea } from "@/components/ui-custom/scroll-area";
 import { SelectInput } from "@/components/ui-custom/select";
 import { SliderInput } from "@/components/ui-custom/slider";
 import { Submit } from "@/components/ui-custom/submit";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AnimatedList } from "@/components/ui/animated-list";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,12 +38,14 @@ import {
   InputGroupButton,
   InputGroupTextarea,
 } from "@/components/ui/input-group";
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { FileInput } from "@/components/uploads/file-input";
+import { ApiRequestError } from "@/lib/api/client";
 import { deepReplace } from "@/lib/deep-replace";
 import { getFetcher } from "@/lib/swr";
 import { cn } from "@/lib/utils";
@@ -51,6 +54,8 @@ import { Agent } from "@circulo-ai/db";
 import {
   createAgentBodySchema,
   defaultModel,
+  deleteAgentParamsSchema,
+  deleteAgentQuerySchema,
   updateAgentBodySchema,
 } from "@circulo-ai/types";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -63,6 +68,8 @@ import {
   Paperclip,
   Pencil,
   Plus,
+  Trash2,
+  TriangleAlert,
 } from "lucide-react";
 import {
   ComponentProps,
@@ -83,7 +90,10 @@ import z from "zod";
 const route: Route = {
   id: "select-agents",
   view: SelectAgents,
-  children: [{ id: "agent-form", view: AgentForm }],
+  children: [
+    { id: "agent-form", view: AgentForm },
+    { id: "remove-agent", view: RemoveAgent },
+  ],
 };
 
 interface NewChatProps {
@@ -205,6 +215,7 @@ function SelectAgents() {
           <PageSpinner />
         )}
         {data && (
+          // TODO needs better performance when too many agents
           <AnimatedList
             itemElement="div"
             ids={data.map((agent) => agent.id)}
@@ -312,7 +323,7 @@ function SelectableAgent({
                     {agent.name}
                   </div>
                   <div className="w-full truncate text-start text-xs text-foreground/75">
-                    {agent.description ?? "Isn't described"}
+                    {agent.description || "Isn't described"}
                   </div>
                 </div>
 
@@ -328,6 +339,11 @@ function SelectableAgent({
               onClick={() => redirect({ id: "agent-form", context: [agent] })}
             >
               <Pencil /> Edit / View
+            </CustomContextMenuItem>
+            <CustomContextMenuItem
+              onClick={() => redirect({ id: "remove-agent", context: [agent] })}
+            >
+              <Trash2 /> Remove
             </CustomContextMenuItem>
             <ContextMenuSeparator />
             <CustomContextMenuItem disabled inset>
@@ -389,16 +405,13 @@ function AgentForm() {
 
   const defaultValues = useMemo(
     () => ({
-      name: "",
-      description: "",
-      instructions: "",
       model: defaultModel,
       temperature: 70,
     }),
     [],
   );
 
-  const formId = useId();
+  const formId = useId(); // TODO could make a hook to gather CustomForm component's stuff
 
   const addForm = useForm<NewAgentRequest>({
     resolver: zodResolver(createAgentBodySchema),
@@ -430,6 +443,9 @@ function AgentForm() {
     redirect({ id: "select-agents" });
     addForm.reset();
     editForm.reset();
+    // TODO implement a tooltip that says "you have unsaved changes" when isDirty, here
+    // it also has a "remember my choice" checkbox
+    // make it a component that wraps a button
   }, [redirect, addForm, editForm]);
 
   return (
@@ -608,6 +624,101 @@ function AgentFormContent({
         </FieldGroup>
       </CustomScrollArea>
     </>
+  );
+}
+
+const deleteAgentSchema = deleteAgentParamsSchema.extend(
+  deleteAgentQuerySchema.shape,
+);
+
+type RemoveAgentRequest = z.input<typeof deleteAgentSchema>;
+
+// TODO implement a "remember my choice" checkbox
+function RemoveAgent() {
+  const { redirect, currentRoute } = useRouteFlowViewContext();
+
+  const currentAgent = useMemo(
+    () => currentRoute.context?.[0] as Agent | undefined,
+    [currentRoute.context],
+  );
+
+  const form = useForm({
+    resolver: zodResolver(deleteAgentSchema),
+    defaultValues: { id: currentAgent?.id, hard: false },
+  });
+
+  useEffect(() => {
+    if (currentAgent) form.reset({ id: currentAgent.id, hard: false });
+  }, [currentAgent, form]);
+
+  const deleteFetcher = useMemo(() => getFetcher("DELETE"), []);
+
+  const { trigger } = useSWRMutation<
+    Agent,
+    ApiRequestError,
+    Key,
+    RemoveAgentRequest
+  >("/api/agent", (url: string, { arg }: { arg: RemoveAgentRequest }) =>
+    deleteFetcher<Agent>([`${url}/${arg.id}`, { hard: arg.hard }]),
+  );
+
+  const goBack = useCallback(
+    () => redirect({ id: "select-agents" }),
+    [redirect],
+  );
+
+  return (
+    <RouteViewLayout>
+      <RouteViewHeader title="Remove Agent" onBack={goBack} />
+      <CustomForm
+        form={form}
+        swr={{ trigger }}
+        onSubmit={goBack}
+        className="my-7 flex flex-col gap-7"
+      >
+        <Alert className="mx-4 w-auto">
+          <TriangleAlert />
+          <AlertTitle>Are you sure?</AlertTitle>
+          <AlertDescription>
+            <p>You are about to remove the following agent:</p>
+          </AlertDescription>
+        </Alert>
+        <Table>
+          <TableBody>
+            <TableRow className="border-teal-50/15">
+              <TableCell className="ps-4 text-teal-50/75">Name</TableCell>
+              <TableCell className="pe-4 font-medium">
+                {currentAgent?.name}
+              </TableCell>
+            </TableRow>
+            <TableRow className="border-teal-50/15">
+              <TableCell className="ps-4 text-teal-50/75">
+                Description
+              </TableCell>
+              <TableCell className="pe-4 font-medium">
+                {currentAgent?.description || "Isn't described"}
+              </TableCell>
+            </TableRow>
+            <TableRow className="border-teal-50/15">
+              <TableCell className="ps-4 text-teal-50/75">
+                Instructions
+              </TableCell>
+              <TableCell className="pe-4 font-medium">
+                {currentAgent?.instructions}
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+        <div className="flex items-center justify-end gap-4 px-4">
+          <Button variant="ghost-sidebar" rounded="full" onClick={goBack}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="primary" rounded="full">
+            Remove
+          </Button>
+        </div>
+      </CustomForm>
+    </RouteViewLayout>
   );
 }
 

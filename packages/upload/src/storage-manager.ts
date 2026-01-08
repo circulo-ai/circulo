@@ -19,9 +19,16 @@ import type {
 /**
  * Storage manager configuration with multiple named storage providers
  */
+export type StorageProviderFactory = () => StorageProvider;
+
+export type StorageManagerProviders<TContexts extends string = string> = Record<
+  TContexts,
+  StorageProvider | StorageProviderFactory
+>;
+
 export interface StorageManagerConfig<TContexts extends string = string> {
-  /** Map of context names to storage providers */
-  providers: Record<TContexts, StorageProvider>;
+  /** Map of context names to storage providers or lazy factories */
+  providers: StorageManagerProviders<TContexts>;
   /** Default provider context to use when none specified */
   defaultContext: TContexts;
 }
@@ -127,13 +134,19 @@ export class StorageManager<TContexts extends string = string> {
    */
   private getProvider(context?: TContexts): StorageProvider {
     const ctx = context || this.config.defaultContext;
-    const provider = this.config.providers[ctx];
+    const providerOrFactory = this.config.providers[ctx];
 
-    if (!provider) {
+    if (!providerOrFactory) {
       throw new Error(`Storage provider not found for context: ${ctx}`);
     }
 
-    return provider;
+    if (typeof providerOrFactory === "function") {
+      const provider = providerOrFactory();
+      this.config.providers[ctx] = provider;
+      return provider;
+    }
+
+    return providerOrFactory;
   }
 
   /**
@@ -141,6 +154,13 @@ export class StorageManager<TContexts extends string = string> {
    */
   getAvailableContexts(): TContexts[] {
     return Object.keys(this.config.providers) as TContexts[];
+  }
+
+  /**
+   * Get the manager's configured default context
+   */
+  getDefaultContext(): TContexts {
+    return this.config.defaultContext;
   }
 
   /**
@@ -335,3 +355,6 @@ export class StorageManager<TContexts extends string = string> {
     );
   }
 }
+
+export type StorageManagerFactory<TContexts extends string = string> =
+  () => StorageManager<TContexts>;

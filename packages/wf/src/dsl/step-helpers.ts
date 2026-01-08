@@ -8,6 +8,14 @@ export function chunk<T>(data: T): StepResult<T> {
   return { type: "chunk", data };
 }
 
+export function waitUntil<T>(until: number, data?: T): StepResult<T> {
+  return { type: "wait", until, data };
+}
+
+export function waitFor<T>(ms: number, data?: T): StepResult<T> {
+  return waitUntil(Date.now() + ms, data);
+}
+
 export function error(
   message: string,
   errorType: ErrorType = "unknown",

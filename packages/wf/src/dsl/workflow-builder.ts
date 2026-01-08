@@ -26,40 +26,68 @@ export interface StepConfig<TContext, TInput, TOutput> {
   ) => Promise<void>;
 }
 
-export class WorkflowBuilder<TContext, TInput = unknown, TOutput = unknown> {
+type ResolveInput<TInput> = [TInput] extends [never] ? unknown : TInput;
+type ResolveOutput<TOutput> = [TOutput] extends [never] ? unknown : TOutput;
+
+/**
+ * WorkflowBuilder keeps the initial input type stable across all steps while
+ * threading the latest step output through the chain for type inference.
+ *
+ * Generics:
+ * - TContext: workflow context shape
+ * - TInput: initial workflow input (set explicitly or inferred from first step)
+ * - TCurrent: output of the latest step (carried forward for inference)
+ */
+export class WorkflowBuilder<TContext, TInput = never, TCurrent = never> {
   private workflowName = "unnamed-workflow";
   private workflowVersion = 1;
   private contextValue?: TContext;
   private stepList: Step<TContext, unknown, unknown>[] = [];
-  private validatorFn?: (input: TInput) => boolean | Promise<boolean>;
-  private transformFn?: (output: unknown) => TOutput | Promise<TOutput>;
+  private validatorFn?: (
+    input: ResolveInput<TInput>,
+  ) => boolean | Promise<boolean>;
+  private transformFn?: (
+    output: unknown,
+  ) => ResolveOutput<TCurrent> | Promise<ResolveOutput<TCurrent>>;
   private maxExecutionTimeValue?: number;
   private tagsValue: Record<string, string> = {};
   private metadataValue: Record<string, unknown> = {};
   private idempotencyKeyValue?: string;
 
-  name(name: string): WorkflowBuilder<TContext, TInput, TOutput> {
+  name(name: string): WorkflowBuilder<TContext, TInput, TCurrent> {
     this.workflowName = name;
     return this;
   }
 
-  version(version: number): WorkflowBuilder<TContext, TInput, TOutput> {
+  version(version: number): WorkflowBuilder<TContext, TInput, TCurrent> {
     this.workflowVersion = version;
     return this;
   }
 
   context(
     initialContext: TContext,
-  ): WorkflowBuilder<TContext, TInput, TOutput> {
+  ): WorkflowBuilder<TContext, TInput, TCurrent> {
     this.contextValue = initialContext;
     return this;
   }
 
   step<TStepName extends string, TStepInput, TStepOutput>(
     name: TStepName,
-    config: StepConfig<TContext, TStepInput, TStepOutput>,
-  ): WorkflowBuilder<TContext, TStepInput, TStepOutput> {
-    const step: Step<TContext, TStepInput, TStepOutput> = {
+    config: StepConfig<
+      TContext,
+      [TCurrent] extends [never] ? ResolveInput<TInput> : TCurrent,
+      TStepOutput
+    >,
+  ): WorkflowBuilder<
+    TContext,
+    [TInput] extends [never] ? TStepInput : TInput,
+    TStepOutput
+  > {
+    const step: Step<
+      TContext,
+      [TCurrent] extends [never] ? ResolveInput<TInput> : TCurrent,
+      TStepOutput
+    > = {
       id: generateId("step"),
       name,
       run: config.run,
@@ -74,50 +102,56 @@ export class WorkflowBuilder<TContext, TInput = unknown, TOutput = unknown> {
 
     return this as unknown as WorkflowBuilder<
       TContext,
-      TStepInput,
+      [TInput] extends [never] ? TStepInput : TInput,
       TStepOutput
     >;
   }
 
   validate(
-    validator: (input: TInput) => boolean | Promise<boolean>,
-  ): WorkflowBuilder<TContext, TInput, TOutput> {
+    validator: (input: ResolveInput<TInput>) => boolean | Promise<boolean>,
+  ): WorkflowBuilder<TContext, TInput, TCurrent> {
     this.validatorFn = validator;
     return this;
   }
 
   transform(
-    transformer: (output: unknown) => TOutput | Promise<TOutput>,
-  ): WorkflowBuilder<TContext, TInput, TOutput> {
+    transformer: (
+      output: unknown,
+    ) => ResolveOutput<TCurrent> | Promise<ResolveOutput<TCurrent>>,
+  ): WorkflowBuilder<TContext, TInput, TCurrent> {
     this.transformFn = transformer;
     return this;
   }
 
-  maxExecutionTime(ms: number): WorkflowBuilder<TContext, TInput, TOutput> {
+  maxExecutionTime(ms: number): WorkflowBuilder<TContext, TInput, TCurrent> {
     this.maxExecutionTimeValue = ms;
     return this;
   }
 
   tags(
     tags: Record<string, string>,
-  ): WorkflowBuilder<TContext, TInput, TOutput> {
+  ): WorkflowBuilder<TContext, TInput, TCurrent> {
     this.tagsValue = tags;
     return this;
   }
 
   metadata(
     metadata: Record<string, unknown>,
-  ): WorkflowBuilder<TContext, TInput, TOutput> {
+  ): WorkflowBuilder<TContext, TInput, TCurrent> {
     this.metadataValue = metadata;
     return this;
   }
 
-  idempotencyKey(key: string): WorkflowBuilder<TContext, TInput, TOutput> {
+  idempotencyKey(key: string): WorkflowBuilder<TContext, TInput, TCurrent> {
     this.idempotencyKeyValue = key;
     return this;
   }
 
-  build(): WorkflowDefinition<TContext, TInput, TOutput> {
+  build(): WorkflowDefinition<
+    TContext,
+    ResolveInput<TInput>,
+    ResolveOutput<TCurrent>
+  > {
     if (!this.contextValue) {
       throw new Error("Initial context must be set using .context()");
     }
@@ -141,10 +175,14 @@ export class WorkflowBuilder<TContext, TInput = unknown, TOutput = unknown> {
   }
 }
 
-export function defineWorkflow<TContext>(): WorkflowBuilder<
+export function defineWorkflow<TContext, TInput = never>(): WorkflowBuilder<
   TContext,
-  unknown,
-  unknown
+  TInput,
+  [TInput] extends [never] ? never : TInput
 > {
-  return new WorkflowBuilder<TContext, unknown, unknown>();
+  return new WorkflowBuilder<
+    TContext,
+    TInput,
+    [TInput] extends [never] ? never : TInput
+  >();
 }
