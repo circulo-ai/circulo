@@ -47,7 +47,7 @@ export const AnimatedItem = forwardRef<
       initial={{ height: 0, opacity: 0 }}
       animate={{ height: "auto", opacity: 1 }}
       exit={{ height: 0, opacity: 0 }}
-      transition={TRANSITION}
+      transition={transition ?? TRANSITION}
       className={cn("overflow-hidden", className)}
       {...props}
       ref={ref}

@@ -9,11 +9,11 @@ export function FaqSection() {
     <FaqProvider>
       <section
         id="faq"
-        className="main-section relative grid grid-cols-3 grid-rows-1 gap-8 px-8 py-4"
+        className="main-section relative grid min-h-max grid-cols-5 gap-8 px-8 py-4 sm:grid-rows-1"
       >
         <FaqBackground />
 
-        <div className="flex flex-col items-center justify-center gap-4 text-center text-balance">
+        <div className="col-span-full flex flex-col items-center justify-center gap-4 text-center text-balance sm:col-span-2">
           <h3 className="text-4xl font-semibold">Frequently asked questions</h3>
           <p className="text-lg">
             These are the most commonly asked questions about Circulo. Can't
@@ -25,7 +25,7 @@ export function FaqSection() {
           <FaqTags />
         </div>
 
-        <FaqList className="col-span-2" />
+        <FaqList className="col-span-full sm:col-span-3" />
       </section>
     </FaqProvider>
   );

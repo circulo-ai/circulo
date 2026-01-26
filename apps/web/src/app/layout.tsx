@@ -26,7 +26,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html
       lang="en"
       suppressHydrationWarning
-      className="snap-y snap-mandatory scroll-smooth"
+      className="scroll-smooth sm:snap-y sm:snap-mandatory"
     >
       <body className={cn("font-sans", "antialiased")}>
         <ThemeProvider>

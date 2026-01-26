@@ -25,7 +25,7 @@ export function FaqList(props: ComponentProps<typeof ScrollArea>) {
 
   return (
     <ScrollArea viewportRef={viewportRef} {...props}>
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-16 bg-linear-to-b from-background to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-16 bg-linear-to-b from-background to-transparent max-sm:hidden" />
       <AnimatedList asChild>
         <Accordion
           type="single"
@@ -38,7 +38,7 @@ export function FaqList(props: ComponentProps<typeof ScrollArea>) {
               <AccordionItem className="pr-4" value={faq.index.toString()}>
                 <CustomAccordionTrigger className="items-center underline-offset-6">
                   <IconBox icon={faq.icon} />
-                  <h4 className="font-semibold">{faq.question}</h4>
+                  <h4 className="grow font-semibold">{faq.question}</h4>
                 </CustomAccordionTrigger>
                 <AccordionContent>
                   <p className="ms-13 text-foreground/75">{faq.answer}</p>
@@ -48,7 +48,7 @@ export function FaqList(props: ComponentProps<typeof ScrollArea>) {
           ))}
         </Accordion>
       </AnimatedList>
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-linear-to-t from-background to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-linear-to-t from-background to-transparent max-sm:hidden" />
       {/* needs CustomScrollBar with z-10? */}
     </ScrollArea>
   );
