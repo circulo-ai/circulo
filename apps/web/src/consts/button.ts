@@ -18,8 +18,11 @@ export const buttonVariants = cva(
           "text-foreground hover:bg-teal-50/5 data-[state=open]:bg-teal-50/5",
         link: "text-teal-500 underline underline-offset-6 hover:text-teal-600",
         text: "text-foreground/75 hover:text-foreground",
+        reversedText: "text-background/75 hover:text-background",
         highlightedText:
           "bg-teal-50/5 text-foreground/75 hover:text-foreground",
+        reversedHighlightedText:
+          "bg-teal-950/5 text-background/75 hover:text-background",
         primary: "bg-foreground text-background hover:bg-foreground/75",
         none: "",
       },
