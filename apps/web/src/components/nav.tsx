@@ -27,8 +27,8 @@ export function Nav() {
       />
 
       <div className="flex w-48 items-center gap-2">
-        <Logo />
-        <h1 className="text-4xl text-teal-50">Circulo</h1>
+        <Logo className="max-sm:h-6" />
+        <h1 className="text-2xl text-teal-50 sm:text-4xl">Circulo</h1>
       </div>
 
       <ul

@@ -353,6 +353,7 @@
     scroll-margin-top: 5rem;
   }
   .main-section {
+    min-height: max-content;
     scroll-snap-align: start;
     scroll-snap-stop: always;
   }

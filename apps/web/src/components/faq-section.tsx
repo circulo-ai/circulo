@@ -9,7 +9,7 @@ export function FaqSection() {
     <FaqProvider>
       <section
         id="faq"
-        className="main-section relative grid min-h-max grid-cols-5 gap-8 px-8 py-4 sm:grid-rows-1"
+        className="main-section relative grid grid-cols-5 gap-8 px-8 py-4 sm:grid-rows-1"
       >
         <FaqBackground />
 
