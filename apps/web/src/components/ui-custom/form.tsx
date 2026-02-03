@@ -14,7 +14,7 @@ interface CustomFormProps<
   Output = Input,
 > extends ComponentProps<typeof RHForm<Input>> {
   form: UseFormReturn<Input>;
-  swr: { trigger: (props: Output) => Promise<void> };
+  swr: { trigger: (props: Output) => Promise<unknown> };
   omitFields?: (keyof Input)[];
 }
 

@@ -7,11 +7,15 @@ import {
   ScopeResolutionError,
   ServiceCollection,
   ServiceLifetime,
+  ServiceScope,
   bindToHono,
   createContainerMiddleware,
+  createServiceLocator,
+  createModule,
   createToken,
   decorateContext,
   factory,
+  getGlobalProvider,
   ifDev,
   ifProd,
   ifTruthy,
@@ -21,6 +25,7 @@ import {
   tryResolveFromContext,
   useClass,
   useExisting,
+  withRequestScope,
 } from "../src";
 
 const random = () => Math.random();
@@ -207,6 +212,103 @@ describe("Resolution helpers", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Service locator
+// ---------------------------------------------------------------------------
+describe("Service locator", () => {
+  it("does not memoize transient tokens by default", () => {
+    const services = new ServiceCollection().addTransient("Transient", () => ({
+      value: random(),
+    }));
+    const provider = services.build();
+    const scope = provider.createScope();
+
+    const locator = createServiceLocator(scope, {
+      Transient: "Transient",
+    });
+
+    const first = locator.Transient;
+    const second = locator.Transient;
+
+    expect(first).not.toBe(second);
+  });
+
+  it("memoizes when cache is enabled", () => {
+    const services = new ServiceCollection().addTransient("Transient", () => ({
+      value: random(),
+    }));
+    const provider = services.build();
+    const scope = provider.createScope();
+
+    const locator = createServiceLocator(
+      scope,
+      { Transient: "Transient" },
+      { cache: true },
+    );
+
+    const first = locator.Transient;
+    const second = locator.Transient;
+
+    expect(first).toBe(second);
+  });
+
+  it("throws on unknown properties when strict is enabled", () => {
+    const services = new ServiceCollection().addSingleton("Value", 1);
+    const provider = services.build();
+    const scope = provider.createScope();
+
+    const locator = createServiceLocator(
+      scope,
+      { Value: "Value" },
+      { strict: true },
+    );
+
+    expect(() => (locator as any).Missing).toThrow(
+      /Service token not registered/,
+    );
+  });
+
+  it("ignores prototype properties", () => {
+    const services = new ServiceCollection().addSingleton("Value", 1);
+    const provider = services.build();
+    const resolveSpy = vi.spyOn(provider, "resolve");
+
+    const locator = createServiceLocator(provider, { Value: "Value" });
+
+    expect((locator as any).toString).toBeUndefined();
+    expect(resolveSpy).not.toHaveBeenCalled();
+  });
+
+  it("avoids cache collisions for dotted keys", () => {
+    const services = new ServiceCollection()
+      .addSingleton("Flat", "flat")
+      .addSingleton("Nested", "nested");
+    const provider = services.build();
+    const scope = provider.createScope();
+
+    const locator = createServiceLocator(
+      scope,
+      { "a.b": "Flat", a: { b: "Nested" } },
+      { cache: true },
+    );
+
+    expect(locator["a.b"]).toBe("flat");
+    expect(locator.a.b).toBe("nested");
+  });
+
+  it("supports optional tokens", () => {
+    const services = new ServiceCollection();
+    const provider = services.build();
+    const scope = provider.createScope();
+
+    const locator = createServiceLocator(scope, {
+      Optional: optional("Missing"),
+    });
+
+    expect(locator.Optional).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Disposal semantics
 // ---------------------------------------------------------------------------
 describe("Disposal semantics", () => {
@@ -385,7 +487,9 @@ describe("Hono helpers", () => {
     const TYPES = { X: createToken<number>("x") };
     const middleware = bindToHono; // ensure tree-shaking avoids unused import
     expect(middleware).toBeDefined();
-    const proxy = (await import("../src/hono")).createContextDiProxy(TYPES, {
+    const proxy = (
+      await import("../src/integration/hono")
+    ).createContextDiProxy(TYPES, {
       strict: true,
     });
     const ctx = { var: {}, set: () => {} };
@@ -401,10 +505,9 @@ describe("Hono helpers", () => {
       return Math.random();
     });
     const provider = services.build();
-    const proxyMw = (await import("../src/hono")).createContextDiProxy(
-      { Cached: "Cached" as any },
-      { cache: true },
-    );
+    const proxyMw = (
+      await import("../src/integration/hono")
+    ).createContextDiProxy({ Cached: "Cached" as any }, { cache: true });
     const scope = provider.createScope();
     const ctx: any = {
       var: { container: scope },
@@ -422,7 +525,9 @@ describe("Hono helpers", () => {
   it("returns undefined for unknown or symbol properties on proxy", async () => {
     const services = new ServiceCollection().addSingleton("Value", 5);
     const provider = services.build();
-    const proxyMw = (await import("../src/hono")).createContextDiProxy({
+    const proxyMw = (
+      await import("../src/integration/hono")
+    ).createContextDiProxy({
       Value: "Value" as any,
     });
     const scope = provider.createScope();
@@ -437,11 +542,31 @@ describe("Hono helpers", () => {
     await scope.dispose();
   });
 
+  it("throws for unknown properties when strict is enabled", async () => {
+    const services = new ServiceCollection().addSingleton("Value", 5);
+    const provider = services.build();
+    const proxyMw = (
+      await import("../src/integration/hono")
+    ).createContextDiProxy({ Value: "Value" as any }, { strict: true });
+    const scope = provider.createScope();
+    const ctx: any = {
+      var: { container: scope },
+      set: (k: string, v: unknown) => ((ctx.var as any)[k] = v),
+    };
+    await proxyMw(ctx, async () => {});
+    expect(() => (ctx as any).di.Missing).toThrow(
+      /Service token not registered/,
+    );
+    await scope.dispose();
+  });
+
   it("throws when token map omits a property", async () => {
     const tokens = { Missing: undefined as any };
     const services = new ServiceCollection().addSingleton("Any", 1);
     const provider = services.build();
-    const mw = (await import("../src/hono")).createContextDiProxy(tokens);
+    const mw = (await import("../src/integration/hono")).createContextDiProxy(
+      tokens,
+    );
     const scope = provider.createScope();
     const ctx: any = { var: { container: scope }, set: () => {} };
     await mw(ctx, async () => {});
@@ -1064,6 +1189,109 @@ describe("edge async resolution paths", () => {
     expect(result.resolvedAsync).toBe(1);
     expect(result.maybeAsync).toBeUndefined();
     expect(result.all).toEqual([1]);
+  });
+});
+
+describe("binding DSL and modules", () => {
+  it("binds values, functions, and classes with dependency objects", () => {
+    class WithDeps {
+      constructor(public deps: { bar: string; id: number }) {}
+    }
+    const services = new ServiceCollection();
+    services.bind("Value").toValue(42);
+    services.bind("Fn").toFunction(() => "fn");
+    services.bind("Bar").toValue("bar");
+    services.bind("Id").toValue(7);
+    services
+      .bind(WithDeps)
+      .toClass(
+        WithDeps,
+        { bar: "Bar", id: "Id" },
+        { lifetime: ServiceLifetime.Transient },
+      );
+
+    const provider = services.build();
+    const scope = provider.createScope();
+
+    expect(provider.resolve("Value")).toBe(42);
+    expect(provider.resolve<() => string>("Fn")()).toBe("fn");
+    const instance = scope.resolve(WithDeps);
+    expect(instance.deps.bar).toBe("bar");
+    expect(instance.deps.id).toBe(7);
+  });
+
+  it("supports scoped lifetime via scope alias", () => {
+    const services = new ServiceCollection();
+    services
+      .bind("ScopedValue")
+      .toFactory(() => ({ id: Math.random() }), { scope: "scoped" });
+    const provider = services.build();
+    const scope1 = provider.createScope();
+    const scope2 = provider.createScope();
+    const a = scope1.resolve<{ id: number }>("ScopedValue");
+    const b = scope1.resolve<{ id: number }>("ScopedValue");
+    const c = scope2.resolve<{ id: number }>("ScopedValue");
+    expect(a).toBe(b);
+    expect(a).not.toBe(c);
+  });
+
+  it("resolves async higher-order bindings when async flag is set", async () => {
+    const services = new ServiceCollection();
+    services.addSingleton("AsyncDep", async () => "dep");
+    services
+      .bind("Ho")
+      .toHigherOrderFunction((dep: string) => `${dep}!`, ["AsyncDep"], {
+        async: true,
+      });
+    const provider = services.build();
+    await expect(provider.resolveAsync("Ho")).resolves.toBe("dep!");
+  });
+
+  it("applies modules with binders", () => {
+    const module = createModule();
+    module.bind("Modded").toValue("mod");
+    const services = new ServiceCollection().addModule(module);
+    const provider = services.build();
+    expect(provider.resolve("Modded")).toBe("mod");
+  });
+});
+
+describe("next helpers", () => {
+  it("reuses provider across calls with getGlobalProvider", () => {
+    const key = Symbol("provider-key");
+    const services = new ServiceCollection().addSingleton("Value", 1);
+    const provider = getGlobalProvider(() => services.build(), key);
+    const provider2 = getGlobalProvider(() => services.build(), key);
+    expect(provider).toBe(provider2);
+    expect(provider.resolve("Value")).toBe(1);
+  });
+
+  it("wraps handlers with per-request scopes", async () => {
+    const services = new ServiceCollection();
+    let disposed = 0;
+    services.addScoped("Scoped", () => ({
+      id: Math.random(),
+      dispose: () => {
+        disposed += 1;
+      },
+    }));
+    const provider = services.build();
+
+    const handler = withRequestScope<
+      ServiceScope,
+      { id: number },
+      { params: Record<string, unknown> },
+      { ok: boolean }
+    >(provider, async (_req, ctx) => {
+      const first = ctx.container.resolve<{ id: number }>("Scoped");
+      const second = ctx.container.resolve<{ id: number }>("Scoped");
+      expect(first).toBe(second);
+      return { ok: true };
+    });
+
+    const result = await handler({ id: 1 }, { params: {} });
+    expect((result as any).ok).toBe(true);
+    expect(disposed).toBe(1);
   });
 });
 

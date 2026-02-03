@@ -17,6 +17,7 @@ import files from "@/routes/files";
 import history from "@/routes/history";
 import messages from "@/routes/messages";
 import suggestions from "@/routes/suggestions";
+import test from "@/routes/test";
 import userProfile from "@/routes/users/profile";
 import userSettings from "@/routes/users/settings";
 import userUnsubscribe from "@/routes/users/unsubscribe";
@@ -87,6 +88,7 @@ const routes = [
   userSettings,
   userUnsubscribe,
   vote,
+  test,
 ] as const;
 
 routes.forEach((route) => {

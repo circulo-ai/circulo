@@ -46,6 +46,10 @@ export {
   type LocalStorageConfig,
 } from "./providers/local";
 export { S3StorageProvider, type S3Config } from "./providers/s3";
+export {
+  VercelBlobStorageProvider,
+  type VercelBlobConfig,
+} from "./providers/vercel-blob";
 
 // Storage manager
 export {
@@ -59,8 +63,37 @@ export {
   type ContextualPresignedDownloadUrlOptions,
   type ContextualPresignedUploadUrlOptions,
   type ContextualUploadOptions,
+  type StorageManagerFactory,
   type StorageManagerConfig,
+  type StorageManagerProviders,
+  type StorageProviderFactory,
 } from "./storage-manager";
+
+// Route handler
+export {
+  FileRouteHandler,
+  type BatchPresignedRequest,
+  type BatchPresignedResponse,
+  type DeleteRequest,
+  type DeleteResponse,
+  type DownloadRequest,
+  type DownloadResponse,
+  type FileHandlerConfig,
+  type FileHandlerHooks,
+  type FileValidationInput,
+  type MultipartAbortData,
+  type MultipartAbortResponse,
+  type MultipartCompleteData,
+  type MultipartGetPartUrlsData,
+  type MultipartGetPartUrlsResponse,
+  type MultipartInitiateData,
+  type MultipartResponse,
+  type PresignedRequest,
+  type PresignedResponse,
+  type ServeResponse,
+  type UploadFile,
+  type UploadResponse,
+} from "./routes/handler";
 
 // Utilities
 export {
@@ -77,6 +110,7 @@ export {
   validateFileType,
 } from "./utils/validation";
 
+export { UploadError, type UploadErrorCode } from "./utils/errors";
 export {
   base64ToBuffer,
   bufferToBase64,

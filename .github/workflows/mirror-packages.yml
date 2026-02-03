@@ -1,0 +1,231 @@
+name: Mirror - Packages
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "packages/di/**"
+      - "packages/upload/**"
+      - "packages/file-parsers/**"
+      - ".github/workflows/mirror-packages.yml"
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  detect-changes:
+    name: Detect Changed Packages
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.ref_name == github.event.repository.default_branch
+    outputs:
+      di: ${{ steps.changed.outputs.di }}
+      upload: ${{ steps.changed.outputs.upload }}
+      file_parsers: ${{ steps.changed.outputs.file_parsers }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Detect package changes
+        id: changed
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "di=true" >> "$GITHUB_OUTPUT"
+            echo "upload=true" >> "$GITHUB_OUTPUT"
+            echo "file_parsers=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          PREV_SHA=${{ github.event.before }}
+          if [ -z "$PREV_SHA" ] || [ "$PREV_SHA" = "0000000000000000000000000000000000000000" ]; then
+            if git rev-parse HEAD^ >/dev/null 2>&1; then
+              PREV_SHA=$(git rev-parse HEAD^)
+            else
+              PREV_SHA=$(git rev-list --max-parents=0 HEAD)
+            fi
+          fi
+
+          RANGE="$PREV_SHA...HEAD"
+
+          changed_in() {
+            local path="$1"
+            if git diff --name-only "$RANGE" -- "$path" | grep -q .; then
+              echo "true"
+            else
+              echo "false"
+            fi
+          }
+
+          echo "di=$(changed_in packages/di)" >> "$GITHUB_OUTPUT"
+          echo "upload=$(changed_in packages/upload)" >> "$GITHUB_OUTPUT"
+          echo "file_parsers=$(changed_in packages/file-parsers)" >> "$GITHUB_OUTPUT"
+
+  mirror-di:
+    name: Mirror @circulo-ai/di
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.di == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Verify mirror access
+        env:
+          MIRROR_PUSH_TOKEN: ${{ secrets.MIRROR_PUSH_TOKEN }}
+          MIRROR_REPO: "circulo-ai/di"
+        run: |
+          set -euo pipefail
+          if [ -z "${MIRROR_PUSH_TOKEN:-}" ]; then
+            echo "Missing MIRROR_PUSH_TOKEN secret." >&2
+            exit 1
+          fi
+          REMOTE_URL="https://x-access-token:${MIRROR_PUSH_TOKEN}@github.com/${MIRROR_REPO}.git"
+          if ! git ls-remote --heads "$REMOTE_URL" >/dev/null 2>&1; then
+            echo "Token cannot access ${MIRROR_REPO}. Check PAT scopes, org access, and repo permissions." >&2
+            exit 1
+          fi
+
+      - name: Push subtree
+        env:
+          MIRROR_PUSH_TOKEN: ${{ secrets.MIRROR_PUSH_TOKEN }}
+          MIRROR_REPO: "circulo-ai/di"
+          TARGET_BRANCH: "master"
+        run: |
+          set -euo pipefail
+
+          if [ -z "${MIRROR_PUSH_TOKEN:-}" ]; then
+            echo "Missing MIRROR_PUSH_TOKEN secret." >&2
+            exit 1
+          fi
+
+          if [ -z "${TARGET_BRANCH:-}" ]; then
+            TARGET_BRANCH="${GITHUB_REF_NAME}"
+          fi
+
+          REMOTE_URL="https://x-access-token:${MIRROR_PUSH_TOKEN}@github.com/${MIRROR_REPO}.git"
+          git remote add mirror "$REMOTE_URL"
+          git subtree split --prefix=packages/di -b "split-di"
+          git push --force mirror "split-di:${TARGET_BRANCH}"
+          git branch -D split-di
+
+  mirror-upload:
+    name: Mirror @circulo-ai/upload
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.upload == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Verify mirror access
+        env:
+          MIRROR_PUSH_TOKEN: ${{ secrets.MIRROR_PUSH_TOKEN }}
+          MIRROR_REPO: "circulo-ai/upload"
+        run: |
+          set -euo pipefail
+          if [ -z "${MIRROR_PUSH_TOKEN:-}" ]; then
+            echo "Missing MIRROR_PUSH_TOKEN secret." >&2
+            exit 1
+          fi
+          REMOTE_URL="https://x-access-token:${MIRROR_PUSH_TOKEN}@github.com/${MIRROR_REPO}.git"
+          if ! git ls-remote --heads "$REMOTE_URL" >/dev/null 2>&1; then
+            echo "Token cannot access ${MIRROR_REPO}. Check PAT scopes, org access, and repo permissions." >&2
+            exit 1
+          fi
+
+      - name: Push subtree
+        env:
+          MIRROR_PUSH_TOKEN: ${{ secrets.MIRROR_PUSH_TOKEN }}
+          MIRROR_REPO: "circulo-ai/upload"
+          TARGET_BRANCH: "master"
+        run: |
+          set -euo pipefail
+
+          if [ -z "${MIRROR_PUSH_TOKEN:-}" ]; then
+            echo "Missing MIRROR_PUSH_TOKEN secret." >&2
+            exit 1
+          fi
+
+          if [ -z "${TARGET_BRANCH:-}" ]; then
+            TARGET_BRANCH="${GITHUB_REF_NAME}"
+          fi
+
+          REMOTE_URL="https://x-access-token:${MIRROR_PUSH_TOKEN}@github.com/${MIRROR_REPO}.git"
+          git remote add mirror "$REMOTE_URL"
+          git subtree split --prefix=packages/upload -b "split-upload"
+          git push --force mirror "split-upload:${TARGET_BRANCH}"
+          git branch -D split-upload
+
+  mirror-file-parsers:
+    name: Mirror @circulo-ai/file-parsers
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.file_parsers == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Verify mirror access
+        env:
+          MIRROR_PUSH_TOKEN: ${{ secrets.MIRROR_PUSH_TOKEN }}
+          MIRROR_REPO: "circulo-ai/file-parsers"
+        run: |
+          set -euo pipefail
+          if [ -z "${MIRROR_PUSH_TOKEN:-}" ]; then
+            echo "Missing MIRROR_PUSH_TOKEN secret." >&2
+            exit 1
+          fi
+          REMOTE_URL="https://x-access-token:${MIRROR_PUSH_TOKEN}@github.com/${MIRROR_REPO}.git"
+          if ! git ls-remote --heads "$REMOTE_URL" >/dev/null 2>&1; then
+            echo "Token cannot access ${MIRROR_REPO}. Check PAT scopes, org access, and repo permissions." >&2
+            exit 1
+          fi
+
+      - name: Push subtree
+        env:
+          MIRROR_PUSH_TOKEN: ${{ secrets.MIRROR_PUSH_TOKEN }}
+          MIRROR_REPO: "circulo-ai/file-parsers"
+          TARGET_BRANCH: "master"
+        run: |
+          set -euo pipefail
+
+          if [ -z "${MIRROR_PUSH_TOKEN:-}" ]; then
+            echo "Missing MIRROR_PUSH_TOKEN secret." >&2
+            exit 1
+          fi
+
+          if [ -z "${TARGET_BRANCH:-}" ]; then
+            TARGET_BRANCH="${GITHUB_REF_NAME}"
+          fi
+
+          REMOTE_URL="https://x-access-token:${MIRROR_PUSH_TOKEN}@github.com/${MIRROR_REPO}.git"
+          git remote add mirror "$REMOTE_URL"
+          git subtree split --prefix=packages/file-parsers -b "split-file-parsers"
+          git push --force mirror "split-file-parsers:${TARGET_BRANCH}"
+          git branch -D split-file-parsers

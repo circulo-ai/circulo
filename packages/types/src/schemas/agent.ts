@@ -39,7 +39,10 @@ export const updateAgentBodySchema = baseAgentSchema
     { message: "At least one field must be provided to update" },
   );
 
-export const deleteAgentQuerySchema = z.object({
+export const deleteAgentParamsSchema = z.object({
   id: z.uuid(),
+});
+
+export const deleteAgentQuerySchema = z.object({
   hard: z.coerce.boolean().optional().default(false),
 });

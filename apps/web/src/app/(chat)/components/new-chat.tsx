@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/tooltip";
 import { FileInput } from "@/components/uploads/file-input";
 import { useMergedRefs } from "@/hooks/use-merged-refs";
+import { ApiRequestError } from "@/lib/api/client";
 import { deepReplace } from "@/lib/deep-replace";
 import { getFetcher } from "@/lib/swr";
 import { cn } from "@/lib/utils";
@@ -55,6 +56,7 @@ import { Agent } from "@circulo-ai/db";
 import {
   createAgentBodySchema,
   defaultModel,
+  deleteAgentParamsSchema,
   deleteAgentQuerySchema,
   updateAgentBodySchema,
 } from "@circulo-ai/types";
@@ -630,7 +632,11 @@ function AgentFormContent({
   );
 }
 
-type RemoveAgentRequest = z.input<typeof deleteAgentQuerySchema>;
+const deleteAgentSchema = deleteAgentParamsSchema.extend(
+  deleteAgentQuerySchema.shape,
+);
+
+type RemoveAgentRequest = z.input<typeof deleteAgentSchema>;
 
 // TODO implement a "remember my choice" checkbox
 function RemoveAgent() {
@@ -642,17 +648,23 @@ function RemoveAgent() {
   );
 
   const form = useForm({
-    resolver: zodResolver(deleteAgentQuerySchema),
-    defaultValues: { id: currentAgent?.id },
+    resolver: zodResolver(deleteAgentSchema),
+    defaultValues: { id: currentAgent?.id, hard: false },
   });
 
   useEffect(() => {
-    if (currentAgent) form.reset({ id: currentAgent.id });
+    if (currentAgent) form.reset({ id: currentAgent.id, hard: false });
   }, [currentAgent, form]);
 
-  const { trigger } = useSWRMutation<any, any, Key, RemoveAgentRequest>(
-    "/api/agent",
-    getFetcher("DELETE"),
+  const deleteFetcher = useMemo(() => getFetcher("DELETE"), []);
+
+  const { trigger } = useSWRMutation<
+    Agent,
+    ApiRequestError,
+    Key,
+    RemoveAgentRequest
+  >("/api/agent", (url: string, { arg }: { arg: RemoveAgentRequest }) =>
+    deleteFetcher<Agent>([`${url}/${arg.id}`, { hard: arg.hard }]),
   );
 
   const goBack = useCallback(
