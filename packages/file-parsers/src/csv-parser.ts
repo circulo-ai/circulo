@@ -1,9 +1,9 @@
 import { parse, type Options } from "csv-parse";
 import { createReadStream, existsSync } from "fs";
 import { Readable } from "stream";
-import { createLogger, type Logger } from "./logger";
-import type { FileParseResult, FileParser } from "./types";
-import { sanitizeTextForUTF8 } from "./utils";
+import { createLogger, type Logger } from "./logger.js";
+import type { FileParseResult, FileParser } from "./types.js";
+import { sanitizeTextForUTF8 } from "./utils.js";
 
 const CONFIG = {
   MAX_PREVIEW_ROWS: 1000,

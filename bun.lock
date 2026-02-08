@@ -296,7 +296,7 @@
     },
     "packages/di": {
       "name": "@circulo-ai/di",
-      "version": "2.1.1",
+      "version": "3.1.0",
       "devDependencies": {
         "@types/node": "^20.19.25",
         "@vitest/coverage-v8": "^2.1.4",
@@ -358,7 +358,7 @@
     },
     "packages/upload": {
       "name": "@circulo-ai/upload",
-      "version": "1.4.1",
+      "version": "1.5.1",
       "dependencies": {
         "@vercel/blob": "^2.0.0",
       },
