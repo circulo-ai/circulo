@@ -5,6 +5,9 @@ export class InMemoryEventStore<TOutput> implements EventStore<TOutput> {
   private readonly maxEvents: number;
 
   constructor(maxEvents = 100000) {
+    if (!Number.isInteger(maxEvents) || maxEvents < 1) {
+      throw new RangeError("maxEvents must be a positive integer");
+    }
     this.maxEvents = maxEvents;
   }
 

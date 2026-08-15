@@ -32,6 +32,11 @@ export const invitationStatusEnum = pgEnum("invitation_status", [
   "declined",
   "expired",
 ]);
+export const workflowRunStatusEnum = pgEnum("workflow_run_status", [
+  "running",
+  "completed",
+  "failed",
+]);
 export const messageAuthorTypeEnum = pgEnum("message_author_type", [
   "user",
   "agent",
@@ -310,6 +315,32 @@ export const stream = pgTable(
   ],
 );
 
+/** Durable ownership record for reconnectable Workflow DevKit runs. */
+export const workflowRun = pgTable(
+  "workflow_runs",
+  {
+    id: text("id").primaryKey(),
+    chatId: uuid("chat_id")
+      .notNull()
+      .references(() => chat.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    status: workflowRunStatusEnum("status").notNull().default("running"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("workflow_runs_chat_idx").on(t.chatId, t.createdAt),
+    index("workflow_runs_user_idx").on(t.userId, t.createdAt),
+  ],
+);
+
 export const chatRelations = relations(chat, ({ one, many }) => ({
   organization: one(organization, {
     fields: [chat.organizationId],
@@ -326,6 +357,7 @@ export const chatRelations = relations(chat, ({ one, many }) => ({
   artifacts: many(artifact),
   votes: many(vote),
   streams: many(stream),
+  workflowRuns: many(workflowRun),
 }));
 
 export const chatMemberRelations = relations(chatMember, ({ one }) => ({
@@ -432,7 +464,23 @@ export const streamRelations = relations(stream, ({ one }) => ({
   }),
 }));
 
+export const workflowRunRelations = relations(workflowRun, ({ one }) => ({
+  chat: one(chat, {
+    fields: [workflowRun.chatId],
+    references: [chat.id],
+  }),
+  user: one(user, {
+    fields: [workflowRun.userId],
+    references: [user.id],
+  }),
+  organization: one(organization, {
+    fields: [workflowRun.organizationId],
+    references: [organization.id],
+  }),
+}));
+
 export type Stream = InferSelectModel<typeof stream>;
+export type WorkflowRun = InferSelectModel<typeof workflowRun>;
 export type Chat = typeof chat.$inferSelect;
 export type NewChat = typeof chat.$inferInsert;
 export type ChatMember = typeof chatMember.$inferSelect;

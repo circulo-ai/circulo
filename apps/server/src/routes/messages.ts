@@ -1,5 +1,3 @@
-import { db } from "@/db";
-import { chat } from "@/db/schema/chat";
 import { getActiveOrganizationId } from "@/lib/auth";
 import { createRouter } from "@/lib/create-app";
 import { hasPermission } from "@/lib/permissions";
@@ -7,6 +5,9 @@ import { requireAuth } from "@/middleware/auth";
 import { ForbiddenError, NotFoundError } from "@circulo-ai/types";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import type { DrizzleChatRepository } from "@/infrastructure/drizzle/chat-repository";
+import type { DrizzleMessageRepository } from "@/infrastructure/drizzle/message-repository";
+import type { RequestServices } from "@/di/di-context";
 
 const paramsSchema = z.object({
   id: z.uuid(),
@@ -14,25 +15,14 @@ const paramsSchema = z.object({
 
 const router = createRouter();
 
-router.get("/messages/test", async (c) => {
-  const result = await db.transaction(async (uow) => {
-    const recentChats = await uow.select().from(chat).limit(5);
-
-    return { recentChats };
-  });
-
-  return c.json({ message: result });
-});
-
 router.delete(
   "/messages/:id/trailing",
   requireAuth,
   zValidator("param", paramsSchema),
   async (c) => {
-    const {
-      ChatRepository: chatRepository,
-      MessageRepository: messageRepository,
-    } = c.di;
+    const di: RequestServices = c.di;
+    const chatRepository: DrizzleChatRepository = di.ChatRepository;
+    const messageRepository: DrizzleMessageRepository = di.MessageRepository;
 
     const { user, activeOrgId, session } = c.var;
     const { id } = c.req.valid("param");
@@ -67,8 +57,8 @@ router.delete(
     }
 
     await messageRepository.deleteByChatIdAfterTimestamp({
-      chatId: chat.id,
-      timestamp: message.createdAt,
+      chatId: chat.aggregateId.toString(),
+      timestamp: message.snapshot.createdAt,
     });
 
     return c.json({ success: true });

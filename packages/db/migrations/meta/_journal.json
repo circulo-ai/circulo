@@ -29,6 +29,13 @@
       "when": 1767471738736,
       "tag": "0004_freezing_kulan_gath",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786817322298,
+      "tag": "0005_jittery_spot",
+      "breakpoints": true
     }
   ]
 }

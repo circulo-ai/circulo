@@ -27,22 +27,23 @@
   "scripts": {
     "dev": "tsc -p tsconfig.json --watch",
     "build": "tsc -p tsconfig.json",
+    "db:generate": "drizzle-kit generate --config=./drizzle.config.ts",
     "db:push": "npx drizzle-kit push --config=./drizzle.config.ts",
     "db:migrate": "npx drizzle-kit migrate --config=./drizzle.config.ts",
     "db:studio": "npx drizzle-kit studio --config=./drizzle.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "drizzle-orm": "^0.44.5",
-    "postgres": "^3.4.5"
+    "drizzle-orm": "^0.44.7",
+    "postgres": "^3.4.7"
   },
   "devDependencies": {
     "@types/node": "^20.19.25",
     "typescript": "^5.7.3"
   },
   "overrides": {
-    "drizzle-orm": "^0.44.5",
-    "postgres": "^3.4.5"
+    "drizzle-orm": "^0.44.7",
+    "postgres": "^3.4.7"
   },
   "dependencies": {
     "@circulo-ai/types": "workspace:*",

@@ -39,6 +39,12 @@ export class DrizzleChatRepository implements Repository<Chat> {
     return row ? toDomain(row) : null;
   }
 
+  async findById(id: Identifier | string): Promise<Chat | null> {
+    return this.getById(
+      typeof id === "string" ? Identifier.from(id) : id,
+    );
+  }
+
   async save(entity: Chat): Promise<Chat> {
     const row = toRow(entity);
     await this.db
@@ -58,6 +64,16 @@ export class DrizzleChatRepository implements Repository<Chat> {
   async deleteById(id: Identifier): Promise<boolean> {
     const result = await this.db
       .delete(chatTable)
+      .where(eq(chatTable.id, id.toString()));
+    return "rowCount" in result
+      ? (result as { rowCount: number }).rowCount > 0
+      : true;
+  }
+
+  async softDeleteById(id: Identifier): Promise<boolean> {
+    const result = await this.db
+      .update(chatTable)
+      .set({ isDeleted: true, deletedAt: new Date(), updatedAt: new Date() })
       .where(eq(chatTable.id, id.toString()));
     return "rowCount" in result
       ? (result as { rowCount: number }).rowCount > 0

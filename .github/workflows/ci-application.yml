@@ -1,0 +1,69 @@
+name: CI - Application Build
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [master, dev]
+  push:
+    branches: [master, dev]
+    paths:
+      - "apps/**"
+      - "packages/db/**"
+      - "packages/types/**"
+      - "packages/upload/**"
+      - "packages/file-parsers/**"
+      - "bun.lock"
+      - "package.json"
+      - "turbo.json"
+      - ".github/workflows/ci-application.yml"
+
+concurrency:
+  group: application-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Build and smoke-test applications
+    runs-on: ubuntu-latest
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+      NODE_ENV: test
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3002
+      DATABASE_URL: postgres://user:password@localhost:5432/circulo
+      BETTER_AUTH_URL: http://localhost:3002
+      BETTER_AUTH_SECRET: test-secret-with-at-least-32-characters
+      ENCRYPTION_KEY: test-encryption-key-with-at-least-32-chars
+      INTERNAL_API_SECRET: test-internal-api-secret-with-32-chars
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.4"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build database package
+        run: bun --filter @circulo-ai/db build
+
+      - name: Build server and workflow bundles
+        run: bun --filter server build
+
+      - name: Type check web
+        run: bun --filter web typecheck
+
+      - name: Build web
+        run: bun --filter web build
+
+      - name: Run repository tests
+        run: bun run test

@@ -8,6 +8,7 @@ function toDomain(row: typeof organizationTable.$inferSelect): Organization {
   return new Organization({
     id: Identifier.from(row.id),
     name: row.name,
+    slug: row.slug,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt ?? undefined,
   });
@@ -18,6 +19,7 @@ function toRow(entity: Organization): typeof organizationTable.$inferInsert {
   return {
     id: snap.id.toString(),
     name: snap.name,
+    slug: snap.slug ?? snap.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-"),
     createdAt: snap.createdAt,
     updatedAt: snap.updatedAt ?? new Date(),
   };

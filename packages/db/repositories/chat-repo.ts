@@ -410,24 +410,27 @@ export const chatRepo = {
     limit,
     startingAfter,
     endingBefore,
+    search,
   }: {
     id: string;
     limit: number;
     startingAfter?: string;
     endingBefore?: string;
+    search?: string;
   }): Promise<{ conversations: ConversationSummary[]; hasMore: boolean }> {
     try {
       const extendedLimit = limit + 1;
 
       const query = (whereCondition?: SQL<any>) =>
-        db
+      db
           .select()
           .from(chat)
-          .where(
-            whereCondition
-              ? and(whereCondition, eq(chat.creatorId, id))
-              : eq(chat.creatorId, id),
-          )
+          .where(and(
+            eq(chat.creatorId, id),
+            eq(chat.isDeleted, false),
+            ...(search?.trim() ? [ilike(chat.title, `%${search.trim()}%`)] : []),
+            ...(whereCondition ? [whereCondition] : []),
+          ))
           .orderBy(desc(chat.createdAt))
           .limit(extendedLimit);
 

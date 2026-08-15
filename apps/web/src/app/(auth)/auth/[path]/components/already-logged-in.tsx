@@ -7,9 +7,20 @@ import { signOut, useSession } from "@/lib/auth-client";
 import { UserAvatar } from "@daveyplate/better-auth-ui";
 import { ArrowRight, LogOut } from "lucide-react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect } from "react";
 
 export const AlreadyLoggedInCard = () => {
   const { data: session, isPending } = useSession();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirectTo") || "/chat";
+
+  useEffect(() => {
+    if (!isPending && session?.user) {
+      router.push(redirectTo);
+    }
+  }, [isPending, session, redirectTo, router]);
 
   if (isPending || !session?.user) {
     return <Spinner />;

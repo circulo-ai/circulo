@@ -15,6 +15,9 @@ export function generateRequestId(): string {
 }
 
 export function getTextFromMessage(message: ChatMessage | UIMessage): string {
+  if (!message.parts || message.parts.length === 0) {
+    return (message as any).content ?? "";
+  }
   return message.parts
     .filter((part) => part.type === "text")
     .map((part) => (part as { type: "text"; text: string }).text)
@@ -25,9 +28,15 @@ export function getTextFromMessages(
   messages: (ChatMessage | UIMessage)[],
 ): string {
   return messages
-    .flatMap((m) => m.parts ?? [])
-    .filter((part) => part.type === "text")
-    .map((part) => part.text)
+    .map((m) => {
+      if (!m.parts || m.parts.length === 0) {
+        return (m as any).content ?? "";
+      }
+      return m.parts
+        .filter((part) => part.type === "text")
+        .map((part) => (part as { type: "text"; text: string }).text)
+        .join("");
+    })
     .join("");
 }
 
@@ -39,14 +48,11 @@ export function getDocumentTimestampByIndex(
   documents: Document[],
   index: number,
 ) {
-  if (!documents) {
-    return new Date();
-  }
-  if (index > documents.length) {
+  if (index < 0 || index >= documents.length) {
     return new Date();
   }
 
-  return documents[index].createdAt;
+  return documents[index]?.createdAt ?? new Date();
 }
 
 export function convertToUIMessages(messages: Message[]): ChatMessage[] {

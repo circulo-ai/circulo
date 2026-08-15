@@ -2,7 +2,7 @@
 
 import { ResizablePanel } from "@/components/ui/resizable";
 import { useSidebar } from "@/components/ui/sidebar";
-import { PanelHandle } from "@arshaan.abh/window-splitter-react";
+import { PanelHandle } from "@window-splitter/react";
 import BezierEasing from "bezier-easing";
 import { ComponentProps, useCallback, useEffect, useRef } from "react";
 
@@ -37,7 +37,6 @@ export function ChatSidebarResizablePanel(
       // isStaticAtRest // TODO can't use but it's a good prop, could make a pr to the library's repo to fix it
       collapsible
       collapsedSize="60px"
-      collapseAnimationOnPointer
       collapseAnimation={{
         duration: 300,
         easing: BezierEasing(0.4, 0, 0.2, 1),

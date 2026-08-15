@@ -5,7 +5,19 @@ import {
   wrapLanguageModel,
 } from "ai";
 
-export const supportingLanguageModels = {
+type SupportingLanguageModel = {
+  gateway: any;
+  capabilities: {
+    imageInput: boolean;
+    objectGeneration: boolean;
+    toolUsage: boolean;
+    toolStreaming: boolean;
+  };
+};
+
+export const supportingLanguageModels: {
+  readonly "gemini-2.5-flash": SupportingLanguageModel;
+} = {
   "gemini-2.5-flash": {
     gateway: google("gemini-2.5-flash"),
     capabilities: {
@@ -15,7 +27,7 @@ export const supportingLanguageModels = {
       toolStreaming: true,
     },
   },
-} as const;
+};
 
 export type SupportedModels = keyof typeof supportingLanguageModels;
 
@@ -23,7 +35,7 @@ export const LLM_MODELS = Object.keys(
   supportingLanguageModels,
 ) as SupportedModels[];
 
-export const myProvider = customProvider({
+export const myProvider: ReturnType<typeof customProvider> = customProvider({
   languageModels: {
     ...Object.fromEntries(
       (

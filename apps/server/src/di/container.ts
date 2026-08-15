@@ -4,6 +4,7 @@ import {
   ChangeChatVisibility,
   CreateArtifact,
   CreateChat,
+  CreateChatWithMessage,
   CreateSuggestion,
   DeleteChat,
   InviteToChat,
@@ -31,6 +32,7 @@ import {
   DrizzleOrganizationRepository,
   DrizzleSuggestionRepository,
   DrizzleUserRepository,
+  DrizzleWorkflowRunRepository,
 } from "@/infrastructure/drizzle";
 import { createLogger } from "@/lib/logs/console/logger";
 import { getRedisClient } from "@/lib/redis";
@@ -82,11 +84,17 @@ export const DI_TOKENS = {
       "VoteRepository",
     ),
   UnitOfWork: createToken<DrizzleUnitOfWork>("UnitOfWork"),
+  WorkflowRunRepository: createToken<DrizzleWorkflowRunRepository>(
+    "WorkflowRunRepository",
+  ),
   RateLimiter: createToken<RateLimiter>("RateLimiter"),
   DomainEventPublisher: createToken<DomainEventPublisher>(
     "DomainEventPublisher",
   ),
   CreateChatUseCase: createToken<CreateChat>("CreateChatUseCase"),
+  CreateChatWithMessageUseCase: createToken<CreateChatWithMessage>(
+    "CreateChatWithMessageUseCase",
+  ),
   RenameChatUseCase: createToken<RenameChat>("RenameChatUseCase"),
   PostMessageUseCase: createToken<PostMessage>("PostMessageUseCase"),
   ChangeChatVisibilityUseCase: createToken<ChangeChatVisibility>(
@@ -212,12 +220,28 @@ export function buildRootProvider(): ServiceProvider {
     return new DrizzleVoteRepository(uow.client);
   });
 
+  services.addScoped(DI_TOKENS.WorkflowRunRepository, (resolver) => {
+    const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
+    return new DrizzleWorkflowRunRepository(uow.client);
+  });
+
   services.addScoped(DI_TOKENS.CreateChatUseCase, (resolver) => {
     const chats = resolver.resolve(DI_TOKENS.ChatRepository);
     const members = resolver.resolve(DI_TOKENS.OrganizationMemberRepository);
     const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
     const publisher = resolver.resolve(DI_TOKENS.DomainEventPublisher);
     return new CreateChat(chats, members, uow, publisher);
+  });
+
+  services.addScoped(DI_TOKENS.CreateChatWithMessageUseCase, (resolver) => {
+    return new CreateChatWithMessage(
+      resolver.resolve(DI_TOKENS.ChatRepository),
+      resolver.resolve(DI_TOKENS.MessageRepository),
+      resolver.resolve(DI_TOKENS.ChatAgentLinkRepository),
+      resolver.resolve(DI_TOKENS.OrganizationMemberRepository),
+      resolver.resolve(DI_TOKENS.UnitOfWork),
+      resolver.resolve(DI_TOKENS.DomainEventPublisher),
+    );
   });
 
   services.addScoped(DI_TOKENS.RenameChatUseCase, (resolver) => {

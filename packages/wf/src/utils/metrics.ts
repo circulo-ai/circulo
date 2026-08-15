@@ -1,6 +1,6 @@
 import type { ErrorType, MetricsCollector } from "../models";
 
-interface MetricValue {
+export interface MetricValue {
   value: number;
   timestamp: number;
   tags: Record<string, string>;
@@ -91,10 +91,20 @@ export class InMemoryMetrics implements MetricsCollector {
     gauges: Map<string, MetricValue[]>;
     histograms: Map<string, MetricValue[]>;
   } {
+    const clone = (
+      metrics: Map<string, MetricValue[]>,
+    ): Map<string, MetricValue[]> =>
+      new Map(
+        Array.from(metrics, ([name, values]) => [
+          name,
+          values.map((metric) => ({ ...metric, tags: { ...metric.tags } })),
+        ]),
+      );
+
     return {
-      counters: this.counters,
-      gauges: this.gauges,
-      histograms: this.histograms,
+      counters: clone(this.counters),
+      gauges: clone(this.gauges),
+      histograms: clone(this.histograms),
     };
   }
 

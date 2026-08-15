@@ -2,6 +2,11 @@ import { getSession, type SessionResponse } from "@/lib/auth";
 import { getSubscriptionForOrg, orgHasPlan } from "@/lib/billing/autumn";
 import { hasPermission, type Action, type Resource } from "@/lib/permissions";
 
+function getSessionActiveOrganizationId(session?: SessionResponse): string | undefined {
+  return (session?.session as { activeOrganizationId?: string } | undefined)
+    ?.activeOrganizationId;
+}
+
 /**
  * Check if user has both permission AND the org has the feature
  * Use this for actions that require BOTH role permission and subscription access
@@ -34,8 +39,7 @@ export async function canAccessFeature(params: {
 
   // Check subscription
   const sessionData = session ?? (await getSession());
-  const orgId =
-    organizationId || (sessionData?.session as any)?.activeOrganizationId;
+  const orgId = organizationId || getSessionActiveOrganizationId(sessionData);
 
   if (!orgId) {
     return { allowed: false, reason: "no_organization" };
@@ -103,9 +107,10 @@ export async function canUserCreateTeamOrg(userId: string): Promise<boolean> {
     )
     .limit(1);
 
-  if (personalOrg.length === 0) return false;
+  const personalOrgRow = personalOrg[0];
+  if (!personalOrgRow) return false;
 
-  const orgId = personalOrg[0].organization.id;
+  const orgId = personalOrgRow.organization.id;
 
   // Check if personal org has feature access
   const subscription = await getSubscriptionForOrg(orgId);
@@ -139,8 +144,7 @@ export async function getOrgLimits(
   hasPrioritySupport: boolean;
 }> {
   const sessionData = session ?? (await getSession());
-  const orgId =
-    organizationId || (sessionData?.session as any)?.activeOrganizationId;
+  const orgId = organizationId || getSessionActiveOrganizationId(sessionData);
 
   if (!orgId) {
     throw new Error("No organization context");

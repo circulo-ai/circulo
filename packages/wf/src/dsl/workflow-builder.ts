@@ -7,7 +7,7 @@ import type {
 } from "../models";
 import { generateId } from "../utils/id";
 
-type StepExecutor<TContext, TInput, TOutput> = (
+export type StepExecutor<TContext, TInput, TOutput> = (
   input: TInput,
   ctx: WorkflowContext<TContext>,
 ) =>
@@ -16,18 +16,22 @@ type StepExecutor<TContext, TInput, TOutput> = (
 
 export interface StepConfig<TContext, TInput, TOutput> {
   run: StepExecutor<TContext, TInput, TOutput>;
-  retries?: number;
-  timeout?: number;
-  backoff?: (attempt: number) => number;
-  errorClassifier?: (error: Error) => ErrorType;
-  compensation?: (
-    input: TInput,
-    ctx: WorkflowContext<TContext>,
-  ) => Promise<void>;
+  retries?: number | undefined;
+  timeout?: number | undefined;
+  backoff?: ((attempt: number) => number) | undefined;
+  errorClassifier?: ((error: Error) => ErrorType) | undefined;
+  compensation?:
+    | ((input: TInput, ctx: WorkflowContext<TContext>) => Promise<void>)
+    | undefined;
 }
 
 type ResolveInput<TInput> = [TInput] extends [never] ? unknown : TInput;
 type ResolveOutput<TOutput> = [TOutput] extends [never] ? unknown : TOutput;
+type StepInput<TInput, TCurrent, TStepInput> = [TCurrent] extends [never]
+  ? [TInput] extends [never]
+    ? TStepInput
+    : TInput
+  : TCurrent;
 
 /**
  * WorkflowBuilder keeps the initial input type stable across all steps while
@@ -41,13 +45,14 @@ type ResolveOutput<TOutput> = [TOutput] extends [never] ? unknown : TOutput;
 export class WorkflowBuilder<TContext, TInput = never, TCurrent = never> {
   private workflowName = "unnamed-workflow";
   private workflowVersion = 1;
-  private contextValue?: TContext;
+  private contextValue: TContext | undefined;
+  private hasContext = false;
   private stepList: Step<TContext, unknown, unknown>[] = [];
   private validatorFn?: (
     input: ResolveInput<TInput>,
   ) => boolean | Promise<boolean>;
   private transformFn?: (
-    output: unknown,
+    output: ResolveOutput<TCurrent>,
   ) => ResolveOutput<TCurrent> | Promise<ResolveOutput<TCurrent>>;
   private maxExecutionTimeValue?: number;
   private tagsValue: Record<string, string> = {};
@@ -55,11 +60,17 @@ export class WorkflowBuilder<TContext, TInput = never, TCurrent = never> {
   private idempotencyKeyValue?: string;
 
   name(name: string): WorkflowBuilder<TContext, TInput, TCurrent> {
+    if (!name.trim()) {
+      throw new Error("Workflow name must not be empty");
+    }
     this.workflowName = name;
     return this;
   }
 
   version(version: number): WorkflowBuilder<TContext, TInput, TCurrent> {
+    if (!Number.isInteger(version) || version < 1) {
+      throw new RangeError("Workflow version must be a positive integer");
+    }
     this.workflowVersion = version;
     return this;
   }
@@ -68,6 +79,7 @@ export class WorkflowBuilder<TContext, TInput = never, TCurrent = never> {
     initialContext: TContext,
   ): WorkflowBuilder<TContext, TInput, TCurrent> {
     this.contextValue = initialContext;
+    this.hasContext = true;
     return this;
   }
 
@@ -75,7 +87,7 @@ export class WorkflowBuilder<TContext, TInput = never, TCurrent = never> {
     name: TStepName,
     config: StepConfig<
       TContext,
-      [TCurrent] extends [never] ? ResolveInput<TInput> : TCurrent,
+      StepInput<TInput, TCurrent, TStepInput>,
       TStepOutput
     >,
   ): WorkflowBuilder<
@@ -85,7 +97,7 @@ export class WorkflowBuilder<TContext, TInput = never, TCurrent = never> {
   > {
     const step: Step<
       TContext,
-      [TCurrent] extends [never] ? ResolveInput<TInput> : TCurrent,
+      StepInput<TInput, TCurrent, TStepInput>,
       TStepOutput
     > = {
       id: generateId("step"),
@@ -116,7 +128,7 @@ export class WorkflowBuilder<TContext, TInput = never, TCurrent = never> {
 
   transform(
     transformer: (
-      output: unknown,
+      output: ResolveOutput<TCurrent>,
     ) => ResolveOutput<TCurrent> | Promise<ResolveOutput<TCurrent>>,
   ): WorkflowBuilder<TContext, TInput, TCurrent> {
     this.transformFn = transformer;
@@ -124,6 +136,9 @@ export class WorkflowBuilder<TContext, TInput = never, TCurrent = never> {
   }
 
   maxExecutionTime(ms: number): WorkflowBuilder<TContext, TInput, TCurrent> {
+    if (!Number.isFinite(ms) || ms <= 0) {
+      throw new RangeError("Maximum execution time must be a positive number");
+    }
     this.maxExecutionTimeValue = ms;
     return this;
   }
@@ -131,18 +146,21 @@ export class WorkflowBuilder<TContext, TInput = never, TCurrent = never> {
   tags(
     tags: Record<string, string>,
   ): WorkflowBuilder<TContext, TInput, TCurrent> {
-    this.tagsValue = tags;
+    this.tagsValue = { ...tags };
     return this;
   }
 
   metadata(
     metadata: Record<string, unknown>,
   ): WorkflowBuilder<TContext, TInput, TCurrent> {
-    this.metadataValue = metadata;
+    this.metadataValue = { ...metadata };
     return this;
   }
 
   idempotencyKey(key: string): WorkflowBuilder<TContext, TInput, TCurrent> {
+    if (!key.trim()) {
+      throw new Error("Idempotency key must not be empty");
+    }
     this.idempotencyKeyValue = key;
     return this;
   }
@@ -152,7 +170,7 @@ export class WorkflowBuilder<TContext, TInput = never, TCurrent = never> {
     ResolveInput<TInput>,
     ResolveOutput<TCurrent>
   > {
-    if (!this.contextValue) {
+    if (!this.hasContext) {
       throw new Error("Initial context must be set using .context()");
     }
 
@@ -163,14 +181,18 @@ export class WorkflowBuilder<TContext, TInput = never, TCurrent = never> {
     return {
       name: this.workflowName,
       version: this.workflowVersion,
-      initialContext: this.contextValue,
+      initialContext: this.contextValue as TContext,
       steps: this.stepList,
-      validate: this.validatorFn,
-      transform: this.transformFn,
-      maxExecutionTime: this.maxExecutionTimeValue,
       tags: this.tagsValue,
       metadata: this.metadataValue,
-      idempotencyKey: this.idempotencyKeyValue,
+      ...(this.validatorFn ? { validate: this.validatorFn } : {}),
+      ...(this.transformFn ? { transform: this.transformFn } : {}),
+      ...(this.maxExecutionTimeValue !== undefined
+        ? { maxExecutionTime: this.maxExecutionTimeValue }
+        : {}),
+      ...(this.idempotencyKeyValue
+        ? { idempotencyKey: this.idempotencyKeyValue }
+        : {}),
     };
   }
 }

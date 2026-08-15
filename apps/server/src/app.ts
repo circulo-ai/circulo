@@ -18,6 +18,7 @@ import history from "@/routes/history";
 import messages from "@/routes/messages";
 import suggestions from "@/routes/suggestions";
 import test from "@/routes/test";
+import workflowRuntime from "@/routes/workflow-runtime";
 import userProfile from "@/routes/users/profile";
 import userSettings from "@/routes/users/settings";
 import userUnsubscribe from "@/routes/users/unsubscribe";
@@ -29,7 +30,7 @@ import { prettyJSON } from "hono/pretty-json";
 import { requestId } from "hono/request-id";
 
 const app = createApp();
-const NODE_ENV = env.NODE_ENV ?? "development";
+const IS_DEVELOPMENT = env.NODE_ENV === "development";
 const OPENAPI_PATH = "/openapi.json";
 
 // Middlewares (register before routes)
@@ -56,15 +57,15 @@ const corsMiddleware = cors({
     return getBaseUrl();
   },
   allowHeaders: ["Content-Type", "Authorization"],
-  allowMethods: ["POST", "GET", "OPTIONS"],
+  allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   exposeHeaders: ["Content-Length"],
   maxAge: 600,
   credentials: true,
 });
 app.use("*", corsMiddleware); // apply globally so preflight never 404s
 
-// Skip rate limiting in development (or when NODE_ENV is unset) to avoid throttling local reloads
-if (NODE_ENV !== "development") {
+// Skip rate limiting only in an explicitly configured development environment.
+if (!IS_DEVELOPMENT) {
   app.use("/api/*", rateLimit());
 }
 
@@ -88,12 +89,19 @@ const routes = [
   userSettings,
   userUnsubscribe,
   vote,
-  test,
 ] as const;
 
 routes.forEach((route) => {
   app.route("/api", route);
 });
+
+if (IS_DEVELOPMENT) {
+  app.route("/api", test);
+}
+
+// Workflow DevKit invokes these internal endpoints directly. They must stay
+// outside the /api prefix used by user-facing routes.
+app.route("/", workflowRuntime);
 
 export type AppType = (typeof routes)[number];
 

@@ -2,6 +2,7 @@
 
 import { DataStreamHandler } from "@/components/data-stream-handler";
 import { PageSpinner } from "@/components/page-spinner";
+import { getChatHistoryPaginationKey } from "@/components/sidebar/sidebar-history";
 import {
   CustomContextMenuContent,
   CustomContextMenuItem,
@@ -38,6 +39,14 @@ import {
   InputGroupButton,
   InputGroupTextarea,
 } from "@/components/ui/input-group";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import {
   Tooltip,
@@ -46,10 +55,16 @@ import {
 } from "@/components/ui/tooltip";
 import { FileInput } from "@/components/uploads/file-input";
 import { useMergedRefs } from "@/hooks/use-merged-refs";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { ApiRequestError } from "@/lib/api/client";
 import { deepReplace } from "@/lib/deep-replace";
-import { getFetcher } from "@/lib/swr";
-import { cn } from "@/lib/utils";
+import {
+  clearCachePattern,
+  fetchWithErrorHandlers,
+  getFetcher,
+  globalMutate,
+} from "@/lib/swr";
+import { cn, generateUUID } from "@/lib/utils";
 import { useChatHistoryStore } from "@/stores/use-chat-history-store";
 import { useChat } from "@ai-sdk/react";
 import { Agent } from "@circulo-ai/db";
@@ -61,6 +76,7 @@ import {
   updateAgentBodySchema,
 } from "@circulo-ai/types";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { WorkflowChatTransport } from "@workflow/ai";
 import {
   ArrowUp,
   Bot,
@@ -75,10 +91,12 @@ import {
 } from "lucide-react";
 import {
   ComponentProps,
+  createContext,
   Dispatch,
   forwardRef,
   SetStateAction,
   useCallback,
+  useContext,
   useEffect,
   useId,
   useMemo,
@@ -86,9 +104,22 @@ import {
   useState,
 } from "react";
 import { Path, useForm } from "react-hook-form";
-import useSWR, { Key } from "swr";
+import useSWR, { Key, useSWRConfig } from "swr";
+import { unstable_serialize } from "swr/infinite";
 import useSWRMutation from "swr/mutation";
+import { useRouter } from "next/navigation";
+import { useLocalStorage } from "usehooks-ts";
 import z from "zod";
+
+// ---- Shared context for agent selection ----
+interface AgentSelectionContextValue {
+  selectedAgentIds: string[];
+  setSelectedAgentIds: Dispatch<SetStateAction<string[]>>;
+}
+const AgentSelectionContext = createContext<AgentSelectionContextValue>({
+  selectedAgentIds: [],
+  setSelectedAgentIds: () => {},
+});
 
 const route: Route = {
   id: "select-agents",
@@ -99,83 +130,215 @@ const route: Route = {
   ],
 };
 
+const SELECTED_AGENT_IDS_STORAGE_KEY = "new-chat-selected-agent-ids";
+
 interface NewChatProps {
   id: string;
 }
 
 export function NewChat({ id }: NewChatProps) {
-  const { sendMessage } = useChat({ id });
+  const [chatId] = useState(() => id ?? generateUUID());
+  const [selectedAgentIds, setSelectedAgentIds] = useLocalStorage<string[]>(
+    SELECTED_AGENT_IDS_STORAGE_KEY,
+    [],
+  );
+  const [inputText, setInputText] = useState("");
+  const isMobile = useIsMobile();
+  const router = useRouter();
+  const { mutate } = useSWRConfig();
+  const { setCurrentChatId } = useChatHistoryStore();
 
-  const { isChatLoading } = useChatHistoryStore();
+  // Use a ref so the transport closure always reads the latest agentIds at send time
+  const selectedAgentIdsRef = useRef<string[]>([]);
+  useEffect(() => {
+    selectedAgentIdsRef.current = selectedAgentIds;
+  }, [selectedAgentIds]);
 
-  if (isChatLoading) return <PageSpinner />; // TODO replace with skeleton
+  useEffect(() => {
+    setCurrentChatId(undefined);
+  }, [setCurrentChatId]);
+
+  const { sendMessage, status } = useChat({
+    id: chatId,
+    generateId: generateUUID,
+    transport: new WorkflowChatTransport({
+      api: "/api/chat",
+      fetch: fetchWithErrorHandlers,
+      onChatSendMessage: (_response, options) => {
+        router.push(`/chat/${options.chatId}`, { scroll: false });
+        setCurrentChatId(options.chatId);
+      },
+      prepareSendMessagesRequest: (config) => ({
+        ...config,
+        body: {
+          ...config.body,
+          id: config.id,
+          message: (() => {
+            const message = config.messages.at(-1);
+            if (!message) {
+              throw new Error("No message to send");
+            }
+            return {
+              ...message,
+              id: message.id ?? generateUUID(),
+            };
+          })(),
+          agentIds: selectedAgentIdsRef.current,
+        },
+      }),
+    }),
+    onFinish: async () => {
+      mutate(unstable_serialize(getChatHistoryPaginationKey));
+      await clearCachePattern(/\/api\/conversations.*/);
+      await globalMutate(
+        (key) =>
+          typeof key === "string" && key.startsWith("/api/conversations"),
+      );
+      setSelectedAgentIds([]);
+    },
+  });
+
+  const handleSubmit = useCallback(() => {
+    if (status === "submitted" || status === "streaming") {
+      return;
+    }
+
+    const text = inputText.trim();
+    setInputText("");
+    sendMessage({
+      role: "user",
+      parts: [{ type: "text", text: text || "Hello" }],
+    });
+  }, [inputText, sendMessage, status]);
+
+  const agentPanel = (
+    <div className="relative h-full overflow-hidden bg-sidebar">
+      <RouteFlowController route={route} />
+    </div>
+  );
+
+  const selectedAgentCount = selectedAgentIds.length;
+  const agentSelectionButton = (
+    <span className="relative inline-flex">
+      <InputGroupButton
+        aria-label={
+          selectedAgentCount > 0
+            ? `${selectedAgentCount} AI agents selected`
+            : "Select AI Agents"
+        }
+        size="icon-md"
+        variant="ghost-sidebar"
+        className="rounded-full"
+      >
+        <Bot />
+      </InputGroupButton>
+      {selectedAgentCount > 0 && (
+        <span className="pointer-events-none absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-teal-600 px-[3px] text-[10px] leading-none font-semibold text-white">
+          {selectedAgentCount}
+        </span>
+      )}
+    </span>
+  );
 
   return (
-    <div className="flex h-full">
-      <article className="mx-auto flex h-full max-w-3xl grow flex-col items-center justify-center gap-8 p-8">
-        <h1 className="text-3xl">This text will be replaced</h1>
-        <CustomInputGroup className="h-14 rounded-full! bg-sidebar!">
-          {/* TODO multiline + combine with CHAT SDK's main input */}
-          <CustomInputGroupInput placeholder=" Your first message (optional)" />
-          <InputGroupAddon align="inline-start" className="ml-0!">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <InputGroupButton
-                  aria-label="Add files"
-                  size="icon-md"
-                  variant="ghost-sidebar" // TODO change the variant's name so it's more generic
-                  className="rounded-full"
-                >
-                  <Paperclip />
-                </InputGroupButton>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Soon...</p>
-              </TooltipContent>
-            </Tooltip>
-          </InputGroupAddon>
+    // Single top-level provider so both desktop panel and mobile Sheet share the same state
+    <AgentSelectionContext.Provider
+      value={{ selectedAgentIds, setSelectedAgentIds }}
+    >
+      <div className="flex h-full overflow-hidden">
+        <article className="mx-auto flex h-full w-full max-w-3xl flex-col items-center justify-center gap-8 p-4 sm:p-8">
+          <h1 className="text-3xl">One chat to rule them all</h1>
+          <CustomInputGroup className="h-14 w-full rounded-full! bg-sidebar!">
+            {/* TODO multiline + combine with CHAT SDK's main input */}
+            <CustomInputGroupInput
+              placeholder=" Your first message (optional)"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit();
+                }
+              }}
+            />
+            <InputGroupAddon align="inline-start" className="ml-0!">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <InputGroupButton
+                    aria-label="Add files"
+                    size="icon-md"
+                    variant="ghost-sidebar"
+                    className="rounded-full"
+                  >
+                    <Paperclip />
+                  </InputGroupButton>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Soon...</p>
+                </TooltipContent>
+              </Tooltip>
+            </InputGroupAddon>
 
-          <InputGroupAddon align="inline-end" className="mr-0!">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <InputGroupButton
-                  aria-label="Dictate"
-                  size="icon-md"
-                  variant="ghost-sidebar"
-                  className="rounded-full"
-                >
-                  <Mic />
-                </InputGroupButton>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Soon...</p>
-              </TooltipContent>
-            </Tooltip>
-            <InputGroupButton
-              aria-label="Submit"
-              size="icon-md"
-              variant="primary"
-              className="rounded-full"
-              onClick={() =>
-                sendMessage({
-                  role: "user",
-                  parts: [{ type: "text", text: "Hello World!" }],
-                })
-              }
-            >
-              <ArrowUp />
-            </InputGroupButton>
-          </InputGroupAddon>
-        </CustomInputGroup>
-      </article>
-      <div className="relative w-xs">
-        <div className="pointer-events-none absolute inset-y-0 end-full w-4 bg-linear-to-l from-background/50 to-transparent" />
-        <div className="relative h-full overflow-hidden bg-sidebar">
-          <RouteFlowController route={route} />
-        </div>
+            <InputGroupAddon align="inline-end" className="mr-0!">
+              {isMobile ? (
+                <Sheet>
+                  <SheetTrigger asChild>{agentSelectionButton}</SheetTrigger>
+                  <SheetContent
+                    side="right"
+                    className="w-80 border-teal-50/15 bg-sidebar p-0"
+                  >
+                    <SheetHeader className="sr-only">
+                      <SheetTitle>Select AI Agents</SheetTitle>
+                      <SheetDescription>
+                        Choose who will help with your request
+                      </SheetDescription>
+                    </SheetHeader>
+                    {agentPanel}
+                  </SheetContent>
+                </Sheet>
+              ) : (
+                agentSelectionButton
+              )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <InputGroupButton
+                    aria-label="Dictate"
+                    size="icon-md"
+                    variant="ghost-sidebar"
+                    className="rounded-full"
+                  >
+                    <Mic />
+                  </InputGroupButton>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Soon...</p>
+                </TooltipContent>
+              </Tooltip>
+              <InputGroupButton
+                aria-label="Submit"
+                size="icon-md"
+                variant="primary"
+                className="rounded-full"
+                onClick={handleSubmit}
+                disabled={status === "submitted" || status === "streaming"}
+              >
+                <ArrowUp />
+              </InputGroupButton>
+            </InputGroupAddon>
+          </CustomInputGroup>
+        </article>
+
+        {/* Desktop: persistent side panel — uses same AgentSelectionContext */}
+        {!isMobile && (
+          <div className="relative hidden w-xs shrink-0 md:block">
+            <div className="pointer-events-none absolute inset-y-0 end-full w-4 bg-linear-to-l from-background/50 to-transparent" />
+            {agentPanel}
+          </div>
+        )}
+
+        <DataStreamHandler />
       </div>
-      <DataStreamHandler />
-    </div>
+    </AgentSelectionContext.Provider>
   );
 }
 
@@ -183,9 +346,20 @@ const AGENT_SELECTION_LIMIT = 3;
 
 function SelectAgents() {
   const { redirect } = useRouteFlowViewContext();
-
-  const [selectedAgentIds, setSelectedAgentIds] = useState<string[]>([]);
+  const { selectedAgentIds, setSelectedAgentIds } = useContext(
+    AgentSelectionContext,
+  );
   const { data } = useSWR<Agent[]>("/api/agent");
+
+  useEffect(() => {
+    if (!data) return;
+
+    const validAgentIds = new Set(data.map((agent) => agent.id));
+    setSelectedAgentIds((current) => {
+      const next = current.filter((agentId) => validAgentIds.has(agentId));
+      return next.length === current.length ? current : next;
+    });
+  }, [data, setSelectedAgentIds]);
 
   return (
     <RouteViewLayout className="flex flex-col">

@@ -9,10 +9,22 @@ export class InMemoryWorkflowStore<
   private workflows = new Map<string, Workflow<TContext, TInput, TOutput>>();
   private locks = new Map<string, Lock>();
   private readonly holderId: string;
+  private readonly lockCleanupTimer: ReturnType<typeof setInterval>;
 
   constructor() {
     this.holderId = generateId("holder");
-    this.startLockCleanup();
+    this.lockCleanupTimer = setInterval(() => {
+      const now = Date.now();
+      for (const [workflowId, lock] of this.locks.entries()) {
+        if (lock.expiresAt <= now) {
+          this.locks.delete(workflowId);
+        }
+      }
+    }, 1000);
+    const timer = this.lockCleanupTimer as ReturnType<typeof setInterval> & {
+      unref?: () => void;
+    };
+    timer.unref?.();
   }
 
   private cloneWorkflow(
@@ -74,29 +86,32 @@ export class InMemoryWorkflowStore<
     }
 
     if (filter?.tags) {
+      const tags = filter.tags;
       results = results.filter((wf) => {
-        return Object.entries(filter.tags!).every(
+        return Object.entries(tags).every(
           ([key, value]) => wf.tags[key] === value,
         );
       });
     }
 
-    if (filter?.createdAfter) {
-      results = results.filter((wf) => wf.createdAt >= filter.createdAfter!);
+    if (filter?.createdAfter !== undefined) {
+      const createdAfter = filter.createdAfter;
+      results = results.filter((wf) => wf.createdAt >= createdAfter);
     }
 
-    if (filter?.createdBefore) {
-      results = results.filter((wf) => wf.createdAt <= filter.createdBefore!);
+    if (filter?.createdBefore !== undefined) {
+      const createdBefore = filter.createdBefore;
+      results = results.filter((wf) => wf.createdAt <= createdBefore);
     }
 
-    if (filter?.resumeBefore) {
+    if (filter?.resumeBefore !== undefined) {
+      const resumeBefore = filter.resumeBefore;
       results = results.filter(
-        (wf) =>
-          wf.resumeAt !== undefined && wf.resumeAt <= filter.resumeBefore!,
+        (wf) => wf.resumeAt !== undefined && wf.resumeAt <= resumeBefore,
       );
     }
 
-    if (filter?.limit) {
+    if (filter?.limit !== undefined) {
       results = results.slice(0, filter.limit);
     }
 
@@ -144,15 +159,9 @@ export class InMemoryWorkflowStore<
     return true;
   }
 
-  private startLockCleanup(): void {
-    setInterval(() => {
-      const now = Date.now();
-      for (const [workflowId, lock] of this.locks.entries()) {
-        if (lock.expiresAt <= now) {
-          this.locks.delete(workflowId);
-        }
-      }
-    }, 1000);
+  dispose(): void {
+    clearInterval(this.lockCleanupTimer);
+    this.clear();
   }
 
   clear(): void {

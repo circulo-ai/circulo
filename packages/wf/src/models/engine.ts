@@ -8,17 +8,17 @@ export interface WorkflowEngineConfig<TContext, TInput, TOutput> {
   workflowStore: WorkflowStore<TContext, TInput, TOutput>;
   eventStore: EventStore<TOutput>;
   eventBus: EventBus<TOutput>;
-  logger: Logger;
-  metrics: MetricsCollector;
-  defaultTimeout?: number;
-  defaultRetries?: number;
-  lockTTL?: number;
-  lockRenewInterval?: number;
-  maxConcurrentWorkflows?: number;
-  workflowTimeout?: number;
-  enableHealthCheck?: boolean;
-  enableAutoResume?: boolean;
-  autoResumeIntervalMs?: number;
+  logger?: Logger | undefined;
+  metrics?: MetricsCollector | undefined;
+  defaultTimeout?: number | undefined;
+  defaultRetries?: number | undefined;
+  lockTTL?: number | undefined;
+  lockRenewInterval?: number | undefined;
+  maxConcurrentWorkflows?: number | undefined;
+  workflowTimeout?: number | undefined;
+  enableHealthCheck?: boolean | undefined;
+  enableAutoResume?: boolean | undefined;
+  autoResumeIntervalMs?: number | undefined;
 }
 
 export interface WorkflowDefinition<TContext, TInput, TOutput> {
@@ -27,11 +27,16 @@ export interface WorkflowDefinition<TContext, TInput, TOutput> {
   initialContext: TContext;
   steps: Step<TContext, unknown, unknown>[];
   validate?(input: TInput): boolean | Promise<boolean>;
-  transform?(output: unknown): TOutput | Promise<TOutput>; // Use TOutput here
-  maxExecutionTime?: number;
-  tags?: Record<string, string>;
-  metadata?: Record<string, unknown>;
-  idempotencyKey?: string;
+  /**
+   * A runtime-only output transform. Functions are intentionally not persisted
+   * with a workflow, so callers that resume work in another process should
+   * pass the transform to `engine.run` instead.
+   */
+  transform?(output: TOutput): TOutput | Promise<TOutput>;
+  maxExecutionTime?: number | undefined;
+  tags?: Record<string, string> | undefined;
+  metadata?: Record<string, unknown> | undefined;
+  idempotencyKey?: string | undefined;
 }
 
 export interface HealthCheck {

@@ -25,7 +25,6 @@ function getLogger(): (
  * Get or create a shared Redis client. Returns null if REDIS_URL is not set or initialization fails.
  */
 export function getRedisClient(): CirculoRedis | null {
-  if (typeof window !== "undefined") return null;
   if (cachedClient !== undefined) return cachedClient;
 
   const url = process.env.REDIS_URL;

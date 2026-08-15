@@ -12,45 +12,41 @@ export class InMemoryEventBus<TOutput> implements EventBus<TOutput> {
     event: WorkflowEvent<TOutput>;
     timestamp: number;
   }> = [];
-  private processing = false;
+  private processingPromise?: Promise<void> | undefined;
 
   async publish(evt: WorkflowEvent<TOutput>): Promise<void> {
-    this.eventQueue.push({ event: evt, timestamp: Date.now() });
+    this.eventQueue.push({
+      event: structuredClone(evt),
+      timestamp: Date.now(),
+    });
 
-    if (!this.processing) {
-      this.processQueue().catch((err) => {
-        console.error("Event processing error:", err);
-      });
-    }
+    this.processingPromise ??= this.processQueue().finally(() => {
+      this.processingPromise = undefined;
+    });
+    await this.processingPromise;
   }
 
   private async processQueue(): Promise<void> {
-    this.processing = true;
+    while (this.eventQueue.length > 0) {
+      const item = this.eventQueue.shift();
+      if (!item) continue;
 
-    try {
-      while (this.eventQueue.length > 0) {
-        const item = this.eventQueue.shift();
-        if (!item) break;
+      const { event } = item;
+      const callbacks = this.subscribers.get(event.workflowId);
+      const allCallbacks = [
+        ...(callbacks ? Array.from(callbacks) : []),
+        ...Array.from(this.globalSubscribers),
+      ];
 
-        const { event } = item;
-        const callbacks = this.subscribers.get(event.workflowId);
-        const allCallbacks = [
-          ...(callbacks ? Array.from(callbacks) : []),
-          ...Array.from(this.globalSubscribers),
-        ];
-
-        await Promise.allSettled(
-          allCallbacks.map(async (cb) => {
-            try {
-              await cb(event);
-            } catch (err) {
-              console.error("Event callback error:", err);
-            }
-          }),
-        );
-      }
-    } finally {
-      this.processing = false;
+      await Promise.allSettled(
+        allCallbacks.map(async (cb) => {
+          try {
+            await cb(event);
+          } catch (err) {
+            console.error("Event callback error:", err);
+          }
+        }),
+      );
     }
   }
 

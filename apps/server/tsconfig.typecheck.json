@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@/workflows/*": ["./src/typecheck-stubs/workflows/*"],
+      "@/*": ["./src/*"],
+      "@/db": ["../../packages/db/dist"],
+      "@/db/*": ["../../packages/db/dist/*"]
+    }
+  },
+  "exclude": ["node_modules", "dist", "drizzle.config.ts", "src/workflows/**/*"]
+}

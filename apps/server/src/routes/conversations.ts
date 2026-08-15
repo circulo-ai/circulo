@@ -29,6 +29,7 @@ router.get(
       limit,
       startingAfter,
       endingBefore,
+      search,
     });
 
     return c.json(result);

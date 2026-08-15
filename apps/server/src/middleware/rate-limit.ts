@@ -53,7 +53,7 @@ export function rateLimit(options: RateLimitOptions = {}) {
     if (c.req.method === "OPTIONS") return next();
     if (options.skip && (await options.skip(c))) return next();
 
-    const limiter: RateLimiter | undefined = c.di?.RateLimiter;
+    const limiter = (c.di as any)?.RateLimiter as RateLimiter | undefined;
     if (!limiter) {
       return next();
     }

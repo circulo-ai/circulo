@@ -46,6 +46,11 @@ const rolePermissions: Record<string, RolePermissions> = {
 
 type RoleType = "owner" | "admin" | "member";
 
+function getSessionActiveOrganizationId(session?: SessionResponse): string | undefined {
+  return (session?.session as { activeOrganizationId?: string } | undefined)
+    ?.activeOrganizationId;
+}
+
 // ============================================================================
 // Core Permission Functions
 // ============================================================================
@@ -68,8 +73,9 @@ export async function getUserRole(
     )
     .limit(1);
 
-  if (membership.length === 0) return null;
-  return membership[0].role as RoleType;
+  const membershipRow = membership[0];
+  if (!membershipRow) return null;
+  return membershipRow.role as RoleType;
 }
 
 /**
@@ -88,15 +94,17 @@ export async function hasPermission<R extends Resource>(
 
   if (!sessionData?.user) return false;
 
-  const orgId =
-    organizationId || (sessionData.session as any).activeOrganizationId;
+  const orgId = organizationId || getSessionActiveOrganizationId(sessionData);
   if (!orgId) return false;
 
   const role = await getUserRole(sessionData.user.id, orgId);
   if (!role) return false;
 
   // Get permissions for the role and resource
-  const permissions = rolePermissions[role][resource];
+  const rolePermissionSet = rolePermissions[role];
+  if (!rolePermissionSet) return false;
+
+  const permissions = rolePermissionSet[resource] ?? [];
 
   // Type-safe check
   return permissions.includes(action);
@@ -121,9 +129,8 @@ export async function requirePermission<R extends Resource>(
 
   if (!allowed) {
     const sessionData = session ?? (await getSession());
-    const orgId =
-      organizationId || (sessionData?.session as any)?.activeOrganizationId;
-    const role = sessionData?.user
+    const orgId = organizationId || getSessionActiveOrganizationId(sessionData);
+    const role = sessionData?.user && orgId
       ? await getUserRole(sessionData.user.id, orgId)
       : null;
 
@@ -154,8 +161,7 @@ export async function isOwner(
   const sessionData = session ?? (await getSession());
   if (!sessionData?.user) return false;
 
-  const orgId =
-    organizationId || (sessionData.session as any).activeOrganizationId;
+  const orgId = organizationId || getSessionActiveOrganizationId(sessionData);
   if (!orgId) return false;
 
   const role = await getUserRole(sessionData.user.id, orgId);
@@ -172,8 +178,7 @@ export async function isAdminOrOwner(
   const sessionData = session ?? (await getSession());
   if (!sessionData?.user) return false;
 
-  const orgId =
-    organizationId || (sessionData.session as any).activeOrganizationId;
+  const orgId = organizationId || getSessionActiveOrganizationId(sessionData);
   if (!orgId) return false;
 
   const role = await getUserRole(sessionData.user.id, orgId);
@@ -243,8 +248,7 @@ export async function getUserPermissions(
   const sessionData = session ?? (await getSession());
   if (!sessionData?.user) return {};
 
-  const orgId =
-    organizationId || (sessionData.session as any).activeOrganizationId;
+  const orgId = organizationId || getSessionActiveOrganizationId(sessionData);
   if (!orgId) return {};
 
   const role = await getUserRole(sessionData.user.id, orgId);

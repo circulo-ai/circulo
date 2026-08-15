@@ -1,17 +1,11 @@
 import {
   CustomSidebar,
-  CustomSidebarInset,
 } from "@/components/ui-custom/sidebar";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { cookies } from "next/headers";
 import { ReactNode } from "react";
 import { ChatSidebarInside } from "./chat-sidebar-inside";
-import { ChatSidebarResizablePanel } from "./chat-sidebar-resizable-panel";
+import { ChatSidebarLayout } from "./chat-sidebar-layout";
 
 export async function ChatSidebar({ children }: { children: ReactNode }) {
   const resizablePanelGroupId = "resizable-panel-group-id";
@@ -30,33 +24,19 @@ export async function ChatSidebar({ children }: { children: ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen={!defaultClose}>
-      <ResizablePanelGroup
-        id={resizablePanelGroupId}
-        autosaveId="chat-sidebar"
-        autosaveStrategy="cookie"
-        orientation="horizontal"
+      <ChatSidebarLayout
+        sidebarId={firstResizablePanelId}
+        contentId={secondResizablePanelId}
+        handleId={resizableHandleId}
         snapshot={snapshot}
-      >
-        <ChatSidebarResizablePanel id={firstResizablePanelId}>
+        sidebar={
           <CustomSidebar>
             <ChatSidebarInside />
           </CustomSidebar>
-        </ChatSidebarResizablePanel>
-        <ResizableHandle
-          size="8px"
-          id={resizableHandleId}
-          className="bg-sidebar transition-colors hover:bg-teal-900"
-        />
-        <ResizablePanel id={secondResizablePanelId}>
-          <CustomSidebarInset>{children}</CustomSidebarInset>
-        </ResizablePanel>
-      </ResizablePanelGroup>
+        }
+      >
+        {children}
+      </ChatSidebarLayout>
     </SidebarProvider>
   );
 }
-
-// TODO fix the bg-chat when the svg has not loaded yet
-// TODO the suspense state flickers
-// TODO the first page spinner shows up late
-// TODO use scroll area component in sidebar for chats
-// TODO use animated list in sidebar for chats

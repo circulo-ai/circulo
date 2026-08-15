@@ -45,7 +45,14 @@ export class ConsoleLogger implements Logger {
   private format(level: string, message: string, context?: LogContext): string {
     const timestamp = new Date().toISOString();
     const ctx = { ...this.context, ...context };
-    const contextStr = Object.keys(ctx).length > 0 ? JSON.stringify(ctx) : "";
+    let contextStr = "";
+    if (Object.keys(ctx).length > 0) {
+      try {
+        contextStr = JSON.stringify(ctx);
+      } catch {
+        contextStr = "[unserializable context]";
+      }
+    }
     return `[${timestamp}] ${level} ${message} ${contextStr}`;
   }
 }

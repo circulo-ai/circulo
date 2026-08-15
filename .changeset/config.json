@@ -13,8 +13,7 @@
     "@circulo-ai/db",
     "@circulo-ai/redis",
     "@circulo-ai/prettier-config",
-    "@circulo-ai/types",
-    "@circulo-ai/wf"
+    "@circulo-ai/types"
   ],
   "privatePackages": {
     "version": true,

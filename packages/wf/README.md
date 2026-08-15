@@ -13,6 +13,7 @@ A production-quality, framework-agnostic TypeScript workflow orchestration runti
 - ✅ **Dynamic Replanning**: Steps can append new steps at runtime
 - ✅ **Event Sourcing**: Complete audit trail of all workflow events
 - ✅ **Pub/Sub Events**: Real-time workflow event subscriptions
+- ✅ **Lifecycle Safe**: Timers, locks, queued work, and shutdown are managed explicitly
 
 ## Installation
 
@@ -53,7 +54,7 @@ const engine = new WorkflowEngine({
 // Define a workflow using the typed DSL
 // Input type can be inferred from the first step, or specified up front:
 // defineWorkflow<MyContext, { initial: number }>()
-const workflow = defineWorkflow<MyContext>()
+const workflow = defineWorkflow<MyContext, { initial: number }>()
   .context({ count: 0, messages: [] })
   .step("start", {
     run: async ({ initial }, ctx) => {
@@ -86,6 +87,8 @@ await engine.run(workflowId);
 // Get final state
 const result = await engine.getWorkflow(workflowId);
 console.log("Final output:", result?.output);
+
+await engine.shutdown();
 ```
 
 ## Architecture
@@ -187,7 +190,7 @@ interface WorkflowContext<TContext> {
   };
   readonly data: TContext;
   updateContext(updates: Partial<TContext>): void;
-  appendSteps(steps: Step[]): void;
+  appendSteps(steps: readonly Step[]): void;
   abort(reason: string): void;
 }
 ```
@@ -203,6 +206,11 @@ await engine.pause(workflowId);
 // Resume from where it left off
 await engine.resume(workflowId);
 ```
+
+`waitFor()` and `waitUntil()` persist the next resume timestamp and release the
+workflow lock. With auto-resume enabled (the default), the engine resumes due
+workflows on its polling interval. Call `await engine.shutdown()` when the
+engine is no longer needed.
 
 ### Dynamic Step Planning
 
@@ -255,8 +263,12 @@ class PostgresWorkflowStore implements WorkflowStore<Context, Input, Output> {
     return db.findOne("workflows", { id });
   }
 
-  async updateWorkflow(wf: Workflow<Context, Input, Output>): Promise<void> {
-    await db.update("workflows", { id: wf.id }, wf);
+  async updateWorkflow(
+    wf: Workflow<Context, Input, Output>,
+    expectedVersion: number,
+  ): Promise<boolean> {
+    await db.update("workflows", { id: wf.id, version: expectedVersion }, wf);
+    return true;
   }
 
   async deleteWorkflow(id: string): Promise<void> {
@@ -275,16 +287,15 @@ The entire package is built with strict TypeScript:
 - Inference works automatically in the DSL
 
 ```typescript
-// Types are inferred automatically
+// The first step input is inferred from its handler, and each following input
+// is checked against the previous step's output.
 const workflow = defineWorkflow<{ count: number }>()
   .context({ count: 0 })
-  .step<"first", { n: number }, { doubled: number }>("first", {
-    run: async ({ n }) => complete({ doubled: n * 2 }),
-    // Input/output types are enforced
+  .step("first", {
+    run: async (input: { n: number }) => complete({ doubled: input.n * 2 }),
   })
-  .step<"second", { doubled: number }, { result: string }>("second", {
+  .step("second", {
     run: async ({ doubled }) => complete({ result: String(doubled) }),
-    // Previous output type becomes next input type
   })
   .build();
 ```
@@ -320,14 +331,16 @@ src/
 ├── store/
 │   ├── memory-workflow-store.ts
 │   └── memory-event-store.ts
-├── pubsub/
-│   └── memory-event-bus.ts
+├── store/
+│   ├── memory-event-bus.ts
+│   ├── memory-event-store.ts
+│   └── memory-workflow-store.ts
 └── utils/
     ├── id.ts
     └── backoff.ts
 
-tests/
-└── basic-workflow.test.ts   # Comprehensive test suite
+test/
+└── workflow.test.ts         # Runtime and type-inference coverage
 ```
 
 ## License
