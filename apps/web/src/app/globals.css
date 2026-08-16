@@ -1,3 +1,4 @@
+@import "@base-ripple/react/styles.css";
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "@daveyplate/better-auth-ui/css";
@@ -352,6 +353,7 @@
     scroll-margin-top: 5rem;
   }
   .main-section {
+    min-height: max-content;
     scroll-snap-align: start;
     scroll-snap-stop: always;
   }
@@ -401,31 +403,7 @@
 }
 
 @theme {
-  --animate-ripple: ripple 1s forwards;
-
-  @keyframes ripple {
-    0% {
-      top: var(--initial-top);
-      left: var(--initial-left);
-      width: 0;
-      filter: blur(0px);
-    }
-    50% {
-      top: 50%;
-      left: 50%;
-      width: 100%;
-    }
-    100% {
-      top: 50%;
-      left: 50%;
-      width: 100%;
-      filter: blur(4px);
-    }
-  }
-}
-
-@theme {
-  --animate-error: error 300ms;
+  --animate-error: error var(--default-transition-duration);
 
   @keyframes error {
     0% {
@@ -454,5 +432,13 @@
     to {
       box-shadow: 0 0 0 8px transparent;
     }
+  }
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
   }
 }

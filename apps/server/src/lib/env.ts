@@ -4,7 +4,9 @@ import { z } from "zod";
 const getEnv = (variable: string) => process.env[variable];
 
 export const env = createEnv({
-  skipValidation: true,
+  // Local builds may intentionally omit secrets, but a production process
+  // must fail fast instead of starting with an incomplete security config.
+  skipValidation: process.env.NODE_ENV !== "production",
   server: {
     // Core app/auth
     DATABASE_URL: z.url(),

@@ -4,12 +4,12 @@ import {
 } from "@/lib/artifacts/server";
 import type { ChatMessage } from "@/lib/types";
 import { generateUUID } from "@/lib/utils";
+import type { ActorContext } from "@/lib/types";
 import { tool, type UIMessageStreamWriter } from "ai";
-import type { Session } from "better-auth";
 import { z } from "zod";
 
 type CreateDocumentProps = {
-  session: Session;
+  session: ActorContext;
   dataStream: UIMessageStreamWriter<ChatMessage>;
 };
 

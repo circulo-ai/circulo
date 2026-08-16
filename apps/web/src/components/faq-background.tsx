@@ -10,7 +10,7 @@ export function FaqBackground() {
   ] = usePointer();
 
   return (
-    <div className="absolute start-0 end-2/3 -z-10 grid h-full grid-cols-4 grid-rows-8 gap-0.5 overflow-hidden bg-teal-50/10">
+    <div className="absolute start-0 end-3/5 -z-10 grid h-full grid-cols-4 grid-rows-8 gap-0.5 overflow-hidden bg-teal-50/10 max-sm:hidden">
       <div
         className="absolute size-128 rounded-full bg-teal-50/10 blur-3xl will-change-transform"
         style={{

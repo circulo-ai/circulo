@@ -57,6 +57,10 @@ export class DrizzleAgentRepository implements Repository<Agent> {
     return row ? toDomain(row) : null;
   }
 
+  async findById(id: Identifier | string): Promise<Agent | null> {
+    return this.getById(typeof id === "string" ? Identifier.from(id) : id);
+  }
+
   async save(entity: Agent): Promise<Agent> {
     const row = toRow(entity);
     await this.db

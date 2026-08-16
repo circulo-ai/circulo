@@ -101,6 +101,13 @@ router.post(
       return c.json(updatedDoc, 200);
     }
 
+    if (chatId) {
+      const chat = await chatRepo.findById(chatId);
+      if (!chat || !(await isMemberOf(user.id, chat.organizationId))) {
+        throw new ForbiddenError("You don't have access to this chat");
+      }
+    }
+
     const newDoc = await artifactRepo.create({
       id,
       content,

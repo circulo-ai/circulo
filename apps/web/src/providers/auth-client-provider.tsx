@@ -1,13 +1,16 @@
 "use client";
 
 import { authClient } from "@/lib/auth-client";
+import { getBaseUrl } from "@/lib/urls/utils";
 import { AuthUIProvider } from "@daveyplate/better-auth-ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
+import { useRef } from "react";
 
 export function AuthClientProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const lastSessionIdRef = useRef<string | null | undefined>(undefined);
 
   return (
     <AuthUIProvider
@@ -27,9 +30,14 @@ export function AuthClientProvider({ children }: { children: ReactNode }) {
       }}
       navigate={router.push}
       replace={router.replace}
-      onSessionChange={() => {
-        // Clear router cache (protected routes)
-        router.refresh();
+      baseURL={getBaseUrl()}
+      onSessionChange={async () => {
+        const session = await authClient.getSession();
+        const sessionId = session?.data?.session?.id || null;
+        if (lastSessionIdRef.current !== undefined && lastSessionIdRef.current !== sessionId) {
+          router.refresh();
+        }
+        lastSessionIdRef.current = sessionId;
       }}
       Link={Link}
     >

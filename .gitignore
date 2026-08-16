@@ -26,6 +26,7 @@ bun-debug.log*
 /build
 /dist
 **/dist/
+**/.well-known/workflow/
 **/standalone/
 sim-standalone.tar.gz
 
@@ -73,3 +74,5 @@ start-collector.sh
 .note.md
 packages/types/**/*.d.ts
 packages/types/**/*.d.ts.map
+
+.well-known

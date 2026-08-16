@@ -1,5 +1,5 @@
 import * as yaml from "js-yaml";
-import type { FileParseResult } from "./types";
+import type { FileParseResult } from "./types.js";
 
 export async function parseYAML(filePath: string): Promise<FileParseResult> {
   const fs = await import("fs/promises");

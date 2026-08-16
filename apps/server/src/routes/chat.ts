@@ -1,11 +1,13 @@
 import { titlePrompt } from "@/lib/ai/prompts";
 import { myProvider } from "@/lib/ai/providers";
 import { getActiveOrganizationId } from "@/lib/auth";
+import type { RequestServices } from "@/di/di-context";
 import { createRouter } from "@/lib/create-app";
 import { hasPermission, isMemberOf } from "@/lib/permissions";
 import { type ChatMessage } from "@/lib/types";
 import { getTextFromMessage, getTextFromMessages } from "@/lib/utils";
 import { requireAuth } from "@/middleware/auth";
+import { orchestrateWorkflow } from "@/workflows/orchestrate/orchestrate";
 import {
   BadRequestError,
   ForbiddenError,
@@ -13,22 +15,37 @@ import {
   RateLimitError,
 } from "@circulo-ai/types";
 import { zValidator } from "@hono/zod-validator";
-import { generateText, safeValidateUIMessages } from "ai";
+import { createUIMessageStreamResponse, generateText } from "ai";
+import { start } from "workflow/api";
 import { z } from "zod";
 
 const deleteQuerySchema = z.object({
   id: z.uuid(),
 });
 
+const messagePartSchema = z.object({
+  type: z.enum(["text", "reasoning", "tool-call", "tool-result", "source"]),
+  text: z.string().optional(),
+  reasoning: z.string().optional(),
+}).passthrough();
+
+const messageSchema = z.object({
+  id: z.uuid(),
+  role: z.enum(["user", "assistant", "system", "data"]),
+  content: z.string().optional().default(""),
+  parts: z.array(messagePartSchema).optional(),
+  createdAt: z.union([z.string(), z.date(), z.number()]).optional(),
+}).passthrough();
+
 const createChatSchema = z.object({
   id: z.uuid(),
   visibility: z.enum(["private", "public"]).default("private"),
-  message: z.unknown().refine(async (value) => {
-    const { success } = await safeValidateUIMessages<ChatMessage>({
-      messages: [value],
-    });
-    return success;
+  agentIds: z.array(z.uuid()).max(10).optional().default([]).superRefine((ids, ctx) => {
+    if (new Set(ids).size !== ids.length) {
+      ctx.addIssue({ code: "custom", message: "agentIds must be unique" });
+    }
   }),
+  message: messageSchema,
 });
 
 const router = createRouter();
@@ -57,12 +74,16 @@ router.post(
         id,
         message,
         visibility: selectedVisibilityType,
+        agentIds,
       } = c.req.valid("json");
       const { user, session } = c.var;
-      const di = c.di;
+      const di: RequestServices = c.di;
       const activeOrgId = c.get("activeOrgId");
 
       const messages: ChatMessage[] = [message as ChatMessage];
+      if (message.role !== "user" || !getTextFromMessage(message as ChatMessage).trim()) {
+        throw new BadRequestError("A non-empty user message is required");
+      }
 
       const activeOrganizationId =
         activeOrgId ?? (await getActiveOrganizationId(c.req.raw));
@@ -85,53 +106,48 @@ router.post(
       }
 
       const title = await generateTitleFromUserMessages({ messages });
+      const agentRepository = di.AgentRepository;
+      const agents = await Promise.all(agentIds.map((agentId) => agentRepository.findById(agentId)));
+      if (agents.some((agent) => !agent || agent.snapshot.organizationId !== activeOrganizationId)) {
+        throw new ForbiddenError("One or more selected agents are not available in this organization");
+      }
 
-      const createChat = di.CreateChatUseCase;
-      const postMessage = di.PostMessageUseCase;
-
-      const chatResult = await createChat.execute({
+      const chatResult = await di.CreateChatWithMessageUseCase.execute({
         id,
+        messageId: message.id,
         organizationId: activeOrganizationId,
         creatorId: user!.id,
         title,
         visibility: selectedVisibilityType,
+        content: getTextFromMessage(message as ChatMessage),
+        agentIds,
       });
-      if (chatResult.isFailure) {
-        throw new BadRequestError(
-          chatResult.getError() ?? "Unable to create chat",
-        );
-      }
+      if (chatResult.isFailure) throw new BadRequestError(chatResult.getError() ?? "Unable to create chat");
 
-      for (const msg of messages) {
-        const messageResult = await postMessage.execute({
-          id: msg.id,
+      const run = await start(orchestrateWorkflow, [
+        {
           chatId: id,
-          authorId: user!.id,
-          content: getTextFromMessage(msg),
-        });
-        if (messageResult.isFailure) {
-          throw new BadRequestError(
-            messageResult.getError() ?? "Unable to post message",
-          );
-        }
-      }
+          messages,
+          triggerType: "user_message",
+          actor: {
+            userId: user!.id,
+            organizationId: activeOrganizationId,
+          },
+        },
+      ]);
 
-      // TODO
-      // const orchestrationInput: OrchestrationInput = {
-      //   chatId: id,
-      //   messages: messages,
-      //   triggerType: "user_message",
-      //   session: session as any,
-      // };
+      await di.WorkflowRunRepository.create({
+        id: run.runId,
+        chatId: id,
+        userId: user!.id,
+        organizationId: activeOrganizationId,
+      });
 
-      // const eventId = randomUUID();
-      // await inngest.send({
-      //   name: "app/orchestrate.run",
-      //   data: orchestrationInput,
-      //   id: eventId,
-      // });
-
-      return c.json({ success: true, eventId: 12 }, 202);
+      const response = createUIMessageStreamResponse({
+        stream: run.getReadable(),
+      });
+      response.headers.set("x-workflow-run-id", run.runId);
+      return response;
     } catch (error) {
       if (error instanceof RateLimitError) return error.toResponse();
       if (
@@ -158,8 +174,9 @@ router.delete(
   zValidator("query", deleteQuerySchema),
   async (c) => {
     const { id } = c.req.valid("query");
-    const di = c.di;
+    const di: RequestServices = c.di;
     const activeOrgId = c.get("activeOrgId");
+    const { user, session } = c.var;
 
     const activeOrganizationId =
       activeOrgId ?? (await getActiveOrganizationId(c.req.raw));
@@ -168,7 +185,27 @@ router.delete(
       throw new ForbiddenError("No active organization");
     }
 
-    const result = await di.DeleteChatUseCase.execute({ id });
+    const chat = await di.ChatRepository.findById(id);
+    if (!chat) {
+      throw new BadRequestError("Chat not found");
+    }
+    if (chat.organizationId !== activeOrganizationId) {
+      throw new ForbiddenError("Chat does not belong to your organization");
+    }
+
+    const canDeleteAnyChat = await hasPermission(
+      "chat",
+      "delete",
+      activeOrganizationId,
+      session as any,
+    );
+
+    const result = await di.DeleteChatUseCase.execute({
+      id,
+      organizationId: activeOrganizationId,
+      requesterId: user!.id,
+      canDeleteAnyChat,
+    });
     if (result.isFailure) {
       return new BadRequestError(
         result.getError() ?? "Unable to delete chat",

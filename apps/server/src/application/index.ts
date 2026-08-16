@@ -3,6 +3,7 @@ export * from "./artifact/update-artifact";
 export * from "./chat/accept-chat-invitation";
 export * from "./chat/change-chat-visibility";
 export * from "./chat/create-chat";
+export * from "./chat/create-chat-with-message";
 export * from "./chat/delete-chat";
 export * from "./chat/invite-to-chat";
 export * from "./chat/manage-chat-agent";

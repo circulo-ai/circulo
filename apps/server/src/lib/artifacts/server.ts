@@ -4,8 +4,7 @@ import { textDocumentHandler } from "@/application/artifact/handlers/text/server
 import { artifactRepo } from "@/db/repositories";
 import type { ArtifactKind, Document } from "@/db/schema";
 import type { UIMessageStreamWriter } from "ai";
-import type { Session } from "better-auth";
-import type { ChatMessage } from "../types";
+import type { ActorContext, ChatMessage } from "../types";
 
 export type SaveDocumentProps = {
   id: string;
@@ -19,14 +18,14 @@ export type CreateDocumentCallbackProps = {
   id: string;
   title: string;
   dataStream: UIMessageStreamWriter<ChatMessage>;
-  session: Session;
+  session: ActorContext;
 };
 
 export type UpdateDocumentCallbackProps = {
   document: Document;
   description: string;
   dataStream: UIMessageStreamWriter<ChatMessage>;
-  session: Session;
+  session: ActorContext;
 };
 
 export type DocumentHandler<T = ArtifactKind> = {

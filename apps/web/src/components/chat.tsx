@@ -109,12 +109,21 @@ export function Chat({
         },
 
         prepareSendMessagesRequest: (config) => {
+          const message = config.messages.at(-1);
+          if (!message) {
+            throw new Error("No message to send");
+          }
+
           return {
             ...config,
             body: {
-              id,
-              message: config.messages.at(-1),
-              selectedVisibilityType: visibilityType,
+              ...config.body,
+              id: config.id,
+              message: {
+                ...message,
+                id: message.id ?? generateUUID(),
+              },
+              visibility: visibilityType,
               agentIds: [],
             },
           };

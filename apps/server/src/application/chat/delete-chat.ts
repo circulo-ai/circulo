@@ -7,7 +7,12 @@ import {
   type UseCase,
 } from "@circulo-ai/core";
 
-export type DeleteChatInput = { id: string };
+export type DeleteChatInput = {
+  id: string;
+  organizationId: string;
+  requesterId: string;
+  canDeleteAnyChat: boolean;
+};
 export type DeleteChatOutput = Result<void>;
 
 export class DeleteChat implements UseCase<DeleteChatInput, DeleteChatOutput> {
@@ -21,7 +26,16 @@ export class DeleteChat implements UseCase<DeleteChatInput, DeleteChatOutput> {
     if (!idCheck.succeeded) return Result.fail(idCheck.message);
 
     return this.uow.transaction(async () => {
-      await this.chats.deleteById(Identifier.from(input.id));
+      const chat = await this.chats.findById(input.id);
+      if (!chat) return Result.fail("Chat not found");
+      if (chat.organizationId !== input.organizationId) {
+        return Result.fail("Chat does not belong to this organization");
+      }
+      if (chat.creatorId !== input.requesterId && !input.canDeleteAnyChat) {
+        return Result.fail("You do not have permission to delete this chat");
+      }
+
+      await this.chats.softDeleteById(Identifier.from(input.id));
       return Result.ok();
     });
   }

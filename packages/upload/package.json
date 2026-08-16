@@ -1,9 +1,20 @@
 {
   "name": "@circulo-ai/upload",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "Universal file upload library with support for S3, Azure Blob, and local storage",
   "type": "module",
   "private": false,
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/circulo-ai/circulo.git"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
@@ -26,6 +37,9 @@
       "require": "./dist/routes/next.cjs",
       "default": "./dist/routes/next.mjs"
     }
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "dev": "tsdown --watch",

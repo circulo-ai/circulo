@@ -1,8 +1,8 @@
 import { existsSync } from "fs";
 import { readFile } from "fs/promises";
-import { createLogger, type Logger } from "./logger";
-import type { FileParseResult, FileParser } from "./types";
-import { sanitizeTextForUTF8 } from "./utils";
+import { createLogger, type Logger } from "./logger.js";
+import type { FileParseResult, FileParser } from "./types.js";
+import { sanitizeTextForUTF8 } from "./utils.js";
 
 export class DocParser implements FileParser {
   constructor(private readonly logger: Logger = createLogger("DocParser")) {}

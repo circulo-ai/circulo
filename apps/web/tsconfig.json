@@ -1,6 +1,10 @@
 {
   "compilerOptions": {
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -10,20 +14,40 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     "incremental": true,
     "target": "ESNext",
-    "plugins": [{ "name": "next" }],
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "#/*": ["./public/*"],
-      "@/db": ["../../packages/db/index.ts"], // TODO replace with @circulo-ai/db
-      "@/db/*": ["../../packages/db/*"], // replace with @circulo-ai/db/*
-      "@circulo-ai/db": ["../../packages/db"],
-      "@circulo-ai/db/*": ["../../packages/db/*"],
-      "@circulo-ai/types": ["../../packages/types/src"],
-      "@circulo-ai/types/*": ["../../packages/types/src/*"]
+      "@/*": [
+        "./src/*"
+      ],
+      "#/*": [
+        "./public/*"
+      ],
+      "@/db": [
+        "../../packages/db/index.ts"
+      ], // TODO replace with @circulo-ai/db
+      "@/db/*": [
+        "../../packages/db/*"
+      ], // replace with @circulo-ai/db/*
+      "@circulo-ai/db": [
+        "../../packages/db"
+      ],
+      "@circulo-ai/db/*": [
+        "../../packages/db/*"
+      ],
+      "@circulo-ai/types": [
+        "../../packages/types/src"
+      ],
+      "@circulo-ai/types/*": [
+        "../../packages/types/src/*"
+      ]
     }
   },
   "include": [
@@ -36,5 +60,7 @@
     "trigger.config.ts",
     "../server/drizzle.config.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules"
+  ]
 }

@@ -1,9 +1,9 @@
 import { db } from "@/db";
 import { settings } from "@/db/schema";
-import { getSession } from "@/lib/auth";
 import { createRouter } from "@/lib/create-app";
 import { createLogger } from "@/lib/logs/console/logger";
 import { generateRequestId } from "@/lib/server-utils";
+import { requireAuth } from "@/middleware/auth";
 import { zValidator } from "@hono/zod-validator";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
@@ -32,20 +32,11 @@ const defaultSettings = {
 
 const router = createRouter();
 
-router.get("/users/me/settings", async (c) => {
+router.get("/users/me/settings", requireAuth, async (c) => {
   const requestId = generateRequestId();
 
   try {
-    const session = await getSession(c.req.raw);
-
-    if (!session?.user?.id) {
-      logger.info(
-        `[${requestId}] Returning default settings for unauthenticated user`,
-      );
-      return c.json({ data: defaultSettings }, 200);
-    }
-
-    const userId = session.user.id;
+    const userId = c.var.user!.id;
     const result = await db
       .select()
       .from(settings)
@@ -79,21 +70,13 @@ router.get("/users/me/settings", async (c) => {
 
 router.patch(
   "/users/me/settings",
+  requireAuth,
   zValidator("json", SettingsSchema),
   async (c) => {
     const requestId = generateRequestId();
 
     try {
-      const session = await getSession(c.req.raw);
-
-      if (!session?.user?.id) {
-        logger.info(
-          `[${requestId}] Settings update attempted by unauthenticated user - acknowledged without saving`,
-        );
-        return c.json({ success: true }, 200);
-      }
-
-      const userId = session.user.id;
+      const userId = c.var.user!.id;
       const validatedData = c.req.valid("json");
 
       await db
@@ -115,7 +98,7 @@ router.patch(
       return c.json({ success: true }, 200);
     } catch (error) {
       logger.error(`[${requestId}] Settings update error`, error);
-      return c.json({ success: true }, 200);
+      return c.json({ error: "Unable to update settings" }, 500);
     }
   },
 );

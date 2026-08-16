@@ -1,4 +1,5 @@
 import type {
+  ErrorType,
   HealthCheck,
   Logger,
   Workflow,
@@ -8,42 +9,67 @@ import type {
   WorkflowFilter,
 } from "../models";
 import { generateId } from "../utils/id";
+import { ConsoleLogger } from "../utils/logger";
+import { InMemoryMetrics } from "../utils/metrics";
 import { WorkflowRunner } from "./workflow-runner";
+
+interface QueuedWorkflow<TOutput> {
+  workflowId: string;
+  transform?: ((output: TOutput) => TOutput | Promise<TOutput>) | undefined;
+  resolve: () => void;
+  reject: (error: unknown) => void;
+}
 
 export class WorkflowEngine<TContext, TInput, TOutput> {
   private runner: WorkflowRunner<TContext, TInput, TOutput>;
   private config: WorkflowEngineConfig<TContext, TInput, TOutput>;
   private logger: Logger;
+  private metrics: NonNullable<
+    WorkflowEngineConfig<TContext, TInput, TOutput>["metrics"]
+  >;
   private runningWorkflows = new Set<string>();
-  private workflowQueue: string[] = [];
+  private workflowQueue: QueuedWorkflow<TOutput>[] = [];
   private processing = false;
   private shutdownRequested = false;
   private idempotencyCache = new Map<string, string>(); // idempotencyKey -> workflowId
-  private resumeTimer?: ReturnType<typeof setInterval>;
+  private resumeTimer?: ReturnType<typeof setInterval> | undefined;
+  private healthTimer?: ReturnType<typeof setInterval> | undefined;
   private resumingDue = false;
+  private transforms = new Map<
+    string,
+    (output: TOutput) => TOutput | Promise<TOutput>
+  >();
 
   constructor(config: WorkflowEngineConfig<TContext, TInput, TOutput>) {
-    this.config = config;
-    this.logger = config.logger.child({ component: "WorkflowEngine" });
+    validateEngineConfig(config);
+    const logger = config.logger ?? new ConsoleLogger();
+    const metrics = config.metrics ?? new InMemoryMetrics();
+    this.config = {
+      ...config,
+      logger,
+      metrics,
+    };
+    this.logger = logger.child({ component: "WorkflowEngine" });
+    this.metrics = metrics;
     this.runner = new WorkflowRunner(
-      config.workflowStore,
-      config.eventStore,
-      config.eventBus,
-      config.logger,
-      config.metrics,
+      this.config.workflowStore,
+      this.config.eventStore,
+      this.config.eventBus,
+      this.logger,
+      this.metrics,
       {
-        defaultTimeout: config.defaultTimeout,
-        defaultRetries: config.defaultRetries,
-        lockTTL: config.lockTTL,
-        lockRenewInterval: config.lockRenewInterval,
+        defaultTimeout: this.config.defaultTimeout,
+        defaultRetries: this.config.defaultRetries,
+        lockTTL: this.config.lockTTL,
+        lockRenewInterval: this.config.lockRenewInterval,
       },
     );
 
-    if (config.enableHealthCheck) {
+    if (this.config.enableHealthCheck) {
       this.startHealthCheck();
     }
 
-    if (config.enableAutoResume !== false) {
+    if (this.config.enableAutoResume !== false) {
       this.startAutoResume();
     }
   }
@@ -128,7 +154,10 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
     };
 
     await this.config.workflowStore.saveWorkflow(workflow);
-    this.config.metrics.incrementCounter("workflow.created", {
+    if (definition.transform) {
+      this.transforms.set(workflow.id, definition.transform);
+    }
+    this.metrics.incrementCounter("workflow.created", {
       name: definition.name,
     });
 
@@ -146,7 +175,7 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
 
   async run(
     workflowId: string,
-    transform?: (output: unknown) => TOutput | Promise<TOutput>,
+    transform?: (output: TOutput) => TOutput | Promise<TOutput>,
   ): Promise<void> {
     if (this.shutdownRequested) {
       throw new Error("Engine is shutting down");
@@ -159,25 +188,31 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
         workflowId,
         queueSize: this.workflowQueue.length,
       });
-      this.workflowQueue.push(workflowId);
-      this.processQueue().catch((err) => {
-        this.logger.error("Queue processing error", err as Error);
+      return new Promise<void>((resolve, reject) => {
+        this.workflowQueue.push({
+          workflowId,
+          transform,
+          resolve,
+          reject,
+        });
+        this.processQueue().catch((err: unknown) => {
+          this.logger.error("Queue processing error", toError(err));
+        });
       });
-      return;
     }
 
-    await this.executeWorkflow(workflowId, transform);
+    await this.executeWorkflow(
+      workflowId,
+      transform ?? this.transforms.get(workflowId),
+    );
   }
 
   private async executeWorkflow(
     workflowId: string,
-    transform?: (output: unknown) => TOutput | Promise<TOutput>,
+    transform?: (output: TOutput) => TOutput | Promise<TOutput>,
   ): Promise<void> {
     this.runningWorkflows.add(workflowId);
-    this.config.metrics.recordGauge(
-      "workflow.active",
-      this.runningWorkflows.size,
-    );
+    this.metrics.recordGauge("workflow.active", this.runningWorkflows.size);
 
     try {
       await this.runner.run(workflowId, transform);
@@ -188,13 +223,10 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
       throw err;
     } finally {
       this.runningWorkflows.delete(workflowId);
-      this.config.metrics.recordGauge(
-        "workflow.active",
-        this.runningWorkflows.size,
-      );
+      this.metrics.recordGauge("workflow.active", this.runningWorkflows.size);
 
-      this.processQueue().catch((err) => {
-        this.logger.error("Queue processing error", err as Error);
+      this.processQueue().catch((err: unknown) => {
+        this.logger.error("Queue processing error", toError(err));
       });
     }
   }
@@ -214,13 +246,22 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
         this.runningWorkflows.size < maxConcurrent &&
         !this.shutdownRequested
       ) {
-        const workflowId = this.workflowQueue.shift();
-        if (workflowId) {
-          this.executeWorkflow(workflowId).catch((err) => {
-            this.logger.error("Queued workflow execution error", err as Error, {
-              workflowId,
+        const queued = this.workflowQueue.shift();
+        if (queued) {
+          this.executeWorkflow(
+            queued.workflowId,
+            queued.transform ?? this.transforms.get(queued.workflowId),
+          )
+            .then(queued.resolve, queued.reject)
+            .catch((err: unknown) => {
+              this.logger.error(
+                "Queued workflow execution error",
+                toError(err),
+                {
+                  workflowId: queued.workflowId,
+                },
+              );
             });
-          });
         }
       }
     } finally {
@@ -238,9 +279,13 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
     return this.runner.resume(workflowId);
   }
 
-  async abort(workflowId: string, reason = "Aborted by user"): Promise<void> {
+  async abort(
+    workflowId: string,
+    reason = "Aborted by user",
+    errorType: ErrorType = "permanent",
+  ): Promise<void> {
     this.logger.info("Aborting workflow", { workflowId, reason });
-    return this.runner.abort(workflowId, reason);
+    return this.runner.abort(workflowId, reason, errorType);
   }
 
   async getWorkflow(
@@ -273,6 +318,7 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
 
     await this.config.workflowStore.deleteWorkflow(workflowId);
     await this.config.eventStore.clear(workflowId);
+    this.transforms.delete(workflowId);
   }
 
   subscribe(
@@ -305,7 +351,7 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
         },
       };
     } catch (err) {
-      this.logger.error("Health check failed", err as Error);
+      this.logger.error("Health check failed", toError(err));
       return {
         healthy: false,
         details: {
@@ -319,28 +365,29 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
   }
 
   private startHealthCheck(): void {
-    setInterval(async () => {
+    this.healthTimer = setInterval(async () => {
       const health = await this.getHealth();
-      this.config.metrics.recordGauge(
+      this.metrics.recordGauge(
         "workflow.queue.size",
         this.workflowQueue.length,
       );
-      this.config.metrics.recordGauge(
+      this.metrics.recordGauge(
         "workflow.active",
         health.details.activeWorkflows,
       );
-      this.config.metrics.recordGauge(
+      this.metrics.recordGauge(
         "workflow.failed",
         health.details.failedWorkflows,
       );
     }, 30000);
+    unref(this.healthTimer);
   }
 
   private startAutoResume(): void {
     const interval = this.config.autoResumeIntervalMs ?? 1000;
     this.resumeTimer = setInterval(() => {
       this.resumeDueWorkflows().catch((err) => {
-        this.logger.error("Auto-resume scan failed", err as Error);
+        this.logger.error("Auto-resume scan failed", toError(err));
       });
     }, interval);
   }
@@ -366,7 +413,7 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
       for (const wf of due) {
         if (wf.resumeAt !== undefined && wf.resumeAt <= now) {
           this.run(wf.id).catch((err) => {
-            this.logger.error("Failed to auto-resume workflow", err as Error, {
+            this.logger.error("Failed to auto-resume workflow", toError(err), {
               workflowId: wf.id,
             });
           });
@@ -381,6 +428,14 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
     this.logger.info("Shutting down workflow engine", { graceful });
     this.shutdownRequested = true;
     this.stopAutoResume();
+    if (this.healthTimer) {
+      clearInterval(this.healthTimer);
+      this.healthTimer = undefined;
+    }
+
+    for (const queued of this.workflowQueue.splice(0)) {
+      queued.reject(new Error("Engine is shutting down"));
+    }
 
     if (graceful) {
       const timeout = 30000;
@@ -405,6 +460,7 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
 
     await this.runner.shutdown();
     this.idempotencyCache.clear();
+    this.transforms.clear();
     this.logger.info("Workflow engine shutdown complete");
   }
 
@@ -421,5 +477,46 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
       queuedWorkflows: this.workflowQueue.length,
       shutdownRequested: this.shutdownRequested,
     };
+  }
+}
+
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+function unref(timer: ReturnType<typeof setInterval>): void {
+  const nodeTimer = timer as ReturnType<typeof setInterval> & {
+    unref?: () => void;
+  };
+  nodeTimer.unref?.();
+}
+
+function validateEngineConfig<TContext, TInput, TOutput>(
+  config: WorkflowEngineConfig<TContext, TInput, TOutput>,
+): void {
+  assertOptionalNonNegative(config.defaultTimeout, "defaultTimeout");
+  assertOptionalNonNegative(config.defaultRetries, "defaultRetries");
+  assertOptionalPositive(config.lockTTL, "lockTTL");
+  assertOptionalPositive(config.lockRenewInterval, "lockRenewInterval");
+  assertOptionalPositive(
+    config.maxConcurrentWorkflows,
+    "maxConcurrentWorkflows",
+  );
+  assertOptionalPositive(config.workflowTimeout, "workflowTimeout");
+  assertOptionalPositive(config.autoResumeIntervalMs, "autoResumeIntervalMs");
+}
+
+function assertOptionalNonNegative(
+  value: number | undefined,
+  name: string,
+): void {
+  if (value !== undefined && (!Number.isFinite(value) || value < 0)) {
+    throw new RangeError(`${name} must be a finite, non-negative number`);
+  }
+}
+
+function assertOptionalPositive(value: number | undefined, name: string): void {
+  if (value !== undefined && (!Number.isFinite(value) || value <= 0)) {
+    throw new RangeError(`${name} must be a finite, positive number`);
   }
 }

@@ -1,61 +1,26 @@
 import { cn } from "@/lib/utils";
-import { Slot, Slottable } from "@radix-ui/react-slot";
-import { ComponentProps, JSX, useId } from "react";
-import { RippleClient } from "./ripple-client";
+import { BaseRipple } from "@base-ripple/react";
+import { Slot } from "@radix-ui/react-slot";
+import { ComponentProps, ElementType } from "react";
 
-interface RippleProps extends ComponentProps<"button"> {
-  asChild?: boolean;
-}
+const DEFAULT_ELEMENT_TYPE = "button" as const;
 
-export function Ripple({
-  className,
-  children,
-  disabled,
+function Ripple<T extends ElementType = typeof DEFAULT_ELEMENT_TYPE>({
+  as,
   asChild,
-  id: explicitId,
-  ...otherProps
-}: RippleProps) {
-  const implicitId = useId();
-  const id = explicitId ?? implicitId;
-
-  const Comp = asChild ? Slot : "button";
-
+  className,
+  ...restProps
+}: ComponentProps<typeof BaseRipple<T>> & { as?: T; asChild?: boolean }) {
   return (
-    <Comp
-      id={id}
-      disabled={disabled === undefined ? true : disabled}
+    <BaseRipple
+      as={asChild ? Slot : DEFAULT_ELEMENT_TYPE}
       className={cn(
-        "relative touch-none overflow-hidden select-none [&_.ripple]:bg-teal-50/15",
+        "base-ripple-container [&>.base-ripple]:bg-teal-50/15",
         className,
       )}
-      {...otherProps}
-    >
-      <Slottable>{children}</Slottable>
-      <RippleClient id={id} disabled={disabled} />
-    </Comp>
+      {...restProps}
+    />
   );
 }
 
-interface WithRippleProps<T> extends ComponentProps<typeof Ripple> {
-  component: (props: T) => JSX.Element;
-  componentProps: T;
-}
-
-export function WithRipple<T>({
-  id: explicitId,
-  children,
-  component: Component,
-  componentProps,
-  ...props
-}: WithRippleProps<T>) {
-  const implicitId = useId();
-  const id = explicitId ?? implicitId;
-
-  return (
-    <Ripple id={id} asChild {...props}>
-      <Component id={id} {...componentProps}>
-        {children}
-      </Component>
-    </Ripple>
-  );
-}
+export { Ripple };

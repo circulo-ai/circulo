@@ -51,7 +51,11 @@ router.post("/chat/:id/pin", requireAuth, async (c) => {
   }
 
   const desiredOrder = body?.pinOrder;
-  const desiredIsPinned = !memberRows[0].isPinned;
+  const memberRow = memberRows[0];
+  if (!memberRow) {
+    throw new ForbiddenError("Not a member of this chat");
+  }
+  const desiredIsPinned = !memberRow.isPinned;
 
   const result: PinChatResponse = await db.transaction(async (tx) => {
     let insertOrder: number;
@@ -99,6 +103,10 @@ router.post("/chat/:id/pin", requireAuth, async (c) => {
         pinnedAt: chatMember.pinnedAt,
         pinOrder: chatMember.pinOrder,
       });
+
+    if (!updated) {
+      throw new Error("Unable to update chat pin state");
+    }
 
     return {
       pinInfo: {

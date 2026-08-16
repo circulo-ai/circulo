@@ -1,14 +1,13 @@
 import type { Suggestion } from "@/db";
 import { artifactRepo, suggestionRepo } from "@/db/repositories";
-import type { ChatMessage } from "@/lib/types";
+import type { ActorContext, ChatMessage } from "@/lib/types";
 import { generateUUID } from "@/lib/utils";
 import { streamObject, tool, type UIMessageStreamWriter } from "ai";
-import type { Session } from "better-auth";
 import { z } from "zod";
 import { myProvider } from "../providers";
 
 type RequestSuggestionsProps = {
-  session: Session;
+  session: ActorContext;
   dataStream: UIMessageStreamWriter<ChatMessage>;
 };
 

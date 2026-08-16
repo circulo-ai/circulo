@@ -10,3 +10,4 @@ export * from "./organization-repository";
 export * from "./suggestion-repository";
 export * from "./user-repository";
 export * from "./vote-repository";
+export * from "./workflow-run-repository";

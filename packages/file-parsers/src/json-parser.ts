@@ -1,4 +1,4 @@
-import type { FileParseResult } from "./types";
+import type { FileParseResult } from "./types.js";
 
 export async function parseJSON(filePath: string): Promise<FileParseResult> {
   const fs = await import("node:fs/promises");

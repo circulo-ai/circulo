@@ -9,12 +9,20 @@ on:
     paths:
       - "packages/**/*.ts"
       - "packages/**/tsconfig.json"
+      - "apps/**/*.ts"
+      - "apps/**/*.tsx"
+      - "apps/**/tsconfig.json"
+      - "package.json"
+      - "bun.lock"
+      - "turbo.json"
       - ".github/workflows/ci-typecheck.yml"
 
 jobs:
   typecheck:
     name: TypeScript Check
     runs-on: ubuntu-latest
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
 
     steps:
       - name: Checkout code

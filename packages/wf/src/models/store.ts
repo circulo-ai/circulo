@@ -25,6 +25,11 @@ export interface WorkflowFilter {
   limit?: number;
 }
 
+/** Optional lifecycle hook implemented by stores that own resources. */
+export interface DisposableStore {
+  dispose(): void | Promise<void>;
+}
+
 export interface Lock {
   id: string;
   workflowId: string;

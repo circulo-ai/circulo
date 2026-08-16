@@ -7,6 +7,7 @@ import { EnhancedLink } from "./enhanced-link";
 import { EnhancedLinkSpinner } from "./enhanced-link-spinner";
 import GradualBlur from "./gradual-blur";
 import { Logo } from "./logo";
+import { NavDrawer } from "./nav-drawer";
 import { NavUlDot } from "./nav-ul-dot";
 import { Button } from "./ui/button";
 import { Spinner } from "./ui/spinner";
@@ -26,13 +27,13 @@ export function Nav() {
       />
 
       <div className="flex w-48 items-center gap-2">
-        <Logo />
-        <h1 className="text-4xl text-teal-50">Circulo</h1>
+        <Logo className="max-sm:h-6" />
+        <h1 className="text-2xl text-teal-50 sm:text-4xl">Circulo</h1>
       </div>
 
       <ul
         id={ulId}
-        className="flex items-center gap-4 rounded-full border-2 border-teal-50/5 bg-teal-50/5 p-2 ps-4"
+        className="flex items-center gap-4 rounded-full border-2 border-teal-50/5 bg-teal-50/5 p-2 ps-4 max-md:hidden"
       >
         {navItems.map(
           (navItem) =>
@@ -84,6 +85,7 @@ export function Nav() {
         <Suspense fallback={<Spinner />}>
           <AuthLink />
         </Suspense>
+        <NavDrawer />
       </div>
     </nav>
   );

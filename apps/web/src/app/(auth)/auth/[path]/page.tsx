@@ -21,7 +21,7 @@ export default async function AuthPage({
     <div className={cn("flex w-full flex-col gap-6")}>
       <SignedOut>
         <AuthView
-          redirectTo="/chats"
+          redirectTo="/chat"
           socialLayout={"vertical"}
           className={"flex flex-col gap-6"}
           path={path}

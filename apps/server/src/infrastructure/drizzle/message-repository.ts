@@ -1,8 +1,8 @@
 import type { DbInstance } from "@/db";
-import { message as messageTable } from "@/db/schema/chat";
+import { message as messageTable, vote as voteTable } from "@/db/schema/chat";
 import { Message } from "@/domain/message/message";
 import { Identifier, type Repository } from "@circulo-ai/core";
-import { eq } from "drizzle-orm";
+import { and, eq, gte, inArray } from "drizzle-orm";
 
 function toDomain(row: typeof messageTable.$inferSelect): Message {
   return new Message({
@@ -47,6 +47,12 @@ export class DrizzleMessageRepository implements Repository<Message> {
     return row ? toDomain(row) : null;
   }
 
+  async findById(id: Identifier | string): Promise<Message | null> {
+    return this.getById(
+      typeof id === "string" ? Identifier.from(id) : id,
+    );
+  }
+
   async save(entity: Message): Promise<Message> {
     const row = toRow(entity);
     await this.db
@@ -71,5 +77,34 @@ export class DrizzleMessageRepository implements Repository<Message> {
     return "rowCount" in result
       ? (result as { rowCount: number }).rowCount > 0
       : true;
+  }
+
+  async deleteByChatIdAfterTimestamp({
+    chatId,
+    timestamp,
+  }: {
+    chatId: string;
+    timestamp: Date;
+  }): Promise<boolean> {
+    const messageIds = await this.db
+      .select({ id: messageTable.id })
+      .from(messageTable)
+      .where(and(eq(messageTable.chatId, chatId), gte(messageTable.createdAt, timestamp)));
+
+    if (messageIds.length === 0) return false;
+
+    const ids = messageIds.map((row) => row.id);
+
+    await this.db
+      .delete(voteTable)
+      .where(and(eq(voteTable.chatId, chatId), inArray(voteTable.messageId, ids)));
+
+    const result = await this.db
+      .update(messageTable)
+      .set({ isDeleted: true, deletedAt: new Date() })
+      .where(and(eq(messageTable.chatId, chatId), inArray(messageTable.id, ids)))
+      .returning({ id: messageTable.id });
+
+    return result.length > 0;
   }
 }

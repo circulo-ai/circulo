@@ -1,11 +1,12 @@
 import type { ArtifactKind, Suggestion } from "@/db/schema";
-import { type AggregatedResult } from "@/workflows/orchestrate/steps/aggregate-results-step";
-import { type RequestClassification } from "@/workflows/orchestrate/steps/classify-request-step";
-import { type AgentExecutionResult } from "@/workflows/orchestrate/steps/execute-agent-task-step";
-import { type ExecutionPlan } from "@/workflows/orchestrate/steps/plan-agent-execution-step";
 import type { UIMessage, UIMessageChunk } from "ai";
 import { z } from "zod";
 import type { AppUsage } from "./usage";
+
+type RequestClassification = Record<string, unknown>;
+type ExecutionPlan = Record<string, unknown>;
+type AgentExecutionResult = Record<string, unknown>;
+type AggregatedResult = Record<string, unknown>;
 
 export type DataPart = { type: "append-message"; message: string };
 
@@ -16,6 +17,12 @@ export const messageMetadataSchema = z.object({
 export type MessageMetadata = z.infer<typeof messageMetadataSchema>;
 
 export type ChatTools = Record<string, any>;
+
+/** Minimal authenticated identity passed into server-side AI tools. */
+export type ActorContext = {
+  userId: string;
+  organizationId?: string;
+};
 
 export type CustomUIDataTypes = {
   textDelta: string;

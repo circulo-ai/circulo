@@ -23,7 +23,13 @@ export default function createApp() {
   const app = createRouter();
   const provider = buildRootProvider();
 
-  bindToHono(app, provider, DI_TOKENS, { cache: true, strict: true });
+  const bind = bindToHono as unknown as (
+    app: unknown,
+    provider: unknown,
+    tokens: unknown,
+    options: unknown,
+  ) => void;
+  bind(app, provider, DI_TOKENS, { cache: true, strict: true });
 
   return app;
 }

@@ -8,7 +8,7 @@ import { Button } from "./ui/button";
 export function HeroSection() {
   return (
     <section id="home" className="main-section flex flex-col">
-      <div className="relative mx-8 mb-4 grid grow grid-cols-2 grid-rows-1 overflow-hidden rounded-4xl">
+      <div className="relative mx-8 mb-4 grid grow grid-cols-2 grid-rows-1 overflow-hidden rounded-4xl [clip-path:inset(0_round_var(--radius-4xl))]">
         {/* stars */}
         <div className="absolute inset-0">
           {Array.from({ length: 128 })
@@ -27,7 +27,7 @@ export function HeroSection() {
         </div>
 
         {/* lines down */}
-        <div className="absolute inset-y-0 start-0 end-1/2 mx-auto flex w-fit gap-8">
+        <div className="absolute inset-y-0 start-0 end-0 mx-auto flex w-fit gap-8 md:end-1/2">
           {[0, 1, 2, 3, 4].map((line) => (
             <div
               key={line}
@@ -72,7 +72,7 @@ export function HeroSection() {
         </div>
 
         {/* content start */}
-        <main className="relative flex h-4/5 flex-col items-center justify-evenly px-8">
+        <main className="relative flex flex-col items-center justify-evenly px-8 max-md:col-span-2">
           <EnhancedLink
             href="https://www.youtube.com/"
             target="_blank"
@@ -88,7 +88,7 @@ export function HeroSection() {
           </EnhancedLink>
 
           <div className="flex flex-col items-center justify-center gap-4 text-center text-balance">
-            <h1 className="text-6xl font-semibold">
+            <h1 className="text-4xl font-semibold sm:text-5xl lg:text-6xl">
               Many minds, one evolving dialogue
             </h1>
             <h2 className="text-lg">
@@ -97,7 +97,7 @@ export function HeroSection() {
             </h2>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 max-sm:flex-col">
             <Button
               asChild
               variant="highlightedText"

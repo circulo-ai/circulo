@@ -19,10 +19,24 @@ import { exponentialBackoff } from "../utils/backoff";
 import { generateId } from "../utils/id";
 
 interface RunnerConfig {
-  defaultTimeout?: number;
-  defaultRetries?: number;
-  lockTTL?: number;
-  lockRenewInterval?: number;
+  defaultTimeout?: number | undefined;
+  defaultRetries?: number | undefined;
+  lockTTL?: number | undefined;
+  lockRenewInterval?: number | undefined;
+}
+
+class StepFailure extends Error {
+  constructor(readonly workflowError: WorkflowError) {
+    super(workflowError.message);
+    this.name = "StepFailure";
+  }
+}
+
+class WorkflowAborted extends Error {
+  constructor() {
+    super("Workflow aborted");
+    this.name = "AbortError";
+  }
 }
 
 export class WorkflowRunner<TContext, TInput, TOutput> {
@@ -45,7 +59,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
 
   async run(
     workflowId: string,
-    transform?: (output: unknown) => TOutput | Promise<TOutput>,
+    transform?: (output: TOutput) => TOutput | Promise<TOutput>,
   ): Promise<void> {
     const lock = await this.acquireWorkflowLock(workflowId);
     if (!lock) {
@@ -89,7 +103,11 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
   async pause(workflowId: string): Promise<void> {
     this.pauseFlags.set(workflowId, true);
     const workflow = await this.workflowStore.loadWorkflow(workflowId);
-    if (workflow && workflow.state === "running") {
+    if (
+      workflow &&
+      workflow.state === "running" &&
+      !this.abortControllers.has(workflowId)
+    ) {
       const success = await this.updateWorkflowState(workflow, "paused");
       if (success) {
         const currentStep = workflow.steps[workflow.currentStep];
@@ -121,7 +139,11 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
     }
   }
 
-  async abort(workflowId: string, reason: string): Promise<void> {
+  async abort(
+    workflowId: string,
+    reason: string,
+    errorType: ErrorType = "permanent",
+  ): Promise<void> {
     const controller = this.abortControllers.get(workflowId);
     if (controller) {
       controller.abort();
@@ -131,7 +153,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
     if (workflow) {
       workflow.state = "failed";
       workflow.error = {
-        type: "permanent",
+        type: errorType,
         message: reason,
         retryable: false,
         timestamp: Date.now(),
@@ -153,12 +175,13 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
   private async executeWorkflow(
     workflow: Workflow<TContext, TInput, TOutput>,
     signal: AbortSignal,
-    transform?: (output: unknown) => TOutput | Promise<TOutput>,
+    transform?: (output: TOutput) => TOutput | Promise<TOutput>,
   ): Promise<void> {
-    const startTime = Date.now();
+    const now = Date.now();
+    const startTime = workflow.executionStartedAt ?? now;
 
     if (!workflow.executionStartedAt) {
-      workflow.executionStartedAt = startTime;
+      workflow.executionStartedAt = now;
     }
 
     workflow.resumeAt = undefined;
@@ -179,6 +202,15 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
       }
 
       if (this.pauseFlags.get(workflow.id)) {
+        if (workflow.state !== "paused") {
+          workflow.state = "paused";
+          await this.updateWorkflowWithVersion(workflow);
+          const currentStep = workflow.steps[workflow.currentStep];
+          await this.emitEvent(workflow.id, "workflow.paused", {
+            type: "paused",
+            stepId: currentStep?.id ?? "",
+          });
+        }
         return;
       }
 
@@ -236,7 +268,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
         );
 
         if (result.type === "error") {
-          throw new Error(result.error.message);
+          throw new StepFailure(result.error);
         }
 
         const duration = Date.now() - stepStartTime;
@@ -299,8 +331,15 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
 
         stepLogger.info("Step completed successfully", { duration });
       } catch (err) {
-        const error = this.classifyError(err as Error, step);
-        stepLogger.error("Step failed", err as Error, {
+        if (signal.aborted || err instanceof WorkflowAborted) {
+          return;
+        }
+
+        const error =
+          err instanceof StepFailure
+            ? err.workflowError
+            : this.classifyError(toError(err), step);
+        stepLogger.error("Step failed", toError(err), {
           errorType: error.type,
         });
 
@@ -465,19 +504,15 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
     timeout: number | undefined,
     signal: AbortSignal,
   ): Promise<StepResult<TStepOutput>> {
-    if (timeout) {
-      const timeoutPromise = this.sleep(timeout, signal).then(() => {
-        const error: WorkflowError = {
-          type: "timeout",
-          message: `Step timeout after ${timeout}ms`,
-          retryable: true,
-          timestamp: Date.now(),
-        };
-        return { type: "error" as const, error };
-      });
-      return Promise.race([promise, timeoutPromise]);
-    }
-    return promise;
+    if (signal.aborted) throw new WorkflowAborted();
+
+    const result = await this.withTimeout(
+      promise,
+      timeout,
+      signal,
+      () => new Error(`Step timeout after ${timeout}ms`),
+    );
+    return result;
   }
 
   private async executeGeneratorStep<TStepOutput>(
@@ -497,14 +532,19 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
     try {
       while (true) {
         if (signal.aborted) {
-          throw new Error("Workflow aborted");
+          throw new WorkflowAborted();
         }
 
-        if (timeout && Date.now() - startTime > timeout) {
-          throw new Error(`Step timeout after ${timeout}ms`);
-        }
-
-        const { value, done } = await generator.next();
+        const remaining =
+          timeout === undefined
+            ? undefined
+            : Math.max(0, timeout - (Date.now() - startTime));
+        const { value, done } = await this.withTimeout(
+          generator.next(),
+          remaining,
+          signal,
+          () => new Error(`Step timeout after ${timeout}ms`),
+        );
 
         if (done) {
           return value;
@@ -519,13 +559,12 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
           logger.debug("Step yielded chunk", { stepId });
         }
       }
-    } catch (err) {
+    } finally {
       try {
         await generator.return({ type: "complete", data: {} as TStepOutput });
       } catch {
-        // Ignore cleanup errors
+        // Generator cleanup must not hide the original step result or error.
       }
-      throw err;
     }
   }
 
@@ -547,13 +586,13 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
         const existing = this.contextUpdates.get(workflow.id) || {};
         this.contextUpdates.set(workflow.id, { ...existing, ...updates });
       },
-      appendSteps: (steps: Step<TContext, unknown, unknown>[]) => {
+      appendSteps: (steps: readonly Step<TContext, unknown, unknown>[]) => {
         const existing = this.stepAppends.get(workflow.id) || [];
         this.stepAppends.set(workflow.id, [...existing, ...steps]);
       },
-      abort: (reason: string, _errorType: ErrorType = "permanent") => {
-        this.abort(workflow.id, reason).catch((err) => {
-          logger.error("Failed to abort workflow", err as Error);
+      abort: (reason: string, errorType: ErrorType = "permanent") => {
+        this.abort(workflow.id, reason, errorType).catch((err: unknown) => {
+          logger.error("Failed to abort workflow", toError(err));
         });
       },
     };
@@ -563,9 +602,17 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
     err: Error,
     step: Step<TContext, unknown, unknown>,
   ): WorkflowError {
-    const errorType = step.errorClassifier
-      ? step.errorClassifier(err)
-      : this.defaultErrorClassifier(err);
+    let errorType: ErrorType;
+    try {
+      errorType = step.errorClassifier
+        ? step.errorClassifier(err)
+        : this.defaultErrorClassifier(err);
+    } catch (classifierError) {
+      this.logger.warn("Step error classifier failed", {
+        error: toError(classifierError).message,
+      });
+      errorType = "unknown";
+    }
 
     return {
       type: errorType,
@@ -729,14 +776,50 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
     );
   }
 
+  private withTimeout<T>(
+    operation: Promise<T>,
+    timeout: number | undefined,
+    signal: AbortSignal,
+    timeoutError: () => Error = () => new Error("Operation timed out"),
+  ): Promise<T> {
+    if (signal.aborted) return Promise.reject(new WorkflowAborted());
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let abortHandler: (() => void) | undefined;
+    const abortPromise = new Promise<never>((_, reject) => {
+      abortHandler = () => reject(new WorkflowAborted());
+      signal.addEventListener("abort", abortHandler, { once: true });
+    });
+    const timeoutPromise =
+      timeout === undefined
+        ? undefined
+        : new Promise<never>((_, reject) => {
+            timer = setTimeout(() => reject(timeoutError()), timeout);
+          });
+
+    const races: Promise<T>[] = [operation, abortPromise];
+    if (timeoutPromise) races.push(timeoutPromise);
+
+    return Promise.race(races).finally(() => {
+      if (timer) clearTimeout(timer);
+      if (abortHandler) signal.removeEventListener("abort", abortHandler);
+    });
+  }
+
   private sleep(ms: number, signal: AbortSignal): Promise<void> {
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(resolve, ms);
+      let timeout: ReturnType<typeof setTimeout>;
       const abortHandler = () => {
         clearTimeout(timeout);
-        reject(new Error("Aborted"));
+        signal.removeEventListener("abort", abortHandler);
+        reject(new WorkflowAborted());
       };
       signal.addEventListener("abort", abortHandler, { once: true });
+      timeout = setTimeout(() => {
+        signal.removeEventListener("abort", abortHandler);
+        resolve();
+      }, ms);
+      if (signal.aborted) abortHandler();
     });
   }
 
@@ -757,4 +840,8 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
     this.lockRenewTimers.clear();
     this.lockRenewalActive.clear();
   }
+}
+
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
 }

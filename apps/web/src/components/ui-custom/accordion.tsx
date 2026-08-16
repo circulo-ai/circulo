@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
-import { AccordionTrigger } from "@radix-ui/react-accordion";
 import { ComponentProps } from "react";
+import { AccordionTrigger } from "../ui/accordion";
 
 interface CustomAccordionTriggerProps extends ComponentProps<
   typeof AccordionTrigger

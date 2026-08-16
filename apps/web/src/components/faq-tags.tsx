@@ -8,7 +8,7 @@ export function FaqTags() {
   const [{ selectedTag }, setFaq] = useFaq();
 
   return (
-    <div className="mt-4 flex items-center gap-2">
+    <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
       {tags.map((tag) => (
         <Button
           variant={tag === selectedTag ? "primary" : "secondary"}

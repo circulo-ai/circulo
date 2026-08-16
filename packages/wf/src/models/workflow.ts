@@ -31,8 +31,8 @@ export interface WorkflowError {
   type: ErrorType;
   message: string;
   retryable: boolean;
-  code?: string;
-  stack?: string;
+  code?: string | undefined;
+  stack?: string | undefined;
   timestamp: number;
 }
 
@@ -44,14 +44,14 @@ export interface Workflow<TContext, TInput, TOutput> {
   currentStep: number;
   context: TContext;
   input: TInput;
-  output?: TOutput;
-  error?: WorkflowError;
+  output?: TOutput | undefined;
+  error?: WorkflowError | undefined;
   createdAt: number;
   updatedAt: number;
-  completedAt?: number;
-  resumeAt?: number;
-  maxExecutionTime?: number;
-  executionStartedAt?: number;
+  completedAt?: number | undefined;
+  resumeAt?: number | undefined;
+  maxExecutionTime?: number | undefined;
+  executionStartedAt?: number | undefined;
   retryCount: number;
   tags: Record<string, string>;
   metadata: Record<string, unknown>;
@@ -62,20 +62,19 @@ export type StepResultType = "chunk" | "complete" | "error" | "wait";
 export type StepResult<TOutput> =
   | { type: "chunk"; data: TOutput }
   | { type: "complete"; data: TOutput }
-  | { type: "wait"; until: number; data?: TOutput }
+  | { type: "wait"; until: number; data?: TOutput | undefined }
   | { type: "error"; error: WorkflowError };
 
 export interface Step<TContext, TInput, TOutput> {
   id: string;
   name: string;
-  retries?: number;
-  timeout?: number;
-  backoff?: (attempt: number) => number;
-  errorClassifier?: (error: Error) => ErrorType;
-  compensation?: (
-    input: TInput,
-    ctx: WorkflowContext<TContext>,
-  ) => Promise<void>;
+  retries?: number | undefined;
+  timeout?: number | undefined;
+  backoff?: ((attempt: number) => number) | undefined;
+  errorClassifier?: ((error: Error) => ErrorType) | undefined;
+  compensation?:
+    | ((input: TInput, ctx: WorkflowContext<TContext>) => Promise<void>)
+    | undefined;
   run(
     input: TInput,
     ctx: WorkflowContext<TContext>,
@@ -95,7 +94,7 @@ export interface WorkflowContext<TContext> {
   readonly logger: Logger;
   readonly metrics: MetricsCollector;
   updateContext(updates: Partial<TContext>): void;
-  appendSteps(steps: Step<TContext, unknown, unknown>[]): void;
+  appendSteps(steps: readonly Step<TContext, unknown, unknown>[]): void;
   abort(reason: string, errorType?: ErrorType): void;
 }
 
@@ -117,5 +116,5 @@ export interface WorkflowEvent<TOutput> {
   timestamp: number;
   eventType: WorkflowEventType;
   payload: WorkflowEventPayload<TOutput>;
-  correlationId?: string;
+  correlationId?: string | undefined;
 }

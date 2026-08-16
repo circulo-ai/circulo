@@ -5,7 +5,7 @@ import {
   CustomSidebarHeader,
   CustomSidebarMenuSkeleton,
 } from "@/components/ui-custom/sidebar";
-import { AnimatedList } from "@/components/ui/animated-list";
+import { AnimatedItem, AnimatedList } from "@/components/ui/animated-list";
 import {
   SidebarContent,
   SidebarGroupContent,
@@ -38,41 +38,35 @@ export function ChatSidebarInside() {
       <SidebarContent>
         <CustomSidebarGroup>
           <SidebarGroupContent>
-            <SidebarMenu>
-              {isLoading &&
-                Array.from({ length: 5 }).map((_, index) => (
-                  <SidebarMenuItem key={index}>
-                    <CustomSidebarMenuSkeleton />
-                  </SidebarMenuItem>
-                ))}
+            <AnimatedList asChild>
+              <SidebarMenu>
+                {isLoading &&
+                  Array.from({ length: 5 }).map((_, index) => (
+                    <SidebarMenuItem key={index}>
+                      <CustomSidebarMenuSkeleton />
+                    </SidebarMenuItem>
+                  ))}
 
-              {!isLoading &&
-                data &&
-                data.chats.length === 0 &&
-                debouncedSearch.length === 0 && <ChatSidebarEmpty />}
+                {!isLoading &&
+                  data &&
+                  data.chats.length === 0 &&
+                  debouncedSearch.length === 0 && <ChatSidebarEmpty />}
 
-              {!isLoading &&
-                data &&
-                data.chats.length === 0 &&
-                debouncedSearch.length !== 0 && <ChatSidebarNoResult />}
+                {!isLoading &&
+                  data &&
+                  data.chats.length === 0 &&
+                  debouncedSearch.length !== 0 && <ChatSidebarNoResult />}
 
-              {!isLoading && data && data.chats.length !== 0 && (
-                <AnimatedList
-                  ids={data.chats.map((chat) => chat.id)}
-                  itemElement="div"
-                  renderItem={(id) => {
-                    const chat = data.chats.find((chat) => chat.id === id);
-                    if (!chat) return;
-                    return (
-                      <ChatSidebarItem
-                        key={id} // TODO do I need this here?
-                        item={chat}
-                      />
-                    );
-                  }}
-                />
-              )}
-            </SidebarMenu>
+                {!isLoading &&
+                  data &&
+                  data.chats.length !== 0 &&
+                  data.chats.map((chat) => (
+                    <AnimatedItem key={chat.id} asChild>
+                      <ChatSidebarItem item={chat} />
+                    </AnimatedItem>
+                  ))}
+              </SidebarMenu>
+            </AnimatedList>
           </SidebarGroupContent>
           <ChatSidebarAddAction />
         </CustomSidebarGroup>

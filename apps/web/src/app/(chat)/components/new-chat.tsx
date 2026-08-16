@@ -2,6 +2,7 @@
 
 import { DataStreamHandler } from "@/components/data-stream-handler";
 import { PageSpinner } from "@/components/page-spinner";
+import { getChatHistoryPaginationKey } from "@/components/sidebar/sidebar-history";
 import {
   CustomContextMenuContent,
   CustomContextMenuItem,
@@ -25,7 +26,7 @@ import { SelectInput } from "@/components/ui-custom/select";
 import { SliderInput } from "@/components/ui-custom/slider";
 import { Submit } from "@/components/ui-custom/submit";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AnimatedList } from "@/components/ui/animated-list";
+import { AnimatedItem, AnimatedList } from "@/components/ui/animated-list";
 import { Button } from "@/components/ui/button";
 import {
   ContextMenu,
@@ -38,6 +39,14 @@ import {
   InputGroupButton,
   InputGroupTextarea,
 } from "@/components/ui/input-group";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import {
   Tooltip,
@@ -45,11 +54,19 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { FileInput } from "@/components/uploads/file-input";
+import { useMergedRefs } from "@/hooks/use-merged-refs";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { ApiRequestError } from "@/lib/api/client";
 import { deepReplace } from "@/lib/deep-replace";
-import { getFetcher } from "@/lib/swr";
-import { cn } from "@/lib/utils";
+import {
+  clearCachePattern,
+  fetchWithErrorHandlers,
+  getFetcher,
+  globalMutate,
+} from "@/lib/swr";
+import { cn, generateUUID } from "@/lib/utils";
 import { useChatHistoryStore } from "@/stores/use-chat-history-store";
+import { useChat } from "@ai-sdk/react";
 import { Agent } from "@circulo-ai/db";
 import {
   createAgentBodySchema,
@@ -59,6 +76,7 @@ import {
   updateAgentBodySchema,
 } from "@circulo-ai/types";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { WorkflowChatTransport } from "@workflow/ai";
 import {
   ArrowUp,
   Bot,
@@ -73,9 +91,12 @@ import {
 } from "lucide-react";
 import {
   ComponentProps,
+  createContext,
   Dispatch,
+  forwardRef,
   SetStateAction,
   useCallback,
+  useContext,
   useEffect,
   useId,
   useMemo,
@@ -83,9 +104,22 @@ import {
   useState,
 } from "react";
 import { Path, useForm } from "react-hook-form";
-import useSWR, { Key } from "swr";
+import useSWR, { Key, useSWRConfig } from "swr";
+import { unstable_serialize } from "swr/infinite";
 import useSWRMutation from "swr/mutation";
+import { useRouter } from "next/navigation";
+import { useLocalStorage } from "usehooks-ts";
 import z from "zod";
+
+// ---- Shared context for agent selection ----
+interface AgentSelectionContextValue {
+  selectedAgentIds: string[];
+  setSelectedAgentIds: Dispatch<SetStateAction<string[]>>;
+}
+const AgentSelectionContext = createContext<AgentSelectionContextValue>({
+  selectedAgentIds: [],
+  setSelectedAgentIds: () => {},
+});
 
 const route: Route = {
   id: "select-agents",
@@ -96,78 +130,215 @@ const route: Route = {
   ],
 };
 
+const SELECTED_AGENT_IDS_STORAGE_KEY = "new-chat-selected-agent-ids";
+
 interface NewChatProps {
   id: string;
 }
 
 export function NewChat({ id }: NewChatProps) {
-  const { trigger } = useSWRMutation("/api/chat", getFetcher("POST"));
+  const [chatId] = useState(() => id ?? generateUUID());
+  const [selectedAgentIds, setSelectedAgentIds] = useLocalStorage<string[]>(
+    SELECTED_AGENT_IDS_STORAGE_KEY,
+    [],
+  );
+  const [inputText, setInputText] = useState("");
+  const isMobile = useIsMobile();
+  const router = useRouter();
+  const { mutate } = useSWRConfig();
+  const { setCurrentChatId } = useChatHistoryStore();
 
-  const { isChatLoading } = useChatHistoryStore();
+  // Use a ref so the transport closure always reads the latest agentIds at send time
+  const selectedAgentIdsRef = useRef<string[]>([]);
+  useEffect(() => {
+    selectedAgentIdsRef.current = selectedAgentIds;
+  }, [selectedAgentIds]);
 
-  if (isChatLoading) return <PageSpinner />; // TODO replace with skeleton
+  useEffect(() => {
+    setCurrentChatId(undefined);
+  }, [setCurrentChatId]);
+
+  const { sendMessage, status } = useChat({
+    id: chatId,
+    generateId: generateUUID,
+    transport: new WorkflowChatTransport({
+      api: "/api/chat",
+      fetch: fetchWithErrorHandlers,
+      onChatSendMessage: (_response, options) => {
+        router.push(`/chat/${options.chatId}`, { scroll: false });
+        setCurrentChatId(options.chatId);
+      },
+      prepareSendMessagesRequest: (config) => ({
+        ...config,
+        body: {
+          ...config.body,
+          id: config.id,
+          message: (() => {
+            const message = config.messages.at(-1);
+            if (!message) {
+              throw new Error("No message to send");
+            }
+            return {
+              ...message,
+              id: message.id ?? generateUUID(),
+            };
+          })(),
+          agentIds: selectedAgentIdsRef.current,
+        },
+      }),
+    }),
+    onFinish: async () => {
+      mutate(unstable_serialize(getChatHistoryPaginationKey));
+      await clearCachePattern(/\/api\/conversations.*/);
+      await globalMutate(
+        (key) =>
+          typeof key === "string" && key.startsWith("/api/conversations"),
+      );
+      setSelectedAgentIds([]);
+    },
+  });
+
+  const handleSubmit = useCallback(() => {
+    if (status === "submitted" || status === "streaming") {
+      return;
+    }
+
+    const text = inputText.trim();
+    setInputText("");
+    sendMessage({
+      role: "user",
+      parts: [{ type: "text", text: text || "Hello" }],
+    });
+  }, [inputText, sendMessage, status]);
+
+  const agentPanel = (
+    <div className="relative h-full overflow-hidden bg-sidebar">
+      <RouteFlowController route={route} />
+    </div>
+  );
+
+  const selectedAgentCount = selectedAgentIds.length;
+  const agentSelectionButton = (
+    <span className="relative inline-flex">
+      <InputGroupButton
+        aria-label={
+          selectedAgentCount > 0
+            ? `${selectedAgentCount} AI agents selected`
+            : "Select AI Agents"
+        }
+        size="icon-md"
+        variant="ghost-sidebar"
+        className="rounded-full"
+      >
+        <Bot />
+      </InputGroupButton>
+      {selectedAgentCount > 0 && (
+        <span className="pointer-events-none absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-teal-600 px-[3px] text-[10px] leading-none font-semibold text-white">
+          {selectedAgentCount}
+        </span>
+      )}
+    </span>
+  );
 
   return (
-    <div className="flex h-full">
-      <article className="mx-auto flex h-full max-w-3xl grow flex-col items-center justify-center gap-8 p-8">
-        <h1 className="text-3xl">This text will be replaced</h1>
-        <CustomInputGroup className="h-14 rounded-full! bg-sidebar!">
-          {/* TODO multiline + combine with CHAT SDK's main input */}
-          <CustomInputGroupInput placeholder=" Your first message (optional)" />
-          <InputGroupAddon align="inline-start" className="ml-0!">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <InputGroupButton
-                  aria-label="Add files"
-                  size="icon-md"
-                  variant="ghost-sidebar" // TODO change the variant's name so it's more generic
-                  className="rounded-full"
-                >
-                  <Paperclip />
-                </InputGroupButton>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Soon...</p>
-              </TooltipContent>
-            </Tooltip>
-          </InputGroupAddon>
+    // Single top-level provider so both desktop panel and mobile Sheet share the same state
+    <AgentSelectionContext.Provider
+      value={{ selectedAgentIds, setSelectedAgentIds }}
+    >
+      <div className="flex h-full overflow-hidden">
+        <article className="mx-auto flex h-full w-full max-w-3xl flex-col items-center justify-center gap-8 p-4 sm:p-8">
+          <h1 className="text-3xl">One chat to rule them all</h1>
+          <CustomInputGroup className="h-14 w-full rounded-full! bg-sidebar!">
+            {/* TODO multiline + combine with CHAT SDK's main input */}
+            <CustomInputGroupInput
+              placeholder=" Your first message (optional)"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit();
+                }
+              }}
+            />
+            <InputGroupAddon align="inline-start" className="ml-0!">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <InputGroupButton
+                    aria-label="Add files"
+                    size="icon-md"
+                    variant="ghost-sidebar"
+                    className="rounded-full"
+                  >
+                    <Paperclip />
+                  </InputGroupButton>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Soon...</p>
+                </TooltipContent>
+              </Tooltip>
+            </InputGroupAddon>
 
-          <InputGroupAddon align="inline-end" className="mr-0!">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <InputGroupButton
-                  aria-label="Dictate"
-                  size="icon-md"
-                  variant="ghost-sidebar"
-                  className="rounded-full"
-                >
-                  <Mic />
-                </InputGroupButton>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Soon...</p>
-              </TooltipContent>
-            </Tooltip>
-            <InputGroupButton
-              aria-label="Submit"
-              size="icon-md"
-              variant="primary"
-              className="rounded-full"
-              onClick={() => trigger()} // TODO use useChat
-            >
-              <ArrowUp />
-            </InputGroupButton>
-          </InputGroupAddon>
-        </CustomInputGroup>
-      </article>
-      <div className="relative w-xs">
-        <div className="pointer-events-none absolute inset-y-0 end-full w-4 bg-linear-to-l from-background/50 to-transparent" />
-        <div className="relative h-full overflow-hidden bg-sidebar">
-          <RouteFlowController route={route} />
-        </div>
+            <InputGroupAddon align="inline-end" className="mr-0!">
+              {isMobile ? (
+                <Sheet>
+                  <SheetTrigger asChild>{agentSelectionButton}</SheetTrigger>
+                  <SheetContent
+                    side="right"
+                    className="w-80 border-teal-50/15 bg-sidebar p-0"
+                  >
+                    <SheetHeader className="sr-only">
+                      <SheetTitle>Select AI Agents</SheetTitle>
+                      <SheetDescription>
+                        Choose who will help with your request
+                      </SheetDescription>
+                    </SheetHeader>
+                    {agentPanel}
+                  </SheetContent>
+                </Sheet>
+              ) : (
+                agentSelectionButton
+              )}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <InputGroupButton
+                    aria-label="Dictate"
+                    size="icon-md"
+                    variant="ghost-sidebar"
+                    className="rounded-full"
+                  >
+                    <Mic />
+                  </InputGroupButton>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Soon...</p>
+                </TooltipContent>
+              </Tooltip>
+              <InputGroupButton
+                aria-label="Submit"
+                size="icon-md"
+                variant="primary"
+                className="rounded-full"
+                onClick={handleSubmit}
+                disabled={status === "submitted" || status === "streaming"}
+              >
+                <ArrowUp />
+              </InputGroupButton>
+            </InputGroupAddon>
+          </CustomInputGroup>
+        </article>
+
+        {/* Desktop: persistent side panel — uses same AgentSelectionContext */}
+        {!isMobile && (
+          <div className="relative hidden w-xs shrink-0 md:block">
+            <div className="pointer-events-none absolute inset-y-0 end-full w-4 bg-linear-to-l from-background/50 to-transparent" />
+            {agentPanel}
+          </div>
+        )}
+
+        <DataStreamHandler />
       </div>
-      <DataStreamHandler />
-    </div>
+    </AgentSelectionContext.Provider>
   );
 }
 
@@ -175,9 +346,20 @@ const AGENT_SELECTION_LIMIT = 3;
 
 function SelectAgents() {
   const { redirect } = useRouteFlowViewContext();
-
-  const [selectedAgentIds, setSelectedAgentIds] = useState<string[]>([]);
+  const { selectedAgentIds, setSelectedAgentIds } = useContext(
+    AgentSelectionContext,
+  );
   const { data } = useSWR<Agent[]>("/api/agent");
+
+  useEffect(() => {
+    if (!data) return;
+
+    const validAgentIds = new Set(data.map((agent) => agent.id));
+    setSelectedAgentIds((current) => {
+      const next = current.filter((agentId) => validAgentIds.has(agentId));
+      return next.length === current.length ? current : next;
+    });
+  }, [data, setSelectedAgentIds]);
 
   return (
     <RouteViewLayout className="flex flex-col">
@@ -209,32 +391,23 @@ function SelectAgents() {
         </Tooltip>
       </div>
 
-      <CustomScrollArea className="overflow-auto *:*:block!">
-        {!data && (
-          // TODO skeleton
-          <PageSpinner />
-        )}
-        {data && (
-          // TODO needs better performance when too many agents
-          <AnimatedList
-            itemElement="div"
-            ids={data.map((agent) => agent.id)}
-            renderItem={(id) => {
-              // TODO optimize performance
-              const agent = data.find((agent) => agent.id === id);
-              if (!agent) return;
-              return (
-                <SelectableAgent
-                  key={id}
-                  agent={agent}
-                  selectedAgentIds={selectedAgentIds}
-                  setSelectedAgentIds={setSelectedAgentIds}
-                />
-              );
-            }}
-          />
-        )}
-      </CustomScrollArea>
+      <AnimatedList asChild>
+        <CustomScrollArea className="overflow-auto *:*:block!">
+          {!data && (
+            // TODO skeleton
+            <PageSpinner />
+          )}
+          {data?.map((agent) => (
+            <AnimatedItem key={agent.id} asChild>
+              <SelectableAgent
+                agent={agent}
+                selectedAgentIds={selectedAgentIds}
+                setSelectedAgentIds={setSelectedAgentIds}
+              />
+            </AnimatedItem>
+          ))}
+        </CustomScrollArea>
+      </AnimatedList>
     </RouteViewLayout>
   );
 }
@@ -245,144 +418,149 @@ interface SelectableAgentProps {
   setSelectedAgentIds: Dispatch<SetStateAction<string[]>>;
 }
 
-function SelectableAgent({
-  agent,
-  selectedAgentIds,
-  setSelectedAgentIds,
-}: SelectableAgentProps) {
-  const { redirect } = useRouteFlowViewContext();
+const SelectableAgent = forwardRef<HTMLButtonElement, SelectableAgentProps>(
+  function SelectableAgent(
+    { agent, selectedAgentIds, setSelectedAgentIds },
+    ref,
+  ) {
+    const { redirect } = useRouteFlowViewContext();
 
-  const agentRef = useRef<HTMLButtonElement>(null);
-  const animationLockRef = useRef(false);
+    const innerAgentRef = useRef<HTMLButtonElement>(null);
+    const agentRef = useMergedRefs(ref, innerAgentRef);
+    const animationLockRef = useRef(false);
 
-  const [isTooltipOpen, setIsTooltipOpen] = useState(false);
+    const [isTooltipOpen, setIsTooltipOpen] = useState(false); // TODO close after some time
 
-  const isSelected = useMemo(
-    () => selectedAgentIds.includes(agent.id),
-    [selectedAgentIds, agent.id],
-  );
+    const isSelected = useMemo(
+      () => selectedAgentIds.includes(agent.id),
+      [selectedAgentIds, agent.id],
+    );
 
-  const handleSelect = useCallback(() => {
-    const nextIsSelected = !isSelected;
-    if (nextIsSelected) {
-      if (selectedAgentIds.length >= AGENT_SELECTION_LIMIT) {
-        const agentElement = agentRef.current as HTMLButtonElement | null;
-        if (animationLockRef.current === false && agentElement) {
-          animationLockRef.current = true;
-          agentElement.classList.add("animate-error");
-          setIsTooltipOpen(true);
-          // TODO cleanup
-          setTimeout(() => {
-            animationLockRef.current = false;
-            agentElement.classList.remove("animate-error");
-          }, 500);
-        }
-      } else setSelectedAgentIds((ids) => [...ids, agent.id]);
-    } else setSelectedAgentIds((ids) => ids.filter((id) => id !== agent.id));
-  }, [isSelected, selectedAgentIds.length, agent.id]);
+    const handleSelect = useCallback(() => {
+      const nextIsSelected = !isSelected;
+      if (nextIsSelected) {
+        if (selectedAgentIds.length >= AGENT_SELECTION_LIMIT) {
+          const agentElement = agentRef.current;
+          if (animationLockRef.current === false && agentElement) {
+            animationLockRef.current = true;
+            agentElement.classList.add("animate-error");
+            setIsTooltipOpen(true);
+            // TODO cleanup
+            setTimeout(() => {
+              animationLockRef.current = false;
+              agentElement.classList.remove("animate-error");
+            }, 500);
+          }
+        } else
+          setSelectedAgentIds((ids) =>
+            ids.includes(agent.id) ? ids : [...ids, agent.id],
+          );
+      } else setSelectedAgentIds((ids) => ids.filter((id) => id !== agent.id));
+    }, [isSelected, selectedAgentIds.length, agent.id]);
 
-  return (
-    <>
-      <ContextMenu>
-        <Tooltip open={isTooltipOpen}>
-          <ContextMenuTrigger asChild>
-            <TooltipTrigger asChild>
-              <Ripple
-                ref={agentRef}
-                disabled={false}
-                onClick={handleSelect}
-                className={cn(
-                  "flex w-full items-center gap-2 px-3 py-2 transition-colors",
-                  isSelected && "bg-teal-50/5",
-                )}
-              >
-                <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-teal-50/15">
-                  {agent.avatarUrl && (
-                    <EnhancedImage
-                      src={agent.avatarUrl}
-                      alt={agent.name}
-                      width={48}
-                      height={48}
-                      className="size-full object-cover"
-                    />
-                  )}
-                  {!agent.avatarUrl && <Bot className="size-5" />}
-                </div>
-
-                <div
-                  className={cn(
-                    "absolute start-11 top-10 flex size-5 scale-0 items-center justify-center rounded-full border-3 border-sidebar bg-green-600 opacity-0 transition-all",
-                    isSelected && "scale-100 border-[#303131] opacity-100",
-                  )}
+    return (
+      <>
+        <ContextMenu>
+          <Tooltip open={isTooltipOpen}>
+            <ContextMenuTrigger asChild>
+              <TooltipTrigger asChild>
+                <Ripple
+                  ref={agentRef}
+                  onClick={handleSelect}
+                  data-active={isSelected}
+                  className="flex w-full items-center gap-2 bg-sidebar px-3 py-2 transition-colors active:bg-teal-50/5! data-[active=true]:bg-teal-50/5"
                 >
-                  <Check className="size-3" />
-                </div>
-
-                <div className="flex flex-col items-start gap-1 overflow-hidden">
-                  <div className="w-full truncate text-start text-sm font-medium">
-                    {agent.name}
+                  <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-teal-50/15">
+                    {agent.avatarUrl && (
+                      <EnhancedImage
+                        src={agent.avatarUrl}
+                        alt={agent.name}
+                        width={48}
+                        height={48}
+                        className="size-full object-cover"
+                      />
+                    )}
+                    {!agent.avatarUrl && <Bot className="size-5" />}
                   </div>
-                  <div className="w-full truncate text-start text-xs text-foreground/75">
-                    {agent.description || "Isn't described"}
+
+                  <div
+                    className={cn(
+                      "absolute start-11 top-10 flex size-5 scale-0 items-center justify-center rounded-full border-3 border-sidebar bg-green-600 opacity-0 transition-all",
+                      isSelected && "scale-100 border-[#303131] opacity-100",
+                    )}
+                  >
+                    <Check className="size-3" />
                   </div>
-                </div>
 
-                <div className="ms-auto truncate overflow-hidden rounded-full bg-teal-50/15 px-1 text-[0.625rem]">
-                  {agent.model}
-                </div>
-              </Ripple>
-            </TooltipTrigger>
-          </ContextMenuTrigger>
+                  <div className="flex flex-col items-start gap-1 overflow-hidden">
+                    <div className="w-full truncate text-start text-sm font-medium">
+                      {agent.name}
+                    </div>
+                    <div className="w-full truncate text-start text-xs text-foreground/75">
+                      {agent.description || "Isn't described"}
+                    </div>
+                  </div>
 
-          <CustomContextMenuContent>
-            <CustomContextMenuItem
-              onClick={() => redirect({ id: "agent-form", context: [agent] })}
-            >
-              <Pencil /> Edit / View
-            </CustomContextMenuItem>
-            <CustomContextMenuItem
-              onClick={() => redirect({ id: "remove-agent", context: [agent] })}
-            >
-              <Trash2 /> Remove
-            </CustomContextMenuItem>
-            <ContextMenuSeparator />
-            <CustomContextMenuItem disabled inset>
-              More features soon...
-            </CustomContextMenuItem>
-          </CustomContextMenuContent>
+                  <div className="ms-auto truncate overflow-hidden rounded-full bg-teal-50/15 px-1 text-[0.625rem]">
+                    {agent.model}
+                  </div>
+                </Ripple>
+              </TooltipTrigger>
+            </ContextMenuTrigger>
 
-          <TooltipContent
-            side="left"
-            className="flex items-center gap-2 p-2 pe-4"
-            onPointerDownOutside={() => setIsTooltipOpen(false)}
-            collisionPadding={8}
-          >
-            <Ripple asChild>
-              <Button
-                variant="secondary"
-                size="icon"
-                rounded="full"
-                className="relative animate-ping-with-shadow shadow-background/50 fill-mode-forwards repeat-1 [animation-delay:500ms]"
+            <CustomContextMenuContent>
+              <CustomContextMenuItem
+                onClick={() => redirect({ id: "agent-form", context: [agent] })}
               >
-                <CircleFadingArrowUp />
-              </Button>
-            </Ripple>
-            <div className="flex flex-col gap-1">
-              <h3 className="text-start font-medium">
-                Upgrade to Select More Agents
-              </h3>
-              <p className="text-start text-background/75">
-                Go to the plans page to upgrade
-              </p>
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </ContextMenu>
+                <Pencil /> Edit / View
+              </CustomContextMenuItem>
+              <CustomContextMenuItem
+                onClick={() =>
+                  redirect({ id: "remove-agent", context: [agent] })
+                }
+              >
+                <Trash2 /> Remove
+              </CustomContextMenuItem>
+              <ContextMenuSeparator />
+              <CustomContextMenuItem disabled inset>
+                More features soon...
+              </CustomContextMenuItem>
+            </CustomContextMenuContent>
 
-      <div className="h-0 border-b border-teal-50/15" />
-    </>
-  );
-}
+            <TooltipContent
+              side="left"
+              className="flex items-center gap-2 p-2 pe-4"
+              onPointerDownOutside={() => setIsTooltipOpen(false)}
+              collisionPadding={8}
+            >
+              <Ripple asChild>
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  rounded="full"
+                  className="relative animate-ping-with-shadow shadow-background/50 fill-mode-forwards repeat-1 [animation-delay:500ms]"
+                >
+                  <CircleFadingArrowUp />
+                </Button>
+              </Ripple>
+              <div className="flex flex-col gap-1">
+                <h3 className="text-start font-medium">
+                  Upgrade to Select More Agents
+                </h3>
+                <p className="text-start text-background/75">
+                  Go to the plans page to upgrade
+                </p>
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </ContextMenu>
+
+        <div className="h-0 border-b border-teal-50/15 last:hidden" />
+      </>
+    );
+  },
+);
+SelectableAgent.displayName = "SelectableAgent";
 
 type NewAgentRequest = z.input<typeof createAgentBodySchema>;
 type EditAgentRequest = z.input<typeof updateAgentBodySchema>;
@@ -502,6 +680,7 @@ function AgentFormContent({
         title={isNewAgent ? "New Agent" : "Edit Agent"}
         onBack={goBack}
       >
+        {/* TODO move this to the end of the form */}
         <Submit variant="primary" form={formId} rounded="full">
           {isNewAgent ? "Add" : "Save"}
         </Submit>

@@ -1,7 +1,11 @@
 import { existsSync } from "fs";
 import path from "path";
-import { createLogger, type Logger } from "./logger";
-import type { FileParseResult, FileParser, SupportedFileType } from "./types";
+import { createLogger, type Logger } from "./logger.js";
+import type {
+  FileParseResult,
+  FileParser,
+  SupportedFileType,
+} from "./types.js";
 
 let parserInstancesPromise: Promise<Record<string, FileParser>> | null = null;
 
@@ -192,15 +196,19 @@ export const parseFile = defaultParser.parseFile;
 export const parseBuffer = defaultParser.parseBuffer;
 export const isSupportedFileType = defaultParser.isSupportedFileType;
 
-export { CsvParser } from "./csv-parser";
-export { DocParser } from "./doc-parser";
-export { DocxParser } from "./docx-parser";
-export { HtmlParser } from "./html-parser";
-export { parseJSON, parseJSONBuffer } from "./json-parser";
-export { MdParser } from "./md-parser";
-export { PdfParser } from "./pdf-parser";
-export { PptxParser } from "./pptx-parser";
-export { TxtParser } from "./txt-parser";
-export type { FileParseResult, FileParser, SupportedFileType } from "./types";
-export { XlsxParser } from "./xlsx-parser";
-export { parseYAML, parseYAMLBuffer } from "./yaml-parser";
+export { CsvParser } from "./csv-parser.js";
+export { DocParser } from "./doc-parser.js";
+export { DocxParser } from "./docx-parser.js";
+export { HtmlParser } from "./html-parser.js";
+export { parseJSON, parseJSONBuffer } from "./json-parser.js";
+export { MdParser } from "./md-parser.js";
+export { PdfParser } from "./pdf-parser.js";
+export { PptxParser } from "./pptx-parser.js";
+export { TxtParser } from "./txt-parser.js";
+export type {
+  FileParseResult,
+  FileParser,
+  SupportedFileType,
+} from "./types.js";
+export { XlsxParser } from "./xlsx-parser.js";
+export { parseYAML, parseYAMLBuffer } from "./yaml-parser.js";
