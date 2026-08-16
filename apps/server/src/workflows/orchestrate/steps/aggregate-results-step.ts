@@ -1,7 +1,7 @@
 import type { ChatMessage } from "@/lib/types";
 import { getTextFromMessages } from "@/lib/utils";
 import { google } from "@ai-sdk/google";
-import { generateObject } from "ai";
+import { generateText, Output } from "ai";
 import { z } from "zod";
 import type { RequestClassification } from "./classify-request-step";
 import type { AgentExecutionResult } from "./execute-agent-task-step";
@@ -27,13 +27,11 @@ export async function aggregateResultsStep(params: {
   classification: RequestClassification;
   triggerMessages: ChatMessage[];
 }): Promise<AggregatedResult> {
-  "use step";
-
   const { agentResults, plan, classification, triggerMessages } = params;
 
   // If single agent, return its result directly
   if (agentResults.length === 1) {
-    const result = agentResults[0];
+    const result = agentResults[0]!;
     return {
       summary: result.success
         ? `${result.agentName} completed the task`
@@ -55,9 +53,9 @@ Duration: ${r.durationMs}ms`,
     )
     .join("\n\n---\n\n");
 
-  const { object } = await generateObject({
+  const { output } = await generateText({
     model: google("gemini-2.5-flash"),
-    schema: aggregatedResultSchema,
+    output: Output.object({ schema: aggregatedResultSchema }),
     system: `You are synthesizing the outputs from multiple AI agents into a coherent final response.
 
 ORIGINAL REQUEST: "${getTextFromMessages(triggerMessages)}"
@@ -78,5 +76,5 @@ ${agentOutputs}
 Synthesize these results into a final response.`,
   });
 
-  return object;
+  return output;
 }

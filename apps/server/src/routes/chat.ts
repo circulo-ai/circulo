@@ -1,13 +1,13 @@
+import type { RequestServices } from "@/di/di-context";
 import { titlePrompt } from "@/lib/ai/prompts";
 import { myProvider } from "@/lib/ai/providers";
 import { getActiveOrganizationId } from "@/lib/auth";
-import type { RequestServices } from "@/di/di-context";
 import { createRouter } from "@/lib/create-app";
 import { hasPermission, isMemberOf } from "@/lib/permissions";
 import { type ChatMessage } from "@/lib/types";
 import { getTextFromMessage, getTextFromMessages } from "@/lib/utils";
 import { requireAuth } from "@/middleware/auth";
-import { orchestrateWorkflow } from "@/workflows/orchestrate/orchestrate";
+import { workflowRunService } from "@/workflows/runtime/workflow-run-service";
 import {
   BadRequestError,
   ForbiddenError,
@@ -16,35 +16,43 @@ import {
 } from "@circulo-ai/types";
 import { zValidator } from "@hono/zod-validator";
 import { createUIMessageStreamResponse, generateText } from "ai";
-import { start } from "workflow/api";
 import { z } from "zod";
 
 const deleteQuerySchema = z.object({
   id: z.uuid(),
 });
 
-const messagePartSchema = z.object({
-  type: z.enum(["text", "reasoning", "tool-call", "tool-result", "source"]),
-  text: z.string().optional(),
-  reasoning: z.string().optional(),
-}).passthrough();
+const messagePartSchema = z
+  .object({
+    type: z.enum(["text", "reasoning", "tool-call", "tool-result", "source"]),
+    text: z.string().optional(),
+    reasoning: z.string().optional(),
+  })
+  .passthrough();
 
-const messageSchema = z.object({
-  id: z.uuid(),
-  role: z.enum(["user", "assistant", "system", "data"]),
-  content: z.string().optional().default(""),
-  parts: z.array(messagePartSchema).optional(),
-  createdAt: z.union([z.string(), z.date(), z.number()]).optional(),
-}).passthrough();
+const messageSchema = z
+  .object({
+    id: z.uuid(),
+    role: z.enum(["user", "assistant", "system", "data"]),
+    content: z.string().optional().default(""),
+    parts: z.array(messagePartSchema).optional(),
+    createdAt: z.union([z.string(), z.date(), z.number()]).optional(),
+  })
+  .passthrough();
 
 const createChatSchema = z.object({
   id: z.uuid(),
   visibility: z.enum(["private", "public"]).default("private"),
-  agentIds: z.array(z.uuid()).max(10).optional().default([]).superRefine((ids, ctx) => {
-    if (new Set(ids).size !== ids.length) {
-      ctx.addIssue({ code: "custom", message: "agentIds must be unique" });
-    }
-  }),
+  agentIds: z
+    .array(z.uuid())
+    .max(10)
+    .optional()
+    .default([])
+    .superRefine((ids, ctx) => {
+      if (new Set(ids).size !== ids.length) {
+        ctx.addIssue({ code: "custom", message: "agentIds must be unique" });
+      }
+    }),
   message: messageSchema,
 });
 
@@ -81,7 +89,10 @@ router.post(
       const activeOrgId = c.get("activeOrgId");
 
       const messages: ChatMessage[] = [message as ChatMessage];
-      if (message.role !== "user" || !getTextFromMessage(message as ChatMessage).trim()) {
+      if (
+        message.role !== "user" ||
+        !getTextFromMessage(message as ChatMessage).trim()
+      ) {
         throw new BadRequestError("A non-empty user message is required");
       }
 
@@ -107,9 +118,18 @@ router.post(
 
       const title = await generateTitleFromUserMessages({ messages });
       const agentRepository = di.AgentRepository;
-      const agents = await Promise.all(agentIds.map((agentId) => agentRepository.findById(agentId)));
-      if (agents.some((agent) => !agent || agent.snapshot.organizationId !== activeOrganizationId)) {
-        throw new ForbiddenError("One or more selected agents are not available in this organization");
+      const agents = await Promise.all(
+        agentIds.map((agentId) => agentRepository.findById(agentId)),
+      );
+      if (
+        agents.some(
+          (agent) =>
+            !agent || agent.snapshot.organizationId !== activeOrganizationId,
+        )
+      ) {
+        throw new ForbiddenError(
+          "One or more selected agents are not available in this organization",
+        );
       }
 
       const chatResult = await di.CreateChatWithMessageUseCase.execute({
@@ -122,19 +142,20 @@ router.post(
         content: getTextFromMessage(message as ChatMessage),
         agentIds,
       });
-      if (chatResult.isFailure) throw new BadRequestError(chatResult.getError() ?? "Unable to create chat");
+      if (chatResult.isFailure)
+        throw new BadRequestError(
+          chatResult.getError() ?? "Unable to create chat",
+        );
 
-      const run = await start(orchestrateWorkflow, [
-        {
-          chatId: id,
-          messages,
-          triggerType: "user_message",
-          actor: {
-            userId: user!.id,
-            organizationId: activeOrganizationId,
-          },
+      const run = await workflowRunService.start({
+        chatId: id,
+        messages,
+        triggerType: "user_message",
+        actor: {
+          userId: user!.id,
+          organizationId: activeOrganizationId,
         },
-      ]);
+      });
 
       await di.WorkflowRunRepository.create({
         id: run.runId,
@@ -143,8 +164,13 @@ router.post(
         organizationId: activeOrganizationId,
       });
 
+      void workflowRunService.run(run.runId).then(
+        () => di.WorkflowRunRepository.markFinished(run.runId, "completed"),
+        () => di.WorkflowRunRepository.markFinished(run.runId, "failed"),
+      );
+
       const response = createUIMessageStreamResponse({
-        stream: run.getReadable(),
+        stream: workflowRunService.getReadable(run.runId),
       });
       response.headers.set("x-workflow-run-id", run.runId);
       return response;

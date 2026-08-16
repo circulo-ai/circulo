@@ -1,10 +1,10 @@
-import { createRouter } from "@/lib/create-app";
-import { getActiveOrganizationId } from "@/lib/auth";
-import { requireAuth } from "@/middleware/auth";
 import type { RequestServices } from "@/di/di-context";
-import { ForbiddenError, BadRequestError } from "@circulo-ai/types";
+import { getActiveOrganizationId } from "@/lib/auth";
+import { createRouter } from "@/lib/create-app";
+import { requireAuth } from "@/middleware/auth";
+import { workflowRunService } from "@/workflows/runtime/workflow-run-service";
+import { BadRequestError, ForbiddenError } from "@circulo-ai/types";
 import { createUIMessageStreamResponse } from "ai";
-import { getRun } from "workflow/api";
 
 const router = createRouter();
 
@@ -36,8 +36,7 @@ router.get("/chat/:id/stream", requireAuth, async (c) => {
     throw new BadRequestError("startIndex must be a non-negative integer");
   }
 
-  const run = getRun(id);
-  const stream = run.getReadable({ startIndex });
+  const stream = workflowRunService.getReadable(id, startIndex);
 
   return createUIMessageStreamResponse({
     stream,

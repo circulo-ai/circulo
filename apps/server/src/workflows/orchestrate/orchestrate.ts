@@ -1,4 +1,3 @@
-import { type CustomUIMessageChunk } from "@/lib/types";
 import { aggregateResultsStep } from "@/workflows/orchestrate/steps/aggregate-results-step";
 import {
   type AgentExecutionResult,
@@ -12,86 +11,242 @@ import {
   type ExecutionPlan,
   planAgentExecutionStep,
 } from "@/workflows/orchestrate/steps/plan-agent-execution-step";
-import { type OrchestrationInput } from "@/workflows/orchestrate/types";
-import {
-  FatalError,
-  fetch,
-  getWorkflowMetadata,
-  getWritable,
-  sleep,
-} from "workflow";
+import type { WorkflowDefinition } from "@circulo-ai/wf";
+import { complete, defineWorkflow } from "@circulo-ai/wf";
+import type { RequestClassification } from "./steps/classify-request-step";
 import { classifyRequestStep } from "./steps/classify-request-step";
+import { type OrchestrationInput } from "./types";
 
-const logger = console;
+export const ORCHESTRATION_WORKFLOW_NAME = "chat-orchestration";
 
-export async function sendEvent(event: CustomUIMessageChunk) {
-  "use step";
-
-  const writable = getWritable<CustomUIMessageChunk>();
-  const writer = writable.getWriter();
-  try {
-    await writer.write(event);
-  } finally {
-    writer.releaseLock();
-  }
+export interface OrchestrationWorkflowState {
+  input: OrchestrationInput;
+  startedAt: number;
+  context?: ChatContext;
+  classification?: RequestClassification;
+  plan?: ExecutionPlan;
+  agentResults?: AgentExecutionResult[];
+  finalResult?: Awaited<ReturnType<typeof aggregateResultsStep>>;
+  failureReason?: string;
 }
 
-async function sendWorkflowCompletion(params: {
-  success: boolean;
-  text: string;
-  executionTimeMs: number;
-}) {
-  "use step";
+type OrchestrationWorkflowContext = Record<string, never>;
 
-  const writable = getWritable<CustomUIMessageChunk>();
-  const writer = writable.getWriter();
-  const messageId = crypto.randomUUID();
+export type OrchestrationWorkflowDefinition = WorkflowDefinition<
+  OrchestrationWorkflowContext,
+  OrchestrationInput,
+  OrchestrationWorkflowState
+>;
 
-  try {
-    await writer.write({
-      type: "data-workflowCompleted",
-      data: {
-        success: params.success,
-        executionTimeMs: params.executionTimeMs,
+export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
+  return defineWorkflow<OrchestrationWorkflowContext, OrchestrationInput>()
+    .name(ORCHESTRATION_WORKFLOW_NAME)
+    .version(1)
+    .context({})
+    .maxExecutionTime(30 * 60 * 1000)
+    .step<"load-chat-context", OrchestrationInput, OrchestrationWorkflowState>(
+      "load-chat-context",
+      {
+        run: async (input) => {
+          try {
+            const context = await loadChatContextStep(input.chatId);
+            return complete({ input, context, startedAt: Date.now() });
+          } catch (error) {
+            return complete({
+              input,
+              startedAt: Date.now(),
+              failureReason: toErrorMessage(error),
+            });
+          }
+        },
       },
-    });
-    await writer.write({ type: "text-start", id: messageId });
-    await writer.write({
-      type: "text-delta",
-      id: messageId,
-      delta: params.text,
-    });
-    await writer.write({ type: "text-end", id: messageId });
-    await writer.write({ type: "finish", finishReason: "stop" });
-  } finally {
-    writer.releaseLock();
-  }
+    )
+    .step<
+      "classify-request",
+      OrchestrationWorkflowState,
+      OrchestrationWorkflowState
+    >("classify-request", {
+      run: async (state) => {
+        if (state.failureReason || !state.context) return complete(state);
+
+        if (!state.context.chat.orchestrationEnabled) {
+          return complete({
+            ...state,
+            failureReason: "Orchestration is disabled for this chat.",
+          });
+        }
+
+        if (state.context.agents.length === 0) {
+          return complete({
+            ...state,
+            failureReason: "No active agents are available in this chat.",
+          });
+        }
+
+        const classification = await classifyRequestStep({
+          inputMessages: state.input.messages,
+          messages: state.context.messages,
+          triggerType: state.input.triggerType,
+          webhookPayload: state.input.webhookPayload,
+        });
+
+        return complete({ ...state, classification });
+      },
+    })
+    .step<
+      "plan-execution",
+      OrchestrationWorkflowState,
+      OrchestrationWorkflowState
+    >("plan-execution", {
+      run: async (state) => {
+        if (state.failureReason || !state.context || !state.classification) {
+          return complete(state);
+        }
+
+        const plan = await planAgentExecutionStep({
+          classification: state.classification,
+          agents: state.context.agents,
+          triggerMessages: state.input.messages,
+          webhookPayload: state.input.webhookPayload,
+        });
+
+        if (plan.selectedAgents.length === 0) {
+          return complete({
+            ...state,
+            plan,
+            failureReason: "No suitable agents were found for this request.",
+          });
+        }
+
+        return complete({ ...state, plan });
+      },
+    })
+    .step<
+      "execute-agents",
+      OrchestrationWorkflowState,
+      OrchestrationWorkflowState
+    >("execute-agents", {
+      run: async (state, workflowContext) => {
+        if (
+          state.failureReason ||
+          !state.context ||
+          !state.plan ||
+          !state.classification
+        ) {
+          return complete({ ...state, agentResults: [] });
+        }
+
+        const circularDependency = detectCircularDependencies(
+          state.plan.selectedAgents,
+        );
+        if (circularDependency) {
+          return complete({
+            ...state,
+            agentResults: [],
+            failureReason: `Execution plan invalid: ${circularDependency}`,
+          });
+        }
+
+        const agentResults = await executeAgentsAccordingToStrategy({
+          actor: state.input.actor,
+          plan: state.plan,
+          context: state.context,
+          webhookPayload: state.input.webhookPayload,
+          workflowId: workflowContext.workflow.id,
+        });
+
+        let finalAgentResults = agentResults;
+        if (
+          state.plan.fallbackAgentId &&
+          agentResults.every((result) => !result.success)
+        ) {
+          const fallbackAgent = state.plan.selectedAgents.find(
+            (agent) => agent.agentId === state.plan?.fallbackAgentId,
+          );
+
+          if (fallbackAgent) {
+            const fallbackResult = await executeAgentTaskStep({
+              actor: state.input.actor,
+              agentPlan: fallbackAgent,
+              context: state.context,
+              previousResults: agentResults,
+              webhookPayload: state.input.webhookPayload,
+              workflowId: workflowContext.workflow.id,
+            });
+            finalAgentResults = [...agentResults, fallbackResult];
+          }
+        }
+
+        return complete({ ...state, agentResults: finalAgentResults });
+      },
+    })
+    .step<
+      "aggregate-results",
+      OrchestrationWorkflowState,
+      OrchestrationWorkflowState
+    >("aggregate-results", {
+      run: async (state) => {
+        if (
+          state.failureReason ||
+          !state.classification ||
+          !state.plan ||
+          !state.agentResults
+        ) {
+          return complete({
+            ...state,
+            finalResult: createFailureResult(
+              state.failureReason ??
+                "The orchestration could not be completed.",
+            ),
+          });
+        }
+
+        const finalResult = await aggregateResultsStep({
+          agentResults: state.agentResults,
+          plan: state.plan,
+          classification: state.classification,
+          triggerMessages: state.input.messages,
+        });
+
+        return complete({ ...state, finalResult });
+      },
+    })
+    .build();
+}
+
+function createFailureResult(reason: string) {
+  return {
+    summary: reason,
+    detailedResponse: reason,
+    actionItems: [],
+    successfulAgents: [],
+    failedAgents: [],
+    overallSuccess: false,
+  };
 }
 
 function detectCircularDependencies(
   agents: ExecutionPlan["selectedAgents"],
 ): string | null {
-  const agentMap = new Map(agents.map((a) => [a.agentId, a]));
+  const agentMap = new Map(agents.map((agent) => [agent.agentId, agent]));
   const visited = new Set<string>();
   const recursionStack = new Set<string>();
 
-  function hasCycle(agentId: string, path: string[] = []): string | null {
+  function visit(agentId: string, path: string[] = []): string | null {
     if (recursionStack.has(agentId)) {
       return `Circular dependency detected: ${[...path, agentId].join(" -> ")}`;
     }
-    if (visited.has(agentId)) {
-      return null;
-    }
+    if (visited.has(agentId)) return null;
 
     visited.add(agentId);
     recursionStack.add(agentId);
 
     const agent = agentMap.get(agentId);
-    for (const depId of agent?.dependsOn || []) {
-      if (!agentMap.has(depId)) {
-        return `Agent ${agentId} depends on non-existent agent ${depId}`;
+    for (const dependencyId of agent?.dependsOn ?? []) {
+      if (!agentMap.has(dependencyId)) {
+        return `Agent ${agentId} depends on non-existent agent ${dependencyId}`;
       }
-      const cycle = hasCycle(depId, [...path, agentId]);
+      const cycle = visit(dependencyId, [...path, agentId]);
       if (cycle) return cycle;
     }
 
@@ -100,290 +255,81 @@ function detectCircularDependencies(
   }
 
   for (const agent of agents) {
-    const cycle = hasCycle(agent.agentId);
+    const cycle = visit(agent.agentId);
     if (cycle) return cycle;
   }
 
   return null;
 }
 
-export async function orchestrateWorkflow(input: OrchestrationInput) {
-  "use workflow";
-
-  // Enable AI SDK calls as workflow steps
-  globalThis.fetch = fetch;
-
-  const startTime = Date.now();
-  let errorStack: string | undefined;
-  try {
-    logger.info("Workflow Started");
-
-    const ctx = getWorkflowMetadata();
-
-    await sendEvent({
-      type: "data-workflowStarted",
-      data: {
-        workflowId: ctx.workflowRunId,
-        chatId: input.chatId,
-        messages: input.messages,
-      },
-    });
-
-    const context = await loadChatContextStep(input.chatId);
-    logger.info("Context Loaded", context);
-
-    if (!context.chat.orchestrationEnabled) {
-      await sendWorkflowCompletion({
-        success: false,
-        text: "Orchestration is disabled for this chat.",
-        executionTimeMs: Date.now() - startTime,
-      });
-      return {
-        success: false,
-        reason: "Orchestration is disabled for this chat",
-      };
-    }
-
-    if (context.agents.length === 0) {
-      await sendWorkflowCompletion({
-        success: false,
-        text: "No active agents are available in this chat.",
-        executionTimeMs: Date.now() - startTime,
-      });
-      return {
-        success: false,
-        reason: "No agents available in this chat",
-      };
-    }
-
-    const classification = await classifyRequestStep({
-      inputMessages: input.messages,
-      messages: context.messages,
-      triggerType: input.triggerType,
-      webhookPayload: input.webhookPayload,
-    });
-
-    logger.info("Classified", classification);
-    await sendEvent({
-      type: "data-workflowClassification",
-      data: classification,
-    });
-
-    const executionPlan = await planAgentExecutionStep({
-      classification,
-      agents: context.agents,
-      triggerMessages: input.messages,
-      webhookPayload: input.webhookPayload,
-    });
-
-    await sendEvent({
-      type: "data-workflowPlan",
-      data: executionPlan,
-    });
-
-    logger.info("Execution Planned", executionPlan);
-
-    if (executionPlan.selectedAgents.length === 0) {
-      await sendWorkflowCompletion({
-        success: false,
-        text: "No suitable agents were found for this request.",
-        executionTimeMs: Date.now() - startTime,
-      });
-      return {
-        success: false,
-        reason: "No suitable agents found for this request",
-        classification,
-        reasoning: executionPlan.reasoning,
-      };
-    }
-
-    // Step 7b: Check for circular dependencies
-    if (executionPlan.strategy === "conditional") {
-      const circularDep = detectCircularDependencies(
-        executionPlan.selectedAgents,
-      );
-      if (circularDep) {
-        throw new FatalError(`Execution plan invalid: ${circularDep}`);
-      }
-    }
-
-    const timeoutPromise = (async () => {
-      await sleep(`${executionPlan.timeoutMinutes}m`);
-      throw new Error("Workflow execution timeout");
-    })();
-
-    const executionPromise = executeAgentsAccordingToStrategy({
-      actor: input.actor,
-      plan: executionPlan,
-      context,
-      webhookPayload: input.webhookPayload,
-    });
-
-    const agentResults = await Promise.race([executionPromise, timeoutPromise]);
-
-    logger.info("Agent Results", agentResults);
-
-    // Step 9: Check fallback agent
-    let finalAgentResults = agentResults;
-    if (
-      executionPlan.fallbackAgentId &&
-      agentResults.every((r) => !r.success)
-    ) {
-      logger.info("All agents failed, trying fallback agent");
-
-      const fallbackAgent = executionPlan.selectedAgents.find(
-        (a) => a.agentId === executionPlan.fallbackAgentId,
-      );
-
-      if (fallbackAgent) {
-        const fallbackResult = await executeAgentTaskStep({
-          actor: input.actor,
-          agentPlan: fallbackAgent,
-          context,
-          previousResults: agentResults,
-          webhookPayload: input.webhookPayload,
-        });
-
-        finalAgentResults = [...agentResults, fallbackResult];
-      }
-    }
-
-    const finalResult = await aggregateResultsStep({
-      agentResults: finalAgentResults,
-      plan: executionPlan,
-      classification,
-      triggerMessages: input.messages,
-    });
-
-    await sendEvent({
-      type: "data-workflowAggregated",
-      data: finalResult,
-    });
-
-    await sendWorkflowCompletion({
-      success: true,
-      text: finalResult.detailedResponse,
-      executionTimeMs: Date.now() - startTime,
-    });
-
-    // TODO: Notify members (Implement in future)
-    // if (classification.notifyMembers) {
-    //   await notifyChatMembersStep({
-    //     chatId: input.chatId,
-    //     excludeUserId: triggerMessages.authorId,
-    //     notification: {
-    //       type: "orchestration_complete",
-    //       agentCount: finalAgentResults.length,
-    //       summary: finalResult.summary,
-    //     },
-    //   });
-    // }
-
-    return {
-      success: true,
-      classification,
-      executionPlan,
-      agentResults: finalAgentResults,
-      finalResult,
-      executionTimeMs: Date.now() - startTime,
-    };
-  } catch (error) {
-    if (error instanceof Error) {
-      errorStack = error.stack;
-    }
-
-    try {
-      await sendWorkflowCompletion({
-        success: false,
-        text:
-          error instanceof Error
-            ? `The orchestration failed: ${error.message}`
-            : "The orchestration failed.",
-        executionTimeMs: Date.now() - startTime,
-      });
-    } catch (completionError) {
-      logger.error("Unable to publish workflow failure", completionError);
-    }
-    throw error;
-  }
-}
-
-// NOT a step - orchestration logic
 async function executeAgentsAccordingToStrategy(params: {
   actor: OrchestrationInput["actor"];
   plan: ExecutionPlan;
   context: ChatContext;
   webhookPayload?: OrchestrationInput["webhookPayload"];
-}) {
-  const { plan, context, webhookPayload, actor } = params;
+  workflowId: string;
+}): Promise<AgentExecutionResult[]> {
+  const { plan, context, webhookPayload, actor, workflowId } = params;
 
   switch (plan.strategy) {
     case "sequential":
-      return await executeSequential({
+      return executeSequential({
         actor,
         plan,
         context,
         webhookPayload,
+        workflowId,
       });
-
     case "parallel":
-      return await executeParallel(actor, plan, context, webhookPayload);
-
+      return executeParallel(actor, plan, context, webhookPayload, workflowId);
     case "conditional":
-      return await executeConditional(actor, plan, context, webhookPayload);
-
+      return executeConditional(
+        actor,
+        plan,
+        context,
+        webhookPayload,
+        workflowId,
+      );
     case "single":
-      return await executeSingle(actor, plan, context, webhookPayload);
-
-    default:
-      throw new Error(`Unknown execution strategy: ${plan.strategy}`);
+      return executeSingle(actor, plan, context, webhookPayload, workflowId);
   }
 }
 
-// NOT a step - orchestration logic
 async function executeSequential(params: {
   actor: OrchestrationInput["actor"];
   plan: ExecutionPlan;
   context: ChatContext;
   webhookPayload?: OrchestrationInput["webhookPayload"];
+  workflowId: string;
 }): Promise<AgentExecutionResult[]> {
-  const { plan, context, webhookPayload, actor } = params;
+  const { plan, context, webhookPayload, actor, workflowId } = params;
   const results: AgentExecutionResult[] = [];
-
   const sortedAgents = [...plan.selectedAgents].sort(
     (a, b) => a.order - b.order,
   );
 
-  for (let i = 0; i < sortedAgents.length; i++) {
-    const agentPlan = sortedAgents[i];
-
+  for (let index = 0; index < sortedAgents.length; index++) {
+    const agentPlan = sortedAgents[index];
+    if (!agentPlan) continue;
     const result = await executeAgentTaskStep({
       actor,
       agentPlan,
       context,
       previousResults: results,
       webhookPayload,
+      workflowId,
     });
-
     results.push(result);
 
     if (!result.success && plan.stopOnError) {
-      // Mark remaining as skipped
-      for (let j = i + 1; j < sortedAgents.length; j++) {
-        const skippedAgent = sortedAgents[j];
-        const skippedChatAgent = context.agents.find(
-          (a) => a.agentId === skippedAgent.agentId,
+      for (const skippedAgent of sortedAgents.slice(index + 1)) {
+        results.push(
+          createSkippedResult(
+            skippedAgent,
+            context,
+            "Skipped due to previous agent failure",
+          ),
         );
-        results.push({
-          agentId: skippedAgent.agentId,
-          agentName: skippedChatAgent?.agent.name || "Unknown Agent",
-          task: skippedAgent.task,
-          success: false,
-          error: "Skipped due to previous agent failure",
-          startTime: new Date(),
-          endTime: new Date(),
-          durationMs: 0,
-        });
       }
       break;
     }
@@ -392,112 +338,74 @@ async function executeSequential(params: {
   return results;
 }
 
-// NOT a step - orchestration logic
 async function executeParallel(
   actor: OrchestrationInput["actor"],
   plan: ExecutionPlan,
   context: ChatContext,
-  webhookPayload?: OrchestrationInput["webhookPayload"],
+  webhookPayload: OrchestrationInput["webhookPayload"],
+  workflowId: string,
 ): Promise<AgentExecutionResult[]> {
   const groups = new Map<number, typeof plan.selectedAgents>();
-
   for (const agent of plan.selectedAgents) {
     const groupId = agent.parallelGroup ?? 0;
-    if (!groups.has(groupId)) {
-      groups.set(groupId, []);
-    }
-    groups.get(groupId)!.push(agent);
+    const group = groups.get(groupId) ?? [];
+    group.push(agent);
+    groups.set(groupId, group);
   }
 
   const results: AgentExecutionResult[] = [];
-  const sortedGroupIds = Array.from(groups.keys()).sort((a, b) => a - b);
-
-  for (let groupIdx = 0; groupIdx < sortedGroupIds.length; groupIdx++) {
-    const groupId = sortedGroupIds[groupIdx];
-    const groupAgents = groups.get(groupId)!;
-
+  for (const groupId of [...groups.keys()].sort((a, b) => a - b)) {
     const groupResults = await Promise.all(
-      groupAgents.map((agentPlan) =>
+      groups.get(groupId)!.map((agentPlan) =>
         executeAgentTaskStep({
           actor,
           agentPlan,
           context,
           previousResults: results,
           webhookPayload,
+          workflowId,
         }),
       ),
     );
-
     results.push(...groupResults);
-
-    if (plan.stopOnError && groupResults.some((r) => !r.success)) {
+    if (plan.stopOnError && groupResults.some((result) => !result.success))
       break;
-    }
   }
-
   return results;
 }
 
-// NOT a step - orchestration logic
 async function executeConditional(
   actor: OrchestrationInput["actor"],
   plan: ExecutionPlan,
   context: ChatContext,
-  webhookPayload: OrchestrationInput["webhookPayload"] | undefined,
+  webhookPayload: OrchestrationInput["webhookPayload"],
+  workflowId: string,
 ): Promise<AgentExecutionResult[]> {
   const results: AgentExecutionResult[] = [];
   const executed = new Set<string>();
   const resultMap = new Map<string, AgentExecutionResult>();
 
-  const maxIterations = plan.selectedAgents.length * 2;
-  let iterations = 0;
-
-  while (
-    executed.size < plan.selectedAgents.length &&
-    iterations < maxIterations
-  ) {
-    iterations++;
-
+  while (executed.size < plan.selectedAgents.length) {
     const ready = plan.selectedAgents.filter((agent) => {
       if (executed.has(agent.agentId)) return false;
-
-      const dependencies = agent.dependsOn || [];
-      const dependenciesMet = dependencies.every((depId) => {
-        const isExecuted = executed.has(depId);
-        const depResult = resultMap.get(depId);
-        return isExecuted && depResult?.success;
-      });
-
-      return dependenciesMet;
+      return (agent.dependsOn ?? []).every(
+        (dependencyId) =>
+          executed.has(dependencyId) && resultMap.get(dependencyId)?.success,
+      );
     });
 
     if (ready.length === 0) {
-      const unexecuted = plan.selectedAgents.filter(
-        (a) => !executed.has(a.agentId),
-      );
-
-      if (unexecuted.length > 0) {
-        console.warn(
-          `Cannot execute remaining agents due to unmet dependencies`,
+      for (const agent of plan.selectedAgents.filter(
+        (candidate) => !executed.has(candidate.agentId),
+      )) {
+        const failed = createSkippedResult(
+          agent,
+          context,
+          "Dependencies not met",
         );
-
-        for (const agent of unexecuted) {
-          const chatAgent = context.agents.find(
-            (ca) => ca.agentId === agent.agentId,
-          );
-          const failedResult: AgentExecutionResult = {
-            agentId: agent.agentId,
-            agentName: chatAgent?.agent.name || "Unknown",
-            task: agent.task,
-            success: false,
-            error: "Dependencies not met",
-            startTime: new Date(),
-            endTime: new Date(),
-            durationMs: 0,
-          };
-          results.push(failedResult);
-          resultMap.set(agent.agentId, failedResult);
-        }
+        results.push(failed);
+        resultMap.set(agent.agentId, failed);
+        executed.add(agent.agentId);
       }
       break;
     }
@@ -510,6 +418,7 @@ async function executeConditional(
           context,
           previousResults: results,
           webhookPayload,
+          workflowId,
         }),
       ),
     );
@@ -520,26 +429,18 @@ async function executeConditional(
       executed.add(result.agentId);
     }
 
-    if (plan.stopOnError && batchResults.some((r) => !r.success)) {
-      const remaining = plan.selectedAgents.filter(
-        (a) => !executed.has(a.agentId),
-      );
-      for (const agent of remaining) {
-        const chatAgent = context.agents.find(
-          (ca) => ca.agentId === agent.agentId,
+    if (plan.stopOnError && batchResults.some((result) => !result.success)) {
+      for (const agent of plan.selectedAgents.filter(
+        (candidate) => !executed.has(candidate.agentId),
+      )) {
+        const skipped = createSkippedResult(
+          agent,
+          context,
+          "Stopped due to previous failure",
         );
-        const skippedResult: AgentExecutionResult = {
-          agentId: agent.agentId,
-          agentName: chatAgent?.agent.name || "Unknown",
-          task: agent.task,
-          success: false,
-          error: "Stopped due to previous failure",
-          startTime: new Date(),
-          endTime: new Date(),
-          durationMs: 0,
-        };
-        results.push(skippedResult);
-        resultMap.set(agent.agentId, skippedResult);
+        results.push(skipped);
+        resultMap.set(agent.agentId, skipped);
+        executed.add(agent.agentId);
       }
       break;
     }
@@ -548,22 +449,48 @@ async function executeConditional(
   return results;
 }
 
-// NOT a step - orchestration logic
 async function executeSingle(
   actor: OrchestrationInput["actor"],
   plan: ExecutionPlan,
   context: ChatContext,
-  webhookPayload?: OrchestrationInput["webhookPayload"],
+  webhookPayload: OrchestrationInput["webhookPayload"],
+  workflowId: string,
 ): Promise<AgentExecutionResult[]> {
   const agentPlan = plan.selectedAgents[0];
+  if (!agentPlan) return [];
+  return [
+    await executeAgentTaskStep({
+      actor,
+      agentPlan,
+      context,
+      previousResults: [],
+      webhookPayload,
+      workflowId,
+    }),
+  ];
+}
 
-  const result = await executeAgentTaskStep({
-    actor,
-    agentPlan,
-    context,
-    previousResults: [],
-    webhookPayload,
-  });
+function createSkippedResult(
+  agentPlan: ExecutionPlan["selectedAgents"][number],
+  context: ChatContext,
+  error: string,
+): AgentExecutionResult {
+  const now = new Date();
+  const chatAgent = context.agents.find(
+    (candidate) => candidate.agentId === agentPlan.agentId,
+  );
+  return {
+    agentId: agentPlan.agentId,
+    agentName: chatAgent?.agent.name ?? "Unknown Agent",
+    task: agentPlan.task,
+    success: false,
+    error,
+    startTime: now,
+    endTime: now,
+    durationMs: 0,
+  };
+}
 
-  return [result];
+function toErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

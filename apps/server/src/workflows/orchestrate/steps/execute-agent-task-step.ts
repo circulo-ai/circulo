@@ -13,40 +13,40 @@ import type {
 import { convertToUIMessages } from "@/lib/utils";
 import type { ChatContext } from "@/workflows/orchestrate/steps/load-chat-step";
 import type { OrchestrationInput } from "@/workflows/orchestrate/types";
-import { DurableAgent } from "@workflow/ai/agent";
+import { publishWorkflowChunk } from "@/workflows/runtime/output-channel";
 import {
   convertToModelMessages,
+  ToolLoopAgent,
   type ModelMessage,
   type UIMessagePart,
   type UIMessageStreamWriter,
 } from "ai";
-import { getWritable } from "workflow";
 import type { ExecutionPlan } from "./plan-agent-execution-step";
 
 export function toUIMessageStreamWriter(
-  writable: WritableStream<CustomUIMessageChunk>,
+  workflowId: string,
 ): UIMessageStreamWriter<ChatMessage> {
-  const writer = writable.getWriter();
-  let chain = Promise.resolve();
-
   const streamWriter: UIMessageStreamWriter<ChatMessage> = {
     write(part) {
-      chain = chain
-        .then(() => writer.write(part as unknown as CustomUIMessageChunk))
-        .catch((err) => streamWriter.onError?.(err));
+      publishWorkflowChunk(workflowId, part as unknown as CustomUIMessageChunk);
     },
 
     merge(stream) {
-      const reader = stream.getReader();
-      chain = chain
-        .then(async () => {
+      void (async () => {
+        try {
+          const reader = stream.getReader();
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-            await writer.write(value as CustomUIMessageChunk);
+            publishWorkflowChunk(
+              workflowId,
+              value as unknown as CustomUIMessageChunk,
+            );
           }
-        })
-        .catch((err) => streamWriter.onError?.(err));
+        } catch (error) {
+          streamWriter.onError?.(error);
+        }
+      })();
     },
 
     onError: undefined,
@@ -200,8 +200,6 @@ async function persistAgentMessages(params: {
   agent: { id: string };
   context: ChatContext;
 }) {
-  "use step";
-
   const { result, modelHistory, agent, context } = params;
 
   const chatId =
@@ -302,7 +300,9 @@ async function persistAgentMessages(params: {
   });
 
   if (inserts.length > 0) {
-    await messageRepo.createMany(inserts);
+    await messageRepo.createMany(
+      inserts as Parameters<typeof messageRepo.createMany>[0],
+    );
   }
 }
 
@@ -312,22 +312,17 @@ export async function executeAgentTaskStep(params: {
   context: ChatContext;
   previousResults: AgentExecutionResult[];
   webhookPayload?: OrchestrationInput["webhookPayload"];
+  workflowId: string;
 }): Promise<AgentExecutionResult> {
-  "use step";
-
-  const { agentPlan, context, previousResults, webhookPayload, actor } =
-    params;
-  const writable = getWritable<CustomUIMessageChunk>(); // the REAL workflow output
-  const dataStream = toUIMessageStreamWriter(writable); // you + tools write here
-
-  // Agent gets its own stream so it never locks the real one
-  const agentStream = new TransformStream<
-    CustomUIMessageChunk,
-    CustomUIMessageChunk
-  >();
-
-  // Pipe agent output into the real workflow output
-  dataStream.merge(agentStream.readable);
+  const {
+    agentPlan,
+    context,
+    previousResults,
+    webhookPayload,
+    actor,
+    workflowId,
+  } = params;
+  const dataStream = toUIMessageStreamWriter(workflowId);
 
   const startTime = new Date();
   const chatAgent = context.agents.find((a) => a.agentId === agentPlan.agentId);
@@ -404,10 +399,11 @@ ${webhookContext}${previousContext}
 
 Provide a focused response for YOUR specific task. Be concise but complete.`;
 
-    // Create durable agent
-    const durableAgent = new DurableAgent({
-      model: async () => myProvider.languageModel(agent.model),
-      system: systemPrompt,
+    // The application workflow engine owns orchestration durability. AI SDK's
+    // ToolLoopAgent owns the model/tool loop within this workflow step.
+    const agentLoop = new ToolLoopAgent({
+      model: myProvider.languageModel(agent.model),
+      instructions: systemPrompt,
       tools: {
         createDocument: createDocument({
           session: actor,
@@ -428,18 +424,24 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
       task: agentPlan.task,
     });
 
-    const modelHistory = convertToModelMessages(
+    const modelHistory = await convertToModelMessages(
       convertToUIMessages(conversationHistory),
     );
 
     // Stream the agent response
-    const result = await durableAgent.stream({
+    const result = await agentLoop.stream({
       messages: modelHistory,
-      writable: agentStream.writable,
     });
 
+    for await (const chunk of result.toUIMessageStream<ChatMessage>({
+      sendFinish: false,
+    })) {
+      dataStream.write(chunk);
+    }
+
     // CRITICAL: Extract the actual output from the messages array
-    const assistantMessages = result.messages.filter(
+    const response = await result.response;
+    const assistantMessages = response.messages.filter(
       (msg) => msg.role === "assistant",
     );
     const lastAssistantMessage =
@@ -459,7 +461,7 @@ Provide a focused response for YOUR specific task. Be concise but complete.`;
     }
 
     await persistAgentMessages({
-      result,
+      result: { messages: response.messages },
       modelHistory,
       agent,
       context,

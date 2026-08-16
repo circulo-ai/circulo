@@ -1,21 +1,54 @@
-// Core repositories
-export { agentRepo } from "./agent-repo";
-export { chatRepo } from "./chat-repo";
-export { messageRepo } from "./message-repo";
-export { userRepo } from "./user-repo";
+import { db, type DbInstance } from "../index";
+import { createAgentRepository } from "./agent-repo";
+import { createArtifactRepository } from "./artifact-repo";
+import { createChatAgentRepository } from "./chat-agent-repo";
+import { createChatInvitationRepository } from "./chat-invitation-repo";
+import { createChatMemberRepository } from "./chat-member-repo";
+import { createChatRepository } from "./chat-repo";
+import { createMessageRepository } from "./message-repo";
+import { createStreamRepository } from "./stream-repo";
+import { createSuggestionRepository } from "./suggestion-repo";
+import { createUserRepository } from "./user-repo";
+import { createVoteRepository } from "./vote-repo";
 
-// Chat-related repositories
-export { chatAgentRepo } from "./chat-agent-repo";
-export { chatInvitationRepo } from "./chat-invitation-repo";
-export { chatMemberRepo } from "./chat-member-repo";
+export type DatabaseRepositories = Readonly<
+  ReturnType<typeof createRepositories>
+>;
 
-// Document repositories
-export { artifactRepo } from "./artifact-repo";
-export { suggestionRepo } from "./suggestion-repo";
+/** Build all query repositories against one database client. */
+export function createRepositories(database: DbInstance) {
+  return {
+    agent: createAgentRepository(database),
+    artifact: createArtifactRepository(database),
+    chat: createChatRepository(database),
+    chatAgent: createChatAgentRepository(database),
+    chatInvitation: createChatInvitationRepository(database),
+    chatMember: createChatMemberRepository(database),
+    message: createMessageRepository(database),
+    stream: createStreamRepository(database),
+    suggestion: createSuggestionRepository(database),
+    user: createUserRepository(database),
+    vote: createVoteRepository(database),
+  };
+}
 
-// Other repositories
-export { streamRepo } from "./stream-repo";
-export { voteRepo } from "./vote-repo";
+/** The process-wide default bundle for callers that do not own a DB client. */
+export const repositories = createRepositories(db);
+
+// Backwards-compatible names, all sourced from the one bundle above.
+export const agentRepo = repositories.agent;
+export const artifactRepo = repositories.artifact;
+export const chatRepo = repositories.chat;
+export const chatAgentRepo = repositories.chatAgent;
+export const chatInvitationRepo = repositories.chatInvitation;
+export const chatMemberRepo = repositories.chatMember;
+export const messageRepo = repositories.message;
+export const streamRepo = repositories.stream;
+export const suggestionRepo = repositories.suggestion;
+export const userRepo = repositories.user;
+export const voteRepo = repositories.vote;
+
+export type { DatabaseRepositories as Repositories };
 
 // Export types
 export type { AgentFilters } from "./agent-repo";

@@ -1,8 +1,14 @@
-import type { Suggestion } from "@/db";
+import type { ArtifactKind, Suggestion } from "@/db";
 import { artifactRepo, suggestionRepo } from "@/db/repositories";
 import type { ActorContext, ChatMessage } from "@/lib/types";
 import { generateUUID } from "@/lib/utils";
-import { streamObject, tool, type UIMessageStreamWriter } from "ai";
+import {
+  Output,
+  streamText,
+  tool,
+  type Tool,
+  type UIMessageStreamWriter,
+} from "ai";
 import { z } from "zod";
 import { myProvider } from "../providers";
 
@@ -11,10 +17,17 @@ type RequestSuggestionsProps = {
   dataStream: UIMessageStreamWriter<ChatMessage>;
 };
 
+type RequestSuggestionsOutput =
+  | { error: string }
+  | { id: string; title: string; kind: ArtifactKind; message: string };
+
 export const requestSuggestions = ({
   session,
   dataStream,
-}: RequestSuggestionsProps) =>
+}: RequestSuggestionsProps): Tool<
+  { documentId: string },
+  RequestSuggestionsOutput
+> =>
   tool({
     description: "Request suggestions for a document",
     inputSchema: z.object({
@@ -36,16 +49,19 @@ export const requestSuggestions = ({
         "userId" | "createdAt" | "documentCreatedAt"
       >[] = [];
 
-      const { elementStream } = streamObject({
+      const { elementStream } = streamText({
         model: myProvider.languageModel("artifact-model"),
         system:
           "You are a help writing assistant. Given a piece of writing, please offer suggestions to improve the piece of writing and describe the change. It is very important for the edits to contain full sentences instead of just words. Max 5 suggestions.",
         prompt: document.content,
-        output: "array",
-        schema: z.object({
-          originalSentence: z.string().describe("The original sentence"),
-          suggestedSentence: z.string().describe("The suggested sentence"),
-          description: z.string().describe("The description of the suggestion"),
+        output: Output.array({
+          element: z.object({
+            originalSentence: z.string().describe("The original sentence"),
+            suggestedSentence: z.string().describe("The suggested sentence"),
+            description: z
+              .string()
+              .describe("The description of the suggestion"),
+          }),
         }),
       });
 

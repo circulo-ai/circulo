@@ -2,10 +2,9 @@ import {
   artifactKinds,
   documentHandlersByArtifactKind,
 } from "@/lib/artifacts/server";
-import type { ChatMessage } from "@/lib/types";
+import type { ActorContext, ChatMessage } from "@/lib/types";
 import { generateUUID } from "@/lib/utils";
-import type { ActorContext } from "@/lib/types";
-import { tool, type UIMessageStreamWriter } from "ai";
+import { tool, type Tool, type UIMessageStreamWriter } from "ai";
 import { z } from "zod";
 
 type CreateDocumentProps = {
@@ -13,7 +12,18 @@ type CreateDocumentProps = {
   dataStream: UIMessageStreamWriter<ChatMessage>;
 };
 
-export const createDocument = ({ session, dataStream }: CreateDocumentProps) =>
+export const createDocument = ({
+  session,
+  dataStream,
+}: CreateDocumentProps): Tool<
+  { title: string; kind: (typeof artifactKinds)[number] },
+  {
+    id: string;
+    title: string;
+    kind: (typeof artifactKinds)[number];
+    content: string;
+  }
+> =>
   tool({
     description:
       "Create a document for a writing or content creation activities. This tool will call other functions that will generate the contents of the document based on the title and kind.",

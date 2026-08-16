@@ -27,7 +27,7 @@ import { generateUUID } from "@/lib/utils";
 import { useChatHistoryStore } from "@/stores/use-chat-history-store";
 import { useChat } from "@ai-sdk/react";
 import type { Vote } from "@circulo-ai/db/schema";
-import { WorkflowChatTransport } from "@workflow/ai";
+import { DefaultChatTransport } from "ai";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
@@ -85,6 +85,19 @@ export function Chat({
     setWorkflowStatus({ isRunning: false });
   }, []);
 
+  const chatFetch = useCallback(
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const response = await fetchWithErrorHandlers(input, init);
+      const workflowRunId = response.headers.get("x-workflow-run-id");
+      if (workflowRunId) {
+        localStorage.setItem(WORKFLOW_RUN_ID_KEY, workflowRunId);
+        setWorkflowStatus({ isRunning: true, currentPhase: "starting" });
+      }
+      return response;
+    },
+    [],
+  );
+
   const { messages, setMessages, sendMessage, status, stop, regenerate } =
     useChat<ChatMessage>({
       resume: !!activeWorkflowRunId,
@@ -92,21 +105,9 @@ export function Chat({
       messages: initialMessages,
       generateId: generateUUID,
 
-      transport: new WorkflowChatTransport({
+      transport: new DefaultChatTransport<ChatMessage>({
         api: "/api/chat",
-        fetch: fetchWithErrorHandlers,
-        maxConsecutiveErrors: 5,
-
-        onChatSendMessage: (response) => {
-          const workflowRunId = response.headers.get("x-workflow-run-id");
-          if (!workflowRunId) {
-            throw new Error(
-              'Workflow run ID not found in "x-workflow-run-id" response header',
-            );
-          }
-          localStorage.setItem(WORKFLOW_RUN_ID_KEY, workflowRunId);
-          setWorkflowStatus({ isRunning: true, currentPhase: "starting" });
-        },
+        fetch: chatFetch,
 
         prepareSendMessagesRequest: (config) => {
           const message = config.messages.at(-1);
@@ -138,11 +139,6 @@ export function Chat({
             ...rest,
             api: `/api/chat/${encodeURIComponent(workflowRunId)}/stream`,
           };
-        },
-
-        onChatEnd: ({ chatId, chunkIndex }) => {
-          console.log("Chat stream ended", { chatId, chunkIndex });
-          handleChatEnd();
         },
       }),
 

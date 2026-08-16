@@ -20,7 +20,9 @@ import {
   UpdateChatMemberPermissions,
 } from "@/application";
 import { getDb, type DbInstance } from "@/db";
+import type { DrizzleRepositories } from "@/infrastructure/drizzle";
 import {
+  createDrizzleRepositories,
   DrizzleAgentRepository,
   DrizzleArtifactRepository,
   DrizzleChatAgentLinkRepository,
@@ -54,6 +56,7 @@ import { DrizzleUnitOfWork } from "./uow";
 export const DI_TOKENS = {
   Db: createToken<DbInstance>("Db"),
   Redis: createToken<CirculoRedis | null>("Redis"),
+  DrizzleRepositories: createToken<DrizzleRepositories>("DrizzleRepositories"),
   ChatRepository: createToken<DrizzleChatRepository>("ChatRepository"),
   MessageRepository: createToken<DrizzleMessageRepository>("MessageRepository"),
   AgentRepository: createToken<DrizzleAgentRepository>("AgentRepository"),
@@ -169,61 +172,63 @@ export function buildRootProvider(): ServiceProvider {
     (resolver) => new DrizzleUnitOfWork(resolver.resolve(DI_TOKENS.Db)),
   );
 
-  services.addScoped(DI_TOKENS.ChatRepository, (resolver) => {
-    const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    return new DrizzleChatRepository(uow.client);
-  });
-  services.addScoped(DI_TOKENS.MessageRepository, (resolver) => {
-    const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    return new DrizzleMessageRepository(uow.client);
-  });
-  services.addScoped(DI_TOKENS.AgentRepository, (resolver) => {
-    const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    return new DrizzleAgentRepository(uow.client);
-  });
-  services.addScoped(DI_TOKENS.ChatMemberRepository, (resolver) => {
-    const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    return new DrizzleChatMemberRepository(uow.client);
-  });
-  services.addScoped(DI_TOKENS.ChatInvitationRepository, (resolver) => {
-    const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    return new DrizzleChatInvitationRepository(uow.client);
-  });
-  services.addScoped(DI_TOKENS.ChatAgentLinkRepository, (resolver) => {
-    const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    return new DrizzleChatAgentLinkRepository(uow.client);
-  });
-  services.addScoped(DI_TOKENS.ArtifactRepository, (resolver) => {
-    const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    return new DrizzleArtifactRepository(uow.client);
-  });
-  services.addScoped(DI_TOKENS.SuggestionRepository, (resolver) => {
-    const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    return new DrizzleSuggestionRepository(uow.client);
-  });
-  services.addScoped(DI_TOKENS.UserRepository, (resolver) => {
-    const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    return new DrizzleUserRepository(uow.client);
-  });
-  services.addScoped(DI_TOKENS.OrganizationRepository, (resolver) => {
-    const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    return new DrizzleOrganizationRepository(uow.client);
-  });
-  services.addScoped(DI_TOKENS.OrganizationMemberRepository, (resolver) => {
-    const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    return new DrizzleOrganizationMemberRepository(uow.client);
-  });
-  services.addScoped(DI_TOKENS.VoteRepository, (resolver) => {
-    const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    const { DrizzleVoteRepository } =
-      require("@/infrastructure/drizzle") as typeof import("@/infrastructure/drizzle");
-    return new DrizzleVoteRepository(uow.client);
-  });
-
-  services.addScoped(DI_TOKENS.WorkflowRunRepository, (resolver) => {
-    const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    return new DrizzleWorkflowRunRepository(uow.client);
-  });
+  services.addScoped(DI_TOKENS.DrizzleRepositories, (resolver) =>
+    createDrizzleRepositories(resolver.resolve(DI_TOKENS.UnitOfWork).client),
+  );
+  services.addScoped(
+    DI_TOKENS.ChatRepository,
+    (resolver) => resolver.resolve(DI_TOKENS.DrizzleRepositories).chat,
+  );
+  services.addScoped(
+    DI_TOKENS.MessageRepository,
+    (resolver) => resolver.resolve(DI_TOKENS.DrizzleRepositories).message,
+  );
+  services.addScoped(
+    DI_TOKENS.AgentRepository,
+    (resolver) => resolver.resolve(DI_TOKENS.DrizzleRepositories).agent,
+  );
+  services.addScoped(
+    DI_TOKENS.ChatMemberRepository,
+    (resolver) => resolver.resolve(DI_TOKENS.DrizzleRepositories).chatMember,
+  );
+  services.addScoped(
+    DI_TOKENS.ChatInvitationRepository,
+    (resolver) =>
+      resolver.resolve(DI_TOKENS.DrizzleRepositories).chatInvitation,
+  );
+  services.addScoped(
+    DI_TOKENS.ChatAgentLinkRepository,
+    (resolver) => resolver.resolve(DI_TOKENS.DrizzleRepositories).chatAgentLink,
+  );
+  services.addScoped(
+    DI_TOKENS.ArtifactRepository,
+    (resolver) => resolver.resolve(DI_TOKENS.DrizzleRepositories).artifact,
+  );
+  services.addScoped(
+    DI_TOKENS.SuggestionRepository,
+    (resolver) => resolver.resolve(DI_TOKENS.DrizzleRepositories).suggestion,
+  );
+  services.addScoped(
+    DI_TOKENS.UserRepository,
+    (resolver) => resolver.resolve(DI_TOKENS.DrizzleRepositories).user,
+  );
+  services.addScoped(
+    DI_TOKENS.OrganizationRepository,
+    (resolver) => resolver.resolve(DI_TOKENS.DrizzleRepositories).organization,
+  );
+  services.addScoped(
+    DI_TOKENS.OrganizationMemberRepository,
+    (resolver) =>
+      resolver.resolve(DI_TOKENS.DrizzleRepositories).organizationMember,
+  );
+  services.addScoped(
+    DI_TOKENS.VoteRepository,
+    (resolver) => resolver.resolve(DI_TOKENS.DrizzleRepositories).vote,
+  );
+  services.addScoped(
+    DI_TOKENS.WorkflowRunRepository,
+    (resolver) => resolver.resolve(DI_TOKENS.DrizzleRepositories).workflowRun,
+  );
 
   services.addScoped(DI_TOKENS.CreateChatUseCase, (resolver) => {
     const chats = resolver.resolve(DI_TOKENS.ChatRepository);

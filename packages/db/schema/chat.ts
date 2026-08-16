@@ -1,5 +1,3 @@
-import type { ChatTools, CustomUIDataTypes } from "@/lib/types";
-import type { UIMessagePart } from "ai";
 import { type InferSelectModel, relations, sql } from "drizzle-orm";
 import {
   boolean,
@@ -200,10 +198,7 @@ export const message = pgTable(
 
     role: text("role").notNull(), // 'user', 'assistant', 'system'
     content: text("content").notNull(),
-    parts: jsonb("parts")
-      .$type<UIMessagePart<CustomUIDataTypes, ChatTools>[]>()
-      .notNull()
-      .default([]),
+    parts: jsonb("parts").$type<unknown[]>().notNull().default([]),
     attachments: jsonb("attachments").$type<unknown[]>().notNull().default([]),
 
     tokenCount: integer("token_count").notNull().default(0),

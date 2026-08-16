@@ -158,7 +158,8 @@ router.patch(
       updateData.defaultToolIds = updates.defaultToolIds;
     if (updates.defaultKnowledgeBaseIds !== undefined)
       updateData.defaultKnowledgeBaseIds = updates.defaultKnowledgeBaseIds;
-    if (updates.metadata !== undefined) updateData.metadata = updates.metadata;
+    if (updates.metadata !== undefined)
+      updateData.metadata = updates.metadata ?? undefined;
 
     const updatedAgent = await agentRepo.update(id, updateData);
     if (!updatedAgent) {

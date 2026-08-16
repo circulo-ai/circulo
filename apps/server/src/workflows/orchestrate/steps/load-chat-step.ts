@@ -1,8 +1,14 @@
-import { db, type Agent, type Chat, type ChatAgent, type ChatMember, type Message } from "@/db";
+import {
+  db,
+  type Agent,
+  type Chat,
+  type ChatAgent,
+  type ChatMember,
+  type Message,
+} from "@/db";
 import { chatMemberRepo, chatRepo, messageRepo } from "@/db/repositories";
 import { chatAgent } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
-import { FatalError } from "workflow";
 
 export interface ChatContext {
   chat: Chat;
@@ -16,11 +22,9 @@ export interface ChatContext {
 export async function loadChatContextStep(
   chatId: string,
 ): Promise<ChatContext> {
-  "use step";
-
   const chat = await chatRepo.findById(chatId);
   if (!chat) {
-    throw new FatalError(`Chat ${chatId} not found`);
+    throw new Error(`Chat ${chatId} not found`);
   }
 
   const messages = await messageRepo.findForChat(chatId, 100); // Last 100 messages

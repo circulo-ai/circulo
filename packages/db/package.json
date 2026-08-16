@@ -46,9 +46,6 @@
     "postgres": "^3.4.7"
   },
   "dependencies": {
-    "@circulo-ai/types": "workspace:*",
-    "ai": "5.0.101",
-    "tokenlens": "^1.3.1",
-    "zod": "^4.1.13"
+    "@circulo-ai/types": "workspace:*"
   }
 }

@@ -63,7 +63,7 @@ export function convertToUIMessages(messages: Message[]): ChatMessage[] {
       role: msg.role as "user" | "assistant" | "system",
       parts:
         Array.isArray(msg.parts) && msg.parts.length > 0
-          ? msg.parts
+          ? (msg.parts as ChatMessage["parts"])
           : [
               {
                 type: "text" as const,

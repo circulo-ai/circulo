@@ -3,7 +3,7 @@ import type { ChatMessage } from "@/lib/types";
 import { getTextFromMessages } from "@/lib/utils";
 import type { OrchestrationInput } from "@/workflows/orchestrate/types";
 import { google } from "@ai-sdk/google";
-import { generateObject } from "ai";
+import { generateText, Output } from "ai";
 import { z } from "zod";
 import type { RequestClassification } from "./classify-request-step";
 
@@ -47,8 +47,6 @@ export async function planAgentExecutionStep(params: {
   triggerMessages: ChatMessage[];
   webhookPayload?: OrchestrationInput["webhookPayload"];
 }): Promise<ExecutionPlan> {
-  "use step";
-
   const { classification, agents, triggerMessages, webhookPayload } = params;
 
   // Build agent catalog
@@ -77,9 +75,9 @@ Event: ${webhookPayload.event}
 This is an automated trigger, not a direct user request.`;
   }
 
-  const { object } = await generateObject({
+  const { output } = await generateText({
     model: google("gemini-2.5-flash"),
-    schema: executionPlanSchema,
+    output: Output.object({ schema: executionPlanSchema }),
     system: `You are an expert orchestration planner for a multi-agent AI system.
 
 Your task is to:
@@ -159,7 +157,7 @@ Plan the optimal agent orchestration.`,
     agents.filter((a) => a.isEnabled).map((a) => a.agentId),
   );
 
-  const validatedAgents = object.selectedAgents.filter((sa) => {
+  const validatedAgents = output.selectedAgents.filter((sa) => {
     if (!validAgentIds.has(sa.agentId)) {
       console.warn(`Agent ${sa.agentId} not found or disabled, skipping`);
       return false;
@@ -168,7 +166,7 @@ Plan the optimal agent orchestration.`,
   });
 
   return {
-    ...object,
+    ...output,
     selectedAgents: validatedAgents,
   };
 }

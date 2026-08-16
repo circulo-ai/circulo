@@ -197,8 +197,8 @@ router.post(
       agentId: body.agentId,
       addedBy: user!.id,
       isEnabled: body.isEnabled ?? true,
-      customInstructions: body.customInstructions ?? null,
-      customTemperature: normalizedTemp ?? null,
+      customInstructions: body.customInstructions ?? undefined,
+      customTemperature: normalizedTemp ?? undefined,
     });
 
     return c.json(created, 201);

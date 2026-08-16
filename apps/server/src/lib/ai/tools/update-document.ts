@@ -1,7 +1,8 @@
+import type { ArtifactKind } from "@/db";
 import { artifactRepo } from "@/db/repositories";
 import { documentHandlersByArtifactKind } from "@/lib/artifacts/server";
 import type { ActorContext, ChatMessage } from "@/lib/types";
-import { tool, type UIMessageStreamWriter } from "ai";
+import { tool, type Tool, type UIMessageStreamWriter } from "ai";
 import { z } from "zod";
 
 type UpdateDocumentProps = {
@@ -9,7 +10,17 @@ type UpdateDocumentProps = {
   dataStream: UIMessageStreamWriter<ChatMessage>;
 };
 
-export const updateDocument = ({ session, dataStream }: UpdateDocumentProps) =>
+type UpdateDocumentOutput =
+  | { error: string }
+  | { id: string; title: string; kind: ArtifactKind; content: string };
+
+export const updateDocument = ({
+  session,
+  dataStream,
+}: UpdateDocumentProps): Tool<
+  { id: string; description: string },
+  UpdateDocumentOutput
+> =>
   tool({
     description: "Update a document with the given description.",
     inputSchema: z.object({

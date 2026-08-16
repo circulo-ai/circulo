@@ -1,5 +1,4 @@
-import { artifactRepo } from "@/db/repositories";
-import { chatRepo } from "@/db/repositories/chat-repo";
+import { artifactRepo, chatRepo } from "@/db/repositories";
 import { createRouter } from "@/lib/create-app";
 import { isMemberOf } from "@/lib/permissions";
 import { requireAuth } from "@/middleware/auth";
@@ -114,7 +113,7 @@ router.post(
       title,
       kind,
       userId: user.id,
-      chatId: chatId ?? null,
+      chatId: chatId ?? undefined,
       version: 1,
     });
 

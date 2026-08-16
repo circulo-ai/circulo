@@ -76,7 +76,7 @@ import {
   updateAgentBodySchema,
 } from "@circulo-ai/types";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { WorkflowChatTransport } from "@workflow/ai";
+import { DefaultChatTransport } from "ai";
 import {
   ArrowUp,
   Bot,
@@ -89,6 +89,7 @@ import {
   Trash2,
   TriangleAlert,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import {
   ComponentProps,
   createContext,
@@ -107,7 +108,6 @@ import { Path, useForm } from "react-hook-form";
 import useSWR, { Key, useSWRConfig } from "swr";
 import { unstable_serialize } from "swr/infinite";
 import useSWRMutation from "swr/mutation";
-import { useRouter } from "next/navigation";
 import { useLocalStorage } from "usehooks-ts";
 import z from "zod";
 
@@ -158,16 +158,24 @@ export function NewChat({ id }: NewChatProps) {
     setCurrentChatId(undefined);
   }, [setCurrentChatId]);
 
+  const chatFetch = useCallback(
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const response = await fetchWithErrorHandlers(input, init);
+      if (response.headers.has("x-workflow-run-id")) {
+        router.push(`/chat/${chatId}`, { scroll: false });
+        setCurrentChatId(chatId);
+      }
+      return response;
+    },
+    [chatId, router, setCurrentChatId],
+  );
+
   const { sendMessage, status } = useChat({
     id: chatId,
     generateId: generateUUID,
-    transport: new WorkflowChatTransport({
+    transport: new DefaultChatTransport({
       api: "/api/chat",
-      fetch: fetchWithErrorHandlers,
-      onChatSendMessage: (_response, options) => {
-        router.push(`/chat/${options.chatId}`, { scroll: false });
-        setCurrentChatId(options.chatId);
-      },
+      fetch: chatFetch,
       prepareSendMessagesRequest: (config) => ({
         ...config,
         body: {

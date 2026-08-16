@@ -3,7 +3,7 @@ import { type ChatMessage } from "@/lib/types";
 import { getTextFromMessages } from "@/lib/utils";
 import { type OrchestrationInput } from "@/workflows/orchestrate/types";
 import { google } from "@ai-sdk/google";
-import { generateObject } from "ai";
+import { generateText, Output } from "ai";
 import { z } from "zod";
 
 const classificationSchema = z.object({
@@ -41,8 +41,6 @@ export async function classifyRequestStep(params: {
   triggerType: OrchestrationInput["triggerType"];
   webhookPayload?: OrchestrationInput["webhookPayload"];
 }): Promise<RequestClassification> {
-  "use step";
-
   const {
     inputMessages: message,
     messages,
@@ -69,9 +67,9 @@ User Message: ${getTextFromMessages(message)}`;
     author: m.authorType,
   }));
 
-  const { object } = await generateObject({
+  const { output } = await generateText({
     model: google("gemini-2.5-flash"),
-    schema: classificationSchema,
+    output: Output.object({ schema: classificationSchema }),
     system: `You are an intelligent request classifier for a multi-agent orchestration system.
 
 Analyze the user's request and conversation history to determine:
@@ -97,5 +95,5 @@ ${prompt}
 Classify this request thoroughly.`,
   });
 
-  return object;
+  return output;
 }

@@ -18,7 +18,6 @@ import history from "@/routes/history";
 import messages from "@/routes/messages";
 import suggestions from "@/routes/suggestions";
 import test from "@/routes/test";
-import workflowRuntime from "@/routes/workflow-runtime";
 import userProfile from "@/routes/users/profile";
 import userSettings from "@/routes/users/settings";
 import userUnsubscribe from "@/routes/users/unsubscribe";
@@ -98,10 +97,6 @@ routes.forEach((route) => {
 if (IS_DEVELOPMENT) {
   app.route("/api", test);
 }
-
-// Workflow DevKit invokes these internal endpoints directly. They must stay
-// outside the /api prefix used by user-facing routes.
-app.route("/", workflowRuntime);
 
 export type AppType = (typeof routes)[number];
 

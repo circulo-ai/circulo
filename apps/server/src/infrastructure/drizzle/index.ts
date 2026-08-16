@@ -7,6 +7,7 @@ export * from "./chat-repository";
 export * from "./message-repository";
 export * from "./organization-member-repository";
 export * from "./organization-repository";
+export * from "./repository-factory";
 export * from "./suggestion-repository";
 export * from "./user-repository";
 export * from "./vote-repository";
