@@ -53,17 +53,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build database package
-        run: bun --filter @circulo-ai/db build
-
-      - name: Build server and workflow bundles
-        run: bun --filter server build
+      - name: Build production application graph
+        run: bun run build
 
       - name: Type check web
         run: bun --filter web typecheck
-
-      - name: Build web
-        run: bun --filter web build
 
       - name: Run repository tests
         run: bun run test
