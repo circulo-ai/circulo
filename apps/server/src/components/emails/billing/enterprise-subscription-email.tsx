@@ -38,7 +38,7 @@ export const EnterpriseSubscriptionEmail = ({
     <Html>
       <Head />
       <Body style={baseStyles.main}>
-        <Preview>Your Enterprise Plan is now active on Sim</Preview>
+        <Preview>Your Enterprise Plan is now active on Circulo</Preview>
         <Container style={baseStyles.container}>
           <Section style={{ padding: "30px 0", textAlign: "center" }}>
             <Row>
@@ -69,7 +69,7 @@ export const EnterpriseSubscriptionEmail = ({
             <Text style={baseStyles.paragraph}>Hello {userName},</Text>
             <Text style={baseStyles.paragraph}>
               Great news! Your <strong>Enterprise Plan</strong> has been
-              activated on Sim. You now have access to advanced features and
+              activated on Circulo. You now have access to advanced features and
               increased capacity for your workflows.
             </Text>
 
@@ -101,7 +101,7 @@ export const EnterpriseSubscriptionEmail = ({
             <Text style={baseStyles.paragraph}>
               Best regards,
               <br />
-              The Sim Team
+              The Circulo Team
             </Text>
 
             <Text
@@ -114,7 +114,7 @@ export const EnterpriseSubscriptionEmail = ({
             >
               This email was sent on {format(createdDate, "MMMM do, yyyy")} to{" "}
               {userEmail}
-              regarding your Enterprise plan activation on Sim.
+              regarding your Enterprise plan activation on Circulo.
             </Text>
           </Section>
         </Container>

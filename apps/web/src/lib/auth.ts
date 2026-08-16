@@ -4,7 +4,7 @@ export const auth = {} as unknown;
 
 export async function getSession() {
   try {
-    const response = await fetch("/api/auth/session", {
+    const response = await fetch("/api/auth/get-session", {
       credentials: "include",
     });
     if (!response.ok) return null;

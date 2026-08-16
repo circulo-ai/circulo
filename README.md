@@ -5,19 +5,20 @@ Circulo is a multi-tenant AI workspace for teams. A user works inside an organiz
 The repository is a Bun/Turborepo monorepo:
 
 - `apps/web` is the Next.js chat application.
-- `apps/server` is the Hono/Bun API, authentication boundary, AI tools, and Workflow DevKit runtime.
+- `apps/server` is the Hono/Bun API, authentication boundary, AI tools, and Circulo Workflow Engine runtime.
 - `packages/db` contains the Drizzle schema, migrations, and legacy repositories.
 - `packages/core`, `packages/di`, `packages/wf`, `packages/upload`, and `packages/file-parsers` provide reusable domain, dependency-injection, workflow, storage, and parsing capabilities.
 
 ## Local setup
 
-Requirements: Bun 1.3+, Node 20+, PostgreSQL, and the credentials for the providers you intend to use. Copy the environment examples into local environment files and replace every placeholder secret:
+Requirements: Bun 1.3+, Node 20+, Docker Desktop, and the credentials for the providers you intend to use. Copy the environment examples into local environment files and replace every placeholder secret:
 
 ```bash
 cp apps/server/.env.example apps/server/.env
 cp apps/web/.env.example apps/web/.env.local
 bun install
-bun --filter @circulo-ai/db db:migrate
+docker compose -f apps/web/docker-compose.yml up -d
+bun run db:migrate
 ```
 
 Start the applications together:
@@ -36,13 +37,13 @@ bun run test
 bun run build
 ```
 
-The server build runs `workflow build` before bundling. This generates the Workflow DevKit flow/step/webhook bundles under `apps/server/.well-known/workflow/v1`; those generated files are intentionally ignored and must be produced by every deployment build. The server exposes the corresponding internal runtime endpoints outside `/api`.
+The server build bundles the application and the Circulo Workflow Engine directly. The workflow engine currently uses process-local execution stores; production deployments should provide a shared durable store and pub/sub adapter before running multiple API instances.
 
 Production requires valid values for `DATABASE_URL`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `ENCRYPTION_KEY`, `INTERNAL_API_SECRET`, and the AI/provider credentials used by configured agents. Database changes are applied with `bun --filter @circulo-ai/db db:migrate`.
 
 ## Security boundaries
 
-All organization data routes require authentication and organization membership. Reconnectable workflow stream IDs are stored with their chat, user, and organization ownership, and reconnect requests are checked against that record. Chat deletion is a recoverable soft delete. Development-only workflow demonstrations are not mounted in production.
+All organization data routes require authentication and organization membership. Reconnectable workflow stream IDs are stored with their chat, user, and organization ownership, and reconnect requests are checked against that record. Chat deletion is a recoverable soft delete. Development-only workflow demonstrations are not mounted in production. The API exposes `/health` for liveness and `/health/ready` for database/cache readiness checks.
 
 ## Architecture direction
 

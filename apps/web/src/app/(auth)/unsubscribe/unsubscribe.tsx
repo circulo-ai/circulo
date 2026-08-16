@@ -316,7 +316,7 @@ function UnsubscribeContent() {
           </CardTitle>
           <CardDescription className="text-muted-foreground">
             We understand email preferences are personal. Choose which emails
-            you&apos;d like to stop receiving from Sim.
+            you&apos;d like to stop receiving from Circulo.
           </CardDescription>
           <div className="mt-2 rounded-lg border bg-muted/50 p-3">
             <p className="text-xs text-muted-foreground">

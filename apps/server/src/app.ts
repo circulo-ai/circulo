@@ -14,6 +14,7 @@ import chatStream from "@/routes/chat-stream";
 import chatVisibility from "@/routes/chat-visibility";
 import conversations from "@/routes/conversations";
 import files from "@/routes/files";
+import health from "@/routes/health";
 import history from "@/routes/history";
 import messages from "@/routes/messages";
 import suggestions from "@/routes/suggestions";
@@ -30,6 +31,7 @@ import { requestId } from "hono/request-id";
 
 const app = createApp();
 const IS_DEVELOPMENT = env.NODE_ENV === "development";
+const SHOULD_APPLY_RATE_LIMITING = env.NODE_ENV === "production";
 const OPENAPI_PATH = "/openapi.json";
 
 // Middlewares (register before routes)
@@ -63,8 +65,9 @@ const corsMiddleware = cors({
 });
 app.use("*", corsMiddleware); // apply globally so preflight never 404s
 
-// Skip rate limiting only in an explicitly configured development environment.
-if (!IS_DEVELOPMENT) {
+// Rate limiting is a production boundary. Keeping it opt-in prevents an unset
+// NODE_ENV from making local development behave like a shared production API.
+if (SHOULD_APPLY_RATE_LIMITING) {
   app.use("/api/*", rateLimit());
 }
 
@@ -93,6 +96,8 @@ const routes = [
 routes.forEach((route) => {
   app.route("/api", route);
 });
+
+app.route("/", health);
 
 if (IS_DEVELOPMENT) {
   app.route("/api", test);

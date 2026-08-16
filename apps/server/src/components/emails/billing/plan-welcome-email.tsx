@@ -102,7 +102,7 @@ export function PlanWelcomeEmail({
             <Text style={baseStyles.paragraph}>
               Best regards,
               <br />
-              The Sim Team
+              The Circulo Team
             </Text>
 
             <Text

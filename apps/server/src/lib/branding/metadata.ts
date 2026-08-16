@@ -7,7 +7,7 @@ export function generateStructuredData() {
     "@type": "SoftwareApplication",
     name: "Circulo",
     description:
-      "Circulo is an open-source AI agent workflow builder. Developers at trail-blazing startups to Fortune 500 companies deploy agentic workflows on the Sim platform.  30,000+ developers are already using Sim to build and deploy AI agent workflows. Sim lets developers integrate with 100+ apps to streamline workflows with AI agents. Sim is SOC2 and HIPAA compliant, ensuring enterprise-level security.",
+      "Circulo is a multi-tenant AI workspace where teams combine specialized AI agents into conversations, orchestrated workflows, and shared outcomes.",
     url: "https://circulo-ai.com",
     applicationCategory: "BusinessApplication",
     operatingSystem: "Web Browser",
@@ -21,10 +21,10 @@ export function generateStructuredData() {
       url: "https://circulo-ai.com",
     },
     featureList: [
-      "Visual AI Agent Builder",
-      "Workflow Canvas Interface",
-      "AI Agent Automation",
-      "Custom AI Workflows",
+      "Shared AI workspace",
+      "Multi-agent conversations",
+      "Orchestrated AI workflows",
+      "Team collaboration",
     ],
   };
 }

@@ -310,7 +310,7 @@ export const stream = pgTable(
   ],
 );
 
-/** Durable ownership record for reconnectable Workflow DevKit runs. */
+/** Durable ownership record for reconnectable Circulo workflow runs. */
 export const workflowRun = pgTable(
   "workflow_runs",
   {
