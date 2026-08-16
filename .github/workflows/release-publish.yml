@@ -36,9 +36,22 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
 
-      - name: Install npm with trusted publishing support
-        run: npm install --global npm@latest
+      - name: Verify npm trusted publishing support
+        run: |
+          set -euo pipefail
+          node --version
+          npm --version
+          npm_version="$(npm --version)"
+          npm_major="${npm_version%%.*}"
+          npm_minor="${npm_version#*.}"
+          npm_minor="${npm_minor%%.*}"
+          if [ "$npm_major" -lt 11 ] || { [ "$npm_major" -eq 11 ] && [ "$npm_minor" -lt 5 ]; }; then
+            echo "npm ${npm_version} is too old for trusted publishing; npm 11.5.1 or newer is required." >&2
+            exit 1
+          fi
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
