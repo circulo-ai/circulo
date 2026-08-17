@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { BaseRipple } from "@base-ripple/react";
-import { Slot } from "@radix-ui/react-slot";
+import { Slot } from "@/lib/slot";
 import { ComponentProps, ElementType } from "react";
 
 const DEFAULT_ELEMENT_TYPE = "button" as const;

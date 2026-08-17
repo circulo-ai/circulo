@@ -1,33 +1,49 @@
 "use client";
 
-import * as CollapsiblePrimitive from "@radix-ui/react-collapsible";
+import * as React from "react";
+import { Collapsible as CollapsiblePrimitive } from "@base-ui/react/collapsible";
 
-function Collapsible({
-  ...props
-}: React.ComponentProps<typeof CollapsiblePrimitive.Root>) {
-  return <CollapsiblePrimitive.Root data-slot="collapsible" {...props} />;
+function Collapsible({ asChild = false, children, ...props }: CollapsiblePrimitive.Root.Props & {
+  asChild?: boolean;
+}) {
+  return (
+    <CollapsiblePrimitive.Root
+      data-slot="collapsible"
+      render={asChild && React.isValidElement(children) ? children : undefined}
+      {...props}
+    >
+      {children}
+    </CollapsiblePrimitive.Root>
+  );
 }
 
-function CollapsibleTrigger({
-  ...props
-}: React.ComponentProps<typeof CollapsiblePrimitive.CollapsibleTrigger>) {
+function CollapsibleTrigger({ asChild = false, children, ...props }: CollapsiblePrimitive.Trigger.Props & {
+  asChild?: boolean;
+}) {
   return (
-    <CollapsiblePrimitive.CollapsibleTrigger
+    <CollapsiblePrimitive.Trigger
       data-slot="collapsible-trigger"
+      render={asChild && React.isValidElement(children) ? children : undefined}
+      nativeButton={asChild ? false : undefined}
       {...props}
-    />
+    >
+      {children}
+    </CollapsiblePrimitive.Trigger>
   );
 }
 
-function CollapsibleContent({
-  ...props
-}: React.ComponentProps<typeof CollapsiblePrimitive.CollapsibleContent>) {
+function CollapsibleContent({ asChild = false, children, ...props }: CollapsiblePrimitive.Panel.Props & {
+  asChild?: boolean;
+}) {
   return (
-    <CollapsiblePrimitive.CollapsibleContent
+    <CollapsiblePrimitive.Panel
       data-slot="collapsible-content"
+      render={asChild && React.isValidElement(children) ? children : undefined}
       {...props}
-    />
+    >
+      {children}
+    </CollapsiblePrimitive.Panel>
   );
 }
 
-export { Collapsible, CollapsibleContent, CollapsibleTrigger };
+export { Collapsible, CollapsibleTrigger, CollapsibleContent };

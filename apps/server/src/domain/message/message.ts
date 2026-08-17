@@ -5,6 +5,8 @@ export type MessageProps = {
   chatId: Identifier;
   authorId: string;
   content: string;
+  parts?: unknown[];
+  attachments?: unknown[];
   createdAt: Date;
   updatedAt?: Date;
 };
@@ -43,6 +45,14 @@ export class Message extends Entity<MessageProps> {
 
   get content(): string {
     return this.props.content;
+  }
+
+  get parts(): unknown[] {
+    return this.props.parts ?? [];
+  }
+
+  get attachments(): unknown[] {
+    return this.props.attachments ?? [];
   }
 
   get snapshot(): MessageProps {

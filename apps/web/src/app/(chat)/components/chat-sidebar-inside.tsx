@@ -1,5 +1,6 @@
 "use client";
 
+import { SettingsModal } from "@/components/sidebar/settings-modal/settings-modal";
 import {
   CustomSidebarGroup,
   CustomSidebarHeader,
@@ -13,6 +14,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { useChatHistory } from "@/hooks/api/chats/use-chat-history";
+import { useState } from "react";
 import { ChatSidebarAddAction } from "./chat-sidebar-add-action";
 import { ChatSidebarBurgerMenu } from "./chat-sidebar-burger-menu";
 import { ChatSidebarEmpty } from "./chat-sidebar-empty";
@@ -21,6 +23,7 @@ import { ChatSidebarNoResult } from "./chat-sidebar-no-result";
 import { ChatSidebarSearch } from "./chat-sidebar-search";
 
 export function ChatSidebarInside() {
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const {
     history: { data, isLoading },
     search,
@@ -71,6 +74,7 @@ export function ChatSidebarInside() {
           <ChatSidebarAddAction />
         </CustomSidebarGroup>
       </SidebarContent>
+      <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
     </>
   );
 }

@@ -1,15 +1,10 @@
-import {
-  defaultModel,
-  LLM_MODELS,
-  type SupportedModels,
-} from "@circulo-ai/types";
+import { defaultModel, type SupportedModels } from "@circulo-ai/types";
 import { relations } from "drizzle-orm";
 import {
   boolean,
   index,
   integer,
   jsonb,
-  pgEnum,
   pgTable,
   text,
   timestamp,
@@ -18,11 +13,6 @@ import {
 } from "drizzle-orm/pg-core";
 import { organization, user } from "./auth";
 import { chatAgent } from "./chat";
-
-export const llmModelEnum = pgEnum(
-  "llm_model",
-  LLM_MODELS as [SupportedModels, ...SupportedModels[]],
-);
 
 export const agent = pgTable(
   "agents",
@@ -44,7 +34,10 @@ export const agent = pgTable(
     avatarUrl: text("avatar_url"),
 
     // Model configuration
-    model: llmModelEnum("model").notNull().default(defaultModel),
+    model: text("model")
+      .$type<SupportedModels>()
+      .notNull()
+      .default(defaultModel),
     maxTokens: integer("max_tokens").default(1000),
     temperature: integer("temperature").default(70), // 0-100 scale
 

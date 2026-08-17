@@ -5,10 +5,13 @@ import { SWRProvider } from "@/providers/swr-provider";
 import { ThemeProvider } from "@/providers/theme-provider";
 import { AutumnProvider } from "autumn-js/react";
 import type { Metadata } from "next";
+import { Figtree } from "next/font/google";
 import { env } from "process";
 import { ReactNode } from "react";
 import { Toaster } from "sonner";
 import "./globals.css";
+
+const figtree = Figtree({ subsets: ["latin"], variable: "--font-sans" });
 
 export const viewport = {
   maximumScale: 1, // Disable auto-zoom on mobile Safari
@@ -26,7 +29,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html
       lang="en"
       suppressHydrationWarning
-      className="scroll-smooth sm:snap-y sm:snap-mandatory"
+      className={cn(
+        "scroll-smooth sm:snap-y sm:snap-mandatory",
+        "font-sans",
+        figtree.variable,
+      )}
     >
       <body className={cn("font-sans", "antialiased")}>
         <ThemeProvider>

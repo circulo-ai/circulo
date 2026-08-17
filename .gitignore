@@ -26,6 +26,8 @@ bun-debug.log*
 /build
 /dist
 **/dist/
+**/dist-final/
+**/dist-final-*/
 **/.well-known/workflow/
 **/standalone/
 sim-standalone.tar.gz
@@ -76,3 +78,17 @@ packages/types/**/*.d.ts
 packages/types/**/*.d.ts.map
 
 .well-known
+
+# Local Git workaround files used when the host Git index is locked.
+.codex-git-index
+.codex-git-index.lock
+.codex-git-index-*
+.codex-index-*
+.codex-git-objects/
+.codex-git-objects2/
+.codex-tmp/
+.playwright-cli
+
+# Local agent tooling
+.agents/
+skills-lock.json

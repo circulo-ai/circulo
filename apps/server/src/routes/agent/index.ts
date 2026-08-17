@@ -1,4 +1,7 @@
+import { db } from "@/db";
 import { agentRepo } from "@/db/repositories";
+import { agent, knowledgeBase } from "@/db/schema";
+import { enforceOrganizationFeatureLimit } from "@/lib/billing/limits";
 import { createRouter } from "@/lib/create-app";
 import { getUserRole, isMemberOf } from "@/lib/permissions";
 import { requireAuth } from "@/middleware/auth";
@@ -13,6 +16,7 @@ import {
   updateAgentBodySchema,
 } from "@circulo-ai/types";
 import { zValidator } from "@hono/zod-validator";
+import { and, count, eq, inArray } from "drizzle-orm";
 import { resolveOrganizationId } from "../utils";
 
 const router = createRouter();
@@ -66,6 +70,12 @@ router.post(
     if (!isOrgMember) {
       throw new ForbiddenError("You don't have access to this organization");
     }
+    const role = await getUserRole(user!.id, organizationId);
+    if (!role || !["owner", "admin"].includes(role)) {
+      throw new ForbiddenError(
+        "Only workspace owners and admins can create agents",
+      );
+    }
 
     const existing = await agentRepo.findByName(organizationId, body.name);
     if (existing) {
@@ -73,6 +83,22 @@ router.post(
         "An agent with the same name exists in this organization",
       );
     }
+
+    const [agentCount] = await db
+      .select({ current: count() })
+      .from(agent)
+      .where(
+        and(
+          eq(agent.organizationId, organizationId),
+          eq(agent.isArchived, false),
+        ),
+      );
+    await enforceOrganizationFeatureLimit({
+      organizationId,
+      feature: "max_agents",
+      current: Number(agentCount?.current ?? 0),
+      resourceName: "Agent",
+    });
 
     try {
       const agent = await agentRepo.create({
@@ -140,6 +166,29 @@ router.patch(
     assertCanManageAgent(existingAgent.createdBy, user!.id, role);
 
     const { id, ...updates } = body;
+
+    if (updates.defaultKnowledgeBaseIds !== undefined) {
+      const ids = updates.defaultKnowledgeBaseIds;
+      const bases =
+        ids.length === 0
+          ? []
+          : await db
+              .select({ id: knowledgeBase.id })
+              .from(knowledgeBase)
+              .where(
+                and(
+                  eq(knowledgeBase.organizationId, organizationId),
+                  eq(knowledgeBase.isArchived, false),
+                  inArray(knowledgeBase.id, ids),
+                ),
+              );
+      if (bases.length !== new Set(ids).size) {
+        throw new BadRequestError(
+          "Every knowledge base must belong to this workspace",
+        );
+      }
+    }
+
     const updateData: Parameters<typeof agentRepo.update>[1] = {};
 
     if (updates.name !== undefined) updateData.name = updates.name;

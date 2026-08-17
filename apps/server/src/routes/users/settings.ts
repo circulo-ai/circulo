@@ -12,7 +12,7 @@ import { z } from "zod";
 const logger = createLogger("UserSettingsAPI");
 
 const SettingsSchema = z.object({
-  telemetryEnabled: z.boolean().optional(),
+  theme: z.enum(["light", "dark", "system"]).optional(),
   emailPreferences: z
     .object({
       unsubscribeAll: z.boolean().optional(),
@@ -21,13 +21,11 @@ const SettingsSchema = z.object({
       unsubscribeNotifications: z.boolean().optional(),
     })
     .optional(),
-  billingUsageNotificationsEnabled: z.boolean().optional(),
 });
 
 const defaultSettings = {
-  telemetryEnabled: true,
   emailPreferences: {},
-  billingUsageNotificationsEnabled: true,
+  theme: "system",
 };
 
 const router = createRouter();
@@ -56,8 +54,8 @@ router.get("/users/me/settings", requireAuth, async (c) => {
     return c.json(
       {
         data: {
-          telemetryEnabled: userSettings.telemetryEnabled,
           emailPreferences: userSettings.emailPreferences ?? {},
+          theme: userSettings.theme,
         },
       },
       200,
@@ -78,19 +76,20 @@ router.patch(
     try {
       const userId = c.var.user!.id;
       const validatedData = c.req.valid("json");
+      const persistenceData = validatedData;
 
       await db
         .insert(settings)
         .values({
           id: nanoid(),
           userId,
-          ...validatedData,
+          ...persistenceData,
           updatedAt: new Date(),
         })
         .onConflictDoUpdate({
           target: [settings.userId],
           set: {
-            ...validatedData,
+            ...persistenceData,
             updatedAt: new Date(),
           },
         });

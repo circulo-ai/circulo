@@ -10,6 +10,8 @@ function toDomain(row: typeof messageTable.$inferSelect): Message {
     chatId: Identifier.from(row.chatId),
     authorId: row.authorId,
     content: row.content,
+    parts: row.parts,
+    attachments: row.attachments,
     createdAt: row.createdAt,
     updatedAt: row.editedAt ?? undefined,
   });
@@ -24,8 +26,8 @@ function toRow(entity: Message): typeof messageTable.$inferInsert {
     authorType: "user",
     role: "user",
     content: snap.content,
-    parts: [],
-    attachments: [],
+    parts: snap.parts,
+    attachments: snap.attachments,
     tokenCount: 0,
     cost: "0",
     quotedMessageId: null,
@@ -48,9 +50,7 @@ export class DrizzleMessageRepository implements Repository<Message> {
   }
 
   async findById(id: Identifier | string): Promise<Message | null> {
-    return this.getById(
-      typeof id === "string" ? Identifier.from(id) : id,
-    );
+    return this.getById(typeof id === "string" ? Identifier.from(id) : id);
   }
 
   async save(entity: Message): Promise<Message> {
@@ -89,7 +89,12 @@ export class DrizzleMessageRepository implements Repository<Message> {
     const messageIds = await this.db
       .select({ id: messageTable.id })
       .from(messageTable)
-      .where(and(eq(messageTable.chatId, chatId), gte(messageTable.createdAt, timestamp)));
+      .where(
+        and(
+          eq(messageTable.chatId, chatId),
+          gte(messageTable.createdAt, timestamp),
+        ),
+      );
 
     if (messageIds.length === 0) return false;
 
@@ -97,12 +102,16 @@ export class DrizzleMessageRepository implements Repository<Message> {
 
     await this.db
       .delete(voteTable)
-      .where(and(eq(voteTable.chatId, chatId), inArray(voteTable.messageId, ids)));
+      .where(
+        and(eq(voteTable.chatId, chatId), inArray(voteTable.messageId, ids)),
+      );
 
     const result = await this.db
       .update(messageTable)
       .set({ isDeleted: true, deletedAt: new Date() })
-      .where(and(eq(messageTable.chatId, chatId), inArray(messageTable.id, ids)))
+      .where(
+        and(eq(messageTable.chatId, chatId), inArray(messageTable.id, ids)),
+      )
       .returning({ id: messageTable.id });
 
     return result.length > 0;

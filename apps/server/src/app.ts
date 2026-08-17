@@ -6,18 +6,28 @@ import agent from "@/routes/agent";
 import artifact from "@/routes/artifact";
 import auth from "@/routes/auth";
 import authSocketToken from "@/routes/auth-socket-token";
+import automation from "@/routes/automation";
 import autumn from "@/routes/autumn";
+import billing from "@/routes/billing";
+import capabilities from "@/routes/capabilities";
 import chat from "@/routes/chat";
 import chatAgents from "@/routes/chat-agents";
+import chatInvitations from "@/routes/chat-invitations";
+import chatMembers from "@/routes/chat-members";
 import chatPin from "@/routes/chat-pin";
+import chatSettings from "@/routes/chat-settings";
 import chatStream from "@/routes/chat-stream";
 import chatVisibility from "@/routes/chat-visibility";
 import conversations from "@/routes/conversations";
 import files from "@/routes/files";
 import health from "@/routes/health";
 import history from "@/routes/history";
+import knowledge from "@/routes/knowledge";
+import memories from "@/routes/memories";
 import messages from "@/routes/messages";
+import models from "@/routes/models";
 import suggestions from "@/routes/suggestions";
+import skills from "@/routes/skills";
 import test from "@/routes/test";
 import userProfile from "@/routes/users/profile";
 import userSettings from "@/routes/users/settings";
@@ -39,11 +49,15 @@ app.use("*", logger());
 app.use("*", requestId());
 app.use(prettyJSON());
 const allowedOrigins = [
+  env.NEXT_PUBLIC_APP_URL,
   getBaseUrl(),
   "http://localhost:3000",
   "http://127.0.0.1:3000",
   "http://localhost:3001",
-];
+  ...(env.CORS_ALLOWED_ORIGINS?.split(",") ?? []),
+]
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 const corsMiddleware = cors({
   origin: (origin) => {
     if (!origin) return getBaseUrl();
@@ -73,20 +87,30 @@ if (SHOULD_APPLY_RATE_LIMITING) {
 
 const routes = [
   autumn,
+  automation,
+  billing,
+  capabilities,
   auth,
   authSocketToken,
   artifact,
   agent,
   chatAgents,
+  chatMembers,
+  chatInvitations,
+  chatSettings,
   chatPin,
   chatStream,
   chat,
   chatVisibility,
   files,
   messages,
+  models,
   conversations,
   history,
+  knowledge,
+  memories,
   suggestions,
+  skills,
   userProfile,
   userSettings,
   userUnsubscribe,
@@ -106,6 +130,11 @@ if (IS_DEVELOPMENT) {
 export type AppType = (typeof routes)[number];
 
 app.onError((err, c) => {
+  console.error("[API Error]", {
+    method: c.req.method,
+    path: c.req.path,
+    error: err instanceof Error ? (err.stack ?? err.message) : err,
+  });
   if (err instanceof HttpError) {
     return err.toResponse();
   }

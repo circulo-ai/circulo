@@ -15,9 +15,10 @@ export function SliderInput({ onChange, value, ...props }: SliderInputProps) {
     <Slider
       value={normalizeValue(value)}
       onValueChange={(newValue) => {
-        if (onChange && newValue[0])
+        const nextValue = Array.isArray(newValue) ? newValue[0] : newValue;
+        if (onChange && nextValue !== undefined)
           onChange({
-            target: { value: newValue[0] },
+            target: { value: nextValue },
           } as unknown as ChangeEvent<Element>);
       }}
       {...props}

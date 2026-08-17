@@ -1,5 +1,6 @@
 import { type InferSelectModel, relations, sql } from "drizzle-orm";
 import {
+  bigint,
   boolean,
   check,
   decimal,
@@ -32,6 +33,7 @@ export const invitationStatusEnum = pgEnum("invitation_status", [
 ]);
 export const workflowRunStatusEnum = pgEnum("workflow_run_status", [
   "running",
+  "paused",
   "completed",
   "failed",
 ]);
@@ -55,6 +57,10 @@ export const chat = pgTable(
     title: text("title").notNull(),
     description: text("description"),
     instructions: text("instructions"),
+    knowledgeBaseIds: jsonb("knowledge_base_ids")
+      .$type<string[]>()
+      .notNull()
+      .default([]),
 
     type: chatTypeEnum("type").notNull().default("direct"),
     visibility: chatVisibilityEnum("visibility").notNull().default("private"),
@@ -325,6 +331,31 @@ export const workflowRun = pgTable(
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
     status: workflowRunStatusEnum("status").notNull().default("running"),
+    state: text("state").notNull().default("pending"),
+    version: integer("version").notNull().default(0),
+    currentStep: integer("current_step").notNull().default(0),
+    retryCount: integer("retry_count").notNull().default(0),
+    maxExecutionTime: integer("max_execution_time"),
+    input: jsonb("input").$type<Record<string, unknown>>(),
+    context: jsonb("context").$type<Record<string, unknown>>(),
+    output: jsonb("output"),
+    error: jsonb("error").$type<Record<string, unknown>>(),
+    tags: jsonb("tags").$type<Record<string, string>>().notNull().default({}),
+    metadata: jsonb("metadata")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default({}),
+    resumeAt: timestamp("resume_at", { withTimezone: true }),
+    executionStartedAt: timestamp("execution_started_at", {
+      withTimezone: true,
+    }),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    lockId: text("lock_id"),
+    lockHolder: text("lock_holder"),
+    lockAcquiredAt: timestamp("lock_acquired_at", { withTimezone: true }),
+    lockExpiresAt: timestamp("lock_expires_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -333,6 +364,26 @@ export const workflowRun = pgTable(
   (t) => [
     index("workflow_runs_chat_idx").on(t.chatId, t.createdAt),
     index("workflow_runs_user_idx").on(t.userId, t.createdAt),
+  ],
+);
+
+/** Durable append-only event log used to rebuild workflow streams after reconnects. */
+export const workflowRunEvent = pgTable(
+  "workflow_run_events",
+  {
+    id: text("id").primaryKey(),
+    workflowId: text("workflow_id")
+      .notNull()
+      .references(() => workflowRun.id, { onDelete: "cascade" }),
+    // Workflow event timestamps are JavaScript epoch milliseconds. PostgreSQL
+    // integer is 32-bit and overflows for every modern epoch timestamp.
+    timestamp: bigint("timestamp", { mode: "number" }).notNull(),
+    eventType: text("event_type").notNull(),
+    payload: jsonb("payload").notNull(),
+    correlationId: text("correlation_id"),
+  },
+  (t) => [
+    index("workflow_run_events_workflow_idx").on(t.workflowId, t.timestamp),
   ],
 );
 
@@ -474,8 +525,19 @@ export const workflowRunRelations = relations(workflowRun, ({ one }) => ({
   }),
 }));
 
+export const workflowRunEventRelations = relations(
+  workflowRunEvent,
+  ({ one }) => ({
+    workflow: one(workflowRun, {
+      fields: [workflowRunEvent.workflowId],
+      references: [workflowRun.id],
+    }),
+  }),
+);
+
 export type Stream = InferSelectModel<typeof stream>;
 export type WorkflowRun = InferSelectModel<typeof workflowRun>;
+export type WorkflowRunEvent = InferSelectModel<typeof workflowRunEvent>;
 export type Chat = typeof chat.$inferSelect;
 export type NewChat = typeof chat.$inferInsert;
 export type ChatMember = typeof chatMember.$inferSelect;

@@ -1,0 +1,1 @@
+ALTER TYPE "public"."workflow_run_status" ADD VALUE 'paused' BEFORE 'completed';

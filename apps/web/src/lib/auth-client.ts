@@ -9,10 +9,6 @@ import {
 } from "better-auth/client/plugins";
 import { nextCookies } from "better-auth/next-js";
 import { createAuthClient } from "better-auth/react";
-import { toast } from "sonner";
-
-const RATE_LIMIT_TOAST_COOLDOWN_MS = 5_000;
-let lastRateLimitToastAt = 0;
 
 export function getBaseURL() {
   return getEnv("NEXT_PUBLIC_APP_URL") || "http://localhost:3000";
@@ -30,17 +26,6 @@ export const authClient = createAuthClient({
     magicLinkClient(),
     organizationClient(),
   ],
-  fetchOptions: {
-    onError(e) {
-      if (e.error.status === 429) {
-        const now = Date.now();
-        if (now - lastRateLimitToastAt >= RATE_LIMIT_TOAST_COOLDOWN_MS) {
-          lastRateLimitToastAt = now;
-          toast.error("Too many requests. Please try again later.");
-        }
-      }
-    },
-  },
 });
 
 export const { useActiveOrganization } = authClient;

@@ -23,6 +23,7 @@ type MessagesProps = {
   regenerate: UseChatHelpers<ChatMessage>["regenerate"];
   isReadonly: boolean;
   isArtifactVisible: boolean;
+  canEditMessages: boolean;
 };
 
 function PureMessages({
@@ -33,6 +34,7 @@ function PureMessages({
   setMessages,
   regenerate,
   isReadonly,
+  canEditMessages,
 }: MessagesProps) {
   const {
     containerRef: messagesContainerRef,
@@ -74,6 +76,7 @@ function PureMessages({
             <PreviewMessage
               key={message.id + index}
               chatId={chatId}
+              canEdit={canEditMessages}
               isLoading={
                 status === "streaming" && messages.length - 1 === index
               }

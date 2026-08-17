@@ -1,13 +1,15 @@
 "use client";
 
-import { Slot, SlotProps } from "@radix-ui/react-slot";
+import { Slot } from "@/lib/slot";
 import { createContext, forwardRef, useContext, useId, useMemo } from "react";
 
-type IdType = SlotProps["id"];
+type IdType = string | undefined;
+
+type IdSlotProps = React.ComponentProps<typeof Slot> & { id?: string };
 
 const IdSlotContext = createContext<IdType>(undefined);
 
-const IdSlot = forwardRef<HTMLElement, SlotProps>(function IdSlot(
+const IdSlot = forwardRef<HTMLElement, IdSlotProps>(function IdSlot(
   { id: providedId, ...restProps },
   ref,
 ) {

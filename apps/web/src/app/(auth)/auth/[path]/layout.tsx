@@ -125,7 +125,7 @@ export default function AuthLayout({
       </div>
 
       {/* Right Panel - Minimalist Showcase */}
-      <div className="relative hidden flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-12 lg:flex">
+      <div className="relative hidden flex-col items-center justify-center overflow-hidden bg-sidebar p-12 lg:flex">
         {/* Subtle grid background */}
         <div className="absolute inset-0 opacity-20">
           <div
@@ -144,7 +144,7 @@ export default function AuthLayout({
             <h2 className="text-3xl leading-tight font-bold text-white">
               A new era of
               <br />
-              <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
+              <span className="text-teal-300">
                 AI collaboration
               </span>
             </h2>

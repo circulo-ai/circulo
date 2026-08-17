@@ -62,7 +62,12 @@ export type StepResultType = "chunk" | "complete" | "error" | "wait";
 export type StepResult<TOutput> =
   | { type: "chunk"; data: TOutput }
   | { type: "complete"; data: TOutput }
-  | { type: "wait"; until: number; data?: TOutput | undefined }
+  | {
+      type: "wait";
+      until: number;
+      data?: TOutput | undefined;
+      resumeCurrentStep?: boolean;
+    }
   | { type: "error"; error: WorkflowError };
 
 export interface Step<TContext, TInput, TOutput> {
@@ -84,6 +89,8 @@ export interface Step<TContext, TInput, TOutput> {
 }
 
 export interface WorkflowContext<TContext> {
+  /** Aborts when the workflow is cancelled or the host is shutting down. */
+  readonly signal: AbortSignal;
   readonly workflow: {
     readonly id: string;
     readonly state: WorkflowState;

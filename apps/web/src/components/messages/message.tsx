@@ -23,6 +23,7 @@ import { memo, useState } from "react";
 import { MessageActions } from "./message-actions";
 import { MessageEditor } from "./message-editor";
 import { MessageReasoning } from "./message-reasoning";
+import { WorkflowProcess } from "./workflow-process";
 
 const PurePreviewMessage = ({
   chatId,
@@ -33,6 +34,7 @@ const PurePreviewMessage = ({
   regenerate,
   isReadonly,
   requiresScrollPadding,
+  canEdit,
 }: {
   chatId: string;
   message: ChatMessage;
@@ -42,6 +44,7 @@ const PurePreviewMessage = ({
   regenerate: UseChatHelpers<ChatMessage>["regenerate"];
   isReadonly: boolean;
   requiresScrollPadding: boolean;
+  canEdit: boolean;
 }) => {
   const [mode, setMode] = useState<"view" | "edit">("view");
 
@@ -92,18 +95,20 @@ const PurePreviewMessage = ({
               className="flex flex-row justify-end gap-2"
               data-testid={"message-attachments"}
             >
-              {attachmentsFromMessage.map((attachment) => (
+              {attachmentsFromMessage.map((attachment, index) => (
                 <PreviewAttachment
                   attachment={{
                     name: attachment.filename ?? "file",
                     contentType: attachment.mediaType,
                     url: attachment.url,
                   }}
-                  key={attachment.url}
+                  key={`${message.id}-attachment-${attachment.url || index}`}
                 />
               ))}
             </div>
           )}
+
+          <WorkflowProcess parts={message.parts} />
 
           {message.parts?.map((part, index) => {
             const { type } = part;
@@ -164,33 +169,7 @@ const PurePreviewMessage = ({
               }
             }
 
-            if (type == "data-workflowStarted") {
-              return <span>Workflow started</span>;
-            }
-
-            if (type == "data-workflowAggregated") {
-              return <span>Workflow aggregated</span>;
-            }
-
-            if (type == "data-workflowCompleted") {
-              return <span>Workflow completed</span>;
-            }
-
-            if (type == "data-workflowClassification") {
-              const classification = (part as any).data as {
-                complexity?: unknown;
-              };
-              return (
-                <span>
-                  Workflow classified {String(classification?.complexity ?? "")}
-                </span>
-              );
-            }
-
-            if (type == "data-workflowPlan") {
-              const plan = (part as any).data as { strategy?: unknown };
-              return <span>Workflow plan {String(plan?.strategy ?? "")}</span>;
-            }
+            if (type.startsWith("data-workflow")) return null;
 
             if (type === "tool-createDocument") {
               const { toolCallId } = part;
@@ -282,6 +261,7 @@ const PurePreviewMessage = ({
               isLoading={isLoading}
               key={`action-${message.id}`}
               message={message}
+              canEdit={canEdit}
               setMode={setMode}
               vote={vote}
             />
@@ -295,13 +275,18 @@ const PurePreviewMessage = ({
 export const PreviewMessage = memo(
   PurePreviewMessage,
   (prevProps, nextProps) => {
+    if (prevProps.chatId !== nextProps.chatId) return false;
     if (prevProps.isLoading !== nextProps.isLoading) {
       return false;
     }
+    if (prevProps.isReadonly !== nextProps.isReadonly) return false;
     if (prevProps.message.id !== nextProps.message.id) {
       return false;
     }
     if (prevProps.requiresScrollPadding !== nextProps.requiresScrollPadding) {
+      return false;
+    }
+    if (prevProps.canEdit !== nextProps.canEdit) {
       return false;
     }
     if (!equal(prevProps.message.parts, nextProps.message.parts)) {
@@ -311,7 +296,7 @@ export const PreviewMessage = memo(
       return false;
     }
 
-    return false;
+    return true;
   },
 );
 

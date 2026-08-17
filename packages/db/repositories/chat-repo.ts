@@ -115,7 +115,16 @@ export function createChatRepository(database: DbInstance) {
       }
     },
 
-    async update(id: string, data: Partial<typeof chat.$inferInsert>) {
+    async update(
+      id: string,
+      data: Omit<
+        Partial<typeof chat.$inferInsert>,
+        "description" | "instructions"
+      > & {
+        description?: string | null;
+        instructions?: string | null;
+      },
+    ) {
       const [row] = await db
         .update(chat)
         .set({ ...data, updatedAt: new Date() })
@@ -271,11 +280,24 @@ export function createChatRepository(database: DbInstance) {
         const query = (whereCondition?: SQL<any>) => {
           const whereClause = searchCondition
             ? whereCondition
-              ? and(eq(chat.creatorId, id), whereCondition, searchCondition)
-              : and(eq(chat.creatorId, id), searchCondition)
+              ? and(
+                  eq(chat.creatorId, id),
+                  eq(chat.isDeleted, false),
+                  whereCondition,
+                  searchCondition,
+                )
+              : and(
+                  eq(chat.creatorId, id),
+                  eq(chat.isDeleted, false),
+                  searchCondition,
+                )
             : whereCondition
-              ? and(whereCondition, eq(chat.creatorId, id))
-              : eq(chat.creatorId, id);
+              ? and(
+                  whereCondition,
+                  eq(chat.creatorId, id),
+                  eq(chat.isDeleted, false),
+                )
+              : and(eq(chat.creatorId, id), eq(chat.isDeleted, false));
 
           return db
             .select()
@@ -332,12 +354,14 @@ export function createChatRepository(database: DbInstance) {
 
     async getChatsByOrgId({
       id,
+      userId,
       limit,
       startingAfter,
       endingBefore,
       search,
     }: {
       id: string;
+      userId: string;
       limit: number;
       startingAfter?: string;
       endingBefore?: string;
@@ -353,18 +377,29 @@ export function createChatRepository(database: DbInstance) {
             )
           : undefined;
 
+        const memberChatIds = db
+          .select({ chatId: chatMember.chatId })
+          .from(chatMember)
+          .where(
+            and(
+              eq(chatMember.userId, userId),
+              sql`${chatMember.leftAt} IS NULL`,
+            ),
+          );
+
         const query = (whereCondition?: SQL<any>) => {
+          const baseCondition = and(
+            eq(chat.organizationId, id),
+            eq(chat.isDeleted, false),
+            inArray(chat.id, memberChatIds),
+          );
           const whereClause = searchCondition
             ? whereCondition
-              ? and(
-                  eq(chat.organizationId, id),
-                  whereCondition,
-                  searchCondition,
-                )
-              : and(eq(chat.organizationId, id), searchCondition)
+              ? and(baseCondition, whereCondition, searchCondition)
+              : and(baseCondition, searchCondition)
             : whereCondition
-              ? and(whereCondition, eq(chat.organizationId, id))
-              : eq(chat.organizationId, id);
+              ? and(baseCondition, whereCondition)
+              : baseCondition;
 
           return db
             .select()
@@ -380,7 +415,14 @@ export function createChatRepository(database: DbInstance) {
           const [selectedChat] = await db
             .select()
             .from(chat)
-            .where(eq(chat.id, startingAfter))
+            .where(
+              and(
+                eq(chat.id, startingAfter),
+                eq(chat.organizationId, id),
+                eq(chat.isDeleted, false),
+                inArray(chat.id, memberChatIds),
+              ),
+            )
             .limit(1);
 
           if (!selectedChat) {
@@ -394,7 +436,14 @@ export function createChatRepository(database: DbInstance) {
           const [selectedChat] = await db
             .select()
             .from(chat)
-            .where(eq(chat.id, endingBefore))
+            .where(
+              and(
+                eq(chat.id, endingBefore),
+                eq(chat.organizationId, id),
+                eq(chat.isDeleted, false),
+                inArray(chat.id, memberChatIds),
+              ),
+            )
             .limit(1);
 
           if (!selectedChat) {
@@ -434,6 +483,12 @@ export function createChatRepository(database: DbInstance) {
     }): Promise<{ conversations: ConversationSummary[]; hasMore: boolean }> {
       try {
         const extendedLimit = limit + 1;
+        const memberChatIds = db
+          .select({ chatId: chatMember.chatId })
+          .from(chatMember)
+          .where(
+            and(eq(chatMember.userId, id), sql`${chatMember.leftAt} IS NULL`),
+          );
 
         const query = (whereCondition?: SQL<any>) =>
           db
@@ -441,7 +496,7 @@ export function createChatRepository(database: DbInstance) {
             .from(chat)
             .where(
               and(
-                eq(chat.creatorId, id),
+                inArray(chat.id, memberChatIds),
                 eq(chat.isDeleted, false),
                 ...(search?.trim()
                   ? [ilike(chat.title, `%${search.trim()}%`)]
@@ -458,7 +513,9 @@ export function createChatRepository(database: DbInstance) {
           const [selectedChat] = await db
             .select()
             .from(chat)
-            .where(eq(chat.id, startingAfter))
+            .where(
+              and(eq(chat.id, startingAfter), inArray(chat.id, memberChatIds)),
+            )
             .limit(1);
 
           if (!selectedChat) {
@@ -472,7 +529,9 @@ export function createChatRepository(database: DbInstance) {
           const [selectedChat] = await db
             .select()
             .from(chat)
-            .where(eq(chat.id, endingBefore))
+            .where(
+              and(eq(chat.id, endingBefore), inArray(chat.id, memberChatIds)),
+            )
             .limit(1);
 
           if (!selectedChat) {
@@ -497,7 +556,9 @@ export function createChatRepository(database: DbInstance) {
         const latestMessages = await db
           .select()
           .from(message)
-          .where(inArray(message.chatId, chatIds))
+          .where(
+            and(inArray(message.chatId, chatIds), eq(message.isDeleted, false)),
+          )
           .orderBy(desc(message.createdAt));
 
         const latestByChat = new Map<string, typeof message.$inferSelect>();
@@ -515,7 +576,11 @@ export function createChatRepository(database: DbInstance) {
           })
           .from(chatMember)
           .where(
-            and(inArray(chatMember.chatId, chatIds), eq(chatMember.userId, id)),
+            and(
+              inArray(chatMember.chatId, chatIds),
+              eq(chatMember.userId, id),
+              sql`${chatMember.leftAt} IS NULL`,
+            ),
           );
         const unreadByChat = new Map<string, number>();
         for (const row of memberRows) {
@@ -724,9 +789,7 @@ export function createChatRepository(database: DbInstance) {
       return {
         ...row.agent,
         instructions: row.customInstructions ?? row.agent.instructions,
-        temperature: row.customTemperature
-          ? row.customTemperature
-          : row.agent.temperature,
+        temperature: row.customTemperature ?? row.agent.temperature,
       } as Agent;
     },
 

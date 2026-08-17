@@ -1,8 +1,8 @@
 import { type Message } from "@/db";
+import { getLanguageModel } from "@/lib/ai/providers";
 import { type ChatMessage } from "@/lib/types";
 import { getTextFromMessages } from "@/lib/utils";
 import { type OrchestrationInput } from "@/workflows/orchestrate/types";
-import { google } from "@ai-sdk/google";
 import { generateText, Output } from "ai";
 import { z } from "zod";
 
@@ -68,7 +68,7 @@ User Message: ${getTextFromMessages(message)}`;
   }));
 
   const { output } = await generateText({
-    model: google("gemini-2.5-flash"),
+    model: getLanguageModel(),
     output: Output.object({ schema: classificationSchema }),
     system: `You are an intelligent request classifier for a multi-agent orchestration system.
 

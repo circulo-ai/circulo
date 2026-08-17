@@ -28,6 +28,10 @@ export class WorkflowOutputChannel {
     return this.chunks.length;
   }
 
+  get isClosed(): boolean {
+    return this.closed;
+  }
+
   createReadable(startIndex = 0): ReadableStream<CustomUIMessageChunk> {
     if (!Number.isInteger(startIndex) || startIndex < 0) {
       throw new RangeError("startIndex must be a non-negative integer");
@@ -83,7 +87,7 @@ export function createWorkflowOutputChannel(
   workflowId: string,
 ): WorkflowOutputChannel {
   const existing = channels.get(workflowId);
-  if (existing) return existing;
+  if (existing && !existing.isClosed) return existing;
 
   const channel = new WorkflowOutputChannel();
   channels.set(workflowId, channel);

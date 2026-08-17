@@ -2,20 +2,20 @@ import { env, isTruthy } from "@/lib/env";
 import { isHosted } from "@/lib/environment";
 import { cn } from "@/lib/utils";
 import { useGeneralStore } from "@/stores/settings/general/store";
-import { CreditCard, Home, Settings, Shield, User, Users } from "lucide-react";
+import { CreditCard, Home, Settings, User, Users } from "lucide-react";
 
 const isBillingEnabled = isTruthy(env.NEXT_PUBLIC_BILLING_ENABLED);
 
 interface SettingsNavigationProps {
   activeSection: string;
   onSectionChange: (
-    section: "general" | "account" | "subscription" | "team" | "privacy",
+    section: "general" | "account" | "subscription" | "team",
   ) => void;
   hasOrganization: boolean;
 }
 
 type NavigationItem = {
-  id: "general" | "account" | "subscription" | "team" | "privacy";
+  id: "general" | "account" | "subscription" | "team";
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   hideWhenBillingDisabled?: boolean;
@@ -36,11 +36,6 @@ const allNavigationItems: NavigationItem[] = [
     icon: User,
   },
   {
-    id: "privacy",
-    label: "Privacy",
-    icon: Shield,
-  },
-  {
     id: "subscription",
     label: "Subscription",
     icon: CreditCard,
@@ -50,7 +45,6 @@ const allNavigationItems: NavigationItem[] = [
     id: "team",
     label: "Team",
     icon: Users,
-    hideWhenBillingDisabled: true,
     requiresTeam: true,
   },
 ];
@@ -60,8 +54,6 @@ export function SettingsNavigation({
   onSectionChange,
   hasOrganization,
 }: SettingsNavigationProps) {
-  console.log(isBillingEnabled);
-
   const navigationItems = allNavigationItems.filter((item) => {
     if (item.hideWhenBillingDisabled && !isBillingEnabled) {
       return false;

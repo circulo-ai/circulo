@@ -13,9 +13,9 @@
     }
   },
   "scripts": {
-    "dev": "tsc -p tsconfig.json --watch",
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "dev": "bun ./node_modules/typescript/bin/tsc -p tsconfig.json --watch",
+    "build": "bun ./node_modules/typescript/bin/tsc -p tsconfig.json",
+    "typecheck": "bun ./node_modules/typescript/bin/tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
     "@types/node": "^20.19.25",

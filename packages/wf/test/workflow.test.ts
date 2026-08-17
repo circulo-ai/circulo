@@ -1,12 +1,19 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import {
+  AdapterEventBus,
   complete,
   defineWorkflow,
   error,
   InMemoryEventBus,
   InMemoryEventStore,
   InMemoryWorkflowStore,
+  JsonEventStore,
+  JsonWorkflowStore,
+  MapJsonKeyValueStore,
+  MapPubSubAdapter,
+  MapWorkflowLockStore,
   waitFor,
+  waitForAndRetry,
   WorkflowEngine,
   type Workflow,
 } from "../src";
@@ -108,6 +115,23 @@ describe("WorkflowEngine", () => {
     await engine.shutdown();
   });
 
+  it("creates and runs a workflow through the convenience API", async () => {
+    const engine = new WorkflowEngine<void, string, string>({
+      workflowStore: new InMemoryWorkflowStore<void, string, string>(),
+      eventStore: new InMemoryEventStore<string>(),
+      eventBus: new InMemoryEventBus<string>(),
+      enableAutoResume: false,
+    });
+    const workflow = defineWorkflow<void, string>()
+      .context(undefined)
+      .step("run", { run: async (input) => complete(input.toUpperCase()) })
+      .build();
+
+    const id = await engine.createAndRun(workflow, "hello");
+    expect((await engine.getWorkflow(id))?.output).toBe("HELLO");
+    await engine.shutdown();
+  });
+
   it("preserves explicit step errors and retries them", async () => {
     const engine = createEngine<void, string>();
     let attempts = 0;
@@ -155,6 +179,65 @@ describe("WorkflowEngine", () => {
 
     expect((await engine.getWorkflow(id))?.state).toBe("completed");
     expect((await engine.getWorkflow(id))?.output).toBe("waiting!");
+    await engine.shutdown();
+  });
+
+  it("can wait and rerun the same step for durable polling", async () => {
+    const engine = createEngine<void, string>();
+    let attempts = 0;
+    const workflow = defineWorkflow<Context, void>()
+      .context({ attempts: 0 })
+      .step("poll", {
+        run: async () => {
+          attempts += 1;
+          return attempts === 1
+            ? waitForAndRetry(20, "waiting")
+            : complete("done");
+        },
+      })
+      .build();
+
+    const id = await engine.createWorkflow(workflow, undefined);
+    await engine.run(id);
+    expect((await engine.getWorkflow(id))?.state).toBe("paused");
+    expect((await engine.getWorkflow(id))?.currentStep).toBe(0);
+
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    await engine.resumeDueWorkflows();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(attempts).toBe(2);
+    expect((await engine.getWorkflow(id))?.state).toBe("completed");
+    expect((await engine.getWorkflow(id))?.output).toBe("done");
+    await engine.shutdown();
+  });
+
+  it("does not strand a workflow when resume races with an active pause", async () => {
+    const engine = createEngine<void, string>();
+    let releaseStep!: () => void;
+    const stepReleased = new Promise<void>((resolve) => {
+      releaseStep = resolve;
+    });
+    const workflow = defineWorkflow<Context, void>()
+      .context({ attempts: 0 })
+      .step("long-running", {
+        run: async () => {
+          await stepReleased;
+          return complete("done");
+        },
+      })
+      .build();
+
+    const id = await engine.createWorkflow(workflow, undefined);
+    const runPromise = engine.run(id);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    await engine.pause(id);
+    await engine.resume(id);
+    releaseStep();
+    await runPromise;
+
+    expect((await engine.getWorkflow(id))?.state).toBe("completed");
     await engine.shutdown();
   });
 
@@ -207,5 +290,76 @@ describe("WorkflowEngine", () => {
     expectTypeOf<Workflow<Context, number, string>["state"]>().toEqualTypeOf<
       "pending" | "running" | "paused" | "failed" | "completed"
     >();
+  });
+});
+
+describe("durable adapter contracts", () => {
+  it("persists workflow state through a JSON key/value adapter", async () => {
+    const store = new MapJsonKeyValueStore();
+    const locks = new MapWorkflowLockStore();
+    const workflow = defineWorkflow<{ count: number }, { value: number }>()
+      .context({ count: 0 })
+      .step("increment", {
+        run: async (input, ctx) => {
+          ctx.updateContext({ count: input.value });
+          return complete(input.value + 1);
+        },
+      })
+      .build();
+    const id = `wf-adapter-${Date.now()}`;
+    const runtime = new JsonWorkflowStore(store, locks, () => workflow.steps);
+    const persisted: Workflow<{ count: number }, { value: number }, number> = {
+      id,
+      version: 0,
+      state: "pending",
+      steps: workflow.steps,
+      currentStep: 0,
+      context: workflow.initialContext,
+      input: { value: 4 },
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      retryCount: 0,
+      tags: { adapter: "json" },
+      metadata: {},
+    };
+
+    await runtime.saveWorkflow(persisted);
+    const loaded = await runtime.loadWorkflow(id);
+    expect(loaded?.steps).toHaveLength(1);
+    expect(loaded?.input).toEqual({ value: 4 });
+
+    loaded!.state = "completed";
+    expect(await runtime.updateWorkflow(loaded!, 0)).toBe(true);
+    expect((await runtime.loadWorkflow(id))?.version).toBe(1);
+    expect(await runtime.updateWorkflow(loaded!, 0)).toBe(false);
+  });
+
+  it("provides append-only event persistence and pub/sub bridging", async () => {
+    const store = new MapJsonKeyValueStore();
+    const events = new JsonEventStore<number>(store);
+    const bus = new AdapterEventBus(new MapPubSubAdapter<number>());
+    const received: string[] = [];
+    const unsubscribe = bus.subscribe("workflow-1", (event) => {
+      received.push(event.eventType);
+    });
+    const event = {
+      id: "event-1",
+      workflowId: "workflow-1",
+      timestamp: Date.now(),
+      eventType: "workflow.completed" as const,
+      payload: { type: "completed" as const, output: 42, duration: 1 },
+    };
+
+    await events.append(event);
+    await bus.publish(event);
+
+    expect(await events.count("workflow-1")).toBe(1);
+    expect((await events.list("workflow-1"))[0]?.payload).toEqual(
+      event.payload,
+    );
+    expect(received).toEqual(["workflow.completed"]);
+    unsubscribe();
+    await events.clear("workflow-1");
+    expect(await events.count("workflow-1")).toBe(0);
   });
 });

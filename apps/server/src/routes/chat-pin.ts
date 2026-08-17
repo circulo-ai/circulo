@@ -3,7 +3,7 @@ import { chatMember } from "@/db/schema/chat";
 import { createRouter } from "@/lib/create-app";
 import { requireAuth } from "@/middleware/auth";
 import { ForbiddenError } from "@circulo-ai/types";
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 export type PinChatResponse = {
@@ -43,7 +43,13 @@ router.post("/chat/:id/pin", requireAuth, async (c) => {
   const memberRows = await db
     .select({ id: chatMember.id, isPinned: chatMember.isPinned })
     .from(chatMember)
-    .where(and(eq(chatMember.chatId, chatId), eq(chatMember.userId, user!.id)))
+    .where(
+      and(
+        eq(chatMember.chatId, chatId),
+        eq(chatMember.userId, user!.id),
+        isNull(chatMember.leftAt),
+      ),
+    )
     .limit(1);
 
   if (memberRows.length === 0) {
@@ -59,41 +65,36 @@ router.post("/chat/:id/pin", requireAuth, async (c) => {
 
   const result: PinChatResponse = await db.transaction(async (tx) => {
     let insertOrder: number;
-    if (typeof desiredOrder === "number") {
-      insertOrder = desiredOrder;
+    if (desiredIsPinned) {
+      insertOrder = Math.max(0, desiredOrder ?? 0);
       await tx
         .update(chatMember)
         .set({ pinOrder: sql`${chatMember.pinOrder} + 1` })
         .where(
           and(
             eq(chatMember.userId, user!.id),
-            eq(chatMember.isPinned, desiredIsPinned),
+            eq(chatMember.isPinned, true),
+            isNull(chatMember.leftAt),
             gte(chatMember.pinOrder, insertOrder),
           ),
         );
     } else {
       insertOrder = 0;
-      await tx
-        .update(chatMember)
-        .set({ pinOrder: sql`${chatMember.pinOrder} + 1` })
-        .where(
-          and(
-            eq(chatMember.userId, user!.id),
-            eq(chatMember.isPinned, desiredIsPinned),
-            gte(chatMember.pinOrder, insertOrder),
-          ),
-        );
     }
 
     const [updated] = await tx
       .update(chatMember)
       .set({
         isPinned: desiredIsPinned,
-        pinnedAt: new Date(),
-        pinOrder: insertOrder,
+        pinnedAt: desiredIsPinned ? new Date() : null,
+        pinOrder: desiredIsPinned ? insertOrder : null,
       })
       .where(
-        and(eq(chatMember.chatId, chatId), eq(chatMember.userId, user!.id)),
+        and(
+          eq(chatMember.chatId, chatId),
+          eq(chatMember.userId, user!.id),
+          isNull(chatMember.leftAt),
+        ),
       )
       .returning({
         id: chatMember.id,

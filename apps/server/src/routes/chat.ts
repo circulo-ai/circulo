@@ -1,7 +1,10 @@
+import { db } from "@/db";
+import { chat as chatTable, message as messageTable } from "@/db/schema";
 import type { RequestServices } from "@/di/di-context";
 import { titlePrompt } from "@/lib/ai/prompts";
-import { myProvider } from "@/lib/ai/providers";
-import { getActiveOrganizationId } from "@/lib/auth";
+import { getLanguageModel } from "@/lib/ai/providers";
+import { getActiveOrganizationId, getSession } from "@/lib/auth";
+import { enforceOrganizationFeatureLimit } from "@/lib/billing/limits";
 import { createRouter } from "@/lib/create-app";
 import { hasPermission, isMemberOf } from "@/lib/permissions";
 import { type ChatMessage } from "@/lib/types";
@@ -16,6 +19,7 @@ import {
 } from "@circulo-ai/types";
 import { zValidator } from "@hono/zod-validator";
 import { createUIMessageStreamResponse, generateText } from "ai";
+import { and, count, eq, gte } from "drizzle-orm";
 import { z } from "zod";
 
 const deleteQuerySchema = z.object({
@@ -24,9 +28,21 @@ const deleteQuerySchema = z.object({
 
 const messagePartSchema = z
   .object({
-    type: z.enum(["text", "reasoning", "tool-call", "tool-result", "source"]),
+    type: z.enum([
+      "text",
+      "file",
+      "reasoning",
+      "tool-call",
+      "tool-result",
+      "source",
+    ]),
     text: z.string().optional(),
     reasoning: z.string().optional(),
+    url: z.string().optional(),
+    name: z.string().optional(),
+    mediaType: z.string().optional(),
+    contentType: z.string().optional(),
+    size: z.number().int().nonnegative().optional(),
   })
   .passthrough();
 
@@ -63,13 +79,21 @@ async function generateTitleFromUserMessages({
 }: {
   messages: ChatMessage[];
 }) {
-  const { text: title } = await generateText({
-    model: myProvider.languageModel("title-model"),
-    system: titlePrompt,
-    prompt: getTextFromMessages(messages),
-  });
-
-  return title;
+  try {
+    const { text: title } = await generateText({
+      model: getLanguageModel(),
+      system: titlePrompt,
+      prompt: getTextFromMessages(messages),
+    });
+    return title.trim() || "New chat";
+  } catch (error) {
+    console.error(
+      "Failed to generate chat title; using a local fallback",
+      error,
+    );
+    const fallback = getTextFromMessages(messages).trim().replace(/\s+/g, " ");
+    return fallback.slice(0, 80) || "New chat";
+  }
 }
 
 router.post(
@@ -84,15 +108,15 @@ router.post(
         visibility: selectedVisibilityType,
         agentIds,
       } = c.req.valid("json");
-      const { user, session } = c.var;
+      const { user } = c.var;
       const di: RequestServices = c.di;
       const activeOrgId = c.get("activeOrgId");
 
       const messages: ChatMessage[] = [message as ChatMessage];
-      if (
-        message.role !== "user" ||
-        !getTextFromMessage(message as ChatMessage).trim()
-      ) {
+      const hasText =
+        getTextFromMessage(message as ChatMessage).trim().length > 0;
+      const hasFile = message.parts?.some((part) => part.type === "file");
+      if (message.role !== "user" || (!hasText && !hasFile)) {
         throw new BadRequestError("A non-empty user message is required");
       }
 
@@ -104,48 +128,138 @@ router.post(
         throw new ForbiddenError("You are not a member of this organization");
       }
 
-      const canCreate = await hasPermission(
-        "chat",
-        "create",
-        activeOrganizationId,
-        session as any,
-      );
-      if (!canCreate) {
-        throw new ForbiddenError(
-          "You don't have permission to create chats in this organization",
-        );
-      }
-
-      const title = await generateTitleFromUserMessages({ messages });
-      const agentRepository = di.AgentRepository;
-      const agents = await Promise.all(
-        agentIds.map((agentId) => agentRepository.findById(agentId)),
-      );
-      if (
-        agents.some(
-          (agent) =>
-            !agent || agent.snapshot.organizationId !== activeOrganizationId,
-        )
-      ) {
-        throw new ForbiddenError(
-          "One or more selected agents are not available in this organization",
-        );
-      }
-
-      const chatResult = await di.CreateChatWithMessageUseCase.execute({
-        id,
-        messageId: message.id,
-        organizationId: activeOrganizationId,
-        creatorId: user!.id,
-        title,
-        visibility: selectedVisibilityType,
-        content: getTextFromMessage(message as ChatMessage),
-        agentIds,
+      const existingChat = await db.query.chat.findFirst({
+        where: eq(chatTable.id, id),
       });
-      if (chatResult.isFailure)
-        throw new BadRequestError(
-          chatResult.getError() ?? "Unable to create chat",
+
+      // Existing chats are append-only from this endpoint. Authorize the
+      // member before evaluating usage limits so a user cannot probe chat
+      // state or consume billing checks for a chat they cannot access.
+      if (existingChat) {
+        if (existingChat.isDeleted) {
+          throw new BadRequestError("Chat not found");
+        }
+        if (existingChat.organizationId !== activeOrganizationId) {
+          throw new ForbiddenError("Chat does not belong to your organization");
+        }
+        if (!(await di.ChatMemberRepository.isMember(user!.id, id))) {
+          throw new ForbiddenError("You are not a member of this chat");
+        }
+      }
+
+      const startOfUtcDay = new Date();
+      startOfUtcDay.setUTCHours(0, 0, 0, 0);
+      await enforceOrganizationFeatureLimit({
+        organizationId: activeOrganizationId,
+        feature: "max_messages_per_day",
+        current: Number(
+          (
+            await db
+              .select({ current: count() })
+              .from(messageTable)
+              .innerJoin(chatTable, eq(messageTable.chatId, chatTable.id))
+              .where(
+                and(
+                  eq(chatTable.organizationId, activeOrganizationId),
+                  eq(chatTable.isDeleted, false),
+                  eq(messageTable.role, "user"),
+                  eq(messageTable.isDeleted, false),
+                  gte(messageTable.createdAt, startOfUtcDay),
+                ),
+              )
+          )[0]?.current ?? 0,
+        ),
+        resourceName: "Daily message",
+      });
+
+      if (existingChat) {
+        const messageResult = await di.PostMessageUseCase.execute({
+          id: message.id,
+          chatId: id,
+          authorId: user!.id,
+          content: hasText
+            ? getTextFromMessage(message as ChatMessage)
+            : "[Attachment]",
+          parts: message.parts ?? [],
+          attachments:
+            message.parts?.filter((part) => part.type === "file") ?? [],
+        });
+        if (messageResult.isFailure) {
+          throw new BadRequestError(
+            messageResult.getError() ?? "Unable to post message",
+          );
+        }
+      } else {
+        // `c.var.session` is the Better Auth session row, not the complete
+        // SessionResponse expected by the permission service. Resolve the full
+        // request session here so valid members are not rejected as guests.
+        const canCreate = await hasPermission(
+          "chat",
+          "create",
+          activeOrganizationId,
+          await getSession(c.req.raw),
         );
+        if (!canCreate) {
+          throw new ForbiddenError(
+            "You don't have permission to create chats in this organization",
+          );
+        }
+
+        await enforceOrganizationFeatureLimit({
+          organizationId: activeOrganizationId,
+          feature: "max_chats",
+          current: Number(
+            (
+              await db
+                .select({ current: count() })
+                .from(chatTable)
+                .where(
+                  and(
+                    eq(chatTable.organizationId, activeOrganizationId),
+                    eq(chatTable.isDeleted, false),
+                  ),
+                )
+            )[0]?.current ?? 0,
+          ),
+          resourceName: "Chat",
+        });
+
+        const title = await generateTitleFromUserMessages({ messages });
+        const agents = await Promise.all(
+          agentIds.map((agentId) => di.AgentRepository.findById(agentId)),
+        );
+        if (
+          agents.some(
+            (agent) =>
+              !agent || agent.snapshot.organizationId !== activeOrganizationId,
+          )
+        ) {
+          throw new ForbiddenError(
+            "One or more selected agents are not available in this organization",
+          );
+        }
+
+        const chatResult = await di.CreateChatWithMessageUseCase.execute({
+          id,
+          messageId: message.id,
+          organizationId: activeOrganizationId,
+          creatorId: user!.id,
+          title,
+          visibility: selectedVisibilityType,
+          content: hasText
+            ? getTextFromMessage(message as ChatMessage)
+            : "[Attachment]",
+          parts: message.parts ?? [],
+          attachments:
+            message.parts?.filter((part) => part.type === "file") ?? [],
+          agentIds,
+        });
+        if (chatResult.isFailure) {
+          throw new BadRequestError(
+            chatResult.getError() ?? "Unable to create chat",
+          );
+        }
+      }
 
       const run = await workflowRunService.start({
         chatId: id,
@@ -164,26 +278,17 @@ router.post(
         organizationId: activeOrganizationId,
       });
 
-      void workflowRunService.run(run.runId).then(
-        () => di.WorkflowRunRepository.markFinished(run.runId, "completed"),
-        () => di.WorkflowRunRepository.markFinished(run.runId, "failed"),
-      );
+      void workflowRunService.run(run.runId).catch((error: unknown) => {
+        console.error("[Chat Workflow Error]", error);
+      });
 
       const response = createUIMessageStreamResponse({
-        stream: workflowRunService.getReadable(run.runId),
+        stream: await workflowRunService.getReadable(run.runId),
       });
       response.headers.set("x-workflow-run-id", run.runId);
       return response;
     } catch (error) {
       if (error instanceof RateLimitError) return error.toResponse();
-      if (
-        error instanceof Error &&
-        error.message?.includes("AI Gateway requires a valid credit card")
-      ) {
-        return new BadRequestError(
-          "AI Gateway requires a valid credit card",
-        ).toResponse();
-      }
       if (error instanceof HttpError) {
         throw error;
       }
@@ -202,7 +307,7 @@ router.delete(
     const { id } = c.req.valid("query");
     const di: RequestServices = c.di;
     const activeOrgId = c.get("activeOrgId");
-    const { user, session } = c.var;
+    const { user } = c.var;
 
     const activeOrganizationId =
       activeOrgId ?? (await getActiveOrganizationId(c.req.raw));
@@ -223,7 +328,7 @@ router.delete(
       "chat",
       "delete",
       activeOrganizationId,
-      session as any,
+      await getSession(c.req.raw),
     );
 
     const result = await di.DeleteChatUseCase.execute({

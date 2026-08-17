@@ -14,13 +14,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { authClient, useSession } from "@/lib/auth-client";
-import { useOrganizationsHooks } from "@/providers/session-provider";
 import { CreateOrganizationDialog } from "@daveyplate/better-auth-ui";
 import {
   Bot,
+  Brain,
+  CalendarClock,
   CreditCard,
   LibraryBig,
   LogOut,
+  Plug,
   Plus,
   Settings,
   TextAlignJustify,
@@ -29,21 +31,19 @@ import { useState } from "react";
 
 export function ChatSidebarBurgerMenu() {
   const { data: session, isPending } = useSession();
-  const { useActiveOrganization, useListOrganizations } =
-    useOrganizationsHooks();
-  const { data: activeOrganization } = useActiveOrganization();
-  const { data: organizations } = useListOrganizations();
+  const { data: activeOrganization } = authClient.useActiveOrganization();
+  const { data: organizations } = authClient.useListOrganizations();
   const [open, setOpen] = useState(false);
 
   return (
     <DropdownMenu>
       <CreateOrganizationDialog open={open} onOpenChange={setOpen} />
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost-sidebar" rounded="full" size="icon" asChild>
-          <Ripple>
+        <Ripple asChild>
+          <Button variant="ghost-sidebar" rounded="full" size="icon">
             <TextAlignJustify />
-          </Ripple>
-        </Button>
+          </Button>
+        </Ripple>
       </DropdownMenuTrigger>
       <CustomDropdownMenuContent sideOffset={8} align="start">
         <DropdownMenuGroup>
@@ -77,25 +77,63 @@ export function ChatSidebarBurgerMenu() {
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <CustomDropdownMenuItem>
+          <CustomDropdownMenuItem
+            onClick={() => window.location.assign("/workspace")}
+          >
+            <Settings />
+            Workspace
+          </CustomDropdownMenuItem>
+          <CustomDropdownMenuItem
+            onClick={() => window.location.assign("/agents")}
+          >
             <Bot />
             Agents
           </CustomDropdownMenuItem>
-          <CustomDropdownMenuItem>
+          <CustomDropdownMenuItem
+            onClick={() => window.location.assign("/knowledge")}
+          >
             <LibraryBig />
             Knowledge
           </CustomDropdownMenuItem>
-          <CustomDropdownMenuItem>
+          <CustomDropdownMenuItem
+            onClick={() => window.location.assign("/memory")}
+          >
+            <Brain />
+            Memory
+          </CustomDropdownMenuItem>
+          <CustomDropdownMenuItem
+            onClick={() => window.location.assign("/automation")}
+          >
+            <CalendarClock />
+            Automation
+          </CustomDropdownMenuItem>
+          <CustomDropdownMenuItem
+            onClick={() => window.location.assign("/plugins")}
+          >
+            <Plug />
+            Plugins
+          </CustomDropdownMenuItem>
+          <CustomDropdownMenuItem
+            onClick={() => window.location.assign("/workspace?section=tools")}
+          >
+            <Settings />
+            Tools & MCP
+          </CustomDropdownMenuItem>
+          <CustomDropdownMenuItem
+            onClick={() => window.location.assign("/pricing")}
+          >
             <CreditCard />
             Billing
           </CustomDropdownMenuItem>
-          <CustomDropdownMenuItem>
+          <CustomDropdownMenuItem
+            onClick={() => window.location.assign("/workspace?section=account")}
+          >
             <Settings />
             Settings
           </CustomDropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <CustomDropdownMenuItem>
+        <CustomDropdownMenuItem onClick={() => void authClient.signOut()}>
           <LogOut />
           Sign out
         </CustomDropdownMenuItem>

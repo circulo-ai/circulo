@@ -1,6 +1,7 @@
 import { CrossSmallIcon } from "@/components/icons/icons";
 import type { Attachment } from "@/lib/types";
 import Image from "next/image";
+import Link from "next/link";
 import { Loader } from "./ai-elements/loader";
 import { Button } from "./ui/button";
 
@@ -13,24 +14,39 @@ export const PreviewAttachment = ({
   isUploading?: boolean;
   onRemove?: () => void;
 }) => {
-  const { name, url, contentType } = attachment;
+  const { name, url, contentType, dataUrl } = attachment;
+  const previewUrl = (dataUrl ?? url)?.trim() || undefined;
+  const isImage = contentType?.toLowerCase().startsWith("image") === true;
+  const isAudio = contentType?.toLowerCase().startsWith("audio") === true;
 
   return (
     <div
       className="group relative size-16 overflow-hidden rounded-lg border bg-muted"
       data-testid="input-attachment-preview"
     >
-      {contentType?.startsWith("image") ? (
+      {isImage && previewUrl ? (
         <Image
           alt={name ?? "An image attachment"}
           className="size-full object-cover"
           height={64}
-          src={url}
+          src={previewUrl}
           width={64}
         />
+      ) : isAudio && previewUrl ? (
+        <audio className="size-full" controls src={previewUrl} />
       ) : (
         <div className="flex size-full items-center justify-center text-xs text-muted-foreground">
-          File
+          {previewUrl ? (
+            <Link
+              className="px-1 text-center underline"
+              href={previewUrl}
+              target="_blank"
+            >
+              File
+            </Link>
+          ) : (
+            <span className="px-1 text-center">File unavailable</span>
+          )}
         </div>
       )}
 

@@ -1,13 +1,12 @@
+import type { RequestServices } from "@/di/di-context";
+import type { DrizzleChatRepository } from "@/infrastructure/drizzle/chat-repository";
+import type { DrizzleMessageRepository } from "@/infrastructure/drizzle/message-repository";
 import { getActiveOrganizationId } from "@/lib/auth";
 import { createRouter } from "@/lib/create-app";
-import { hasPermission } from "@/lib/permissions";
 import { requireAuth } from "@/middleware/auth";
 import { ForbiddenError, NotFoundError } from "@circulo-ai/types";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import type { DrizzleChatRepository } from "@/infrastructure/drizzle/chat-repository";
-import type { DrizzleMessageRepository } from "@/infrastructure/drizzle/message-repository";
-import type { RequestServices } from "@/di/di-context";
 
 const paramsSchema = z.object({
   id: z.uuid(),
@@ -24,7 +23,7 @@ router.delete(
     const chatRepository: DrizzleChatRepository = di.ChatRepository;
     const messageRepository: DrizzleMessageRepository = di.MessageRepository;
 
-    const { user, activeOrgId, session } = c.var;
+    const { user, activeOrgId } = c.var;
     const { id } = c.req.valid("param");
 
     const message = await messageRepository.findById(id);
@@ -44,16 +43,26 @@ router.delete(
       throw new ForbiddenError("Chat does not belong to your organization");
     }
 
-    if (chat.creatorId !== user!.id) {
-      const canUpdate = await hasPermission(
-        "chat",
-        "update",
-        chat.organizationId,
-        session as any,
+    if (
+      !(await di.ChatMemberRepository.isMember(
+        user!.id,
+        chat.aggregateId.toString(),
+      ))
+    ) {
+      throw new ForbiddenError("You are not a member of this chat");
+    }
+
+    if (message.authorId !== user!.id) {
+      throw new ForbiddenError("You can only edit your own user messages");
+    }
+
+    const humanMemberCount = await di.ChatMemberRepository.countActiveForChat(
+      chat.aggregateId.toString(),
+    );
+    if (humanMemberCount > 1) {
+      throw new ForbiddenError(
+        "Editing is disabled when a chat has more than one human member",
       );
-      if (!canUpdate) {
-        throw new ForbiddenError("You don't have permission to edit this chat");
-      }
     }
 
     await messageRepository.deleteByChatIdAfterTimestamp({

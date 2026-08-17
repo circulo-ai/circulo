@@ -14,13 +14,15 @@ router.get("/chat/:id/stream", requireAuth, async (c) => {
   const di: RequestServices = c.di;
   const organizationId =
     c.get("activeOrgId") ?? (await getActiveOrganizationId(c.req.raw));
-  const ownedRun = await di.WorkflowRunRepository.findOwnedById({
+  const accessibleRun = await di.WorkflowRunRepository.findByIdInOrganization({
     id,
-    userId: user!.id,
     organizationId,
   });
 
-  if (!ownedRun) {
+  if (
+    !accessibleRun ||
+    !(await di.ChatMemberRepository.isMember(user!.id, accessibleRun.chatId))
+  ) {
     throw new ForbiddenError("Workflow run is not available");
   }
 
@@ -36,7 +38,7 @@ router.get("/chat/:id/stream", requireAuth, async (c) => {
     throw new BadRequestError("startIndex must be a non-negative integer");
   }
 
-  const stream = workflowRunService.getReadable(id, startIndex);
+  const stream = await workflowRunService.getReadable(id, startIndex);
 
   return createUIMessageStreamResponse({
     stream,

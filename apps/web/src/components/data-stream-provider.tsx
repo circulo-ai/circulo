@@ -13,6 +13,9 @@ type DataStreamContextValue = {
 };
 
 const DataStreamContext = createContext<DataStreamContextValue | null>(null);
+const DataStreamActionsContext = createContext<
+  React.Dispatch<React.SetStateAction<DataUIPart<CustomUIDataTypes>[]>> | null
+>(null);
 
 export function DataStreamProvider({
   children,
@@ -26,9 +29,11 @@ export function DataStreamProvider({
   const value = useMemo(() => ({ dataStream, setDataStream }), [dataStream]);
 
   return (
-    <DataStreamContext.Provider value={value}>
-      {children}
-    </DataStreamContext.Provider>
+    <DataStreamActionsContext.Provider value={setDataStream}>
+      <DataStreamContext.Provider value={value}>
+        {children}
+      </DataStreamContext.Provider>
+    </DataStreamActionsContext.Provider>
   );
 }
 
@@ -38,4 +43,14 @@ export function useDataStream() {
     throw new Error("useDataStream must be used within a DataStreamProvider");
   }
   return context;
+}
+
+export function useDataStreamActions() {
+  const setDataStream = useContext(DataStreamActionsContext);
+  if (!setDataStream) {
+    throw new Error(
+      "useDataStreamActions must be used within a DataStreamProvider",
+    );
+  }
+  return setDataStream;
 }

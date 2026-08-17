@@ -1,4 +1,4 @@
-import { type Chat, chatMember, db } from "@/db";
+import { chat, type Chat, chatMember, db } from "@/db";
 import { chatRepo } from "@/db/repositories";
 import { getActiveOrganizationId } from "@/lib/auth";
 import { createRouter } from "@/lib/create-app";
@@ -40,6 +40,7 @@ router.get(
 
     const chatsPage = await chatRepo.getChatsByOrgId({
       id: organizationId,
+      userId: user!.id,
       limit: limit ?? 10,
       startingAfter: starting_after,
       endingBefore: ending_before,
@@ -84,10 +85,38 @@ router.get(
 );
 
 router.delete("/history", requireAuth, async (c) => {
-  const result = await chatRepo.deleteAllByUserId({
-    userId: c.var.user!.id,
-  });
-  return c.json(result);
+  const organizationId =
+    c.var.activeOrgId ?? (await getActiveOrganizationId(c.req.raw));
+  const userId = c.var.user!.id;
+  const ownedChats = await db
+    .select({ id: chat.id })
+    .from(chat)
+    .where(
+      and(
+        eq(chat.creatorId, userId),
+        eq(chat.organizationId, organizationId),
+        eq(chat.isDeleted, false),
+      ),
+    );
+
+  if (ownedChats.length === 0) return c.json({ deletedCount: 0 });
+
+  // Keep this operation scoped to the active workspace and use the existing
+  // soft-delete semantics so shared workspace data cannot be removed by a
+  // user clearing their personal history.
+  const deleted = await db
+    .update(chat)
+    .set({ isDeleted: true, deletedAt: new Date(), updatedAt: new Date() })
+    .where(
+      and(
+        eq(chat.creatorId, userId),
+        eq(chat.organizationId, organizationId),
+        eq(chat.isDeleted, false),
+      ),
+    )
+    .returning({ id: chat.id });
+
+  return c.json({ deletedCount: deleted.length });
 });
 
 export default router;

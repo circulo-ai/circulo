@@ -1,0 +1,1 @@
+ALTER TABLE "workflow_run_events" ALTER COLUMN "timestamp" SET DATA TYPE bigint;

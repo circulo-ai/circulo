@@ -1,9 +1,5 @@
 import { createLogger } from "@/lib/logs/console/logger";
-import type {
-  General,
-  GeneralStore,
-  UserSettings,
-} from "@/stores/settings/general/types";
+import type { General, GeneralStore } from "@/stores/settings/general/types";
 import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
 
@@ -21,66 +17,13 @@ export const useGeneralStore = create<GeneralStore>()(
         let hasLoadedFromDb = false; // Track if we've loaded from DB in this session
 
         const store: General = {
-          telemetryEnabled: true,
+          theme: "system",
           isLoading: false,
           error: null,
-          // Individual loading states
-          isTelemetryLoading: false,
-          isBillingUsageNotificationsLoading: false,
-          isBillingUsageNotificationsEnabled: true,
-        };
-
-        // Optimistic update helper
-        const updateSettingOptimistic = async <K extends keyof UserSettings>(
-          key: K,
-          value: UserSettings[K],
-          loadingKey: keyof General,
-          stateKey: keyof General,
-        ) => {
-          // Prevent multiple simultaneous updates
-          if ((get() as any)[loadingKey]) return;
-
-          const originalValue = (get() as any)[stateKey];
-
-          // Optimistic update
-          set({ [stateKey]: value, [loadingKey]: true } as any);
-
-          try {
-            await get().updateSetting(key, value);
-            set({ [loadingKey]: false } as any);
-          } catch (error) {
-            // Rollback on error
-            set({ [stateKey]: originalValue, [loadingKey]: false } as any);
-            logger.error(
-              `Failed to update ${String(key)}, rolled back:`,
-              error,
-            );
-          }
         };
 
         return {
           ...store,
-          // Basic Actions with optimistic updates
-          setTelemetryEnabled: async (enabled) => {
-            if (get().isTelemetryLoading) return;
-            await updateSettingOptimistic(
-              "telemetryEnabled",
-              enabled,
-              "isTelemetryLoading",
-              "telemetryEnabled",
-            );
-          },
-
-          setBillingUsageNotificationsEnabled: async (enabled: boolean) => {
-            if (get().isBillingUsageNotificationsLoading) return;
-            await updateSettingOptimistic(
-              "isBillingUsageNotificationsEnabled",
-              enabled,
-              "isBillingUsageNotificationsLoading",
-              "isBillingUsageNotificationsEnabled",
-            );
-          },
-
           // API Actions
           loadSettings: async (force = false) => {
             // Skip if we've already loaded from DB and not forcing
@@ -88,30 +31,6 @@ export const useGeneralStore = create<GeneralStore>()(
               logger.debug(
                 "Already loaded settings from DB, using cached data",
               );
-              return;
-            }
-
-            // If we have persisted state and not forcing, check if we need to load
-            const persistedState = localStorage.getItem("general-settings");
-            if (persistedState && !force) {
-              try {
-                const parsed = JSON.parse(persistedState);
-                // If we have valid theme data, skip DB load unless forced
-                if (parsed.state?.theme) {
-                  logger.debug("Using cached settings from localStorage");
-                  hasLoadedFromDb = true; // Mark as loaded to prevent future API calls
-                  return;
-                }
-              } catch (e) {
-                // If parsing fails, continue to load from DB
-              }
-            }
-            // Skip loading if on a chat path
-            if (
-              typeof window !== "undefined" &&
-              window.location.pathname.startsWith("/chat/")
-            ) {
-              logger.debug("Skipping settings load - on chat page");
               return;
             }
 
@@ -134,9 +53,7 @@ export const useGeneralStore = create<GeneralStore>()(
               const { data } = await response.json();
 
               set({
-                telemetryEnabled: data.telemetryEnabled,
-                isBillingUsageNotificationsEnabled:
-                  data.billingUsageNotificationsEnabled ?? true,
+                theme: data.theme ?? "system",
                 isLoading: false,
               });
 
@@ -153,14 +70,6 @@ export const useGeneralStore = create<GeneralStore>()(
           },
 
           updateSetting: async (key, value) => {
-            if (
-              typeof window !== "undefined" &&
-              window.location.pathname.startsWith("/chat/")
-            ) {
-              logger.debug(`Skipping setting update for ${key} on chat page`);
-              return;
-            }
-
             try {
               const response = await fetch("/api/users/me/settings", {
                 method: "PATCH",

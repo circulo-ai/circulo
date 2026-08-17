@@ -15,6 +15,8 @@ export type PostMessageInput = {
   chatId: string;
   authorId: string;
   content: string;
+  parts?: unknown[];
+  attachments?: unknown[];
 };
 
 export type PostMessageOutput = Result<{ messageId: string }>;
@@ -48,6 +50,8 @@ export class PostMessage implements UseCase<
         chatId: chat.aggregateId,
         authorId: input.authorId,
         content: input.content,
+        parts: input.parts,
+        attachments: input.attachments,
         createdAt: new Date(),
       });
 

@@ -4,6 +4,8 @@ import {
   chatMemberRepo,
   chatRepo,
 } from "@/db/repositories";
+import { getSession } from "@/lib/auth";
+import { enforceOrganizationFeatureLimit } from "@/lib/billing/limits";
 import { createRouter } from "@/lib/create-app";
 import { hasPermission, isMemberOf } from "@/lib/permissions";
 import { requireAuth } from "@/middleware/auth";
@@ -95,8 +97,9 @@ async function requireManageAgentsPermission(opts: {
     Awaited<ReturnType<typeof chatMemberRepo.findByUserAndChat>>
   >;
   userId: string;
+  request: Request;
 }) {
-  const { chat, membership, userId } = opts;
+  const { chat, membership, userId, request } = opts;
 
   if (!chat) {
     throw new NotFoundError("Chat not found");
@@ -105,7 +108,12 @@ async function requireManageAgentsPermission(opts: {
   if (chat.creatorId === userId) return;
   if (membership.canManageAgents) return;
 
-  const canUpdate = await hasPermission("chat", "update", chat.organizationId);
+  const canUpdate = await hasPermission(
+    "chat",
+    "update",
+    chat.organizationId,
+    await getSession(request),
+  );
   if (!canUpdate) {
     throw new ForbiddenError(
       "You don't have permission to manage agents in this chat",
@@ -162,6 +170,7 @@ router.post(
       chat,
       membership,
       userId: user!.id,
+      request: c.req.raw,
     });
 
     const agent = await agentRepo.findById(body.agentId);
@@ -175,6 +184,18 @@ router.post(
 
     const existing = await chatAgentRepo.findAgentInChat(body.agentId, chat.id);
     const normalizedTemp = normalizeTemperature(body.customTemperature);
+    const willEnable = body.isEnabled ?? true;
+
+    if (!existing || (!existing.isEnabled && willEnable)) {
+      await enforceOrganizationFeatureLimit({
+        organizationId: chat.organizationId,
+        feature: "max_agents_in_chat",
+        current: await chatAgentRepo.countForChat(chat.id, {
+          enabledOnly: true,
+        }),
+        resourceName: "Agents in this chat",
+      });
+    }
 
     if (existing) {
       const updateData: Record<string, any> = {
@@ -221,7 +242,12 @@ router.patch(
       activeOrgId,
     );
 
-    await requireManageAgentsPermission({ chat, membership, userId: user!.id });
+    await requireManageAgentsPermission({
+      chat,
+      membership,
+      userId: user!.id,
+      request: c.req.raw,
+    });
 
     const link = await chatAgentRepo.findAgentInChat(body.agentId, chat.id);
     if (!link) {
@@ -266,7 +292,12 @@ router.delete(
       activeOrgId,
     );
 
-    await requireManageAgentsPermission({ chat, membership, userId: user!.id });
+    await requireManageAgentsPermission({
+      chat,
+      membership,
+      userId: user!.id,
+      request: c.req.raw,
+    });
 
     const deleted = await chatAgentRepo.deleteByChatAndAgent(
       chat.id,

@@ -167,16 +167,11 @@ export const settings = pgTable("settings", {
     .references(() => user.id, { onDelete: "cascade" })
     .unique(), // One settings record per user
 
-  // Privacy settings
-  telemetryEnabled: boolean("telemetry_enabled").notNull().default(true),
+  // Workspace UI preferences
+  theme: text("theme").notNull().default("system"),
 
   // Email preferences
   emailPreferences: json("email_preferences").notNull().default("{}"),
-
-  // Notification preferences
-  errorNotificationsEnabled: boolean("error_notifications_enabled")
-    .notNull()
-    .default(true),
 
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

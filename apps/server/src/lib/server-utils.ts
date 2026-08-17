@@ -55,8 +55,10 @@ export function calculateCostFromUsage(
 
   // Try to find a matching model pricing rule
   const key = Object.keys(pricing).find((k) => model.startsWith(k));
-  const price =
-    (key ? pricing[key] : undefined) ?? { input: 0.002, output: 0.006 }; // default fallback
+  const price = (key ? pricing[key] : undefined) ?? {
+    input: 0.002,
+    output: 0.006,
+  }; // default fallback
 
   const inputCost = (inputTokens / 1000) * price.input;
   const outputCost = (outputTokens / 1000) * price.output;

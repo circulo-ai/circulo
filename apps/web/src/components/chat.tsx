@@ -1,24 +1,16 @@
 "use client";
 
 import { Artifact } from "@/components/artifacts/artifact";
+import { ChatSettingsDialog } from "@/components/chat-settings-dialog";
 import { Messages } from "@/components/messages/messages";
 import { getChatHistoryPaginationKey } from "@/components/sidebar/sidebar-history";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { useArtifactSelector } from "@/hooks/api/chats/use-artifact";
 import { useChatVisibility } from "@/hooks/api/chats/use-chat-visibility";
 import { ApiRequestError } from "@/lib/api/client";
 import {
   clearCachePattern,
   fetchWithErrorHandlers,
+  getFetcher,
   globalMutate,
 } from "@/lib/swr";
 import type { Attachment, ChatMessage } from "@/lib/types";
@@ -32,13 +24,26 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { unstable_serialize } from "swr/infinite";
-import { useDataStream } from "./data-stream-provider";
+import { useDataStreamActions } from "./data-stream-provider";
 import { MultimodalInput } from "./multimodal-input";
 import { PageSpinner } from "./page-spinner";
 import { toast } from "./toast";
 import type { VisibilityType } from "./visibility-selector";
 
-const WORKFLOW_RUN_ID_KEY = "active-workflow-run-id";
+const WORKFLOW_RUN_ID_KEY_PREFIX = "active-workflow-run-id:";
+
+const ARTIFACT_STREAM_PART_TYPES: ReadonlySet<string> = new Set([
+  "data-suggestion",
+  "data-textDelta",
+  "data-imageDelta",
+  "data-sheetDelta",
+  "data-codeDelta",
+  "data-id",
+  "data-title",
+  "data-kind",
+  "data-clear",
+  "data-finish",
+]);
 
 export function Chat({
   id,
@@ -62,11 +67,18 @@ export function Chat({
   });
 
   const { mutate } = useSWRConfig();
-  const { setDataStream } = useDataStream();
+  const setDataStream = useDataStreamActions();
+  const workflowRunStorageKey = `${WORKFLOW_RUN_ID_KEY_PREFIX}${id}`;
 
   const [input, setInput] = useState<string>("");
   const [usage, setUsage] = useState<AppUsage | undefined>(initialLastContext);
-  const [showCreditCardAlert, setShowCreditCardAlert] = useState(false);
+  const { data: chatMemberAccess } = useSWR<{
+    humanMemberCount: number;
+    canEditMessages: boolean;
+  }>(isReadonly ? null : `/api/chat/${id}/members`, getFetcher(), {
+    shouldRetryOnError: false,
+    onError: () => undefined,
+  });
 
   // Workflow orchestration state
   const [workflowStatus, setWorkflowStatus] = useState<{
@@ -75,27 +87,56 @@ export function Chat({
     progress?: number;
   }>({ isRunning: false });
 
+  const persistedWorkflowRunId = useMemo(() => {
+    for (const message of [...initialMessages].reverse()) {
+      const tracePart = message.parts?.find(
+        (part) => part.type === "data-workflowTrace",
+      ) as
+        | {
+            type: "data-workflowTrace";
+            data?: { workflowId?: unknown; status?: unknown };
+          }
+        | undefined;
+      if (
+        (tracePart?.data?.status === "paused" ||
+          tracePart?.data?.status === "running") &&
+        typeof tracePart.data.workflowId === "string"
+      ) {
+        return tracePart.data.workflowId;
+      }
+    }
+    return undefined;
+  }, [initialMessages]);
+
   const activeWorkflowRunId = useMemo(() => {
     if (typeof window === "undefined") return;
-    return localStorage.getItem(WORKFLOW_RUN_ID_KEY) ?? undefined;
-  }, []);
+    return (
+      localStorage.getItem(workflowRunStorageKey) ?? persistedWorkflowRunId
+    );
+  }, [persistedWorkflowRunId, workflowRunStorageKey]);
+
+  useEffect(() => {
+    if (activeWorkflowRunId) {
+      localStorage.setItem(workflowRunStorageKey, activeWorkflowRunId);
+    }
+  }, [activeWorkflowRunId, workflowRunStorageKey]);
 
   const handleChatEnd = useCallback(() => {
-    localStorage.removeItem(WORKFLOW_RUN_ID_KEY);
+    localStorage.removeItem(workflowRunStorageKey);
     setWorkflowStatus({ isRunning: false });
-  }, []);
+  }, [workflowRunStorageKey]);
 
   const chatFetch = useCallback(
     async (input: RequestInfo | URL, init?: RequestInit) => {
       const response = await fetchWithErrorHandlers(input, init);
       const workflowRunId = response.headers.get("x-workflow-run-id");
       if (workflowRunId) {
-        localStorage.setItem(WORKFLOW_RUN_ID_KEY, workflowRunId);
+        localStorage.setItem(workflowRunStorageKey, workflowRunId);
         setWorkflowStatus({ isRunning: true, currentPhase: "starting" });
       }
       return response;
     },
-    [],
+    [workflowRunStorageKey],
   );
 
   const { messages, setMessages, sendMessage, status, stop, regenerate } =
@@ -131,7 +172,8 @@ export function Chat({
         },
 
         prepareReconnectToStreamRequest: ({ api, ...rest }) => {
-          const workflowRunId = localStorage.getItem(WORKFLOW_RUN_ID_KEY);
+          const workflowRunId =
+            localStorage.getItem(workflowRunStorageKey) ?? activeWorkflowRunId;
           if (!workflowRunId) {
             throw new Error("No active workflow run ID found");
           }
@@ -143,8 +185,12 @@ export function Chat({
       }),
 
       onData: (dataPart) => {
-        // Store data parts for components that need them
-        setDataStream((ds) => (ds ? [...ds, dataPart] : []));
+        // Only artifact parts belong in the artifact stream queue. Workflow,
+        // usage, and message-control events are handled below or by the chat
+        // message stream and must not cause artifact-store writes.
+        if (ARTIFACT_STREAM_PART_TYPES.has(dataPart.type)) {
+          setDataStream((ds) => [...ds, dataPart]);
+        }
 
         // Handle different data types
         switch (dataPart.type) {
@@ -158,7 +204,6 @@ export function Chat({
               currentPhase: "started",
               progress: 0,
             });
-            console.log("Workflow started:", dataPart.data);
             break;
 
           case "data-workflowClassification":
@@ -167,7 +212,6 @@ export function Chat({
               currentPhase: "classified",
               progress: 15,
             }));
-            console.log("Request classified:", dataPart.data);
             break;
 
           case "data-workflowPlan":
@@ -176,7 +220,6 @@ export function Chat({
               currentPhase: "planned",
               progress: 25,
             }));
-            console.log("Execution plan:", dataPart.data);
             break;
 
           case "data-workflowAgentStarted":
@@ -184,15 +227,12 @@ export function Chat({
               ...prev,
               currentPhase: `executing:${dataPart.data.agentName}`,
             }));
-            console.log("Agent started:", dataPart.data);
             break;
 
           case "data-workflowAgentProgress":
-            console.log("Agent progress:", dataPart.data);
             break;
 
           case "data-workflowAgentCompleted":
-            console.log("Agent completed:", dataPart.data);
             break;
 
           case "data-workflowAggregated":
@@ -201,7 +241,6 @@ export function Chat({
               currentPhase: "aggregated",
               progress: 95,
             }));
-            console.log("Results aggregated:", dataPart.data);
             break;
 
           case "data-workflowCompleted":
@@ -210,8 +249,13 @@ export function Chat({
               currentPhase: "completed",
               progress: 100,
             });
-            console.log("Workflow completed:", dataPart.data);
             handleChatEnd();
+            break;
+          case "data-workflowPaused":
+            setWorkflowStatus({
+              isRunning: true,
+              currentPhase: "awaiting approval",
+            });
             break;
 
           case "data-workflowError":
@@ -241,14 +285,6 @@ export function Chat({
       onError: (error) => {
         console.error("Chat error:", error);
         handleChatEnd();
-
-        if (
-          error instanceof ApiRequestError &&
-          error.message?.includes("AI Gateway requires a valid credit card")
-        ) {
-          setShowCreditCardAlert(true);
-          return;
-        }
 
         toast({
           type: "error",
@@ -287,7 +323,8 @@ export function Chat({
 
   return (
     <>
-      <div className="overscroll-behavior-contain flex h-dvh min-w-0 touch-pan-y flex-col">
+      <div className="overscroll-behavior-contain relative flex h-dvh min-w-0 touch-pan-y flex-col">
+        {!isReadonly && <ChatSettingsDialog chatId={id} />}
         <Messages
           chatId={id}
           isArtifactVisible={isArtifactVisible}
@@ -297,6 +334,7 @@ export function Chat({
           setMessages={setMessages}
           status={status}
           votes={votes}
+          canEditMessages={chatMemberAccess?.canEditMessages ?? false}
         />
 
         <div className="sticky bottom-0 z-1 mx-auto flex w-full max-w-4xl gap-2 border-t-0 px-2 pb-3 md:px-4 md:pb-4">
@@ -335,36 +373,6 @@ export function Chat({
         stop={stop}
         votes={votes}
       />
-
-      <AlertDialog
-        onOpenChange={setShowCreditCardAlert}
-        open={showCreditCardAlert}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Activate AI Gateway</AlertDialogTitle>
-            <AlertDialogDescription>
-              This application requires{" "}
-              {process.env.NODE_ENV === "production" ? "the owner" : "you"} to
-              activate Vercel AI Gateway.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                window.open(
-                  "https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fai%3Fmodal%3Dadd-credit-card",
-                  "_blank",
-                );
-                window.location.href = "/";
-              }}
-            >
-              Activate
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }

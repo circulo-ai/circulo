@@ -175,10 +175,10 @@ export function Account(_props: AccountProps) {
   const handleSignOut = async () => {
     try {
       await Promise.all([signOut(), clearUserData()]);
-      router.push("/login?fromLogout=true");
+      router.push("/auth/sign-in?fromLogout=true");
     } catch (error) {
       logger.error("Error signing out:", { error });
-      router.push("/login?fromLogout=true");
+      router.push("/auth/sign-in?fromLogout=true");
     }
   };
 
@@ -233,8 +233,12 @@ export function Account(_props: AccountProps) {
                     defaultStorageContext: "profile-pictures",
                   }}
                   disabled={uploadManager.hasActiveUploads}
-                  onChange={() => {
-                    // TODO implement
+                  onChange={(value) => {
+                    if (typeof value === "string") {
+                      void updateUserImage(value).catch(() => {
+                        setUploadError("Failed to update profile picture");
+                      });
+                    }
                   }}
                   customComponent={({}) => (
                     <div className="group relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#802FFF] transition-all hover:opacity-80">

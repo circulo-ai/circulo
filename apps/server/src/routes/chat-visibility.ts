@@ -1,5 +1,6 @@
+import { chatRepo } from "@/db/repositories";
 import { DI_TOKENS, type RequestContainer } from "@/di/container";
-import { getActiveOrganizationId } from "@/lib/auth";
+import { getActiveOrganizationId, getSession } from "@/lib/auth";
 import { createRouter } from "@/lib/create-app";
 import { hasPermission } from "@/lib/permissions";
 import { requireAuth } from "@/middleware/auth";
@@ -24,7 +25,7 @@ router.patch(
   zValidator("json", visibilitySchema),
   async (c) => {
     const { id, visibility } = c.req.valid("json");
-    const { session, activeOrgId, di } = c.var as typeof c.var & {
+    const { activeOrgId, di } = c.var as typeof c.var & {
       di: RequestContainer;
     };
     const activeOrganizationId =
@@ -32,11 +33,17 @@ router.patch(
     if (!activeOrganizationId)
       throw new ForbiddenError("No active organization");
 
+    const chat = await chatRepo.findById(id);
+    if (!chat || chat.isDeleted) throw new NotFoundError("Chat not found");
+    if (chat.organizationId !== activeOrganizationId) {
+      throw new ForbiddenError("Chat does not belong to your organization");
+    }
+
     const canUpdate = await hasPermission(
       "chat",
       "update",
       activeOrganizationId,
-      session as any,
+      await getSession(c.req.raw),
     );
     if (!canUpdate)
       throw new ForbiddenError(

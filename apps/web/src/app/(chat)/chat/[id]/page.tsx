@@ -1,17 +1,49 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { Chat } from "@/components/chat";
 import { DataStreamHandler } from "@/components/data-stream-handler";
 import { convertToUIMessages } from "@/lib/utils";
-import { chatRepo, messageRepo } from "@circulo-ai/db/repositories";
+import {
+  chatMemberRepo,
+  chatRepo,
+  messageRepo,
+} from "@circulo-ai/db/repositories";
+
+async function getRequestUserId(): Promise<string | null> {
+  const requestHeaders = await headers();
+  const cookie = requestHeaders.get("cookie");
+  if (!cookie) return null;
+
+  const apiBaseUrl =
+    process.env.SERVER_API_URL ??
+    process.env.NEXT_PUBLIC_BETTER_AUTH_URL ??
+    "http://localhost:3002";
+  try {
+    const response = await fetch(`${apiBaseUrl}/api/auth/get-session`, {
+      headers: { cookie },
+      cache: "no-store",
+    });
+    if (!response.ok) return null;
+    const session = (await response.json()) as {
+      user?: { id?: string } | null;
+    } | null;
+    return session?.user?.id ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export default async function Page(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const { id } = params;
+  const userId = await getRequestUserId();
+  if (!userId || !(await chatMemberRepo.isMember(userId, id))) {
+    notFound();
+  }
   const chat = await chatRepo.findById(id);
 
-  if (!chat) {
+  if (!chat || chat.isDeleted) {
     notFound();
   }
 

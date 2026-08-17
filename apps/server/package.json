@@ -4,16 +4,17 @@
   "private": true,
   "version": "0.0.2",
   "scripts": {
-    "dev": "cross-env NODE_ENV=development bun --hot src/index.ts",
+    "dev": "bun --hot src/index.ts",
     "build": "bun ./build-server.ts",
     "start": "bun dist/index.js",
-    "typecheck": "tsc -p tsconfig.typecheck.json --noEmit",
-    "test": "vitest run --passWithNoTests",
-    "db:generate": "npx drizzle-kit generate",
-    "db:drop": "npx drizzle-kit drop",
-    "db:migrate": "npx drizzle-kit migrate",
-    "db:push": "npx drizzle-kit push",
-    "db:studio": "npx drizzle-kit studio"
+    "typecheck": "bun ./node_modules/typescript/bin/tsc -p tsconfig.typecheck.json --noEmit",
+    "test": "bun ./node_modules/vitest/vitest.mjs run --passWithNoTests",
+    "db:generate": "bun --env-file=.env ../../node_modules/drizzle-kit/bin.cjs generate --config=../../packages/db/drizzle.config.ts",
+    "db:check": "bun --env-file=.env ../../node_modules/drizzle-kit/bin.cjs check --config=../../packages/db/drizzle.config.ts",
+    "db:drop": "bun --env-file=.env ../../node_modules/drizzle-kit/bin.cjs drop --config=../../packages/db/drizzle.config.ts",
+    "db:migrate": "bun --env-file=.env ../../node_modules/drizzle-kit/bin.cjs migrate --config=../../packages/db/drizzle.config.ts",
+    "db:push": "bun --env-file=.env ../../node_modules/drizzle-kit/bin.cjs push --config=../../packages/db/drizzle.config.ts",
+    "db:studio": "bun --env-file=.env ../../node_modules/drizzle-kit/bin.cjs studio --config=../../packages/db/drizzle.config.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "4.0.44",
@@ -34,6 +35,7 @@
     "@hono/standard-validator": "^0.2.0",
     "@hono/zod-openapi": "^1.1.5",
     "@hono/zod-validator": "^0.7.5",
+    "@openrouter/ai-sdk-provider": "3.0.0",
     "@react-email/components": "^0.5.7",
     "@react-email/render": "^2.0.0",
     "@scalar/hono-api-reference": "^0.9.26",

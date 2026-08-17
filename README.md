@@ -37,7 +37,7 @@ bun run test
 bun run build
 ```
 
-The server build bundles the application and the Circulo Workflow Engine directly. The workflow engine currently uses process-local execution stores; production deployments should provide a shared durable store and pub/sub adapter before running multiple API instances.
+The server build bundles the application and the Circulo Workflow Engine directly. Production orchestration state, workflow events, optimistic versions, and execution locks are stored in PostgreSQL, and interrupted runs are reclaimed on server startup. The live HTTP output channel is instance-local, so deployments with multiple API instances should use sticky routing for an active stream or add a shared pub/sub adapter at the load-balancer boundary.
 
 Production requires valid values for `DATABASE_URL`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `ENCRYPTION_KEY`, `INTERNAL_API_SECRET`, and the AI/provider credentials used by configured agents. Database changes are applied with `bun --filter @circulo-ai/db db:migrate`.
 

@@ -1,5 +1,7 @@
+"use client";
+
 import { navItems } from "@/consts/nav";
-import { getSession } from "@/lib/auth";
+import { useSession } from "@/lib/auth-client";
 import { UserButton } from "@daveyplate/better-auth-ui";
 import { ArrowUpRight, Phone, User } from "lucide-react";
 import { Suspense, useId } from "react";
@@ -91,9 +93,11 @@ export function Nav() {
   );
 }
 
-async function AuthLink() {
-  const session = await getSession();
+function AuthLink() {
+  const { data: session, isPending } = useSession();
   const signedIn = session?.user;
+
+  if (isPending) return <Spinner />;
 
   if (signedIn) return <UserButton variant="ghost" />;
 

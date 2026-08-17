@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { renderMagicLinkEmail } from "@/components/emails";
+import { renderInvitationEmail } from "@/components/emails/render-email";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { canCreateTeamOrg } from "@/lib/billing/autumn";
@@ -29,6 +30,7 @@ import { nanoid } from "nanoid";
 import { env } from "./env";
 
 const logger = createLogger("Auth");
+const isProduction = env.NODE_ENV === "production";
 
 export const statement = {
   ...defaultStatements,
@@ -39,17 +41,17 @@ const ac = createAccessControl(statement);
 
 const ownerRole = ac.newRole({
   ...ownerAc.statements,
-  chat: ["create", "update", "delete"],
+  chat: ["create", "share", "update", "delete"],
 });
 
 const adminRole = ac.newRole({
   ...adminAc.statements,
-  chat: ["create", "update"],
+  chat: ["create", "share", "update"],
 });
 
 const memberRole = ac.newRole({
   ...memberAc.statements,
-  chat: ["create"],
+  chat: ["create", "share"],
 });
 
 const createPersonalOrganization = async (user: User) => {
@@ -166,6 +168,7 @@ export const auth = betterAuth({
     "http://127.0.0.1:3000",
     "http://localhost:3001",
     "http://127.0.0.1:3001",
+    ...(env.CORS_ALLOWED_ORIGINS?.split(",") ?? []),
   ].filter(Boolean),
   database: drizzleAdapter(db, {
     provider: "pg",
@@ -1238,6 +1241,36 @@ export const auth = betterAuth({
         member: memberRole,
       },
       membershipLimit: 50,
+      sendInvitationEmail: async ({
+        id,
+        email,
+        organization: invitedOrganization,
+        inviter,
+      }) => {
+        const invitationUrl = `${env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/invite/${encodeURIComponent(id)}`;
+        const html = await renderInvitationEmail(
+          inviter.user.name || "A team member",
+          invitedOrganization.name,
+          invitationUrl,
+          email,
+        );
+
+        const result = await sendEmail({
+          from: "onboarding@resend.dev",
+          to: email,
+          subject: `You're invited to join ${invitedOrganization.name} on Circulo`,
+          html,
+          emailType: "transactional",
+        });
+
+        if (!result.success) {
+          logger.warn("Organization invitation email could not be delivered", {
+            invitationId: id,
+            email,
+            message: result.message,
+          });
+        }
+      },
       allowUserToCreateOrganization: async (user) => {
         try {
           // Find the user's personal organization
@@ -1253,7 +1286,7 @@ export const auth = betterAuth({
                 eq(schema.member.userId, user.id),
                 eq(schema.member.role, "owner"),
                 // Check for personal org type in metadata
-                sql`${schema.organization.metadata}->>'type' = 'personal'`,
+                sql`(${schema.organization.metadata})::jsonb->>'type' = 'personal'`,
               ),
             )
             .limit(1);
@@ -1286,13 +1319,33 @@ export const auth = betterAuth({
       organizationCreation: {
         beforeCreate: async ({ organization, user }) => {
           // Mark new orgs as "team" type (personal orgs are created separately)
+          const rawMetadata = (organization as any).metadata;
+          let existingMetadata: Record<string, unknown> = {};
+          if (typeof rawMetadata === "string") {
+            try {
+              const parsed = JSON.parse(rawMetadata);
+              if (
+                parsed &&
+                typeof parsed === "object" &&
+                !Array.isArray(parsed)
+              ) {
+                existingMetadata = parsed;
+              }
+            } catch {
+              // Invalid legacy metadata is ignored when creating a new workspace.
+            }
+          } else if (rawMetadata && typeof rawMetadata === "object") {
+            existingMetadata = rawMetadata;
+          }
+          const metadata = {
+            ...existingMetadata,
+            type: "team",
+          };
+
           return {
             data: {
               ...organization,
-              metadata: {
-                ...((organization as any).metadata || {}),
-                type: "team",
-              },
+              metadata: JSON.stringify(metadata),
             },
           };
         },
@@ -1312,12 +1365,14 @@ export const auth = betterAuth({
   ],
   advanced: {
     defaultCookieAttributes: {
-      sameSite: "none",
-      secure: true,
-      partitioned: true, // New browser standards will mandate this for foreign cookies
+      // Secure cross-site cookies are required in production, but they are
+      // rejected by browsers when local development runs over plain HTTP.
+      sameSite: isProduction ? "none" : "lax",
+      secure: isProduction,
+      ...(isProduction ? { partitioned: true } : {}), // Partitioned cookies also require Secure.
     },
     crossSubDomainCookies: {
-      enabled: true,
+      enabled: isProduction,
     },
   },
 });

@@ -19,7 +19,12 @@ function toRow(entity: Organization): typeof organizationTable.$inferInsert {
   return {
     id: snap.id.toString(),
     name: snap.name,
-    slug: snap.slug ?? snap.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+    slug:
+      snap.slug ??
+      snap.name
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-"),
     createdAt: snap.createdAt,
     updatedAt: snap.updatedAt ?? new Date(),
   };

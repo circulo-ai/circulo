@@ -15,6 +15,12 @@ export const env = createEnv({
     ENCRYPTION_KEY: z.string().min(32),
     INTERNAL_API_SECRET: z.string().min(32),
     AUTUMN_SECRET_KEY: z.string().optional(),
+    // Local development should exercise collaboration and automation limits
+    // by default. Production never reads this override (see autumn.ts).
+    BILLING_LOCAL_DEV_PLAN: z
+      .enum(["free", "pro", "team", "enterprise"])
+      .optional()
+      .default("team"),
     E2B_API_KEY: z.string().optional(),
 
     // OAuth credentials
@@ -84,6 +90,12 @@ export const env = createEnv({
     REDIS_URL: z.url().optional(),
 
     // AI
+    OPENROUTER_API_KEY: z.string().min(1).optional(),
+    OPENROUTER_BASE_URL: z.url().optional(),
+    OPENROUTER_HTTP_REFERER: z.url().optional(),
+    OPENROUTER_APP_TITLE: z.string().optional(),
+    OPENROUTER_DEFAULT_MODEL: z.string().min(1).optional(),
+    CORS_ALLOWED_ORIGINS: z.string().optional(),
     GOOGLE_GENERATIVE_AI_API_KEY: z.string().optional(),
     OLLAMA_URL: z.string().optional(),
 

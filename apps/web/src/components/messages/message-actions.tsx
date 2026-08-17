@@ -19,12 +19,14 @@ export function PureMessageActions({
   vote,
   isLoading,
   setMode,
+  canEdit = true,
 }: {
   chatId: string;
   message: ChatMessage;
   vote: Vote | undefined;
   isLoading: boolean;
   setMode?: (mode: "view" | "edit") => void;
+  canEdit?: boolean;
 }) {
   const { mutate } = useSWRConfig();
   const [_, copyToClipboard] = useCopyToClipboard();
@@ -54,7 +56,7 @@ export function PureMessageActions({
     return (
       <Actions className="-mr-0.5 justify-end">
         <div className="relative">
-          {setMode && (
+          {setMode && canEdit && (
             <Action
               className="absolute top-0 -left-10 opacity-0 transition-opacity group-hover/message:opacity-100 focus-visible:opacity-100"
               data-testid="message-edit-button"
@@ -184,6 +186,18 @@ export function PureMessageActions({
 export const MessageActions = memo(
   PureMessageActions,
   (prevProps, nextProps) => {
+    if (prevProps.chatId !== nextProps.chatId) {
+      return false;
+    }
+    if (prevProps.message.id !== nextProps.message.id) {
+      return false;
+    }
+    if (!equal(prevProps.message.parts, nextProps.message.parts)) {
+      return false;
+    }
+    if (prevProps.canEdit !== nextProps.canEdit) {
+      return false;
+    }
     if (!equal(prevProps.vote, nextProps.vote)) {
       return false;
     }

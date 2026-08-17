@@ -1,4 +1,9 @@
-import { chatRepo, voteRepo } from "@/db/repositories";
+import {
+  chatMemberRepo,
+  chatRepo,
+  messageRepo,
+  voteRepo,
+} from "@/db/repositories";
 import { createRouter } from "@/lib/create-app";
 import { requireAuth } from "@/middleware/auth";
 import { ForbiddenError, NotFoundError } from "@circulo-ai/types";
@@ -31,7 +36,7 @@ router.get(
       throw new NotFoundError("Chat not found");
     }
 
-    if (chat.creatorId !== user.id) {
+    if (!(await chatMemberRepo.isMember(user.id, chatId))) {
       throw new ForbiddenError(
         "You are not allowed to view votes for this chat",
       );
@@ -56,8 +61,13 @@ router.patch(
       throw new NotFoundError("Chat not found");
     }
 
-    if (chat.creatorId !== user.id) {
+    if (!(await chatMemberRepo.isMember(user.id, chatId))) {
       throw new ForbiddenError("You are not allowed to vote on this chat");
+    }
+
+    const message = await messageRepo.findById(messageId);
+    if (!message || message.chatId !== chatId || message.isDeleted) {
+      throw new NotFoundError("Message not found");
     }
 
     await voteRepo.vote(user.id, chatId, messageId, type);
