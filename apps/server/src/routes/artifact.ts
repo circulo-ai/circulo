@@ -1,6 +1,5 @@
-import { artifactRepo, chatRepo } from "@/db/repositories";
+import { artifactRepo, chatMemberRepo, chatRepo } from "@/db/repositories";
 import { createRouter } from "@/lib/create-app";
-import { isMemberOf } from "@/lib/permissions";
 import { requireAuth } from "@/middleware/auth";
 import {
   BadRequestError,
@@ -23,6 +22,17 @@ const bodySchema = z.object({
 
 const router = createRouter();
 
+async function requireActiveChatMember(userId: string, chatId: string) {
+  const chat = await chatRepo.findById(chatId);
+  if (!chat || chat.isDeleted) {
+    throw new ForbiddenError("You don't have access to this chat");
+  }
+  if (!(await chatMemberRepo.isMember(userId, chatId))) {
+    throw new ForbiddenError("You don't have access to this chat");
+  }
+  return chat;
+}
+
 router.get(
   "/artifact",
   requireAuth,
@@ -44,17 +54,7 @@ router.get(
       throw new ForbiddenError("You don't have access to this artifact!");
     }
 
-    const chat = await chatRepo.findById(document.chatId);
-
-    if (!chat || !chat.organizationId) {
-      throw new ForbiddenError("No access!");
-    }
-
-    const isOrgMember = await isMemberOf(c.var.user!.id, chat.organizationId);
-
-    if (!isOrgMember) {
-      throw new ForbiddenError("You don't have access to this artifact!");
-    }
+    await requireActiveChatMember(c.var.user!.id, document.chatId);
 
     return c.json([document], 200);
   },
@@ -78,17 +78,7 @@ router.post(
           throw new ForbiddenError();
         }
 
-        const chat = await chatRepo.findById(existingDoc.chatId);
-
-        if (!chat || !chat.organizationId) {
-          throw new ForbiddenError();
-        }
-
-        const isOrgMember = await isMemberOf(user.id, chat.organizationId);
-
-        if (!isOrgMember) {
-          throw new ForbiddenError();
-        }
+        await requireActiveChatMember(user.id, existingDoc.chatId);
       }
 
       const updatedDoc = await artifactRepo.update(id, {
@@ -101,10 +91,7 @@ router.post(
     }
 
     if (chatId) {
-      const chat = await chatRepo.findById(chatId);
-      if (!chat || !(await isMemberOf(user.id, chat.organizationId))) {
-        throw new ForbiddenError("You don't have access to this chat");
-      }
+      await requireActiveChatMember(user.id, chatId);
     }
 
     const newDoc = await artifactRepo.create({

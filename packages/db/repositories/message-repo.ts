@@ -171,6 +171,21 @@ export function createMessageRepository(database: DbInstance) {
       });
     },
 
+    async findWorkflowMessage(chatId: string, workflowId: string) {
+      const tracePart = JSON.stringify([
+        { type: "data-workflowTrace", data: { workflowId } },
+      ]);
+      return db.query.message.findFirst({
+        where: and(
+          eq(message.chatId, chatId),
+          eq(message.authorType, "agent"),
+          eq(message.isDeleted, false),
+          sql`${message.parts} @> ${tracePart}::jsonb`,
+        ),
+        orderBy: desc(message.createdAt),
+      });
+    },
+
     async findByAuthor(
       authorType: MessageAuthorType,
       authorId: string,

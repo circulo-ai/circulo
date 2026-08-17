@@ -84,7 +84,6 @@ export function toQueryString<T extends Record<string, unknown>>(
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined || value === null || value === "") continue;
 
-    // Arrays become multiple key=value items
     if (Array.isArray(value)) {
       for (const v of value) {
         if (v !== undefined && v !== null && v !== "") {

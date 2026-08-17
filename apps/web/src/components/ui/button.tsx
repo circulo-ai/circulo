@@ -1,32 +1,33 @@
-import { buttonVariants } from "@/consts/button";
-import { Slot } from "@radix-ui/react-slot";
-import { type VariantProps } from "class-variance-authority";
-import * as React from "react";
+import { Button as ButtonPrimitive } from "@base-ui/react/button"
+import { type VariantProps } from "class-variance-authority"
+import * as React from "react"
 
-import { cn } from "@/lib/utils";
+import { buttonVariants } from "@/consts/button"
+import { cn } from "@/lib/utils"
 
 function Button({
   className,
   variant,
   size,
   rounded,
+  children,
   asChild = false,
-  type = "button",
   ...props
-}: React.ComponentProps<"button"> &
+}: ButtonPrimitive.Props &
   VariantProps<typeof buttonVariants> & {
-    asChild?: boolean;
+    asChild?: boolean
   }) {
-  const Comp = asChild ? Slot : "button";
-
   return (
-    <Comp
-      type={type}
+    <ButtonPrimitive
       data-slot="button"
       className={cn(buttonVariants({ variant, size, rounded, className }))}
+      nativeButton={asChild ? false : undefined}
+      render={asChild && React.isValidElement(children) ? children : undefined}
       {...props}
-    />
-  );
+    >
+      {children}
+    </ButtonPrimitive>
+  )
 }
 
-export { Button, buttonVariants };
+export { Button, buttonVariants }

@@ -14,6 +14,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { toast } from "sonner";
 
 export type MessageEditorProps = {
   message: ChatMessage;
@@ -79,28 +80,37 @@ export function MessageEditor({
           disabled={isSubmitting}
           onClick={async () => {
             setIsSubmitting(true);
+            try {
+              await deleteTrailingMessages({
+                id: message.id,
+              });
 
-            await deleteTrailingMessages({
-              id: message.id,
-            });
+              setMessages((messages) => {
+                const index = messages.findIndex((m) => m.id === message.id);
 
-            setMessages((messages) => {
-              const index = messages.findIndex((m) => m.id === message.id);
+                if (index !== -1) {
+                  const updatedMessage: ChatMessage = {
+                    ...message,
+                    parts: [{ type: "text", text: draftContent }],
+                  };
 
-              if (index !== -1) {
-                const updatedMessage: ChatMessage = {
-                  ...message,
-                  parts: [{ type: "text", text: draftContent }],
-                };
+                  return [...messages.slice(0, index), updatedMessage];
+                }
 
-                return [...messages.slice(0, index), updatedMessage];
-              }
+                return messages;
+              });
 
-              return messages;
-            });
-
-            setMode("view");
-            regenerate();
+              setMode("view");
+              regenerate();
+            } catch (error) {
+              toast.error(
+                error instanceof Error
+                  ? error.message
+                  : "Unable to edit this message",
+              );
+            } finally {
+              setIsSubmitting(false);
+            }
           }}
           variant="default"
         >

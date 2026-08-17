@@ -232,15 +232,17 @@ export function buildRootProvider(): ServiceProvider {
 
   services.addScoped(DI_TOKENS.CreateChatUseCase, (resolver) => {
     const chats = resolver.resolve(DI_TOKENS.ChatRepository);
+    const chatMembers = resolver.resolve(DI_TOKENS.ChatMemberRepository);
     const members = resolver.resolve(DI_TOKENS.OrganizationMemberRepository);
     const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
     const publisher = resolver.resolve(DI_TOKENS.DomainEventPublisher);
-    return new CreateChat(chats, members, uow, publisher);
+    return new CreateChat(chats, chatMembers, members, uow, publisher);
   });
 
   services.addScoped(DI_TOKENS.CreateChatWithMessageUseCase, (resolver) => {
     return new CreateChatWithMessage(
       resolver.resolve(DI_TOKENS.ChatRepository),
+      resolver.resolve(DI_TOKENS.ChatMemberRepository),
       resolver.resolve(DI_TOKENS.MessageRepository),
       resolver.resolve(DI_TOKENS.ChatAgentLinkRepository),
       resolver.resolve(DI_TOKENS.OrganizationMemberRepository),

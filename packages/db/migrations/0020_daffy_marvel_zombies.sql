@@ -1,0 +1,1 @@
+ALTER TABLE "skills" ADD CONSTRAINT "skills_mcp_integration_id_mcp_integrations_id_fk" FOREIGN KEY ("mcp_integration_id") REFERENCES "public"."mcp_integrations"("id") ON DELETE set null ON UPDATE no action;

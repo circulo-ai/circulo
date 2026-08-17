@@ -17,6 +17,25 @@ export function waitUntil<T>(until: number, data?: T): StepResult<T> {
   return { type: "wait", until, data };
 }
 
+/** Wait and execute the same step again when the durable timer resumes. */
+export function waitUntilAndRetry<T>(until: number, data?: T): StepResult<T> {
+  if (!Number.isFinite(until) || until < 0) {
+    throw new RangeError(
+      "waitUntilAndRetry() requires a finite, non-negative timestamp",
+    );
+  }
+  return { type: "wait", until, data, resumeCurrentStep: true };
+}
+
+export function waitForAndRetry<T>(ms: number, data?: T): StepResult<T> {
+  if (!Number.isFinite(ms) || ms < 0) {
+    throw new RangeError(
+      "waitForAndRetry() requires a finite, non-negative duration",
+    );
+  }
+  return waitUntilAndRetry(Date.now() + ms, data);
+}
+
 export function waitFor<T>(ms: number, data?: T): StepResult<T> {
   if (!Number.isFinite(ms) || ms < 0) {
     throw new RangeError("waitFor() requires a finite, non-negative duration");

@@ -1,4 +1,5 @@
-import { feature, featureItem, product } from "atmn";
+import { BILLING_PLANS } from "@circulo-ai/types";
+import { feature, featureItem, priceItem, product } from "atmn";
 
 // Boolean feature - access is granted by including it with included_usage: 1
 export const createTeamOrganization = feature({
@@ -27,90 +28,136 @@ export const prioritySupport = feature({
   type: "boolean",
 });
 
+export const maxMessagesPerDay = feature({
+  id: "max_messages_per_day",
+  name: "Max Messages Per Day",
+  type: "single_use",
+});
+
+export const kbSlots = feature({
+  id: "kb_slots",
+  name: "Knowledge Base Slots",
+  type: "continuous_use",
+});
+
+export const maxChats = feature({
+  id: "max_chats",
+  name: "Max Chats",
+  type: "continuous_use",
+});
+
+export const teamMembers = feature({
+  id: "team_members",
+  name: "Team Members",
+  type: "continuous_use",
+});
+
+export const maxAgentsInChat = feature({
+  id: "max_agents_in_chat",
+  name: "Max Agents In Chat",
+  type: "continuous_use",
+});
+
+export const rateLimitPerMinute = feature({
+  id: "rate_limit_per_minute",
+  name: "Rate Limit Per Minute",
+  type: "continuous_use",
+});
+
+const usage = (value: number | "unlimited") =>
+  value === "unlimited" ? "inf" : value;
+
+const itemsFor = (plan: (typeof BILLING_PLANS)[number]) => [
+  featureItem({
+    feature_id: maxAgents.id,
+    included_usage: usage(plan.features.maxAgents),
+  }),
+  featureItem({
+    feature_id: apiCalls.id,
+    included_usage: usage(plan.features.apiCalls),
+    interval: "month",
+  }),
+  featureItem({
+    feature_id: maxMessagesPerDay.id,
+    included_usage: usage(plan.features.maxMessagesPerDay),
+    interval: "day",
+  }),
+  featureItem({
+    feature_id: kbSlots.id,
+    included_usage: usage(plan.features.kbSlots),
+  }),
+  featureItem({
+    feature_id: maxChats.id,
+    included_usage: usage(plan.features.maxChats),
+  }),
+  featureItem({
+    feature_id: teamMembers.id,
+    included_usage: usage(plan.features.teamMembers),
+  }),
+  featureItem({
+    feature_id: maxAgentsInChat.id,
+    included_usage: usage(plan.features.maxAgentsInChat),
+  }),
+  featureItem({
+    feature_id: rateLimitPerMinute.id,
+    included_usage: usage(plan.features.rateLimitPerMinute),
+  }),
+  ...(plan.features.createTeamOrg
+    ? [
+        featureItem({
+          feature_id: createTeamOrganization.id,
+          included_usage: 1,
+        }),
+      ]
+    : []),
+  ...(plan.features.prioritySupport
+    ? [featureItem({ feature_id: prioritySupport.id, included_usage: 1 })]
+    : []),
+];
+
 export const free = product({
-  id: "free",
-  name: "Free",
+  id: BILLING_PLANS[0].id,
+  name: BILLING_PLANS[0].name,
   is_default: true, // New users get this plan
-  items: [
-    featureItem({
-      feature_id: maxAgents.id,
-      included_usage: 3,
-    }),
-    featureItem({
-      feature_id: apiCalls.id,
-      included_usage: 1000,
-      interval: "month",
-    }),
-    // No create_team_org = Free users can't create team orgs
-    // No priority_support = Free users don't have priority support
-  ],
+  items: itemsFor(BILLING_PLANS[0]),
 });
 
 export const pro = product({
-  id: "pro",
-  name: "Pro",
+  id: BILLING_PLANS[1].id,
+  name: BILLING_PLANS[1].name,
   items: [
-    featureItem({
-      feature_id: maxAgents.id,
-      included_usage: 10,
-    }),
-    featureItem({
-      feature_id: apiCalls.id,
-      included_usage: 10000,
-      interval: "month",
-    }),
-    // For boolean features, include with included_usage: 1 to grant access
-    featureItem({
-      feature_id: createTeamOrganization.id,
-      included_usage: 1,
-    }),
+    ...itemsFor(BILLING_PLANS[1]),
+    priceItem({ price: 20, interval: "month" }),
   ],
 });
 
 export const team = product({
-  id: "team",
-  name: "Team",
+  id: BILLING_PLANS[2].id,
+  name: BILLING_PLANS[2].name,
   items: [
-    featureItem({
-      feature_id: maxAgents.id,
-      included_usage: 50,
-    }),
-    featureItem({
-      feature_id: apiCalls.id,
-      included_usage: 50000,
-      interval: "month",
-    }),
-    featureItem({
-      feature_id: createTeamOrganization.id,
-      included_usage: 1,
-    }),
-    featureItem({
-      feature_id: prioritySupport.id,
-      included_usage: 1,
-    }),
+    ...itemsFor(BILLING_PLANS[2]),
+    priceItem({ price: 60, interval: "month" }),
   ],
 });
 
 export const enterprise = product({
-  id: "enterprise",
-  name: "Enterprise",
-  items: [
-    featureItem({
-      feature_id: maxAgents.id,
-      included_usage: "inf", // Unlimited
-    }),
-    featureItem({
-      feature_id: apiCalls.id,
-      included_usage: "inf",
-      interval: "month",
-    }),
-    featureItem({
-      feature_id: createTeamOrganization.id,
-      included_usage: 1,
-    }),
-    featureItem({
-      feature_id: prioritySupport.id,
-      included_usage: 1,
-    }),
-  ],
+  id: BILLING_PLANS[3].id,
+  name: BILLING_PLANS[3].name,
+  items: itemsFor(BILLING_PLANS[3]),
 });
+
+export default {
+  features: [
+    createTeamOrganization,
+    maxAgents,
+    apiCalls,
+    prioritySupport,
+    maxMessagesPerDay,
+    kbSlots,
+    maxChats,
+    teamMembers,
+    maxAgentsInChat,
+    rateLimitPerMinute,
+  ],
+  products: [free, pro, team, enterprise],
+};

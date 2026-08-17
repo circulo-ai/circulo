@@ -28,10 +28,9 @@ export function FaqList(props: ComponentProps<typeof ScrollArea>) {
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-16 bg-linear-to-b from-background to-transparent max-sm:hidden" />
       <AnimatedList asChild>
         <Accordion
-          type="single"
-          collapsible={true}
+          multiple={false}
           className="my-16"
-          defaultValue={faqs[0].index.toString()}
+          defaultValue={[faqs[0].index.toString()]}
         >
           {filteredFaqs.map((faq) => (
             <AnimatedItem key={faq.index} asChild>

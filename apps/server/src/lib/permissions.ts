@@ -46,7 +46,9 @@ const rolePermissions: Record<string, RolePermissions> = {
 
 type RoleType = "owner" | "admin" | "member";
 
-function getSessionActiveOrganizationId(session?: SessionResponse): string | undefined {
+function getSessionActiveOrganizationId(
+  session?: SessionResponse,
+): string | undefined {
   return (session?.session as { activeOrganizationId?: string } | undefined)
     ?.activeOrganizationId;
 }
@@ -130,9 +132,10 @@ export async function requirePermission<R extends Resource>(
   if (!allowed) {
     const sessionData = session ?? (await getSession());
     const orgId = organizationId || getSessionActiveOrganizationId(sessionData);
-    const role = sessionData?.user && orgId
-      ? await getUserRole(sessionData.user.id, orgId)
-      : null;
+    const role =
+      sessionData?.user && orgId
+        ? await getUserRole(sessionData.user.id, orgId)
+        : null;
 
     throw new Error(
       `Permission denied: ${role || "guest"} cannot ${action} ${resource}`,

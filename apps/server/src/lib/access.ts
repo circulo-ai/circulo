@@ -2,7 +2,9 @@ import { getSession, type SessionResponse } from "@/lib/auth";
 import { getSubscriptionForOrg, orgHasPlan } from "@/lib/billing/autumn";
 import { hasPermission, type Action, type Resource } from "@/lib/permissions";
 
-function getSessionActiveOrganizationId(session?: SessionResponse): string | undefined {
+function getSessionActiveOrganizationId(
+  session?: SessionResponse,
+): string | undefined {
   return (session?.session as { activeOrganizationId?: string } | undefined)
     ?.activeOrganizationId;
 }

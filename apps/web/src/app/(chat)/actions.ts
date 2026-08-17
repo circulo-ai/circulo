@@ -1,13 +1,22 @@
 import type { VisibilityType } from "@/components/visibility-selector";
 
 export async function deleteTrailingMessages({ id }: { id: string }) {
-  await fetch(`/api/messages/${encodeURIComponent(id)}/trailing`, {
-    method: "DELETE",
-    headers: {
-      "Content-Type": "application/json",
+  const response = await fetch(
+    `/api/messages/${encodeURIComponent(id)}/trailing`,
+    {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
     },
-    credentials: "include",
-  });
+  );
+  if (response.ok) return;
+
+  const payload = (await response.json().catch(() => null)) as {
+    message?: string;
+  } | null;
+  throw new Error(payload?.message ?? "Unable to edit this message");
 }
 
 export async function updateChatVisibility({

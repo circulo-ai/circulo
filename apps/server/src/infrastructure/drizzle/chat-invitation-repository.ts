@@ -2,7 +2,7 @@ import type { DbInstance } from "@/db";
 import { chatInvitation as chatInvitationTable } from "@/db/schema/chat";
 import { ChatInvitation } from "@/domain/chat/chat-invitation";
 import { Identifier, type Repository } from "@circulo-ai/core";
-import { and, eq } from "drizzle-orm";
+import { and, eq, gt } from "drizzle-orm";
 
 function toDomain(
   row: typeof chatInvitationTable.$inferSelect,
@@ -95,6 +95,8 @@ export class DrizzleChatInvitationRepository implements Repository<ChatInvitatio
       where: and(
         eq(chatInvitationTable.email, email),
         eq(chatInvitationTable.chatId, chatId.toString()),
+        eq(chatInvitationTable.status, "pending"),
+        gt(chatInvitationTable.expiresAt, new Date()),
       ),
     });
     return row ? toDomain(row) : null;

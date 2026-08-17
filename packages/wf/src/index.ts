@@ -11,7 +11,9 @@ export {
   error,
   streamStep,
   waitFor,
+  waitForAndRetry,
   waitUntil,
+  waitUntilAndRetry,
 } from "./dsl/step-helpers";
 export { WorkflowBuilder, defineWorkflow } from "./dsl/workflow-builder";
 export type { StepConfig } from "./dsl/workflow-builder";
@@ -20,6 +22,7 @@ export type { StepConfig } from "./dsl/workflow-builder";
 export * from "./models";
 
 // Implementations
+export * from "./adapters";
 export { InMemoryEventBus } from "./store/memory-event-bus";
 export { InMemoryEventStore } from "./store/memory-event-store";
 export { InMemoryWorkflowStore } from "./store/memory-workflow-store";

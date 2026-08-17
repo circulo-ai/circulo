@@ -124,7 +124,20 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
     this.pauseFlags.delete(workflowId);
     const workflow = await this.workflowStore.loadWorkflow(workflowId);
 
-    if (workflow && workflow.state === "paused") {
+    if (!workflow) return;
+
+    // A pause request can race with an approval decision while the current
+    // step is still executing. In that case the durable row is still
+    // `running`; clearing the flag lets the active runner continue. If no
+    // runner is active, start one so a decision cannot strand the workflow.
+    if (workflow.state === "running") {
+      if (!this.abortControllers.has(workflowId)) {
+        await this.run(workflowId);
+      }
+      return;
+    }
+
+    if (workflow.state === "paused") {
       workflow.resumeAt = undefined;
       const success = await this.updateWorkflowState(workflow, "running");
       if (success) {
@@ -246,7 +259,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
         stepId: step.id,
         stepName: step.name,
       });
-      const ctx = this.createContext(workflow, stepLogger);
+      const ctx = this.createContext(workflow, stepLogger, signal);
 
       try {
         const stepStartTime = Date.now();
@@ -291,7 +304,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
           this.applyContextUpdates(workflow);
           this.applyStepAppends(workflow);
 
-          workflow.currentStep++;
+          if (!result.resumeCurrentStep) workflow.currentStep++;
           workflow.retryCount = 0;
           workflow.state = "paused";
           workflow.resumeAt = result.until;
@@ -571,8 +584,10 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
   private createContext(
     workflow: Workflow<TContext, TInput, TOutput>,
     logger: Logger,
+    signal: AbortSignal,
   ): WorkflowContext<TContext> {
     return {
+      signal,
       workflow: {
         id: workflow.id,
         state: workflow.state,

@@ -45,7 +45,7 @@ export function UserAvatar({
   user,
   localization: propLocalization,
   ...props
-}: UserAvatarProps & ComponentProps<typeof Avatar>) {
+}: UserAvatarProps & Omit<ComponentProps<typeof Avatar>, "size">) {
   const {
     localization: contextLocalization,
     gravatar,

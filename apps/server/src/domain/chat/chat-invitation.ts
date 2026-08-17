@@ -39,6 +39,15 @@ export class ChatInvitation extends Entity<ChatInvitationProps> {
   }
 
   accept(inviteeId: string, at: Date = new Date()) {
+    if (this.props.status !== "pending") {
+      throw new ValidationError("invitation is no longer pending", "status");
+    }
+    if (this.props.expiresAt.getTime() <= at.getTime()) {
+      throw new ValidationError("invitation has expired", "expiresAt");
+    }
+    if (!inviteeId.trim()) {
+      throw new ValidationError("inviteeId is required", "inviteeId");
+    }
     this.props = {
       ...this.props,
       status: "accepted",

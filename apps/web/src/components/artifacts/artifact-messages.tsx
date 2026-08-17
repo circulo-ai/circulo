@@ -47,6 +47,7 @@ function PureArtifactMessages({
         <PreviewMessage
           key={message.id + index}
           chatId={chatId}
+          canEdit={false}
           isLoading={status === "streaming" && index === messages.length - 1}
           isReadonly={isReadonly}
           message={message}

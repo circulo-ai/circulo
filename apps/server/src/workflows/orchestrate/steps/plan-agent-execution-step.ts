@@ -1,8 +1,8 @@
 import type { Agent, ChatAgent } from "@/db";
+import { getLanguageModel } from "@/lib/ai/providers";
 import type { ChatMessage } from "@/lib/types";
 import { getTextFromMessages } from "@/lib/utils";
 import type { OrchestrationInput } from "@/workflows/orchestrate/types";
-import { google } from "@ai-sdk/google";
 import { generateText, Output } from "ai";
 import { z } from "zod";
 import type { RequestClassification } from "./classify-request-step";
@@ -15,27 +15,26 @@ const executionPlanSchema = z.object({
     z.object({
       agentId: z.uuid(),
       order: z.number().describe("Execution order (0-based)"),
+      // Azure/OpenAI strict structured output requires every property to be
+      // required. Nullable fields preserve the planner's ability to express
+      // that a dependency or parallel group is not applicable.
       parallelGroup: z
-        .number()
-        .optional()
-        .describe("Agents in same group run in parallel"),
+        .union([z.number(), z.null()])
+        .describe("Agents in same group run in parallel, or null"),
       dependsOn: z
-        .array(z.uuid())
-        .optional()
-        .describe("Agent IDs this depends on"),
+        .union([z.array(z.uuid()), z.null()])
+        .describe("Agent IDs this depends on, or null"),
       reason: z.string().describe("Why this agent was selected"),
       task: z.string().describe("Specific task for this agent"),
       estimatedDuration: z
-        .string()
-        .optional()
-        .describe("Estimated time (e.g., '30s', '2m')"),
+        .union([z.string(), z.null()])
+        .describe("Estimated time (e.g., '30s', '2m'), or null"),
       priority: z.enum(["low", "medium", "high"]),
     }),
   ),
   fallbackAgentId: z
-    .uuid()
-    .optional()
-    .describe("Fallback agent if primary fails"),
+    .union([z.uuid(), z.null()])
+    .describe("Fallback agent if primary fails, or null"),
   timeoutMinutes: z.number().describe("Maximum execution time in minutes"),
 });
 
@@ -49,6 +48,18 @@ export async function planAgentExecutionStep(params: {
 }): Promise<ExecutionPlan> {
   const { classification, agents, triggerMessages, webhookPayload } = params;
 
+  if (agents.length === 0) {
+    return {
+      strategy: "single",
+      reasoning:
+        "No specialist agents are configured; use the default assistant.",
+      stopOnError: true,
+      selectedAgents: [],
+      fallbackAgentId: null,
+      timeoutMinutes: 10,
+    };
+  }
+
   // Build agent catalog
   const agentDescriptions = agents
     .map((ca, idx) => {
@@ -61,7 +72,7 @@ export async function planAgentExecutionStep(params: {
   Description: ${agent.description || "No description"}
   Instructions: ${customInstructions.substring(0, 200)}...
   Model: ${agent.model}
-  Temperature: ${ca.customTemperature || agent.temperature}
+  Temperature: ${ca.customTemperature ?? agent.temperature}
   Enabled: ${ca.isEnabled}`;
     })
     .join("\n\n");
@@ -76,7 +87,7 @@ This is an automated trigger, not a direct user request.`;
   }
 
   const { output } = await generateText({
-    model: google("gemini-2.5-flash"),
+    model: getLanguageModel(),
     output: Output.object({ schema: executionPlanSchema }),
     system: `You are an expert orchestration planner for a multi-agent AI system.
 
@@ -144,7 +155,10 @@ RULES:
 - Set realistic timeout based on complexity
 - Assign clear, specific tasks to each agent
 - Make sure tasks don't overlap unnecessarily
-- In sequential mode, explicitly state how each agent should use previous outputs`,
+- In sequential mode, explicitly state how each agent should use previous outputs
+- Return every schema property. Use null for parallelGroup, dependsOn,
+  estimatedDuration, or fallbackAgentId when it does not apply; do not omit
+  those properties.`,
     prompt: `User's request: "${getTextFromMessages(triggerMessages)}"
 
 Classification reasoning: ${classification.reasoning}
@@ -164,6 +178,29 @@ Plan the optimal agent orchestration.`,
     }
     return true;
   });
+
+  // An explicit @agent-id mention is an execution directive, not merely
+  // prompt text. Preserve it even if the planner would otherwise choose a
+  // different specialist.
+  const requestText = getTextFromMessages(triggerMessages);
+  const explicitlyMentioned = agents.filter((chatAgent) =>
+    requestText.includes(`@${chatAgent.agentId}`),
+  );
+  const selectedIds = new Set(validatedAgents.map((agent) => agent.agentId));
+  for (const chatAgent of explicitlyMentioned) {
+    if (selectedIds.has(chatAgent.agentId)) continue;
+    validatedAgents.push({
+      agentId: chatAgent.agentId,
+      order: validatedAgents.length,
+      parallelGroup: null,
+      dependsOn: null,
+      reason: "Explicitly mentioned by the user",
+      task: requestText,
+      estimatedDuration: null,
+      priority: "high",
+    });
+    selectedIds.add(chatAgent.agentId);
+  }
 
   return {
     ...output,

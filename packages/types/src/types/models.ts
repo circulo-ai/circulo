@@ -1,18 +1,15 @@
-export const supportingLanguageModels = {
-  "gemini-2.5-flash": {
-    capabilities: {
-      imageInput: true,
-      objectGeneration: true,
-      toolUsage: true,
-      toolStreaming: true,
-    },
-  },
-} as const;
+/**
+ * OpenRouter model identifiers are intentionally data, not a TypeScript enum.
+ * The catalog changes independently of application releases and is loaded at
+ * runtime from OpenRouter's models API.
+ */
+export type SupportedModels = string;
 
-export type SupportedModels = keyof typeof supportingLanguageModels;
+export const defaultModel: SupportedModels = "openai/gpt-4o-mini";
 
-export const LLM_MODELS = Object.keys(
-  supportingLanguageModels,
-) as SupportedModels[];
-
-export const defaultModel: SupportedModels = "gemini-2.5-flash";
+// Kept for backwards-compatible consumers that need a non-empty z.enum tuple.
+// Runtime model validation is performed against the OpenRouter catalog.
+export const LLM_MODELS = [defaultModel] as [
+  SupportedModels,
+  ...SupportedModels[],
+];

@@ -6,7 +6,10 @@ on:
     branches:
       - master
     paths:
-      - "packages/*/package.json"
+      - ".changeset/**"
+      - ".github/workflows/release-publish.yml"
+      - "packages/**/package.json"
+      - "bun.lock"
 
 permissions:
   contents: write
@@ -79,6 +82,8 @@ jobs:
       - name: Publish changed packages with npm trusted publishing
         uses: changesets/action@v1
         with:
-          publish: bunx changeset publish
+          # Run Changesets through the npm CLI installed above so npm's OIDC
+          # trusted-publisher flow is the publisher of record.
+          publish: npx --no-install changeset publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

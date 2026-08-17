@@ -40,9 +40,7 @@ export class DrizzleChatRepository implements Repository<Chat> {
   }
 
   async findById(id: Identifier | string): Promise<Chat | null> {
-    return this.getById(
-      typeof id === "string" ? Identifier.from(id) : id,
-    );
+    return this.getById(typeof id === "string" ? Identifier.from(id) : id);
   }
 
   async save(entity: Chat): Promise<Chat> {

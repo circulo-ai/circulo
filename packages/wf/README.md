@@ -13,6 +13,9 @@ A production-quality, framework-agnostic TypeScript workflow orchestration runti
 - ✅ **Dynamic Replanning**: Steps can append new steps at runtime
 - ✅ **Event Sourcing**: Complete audit trail of all workflow events
 - ✅ **Pub/Sub Events**: Real-time workflow event subscriptions
+- ✅ **Adapter Ready**: JSON workflow/event stores and external pub/sub bridges
+- ✅ **Cancellation Aware**: Every step receives an `AbortSignal`
+- ✅ **Atomic Updates**: Optimistic concurrency prevents duplicate workers
 - ✅ **Lifecycle Safe**: Timers, locks, queued work, and shutdown are managed explicitly
 
 ## Installation
@@ -90,6 +93,39 @@ console.log("Final output:", result?.output);
 
 await engine.shutdown();
 ```
+
+### Durable adapters
+
+The runtime does not require a specific database or queue. Implement
+`JsonKeyValueStore` over the storage you already use and `WorkflowLockStore`
+over its atomic lock primitive. The package supplies workflow and event-store
+implementations on top of those contracts:
+
+```typescript
+import {
+  AdapterEventBus,
+  JsonEventStore,
+  JsonWorkflowStore,
+} from "@circulo-ai/wf";
+
+const workflowStore = new JsonWorkflowStore(
+  keyValueStore,
+  lockStore,
+  () => workflowDefinition.steps,
+  { keyPrefix: "circulo:workflow:" },
+);
+const eventStore = new JsonEventStore(keyValueStore, "circulo:event:");
+const eventBus = new AdapterEventBus(pubSubAdapter);
+const engine = new WorkflowEngine({ workflowStore, eventStore, eventBus });
+const id = await engine.createAndRun(workflowDefinition, input);
+```
+
+`JsonKeyValueStore.compareAndSet` is deliberately required: a read-then-write
+implementation is not safe when two workers resume the same workflow. This
+keeps the adapter layer small while making Postgres, Redis, SQLite, DynamoDB,
+NATS, Kafka, and hosted KV/pub-sub integrations straightforward and vendor
+independent. `MapJsonKeyValueStore`, `MapWorkflowLockStore`, and
+`MapPubSubAdapter` are included for tests and local development.
 
 ## Architecture
 
@@ -183,6 +219,7 @@ Each step receives a strongly-typed context:
 
 ```typescript
 interface WorkflowContext<TContext> {
+  signal: AbortSignal;
   readonly workflow: {
     readonly id: string;
     readonly state: WorkflowState;

@@ -2,6 +2,7 @@
 
 import { DataStreamHandler } from "@/components/data-stream-handler";
 import { PageSpinner } from "@/components/page-spinner";
+import { PreviewAttachment } from "@/components/preview-attachment";
 import { getChatHistoryPaginationKey } from "@/components/sidebar/sidebar-history";
 import {
   CustomContextMenuContent,
@@ -28,11 +29,7 @@ import { Submit } from "@/components/ui-custom/submit";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AnimatedItem, AnimatedList } from "@/components/ui/animated-list";
 import { Button } from "@/components/ui/button";
-import {
-  ContextMenu,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
+import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { FieldGroup } from "@/components/ui/field";
 import {
   InputGroupAddon,
@@ -56,7 +53,10 @@ import {
 import { FileInput } from "@/components/uploads/file-input";
 import { useMergedRefs } from "@/hooks/use-merged-refs";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useUploadTaskManager } from "@/hooks/use-upload-task-manager";
+import { useVoiceRecorder } from "@/hooks/use-voice-recorder";
 import { ApiRequestError } from "@/lib/api/client";
+import { attachmentFromUploadTask } from "@/lib/attachments";
 import { deepReplace } from "@/lib/deep-replace";
 import {
   clearCachePattern,
@@ -64,6 +64,7 @@ import {
   getFetcher,
   globalMutate,
 } from "@/lib/swr";
+import type { Attachment } from "@/lib/types";
 import { cn, generateUUID } from "@/lib/utils";
 import { useChatHistoryStore } from "@/stores/use-chat-history-store";
 import { useChat } from "@ai-sdk/react";
@@ -86,6 +87,7 @@ import {
   Paperclip,
   Pencil,
   Plus,
+  Square,
   Trash2,
   TriangleAlert,
 } from "lucide-react";
@@ -143,10 +145,43 @@ export function NewChat({ id }: NewChatProps) {
     [],
   );
   const [inputText, setInputText] = useState("");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const isMobile = useIsMobile();
   const router = useRouter();
   const { mutate } = useSWRConfig();
   const { setCurrentChatId } = useChatHistoryStore();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadManager = useUploadTaskManager({
+    defaultStorageContext: "chat",
+  });
+
+  useEffect(() => {
+    let active = true;
+    const completedTasks = uploadManager.uploadTasks.filter(
+      (task) => task.status === "success" && task.url,
+    );
+    void Promise.all(completedTasks.map(attachmentFromUploadTask)).then(
+      (completedAttachments) => {
+        if (!active) return;
+        setAttachments((previous) => {
+          const map = new Map(
+            previous.map((attachment) => [attachment.url, attachment]),
+          );
+          completedAttachments.forEach((attachment) => {
+            if (attachment) map.set(attachment.url, attachment);
+          });
+          return Array.from(map.values());
+        });
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [uploadManager.uploadTasks]);
+
+  const voiceRecorder = useVoiceRecorder({
+    onRecordingComplete: (file) => uploadManager.enqueueUploads([file], "chat"),
+  });
 
   // Use a ref so the transport closure always reads the latest agentIds at send time
   const selectedAgentIdsRef = useRef<string[]>([]);
@@ -161,7 +196,9 @@ export function NewChat({ id }: NewChatProps) {
   const chatFetch = useCallback(
     async (input: RequestInfo | URL, init?: RequestInit) => {
       const response = await fetchWithErrorHandlers(input, init);
-      if (response.headers.has("x-workflow-run-id")) {
+      const workflowRunId = response.headers.get("x-workflow-run-id");
+      if (workflowRunId) {
+        localStorage.setItem(`active-workflow-run-id:${chatId}`, workflowRunId);
         router.push(`/chat/${chatId}`, { scroll: false });
         setCurrentChatId(chatId);
       }
@@ -212,12 +249,34 @@ export function NewChat({ id }: NewChatProps) {
     }
 
     const text = inputText.trim();
+    const hasActiveUploads = uploadManager.uploadTasks.some((task) =>
+      ["queued", "preparing", "uploading"].includes(task.status),
+    );
+    if (hasActiveUploads || voiceRecorder.isRecording) return;
+    if (!text && attachments.length === 0) return;
     setInputText("");
     sendMessage({
       role: "user",
-      parts: [{ type: "text", text: text || "Hello" }],
+      parts: [
+        ...attachments.map((attachment) => ({
+          type: "file" as const,
+          url: attachment.dataUrl ?? attachment.url,
+          name: attachment.name,
+          mediaType: attachment.contentType,
+        })),
+        ...(text ? [{ type: "text" as const, text }] : []),
+      ],
     });
-  }, [inputText, sendMessage, status]);
+    uploadManager.resetAllUploadTasks();
+    setAttachments([]);
+  }, [
+    attachments,
+    inputText,
+    sendMessage,
+    status,
+    uploadManager,
+    voiceRecorder.isRecording,
+  ]);
 
   const agentPanel = (
     <div className="relative h-full overflow-hidden bg-sidebar">
@@ -256,6 +315,36 @@ export function NewChat({ id }: NewChatProps) {
       <div className="flex h-full overflow-hidden">
         <article className="mx-auto flex h-full w-full max-w-3xl flex-col items-center justify-center gap-8 p-4 sm:p-8">
           <h1 className="text-3xl">One chat to rule them all</h1>
+          <input
+            ref={fileInputRef}
+            className="hidden"
+            multiple
+            onChange={(event) => {
+              const files = Array.from(event.target.files ?? []);
+              if (files.length) uploadManager.enqueueUploads(files, "chat");
+              event.target.value = "";
+            }}
+            type="file"
+          />
+          {(attachments.length > 0 || uploadManager.uploadTasks.length > 0) && (
+            <div className="flex w-full flex-wrap gap-2">
+              {attachments.map((attachment) => (
+                <PreviewAttachment
+                  attachment={attachment}
+                  key={attachment.url}
+                  onRemove={() => {
+                    const task = uploadManager.uploadTasks.find(
+                      (item) => item.url === attachment.url,
+                    );
+                    if (task) uploadManager.removeUploadTask(task.id);
+                    setAttachments((current) =>
+                      current.filter((item) => item.url !== attachment.url),
+                    );
+                  }}
+                />
+              ))}
+            </div>
+          )}
           <CustomInputGroup className="h-14 w-full rounded-full! bg-sidebar!">
             {/* TODO multiline + combine with CHAT SDK's main input */}
             <CustomInputGroupInput
@@ -277,12 +366,13 @@ export function NewChat({ id }: NewChatProps) {
                     size="icon-md"
                     variant="ghost-sidebar"
                     className="rounded-full"
+                    onClick={() => fileInputRef.current?.click()}
                   >
                     <Paperclip />
                   </InputGroupButton>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Soon...</p>
+                  <p>Add files</p>
                 </TooltipContent>
               </Tooltip>
             </InputGroupAddon>
@@ -313,13 +403,33 @@ export function NewChat({ id }: NewChatProps) {
                     aria-label="Dictate"
                     size="icon-md"
                     variant="ghost-sidebar"
-                    className="rounded-full"
+                    className={cn(
+                      "rounded-full",
+                      voiceRecorder.isRecording && "text-red-500",
+                    )}
+                    onClick={() => {
+                      if (voiceRecorder.isRecording) {
+                        voiceRecorder.stop();
+                      } else {
+                        void voiceRecorder
+                          .start()
+                          .catch(() =>
+                            window.alert(
+                              "Microphone permission is required to record voice.",
+                            ),
+                          );
+                      }
+                    }}
                   >
-                    <Mic />
+                    {voiceRecorder.isRecording ? <Square /> : <Mic />}
                   </InputGroupButton>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Soon...</p>
+                  <p>
+                    {voiceRecorder.isRecording
+                      ? "Stop recording"
+                      : "Record voice"}
+                  </p>
                 </TooltipContent>
               </Tooltip>
               <InputGroupButton
@@ -328,7 +438,14 @@ export function NewChat({ id }: NewChatProps) {
                 variant="primary"
                 className="rounded-full"
                 onClick={handleSubmit}
-                disabled={status === "submitted" || status === "streaming"}
+                disabled={
+                  status === "submitted" ||
+                  status === "streaming" ||
+                  voiceRecorder.isRecording ||
+                  uploadManager.uploadTasks.some((task) =>
+                    ["queued", "preparing", "uploading"].includes(task.status),
+                  )
+                }
               >
                 <ArrowUp />
               </InputGroupButton>
@@ -469,7 +586,7 @@ const SelectableAgent = forwardRef<HTMLButtonElement, SelectableAgentProps>(
     return (
       <>
         <ContextMenu>
-          <Tooltip open={isTooltipOpen}>
+          <Tooltip open={isTooltipOpen} onOpenChange={setIsTooltipOpen}>
             <ContextMenuTrigger asChild>
               <TooltipTrigger asChild>
                 <Ripple
@@ -529,16 +646,11 @@ const SelectableAgent = forwardRef<HTMLButtonElement, SelectableAgentProps>(
               >
                 <Trash2 /> Remove
               </CustomContextMenuItem>
-              <ContextMenuSeparator />
-              <CustomContextMenuItem disabled inset>
-                More features soon...
-              </CustomContextMenuItem>
             </CustomContextMenuContent>
 
             <TooltipContent
               side="left"
               className="flex items-center gap-2 p-2 pe-4"
-              onPointerDownOutside={() => setIsTooltipOpen(false)}
               collisionPadding={8}
             >
               <Ripple asChild>
@@ -621,6 +733,23 @@ function AgentForm() {
     EditAgentRequest
   >("/api/agent", getFetcher("PATCH"));
 
+  const submitNewAgent = useCallback(
+    async (payload: NewAgentRequest) => {
+      const result = await newAgent(payload);
+      await globalMutate("/api/agent");
+      return result;
+    },
+    [newAgent],
+  );
+  const submitEditAgent = useCallback(
+    async (payload: EditAgentRequest) => {
+      const result = await editAgent(payload);
+      await globalMutate("/api/agent");
+      return result;
+    },
+    [editAgent],
+  );
+
   useEffect(() => {
     if (currentAgent) editForm.reset(currentAgent);
   }, [currentAgent, editForm]);
@@ -641,7 +770,7 @@ function AgentForm() {
           key="new-agent"
           id={formId}
           form={addForm}
-          swr={{ trigger: newAgent }}
+          swr={{ trigger: submitNewAgent }}
           onSubmit={goBack}
           className="flex h-full flex-col"
         >
@@ -656,7 +785,7 @@ function AgentForm() {
           key="edit-agent"
           id={formId}
           form={editForm}
-          swr={{ trigger: editAgent }}
+          swr={{ trigger: submitEditAgent }}
           onSubmit={goBack}
           className="flex h-full flex-col"
         >
@@ -682,6 +811,28 @@ function AgentFormContent({
   formId,
   goBack,
 }: AgentFormContentProps) {
+  const { data: modelCatalog } = useSWR<{
+    models: Array<{ id: string; name: string }>;
+  }>("/api/models?toolsOnly=true", {
+    shouldRetryOnError: false,
+    onError: () => undefined,
+  });
+  const modelOptions = useMemo(
+    () =>
+      (
+        modelCatalog?.models ?? [
+          { id: defaultModel, name: defaultModel },
+          { id: "openrouter/free", name: "OpenRouter Free Router" },
+        ]
+      ).map((model) => ({
+        value: model.id,
+        label:
+          model.name === model.id ? model.id : `${model.name} (${model.id})`,
+        type: "single" as const,
+      })),
+    [modelCatalog],
+  );
+
   return (
     <>
       <RouteViewHeader
@@ -726,77 +877,14 @@ function AgentFormContent({
           />
           <ControlledInput
             name={"model" satisfies Path<AgentRequest>}
-            description="More models coming soon"
+            description="Models are loaded from OpenRouter"
             className="mx-4 w-auto"
             errorPosition="before-input"
             orientation="horizontal"
             inputStyle="no-input-group"
             inputComponent={SelectInput} // TODO replace with combobox
             inputProps={{
-              // TODO get from endpoint
-              options: [
-                {
-                  type: "group",
-                  label: "OpenAI",
-                  options: [
-                    { value: "gpt-4.1", label: "GPT-4.1", type: "single" },
-                    {
-                      value: "gpt-4.1-mini",
-                      label: "GPT-4.1 Mini",
-                      type: "single",
-                    },
-                    {
-                      value: "gpt-4.1-nano",
-                      label: "GPT-4.1 Nano",
-                      type: "single",
-                    },
-                  ],
-                },
-                { type: "separator" },
-                {
-                  type: "group",
-                  label: "Anthropic",
-                  options: [
-                    {
-                      value: "claude-opus-4-5",
-                      label: "Claude Opus 4.5",
-                      type: "single",
-                    },
-                    {
-                      value: "claude-sonnet-4-5",
-                      label: "Claude Sonnet 4.5",
-                      type: "single",
-                    },
-                    {
-                      value: "claude-haiku-4-5",
-                      label: "Claude Haiku 4.5",
-                      type: "single",
-                    },
-                  ],
-                },
-                { type: "separator" },
-                {
-                  type: "group",
-                  label: "Google (Gemini)",
-                  options: [
-                    {
-                      value: "gemini-3-pro",
-                      label: "Gemini 3 Pro",
-                      type: "single",
-                    },
-                    {
-                      value: "gemini-2.5-pro",
-                      label: "Gemini 2.5 Pro",
-                      type: "single",
-                    },
-                    {
-                      value: "gemini-2.5-flash",
-                      label: "Gemini 2.5 Flash",
-                      type: "single",
-                    },
-                  ],
-                },
-              ],
+              options: modelOptions,
             }}
           />
           <ControlledInput

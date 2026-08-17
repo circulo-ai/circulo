@@ -2,6 +2,7 @@
 # Dependencies & package manager caches
 # ===============================
 node_modules
+.agents
 .pnpm-store
 
 # Lockfiles (don’t format / treat as generated)

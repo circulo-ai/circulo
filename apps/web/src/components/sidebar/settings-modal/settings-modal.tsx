@@ -2,18 +2,20 @@
 
 import { Account } from "@/components/sidebar/settings-modal/components/account/account";
 import { General } from "@/components/sidebar/settings-modal/components/general/general";
-import { Privacy } from "@/components/sidebar/settings-modal/components/privacy/privacy";
 import { SettingsNavigation } from "@/components/sidebar/settings-modal/components/settings-navigation/settings-navigation";
+import { Team } from "@/components/sidebar/settings-modal/components/team/team";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { SubscriptionUsageIndicator } from "@/components/usage-indicator";
+import { authClient } from "@/lib/auth-client";
 import { env, isTruthy } from "@/lib/env";
 import { createLogger } from "@/lib/logs/console/logger";
 import { useGeneralStore } from "@/stores/settings/general/store";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 const logger = createLogger("SettingsModal");
 
@@ -24,37 +26,25 @@ interface SettingsModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type SettingsSection =
-  | "general"
-  | "account"
-  | "subscription"
-  | "team"
-  | "privacy";
+type SettingsSection = "general" | "account" | "subscription" | "team";
 
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const [activeSection, setActiveSection] =
     useState<SettingsSection>("general");
-  const [isLoading, setIsLoading] = useState(true);
+  const [, setIsLoading] = useState(true);
   const loadSettings = useGeneralStore((state) => state.loadSettings);
-  const hasLoadedInitialData = useRef(false);
-  const hasLoadedGeneral = useRef(false);
-  const environmentCloseHandler = useRef<((open: boolean) => void) | null>(
-    null,
-  );
-  const credentialsCloseHandler = useRef<((open: boolean) => void) | null>(
-    null,
-  );
+  const { data: activeOrganization } = authClient.useActiveOrganization();
+  const [hasLoadedGeneral, setHasLoadedGeneral] = useState(false);
 
   useEffect(() => {
     async function loadGeneralIfNeeded() {
       if (!open) return;
       if (activeSection !== "general") return;
-      if (hasLoadedGeneral.current) return;
+      if (hasLoadedGeneral) return;
       setIsLoading(true);
       try {
         await loadSettings();
-        hasLoadedGeneral.current = true;
-        hasLoadedInitialData.current = true;
+        setHasLoadedGeneral(true);
       } catch (error) {
         logger.error("Error loading general settings:", error);
       } finally {
@@ -65,10 +55,9 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
     if (open) {
       void loadGeneralIfNeeded();
     } else {
-      hasLoadedInitialData.current = false;
-      hasLoadedGeneral.current = false;
+      setHasLoadedGeneral(false);
     }
-  }, [open, activeSection, loadSettings]);
+  }, [open, activeSection, hasLoadedGeneral, loadSettings]);
 
   useEffect(() => {
     const handleOpenSettings = (
@@ -93,15 +82,10 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
   // Redirect away from billing tabs if billing is disabled
   useEffect(() => {
-    if (
-      !isBillingEnabled &&
-      (activeSection === "subscription" || activeSection === "team")
-    ) {
+    if (!isBillingEnabled && activeSection === "subscription") {
       setActiveSection("general");
     }
   }, [activeSection]);
-
-  const isSubscriptionEnabled = isBillingEnabled;
 
   // Handle dialog close - delegate to environment component if it's active
   const handleDialogOpenChange = (newOpen: boolean) => {
@@ -121,7 +105,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             <SettingsNavigation
               activeSection={activeSection}
               onSectionChange={setActiveSection}
-              hasOrganization={false}
+              hasOrganization={Boolean(activeOrganization)}
             />
           </div>
 
@@ -137,11 +121,16 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                 <Account onOpenChange={onOpenChange} />
               </div>
             )}
-            {activeSection === "privacy" && (
-              <div className="h-full">
-                <Privacy />
+            {activeSection === "subscription" && isBillingEnabled && (
+              <div className="p-6">
+                <h2 className="mb-2 text-base font-medium">Subscription</h2>
+                <p className="mb-4 text-sm text-muted-foreground">
+                  Review your current plan and usage.
+                </p>
+                <SubscriptionUsageIndicator />
               </div>
             )}
+            {activeSection === "team" && activeOrganization && <Team />}
           </div>
         </div>
       </DialogContent>

@@ -68,14 +68,7 @@ jobs:
           node-version: "20"
 
       - name: Install dependencies
-        run: |
-          set -euo pipefail
-          if bun install --frozen-lockfile; then
-            exit 0
-          fi
-          echo "bun.lock invalid; reinstalling without the lockfile" >&2
-          rm -f bun.lock
-          bun install
+        run: bun install --frozen-lockfile
 
       - name: Check if package has tests
         id: check-tests

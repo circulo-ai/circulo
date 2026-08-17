@@ -1,4 +1,5 @@
 import { Chat } from "@/domain/chat/chat";
+import type { DrizzleChatMemberRepository } from "@/infrastructure/drizzle/chat-member-repository";
 import type { DrizzleChatRepository } from "@/infrastructure/drizzle/chat-repository";
 import type { DrizzleOrganizationMemberRepository } from "@/infrastructure/drizzle/organization-member-repository";
 import {
@@ -24,6 +25,7 @@ export type CreateChatOutput = Result<{ chatId: string }>;
 export class CreateChat implements UseCase<CreateChatInput, CreateChatOutput> {
   constructor(
     private readonly chats: DrizzleChatRepository,
+    private readonly chatMembers: DrizzleChatMemberRepository,
     private readonly members: DrizzleOrganizationMemberRepository,
     private readonly uow: UnitOfWork,
     private readonly publisher: DomainEventPublisher,
@@ -61,6 +63,10 @@ export class CreateChat implements UseCase<CreateChatInput, CreateChatOutput> {
       });
 
       await this.chats.save(chat);
+      await this.chatMembers.createOwner(
+        chat.aggregateId.toString(),
+        input.creatorId,
+      );
       await Promise.all(
         chat.pullDomainEvents().map((evt) => this.publisher.publish(evt)),
       );

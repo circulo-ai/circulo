@@ -34,7 +34,10 @@ export function AuthClientProvider({ children }: { children: ReactNode }) {
       onSessionChange={async () => {
         const session = await authClient.getSession();
         const sessionId = session?.data?.session?.id || null;
-        if (lastSessionIdRef.current !== undefined && lastSessionIdRef.current !== sessionId) {
+        if (
+          lastSessionIdRef.current !== undefined &&
+          lastSessionIdRef.current !== sessionId
+        ) {
           router.refresh();
         }
         lastSessionIdRef.current = sessionId;

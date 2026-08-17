@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { LLM_MODELS } from "../types/models";
+import { defaultModel } from "../types/models";
 
 export const getAgentQuerySchema = z.object({
   id: z.uuid().optional(),
@@ -14,7 +14,7 @@ export const baseAgentSchema = z.object({
   description: z.string().optional(),
   instructions: z.string().min(1, "Instructions are required"),
   avatarUrl: z.url().or(z.string().startsWith("/")).optional(),
-  model: z.enum(LLM_MODELS),
+  model: z.string().min(1).default(defaultModel),
   maxTokens: z.coerce.number().int().positive().optional(),
   temperature: z.coerce.number().int().min(0).max(100).optional(),
   defaultToolIds: z.array(z.string()).optional(),

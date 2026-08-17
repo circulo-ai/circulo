@@ -2,6 +2,7 @@ import { Chat } from "@/domain/chat/chat";
 import { ChatAgentLink } from "@/domain/chat/chat-agent-link";
 import { Message } from "@/domain/message/message";
 import type { DrizzleChatAgentLinkRepository } from "@/infrastructure/drizzle/chat-agent-link-repository";
+import type { DrizzleChatMemberRepository } from "@/infrastructure/drizzle/chat-member-repository";
 import type { DrizzleChatRepository } from "@/infrastructure/drizzle/chat-repository";
 import type { DrizzleMessageRepository } from "@/infrastructure/drizzle/message-repository";
 import type { DrizzleOrganizationMemberRepository } from "@/infrastructure/drizzle/organization-member-repository";
@@ -23,10 +24,15 @@ export type CreateChatWithMessageInput = {
   title: string;
   visibility: "private" | "public";
   content: string;
+  parts?: unknown[];
+  attachments?: unknown[];
   agentIds: string[];
 };
 
-export type CreateChatWithMessageOutput = Result<{ chatId: string; eventId: string }>;
+export type CreateChatWithMessageOutput = Result<{
+  chatId: string;
+  eventId: string;
+}>;
 
 export class CreateChatWithMessage implements UseCase<
   CreateChatWithMessageInput,
@@ -34,6 +40,7 @@ export class CreateChatWithMessage implements UseCase<
 > {
   constructor(
     private readonly chats: DrizzleChatRepository,
+    private readonly chatMembers: DrizzleChatMemberRepository,
     private readonly messages: DrizzleMessageRepository,
     private readonly links: DrizzleChatAgentLinkRepository,
     private readonly members: DrizzleOrganizationMemberRepository,
@@ -41,7 +48,9 @@ export class CreateChatWithMessage implements UseCase<
     private readonly publisher: DomainEventPublisher,
   ) {}
 
-  async execute(input: CreateChatWithMessageInput): Promise<CreateChatWithMessageOutput> {
+  async execute(
+    input: CreateChatWithMessageInput,
+  ): Promise<CreateChatWithMessageOutput> {
     for (const [value, name] of [
       [input.id, "id"],
       [input.messageId, "messageId"],
@@ -77,12 +86,18 @@ export class CreateChatWithMessage implements UseCase<
       });
 
       await this.chats.save(chat);
+      await this.chatMembers.createOwner(
+        chat.aggregateId.toString(),
+        input.creatorId,
+      );
       await this.messages.save(
         new Message({
           id: Identifier.from(input.messageId),
           chatId: chat.aggregateId,
           authorId: input.creatorId,
           content: input.content,
+          parts: input.parts,
+          attachments: input.attachments,
           createdAt: new Date(),
         }),
       );

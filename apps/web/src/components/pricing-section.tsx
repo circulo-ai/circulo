@@ -1,5 +1,6 @@
 import { generateRandomPath, Step } from "@/lib/border-walk";
 import { Icon } from "@/types/icon";
+import { BILLING_PLANS, formatBillingLimit } from "@circulo-ai/types";
 import {
   Bot,
   Gauge,
@@ -11,7 +12,6 @@ import {
   Users,
   UsersRound,
 } from "lucide-react";
-import { unstable_cache } from "next/cache";
 import { Suspense } from "react";
 import { PricingBackground } from "./pricing-background";
 import { Spinner } from "./ui/spinner";
@@ -49,8 +49,7 @@ export function PricingSection() {
 }
 
 async function Plans() {
-  const plans = await getCachedPlans();
-  // needs refactoring, from here
+  const plans = BILLING_PLANS;
   const featureTranslations: Record<string, string> = {
     customBilling: "Custom billing",
     dedicatedSupport: "Dedicated support",
@@ -61,6 +60,7 @@ async function Plans() {
     maxAgentsInChat: "Max agents in chat",
     rateLimitPerMinute: "Rate limit per minute",
     maxMessagesPerDay: "Max messages per day",
+    apiCalls: "API calls per month",
   };
 
   const featureIcons: Record<string, Icon> = {
@@ -73,13 +73,17 @@ async function Plans() {
     maxAgentsInChat: UsersRound,
     rateLimitPerMinute: Gauge,
     maxMessagesPerDay: MessageSquareText,
+    apiCalls: MessageSquareText,
   };
 
   return (
     <div className="absolute inset-0 grid grid-cols-12 grid-rows-8 gap-0.5">
       <div className="col-span-1 row-span-1 row-start-2"></div>
       {plans.map((plan: any) => {
-        const featureNames = Object.keys(plan.features ?? {}) as [];
+        const featureNames = Object.keys(plan.features).filter(
+          (featureName) =>
+            !["createTeamOrg", "prioritySupport"].includes(featureName),
+        );
         return (
           <article
             key={plan.id}
@@ -93,20 +97,31 @@ async function Plans() {
 
             <div className="mt-auto flex flex-col gap-1">
               {featureNames.map((featureName) => {
-                const Icon = featureIcons[featureName];
+                const FeatureIcon = featureIcons[featureName] ?? Gauge;
                 return (
                   <div
                     key={featureName}
                     className="flex items-center justify-between"
                   >
                     <div className="flex items-center gap-2">
-                      <Icon className="size-4" />
+                      <FeatureIcon className="size-4" />
                       {featureTranslations[featureName]}
                     </div>
-                    <div>{plan?.features?.[featureName] ?? "–"}</div>
+                    <div>
+                      {formatBillingLimit(
+                        plan.features[
+                          featureName as keyof typeof plan.features
+                        ],
+                      )}
+                    </div>
                   </div>
                 );
               })}
+              <div className="mt-3 border-t pt-3 text-lg font-medium">
+                {plan.monthlyPrice === null
+                  ? "Custom pricing"
+                  : `$${plan.monthlyPrice}/month`}
+              </div>
             </div>
           </article>
         );
@@ -115,8 +130,3 @@ async function Plans() {
   );
   // to here
 }
-
-const getCachedPlans = unstable_cache(async () => [], ["plans"], {
-  tags: ["plans"],
-  revalidate: 60 * 60 * 24,
-});

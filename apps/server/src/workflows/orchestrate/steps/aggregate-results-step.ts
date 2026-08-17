@@ -1,7 +1,9 @@
+import { db, humanApproval } from "@/db";
+import { getLanguageModel } from "@/lib/ai/providers";
 import type { ChatMessage } from "@/lib/types";
 import { getTextFromMessages } from "@/lib/utils";
-import { google } from "@ai-sdk/google";
 import { generateText, Output } from "ai";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import type { RequestClassification } from "./classify-request-step";
 import type { AgentExecutionResult } from "./execute-agent-task-step";
@@ -16,7 +18,7 @@ const aggregatedResultSchema = z.object({
   successfulAgents: z.array(z.string()),
   failedAgents: z.array(z.string()),
   overallSuccess: z.boolean(),
-  recommendations: z.array(z.string()).optional(),
+  recommendations: z.array(z.string()),
 });
 
 export type AggregatedResult = z.infer<typeof aggregatedResultSchema>;
@@ -26,8 +28,57 @@ export async function aggregateResultsStep(params: {
   plan: ExecutionPlan;
   classification: RequestClassification;
   triggerMessages: ChatMessage[];
+  pendingApprovalId?: string;
+  workflowRunId?: string;
 }): Promise<AggregatedResult> {
-  const { agentResults, plan, classification, triggerMessages } = params;
+  const {
+    agentResults,
+    plan,
+    classification,
+    triggerMessages,
+    pendingApprovalId,
+    workflowRunId,
+  } = params;
+
+  if (pendingApprovalId && workflowRunId) {
+    const approval = await db.query.humanApproval.findFirst({
+      where: eq(humanApproval.id, pendingApprovalId),
+    });
+    if (approval && approval.workflowRunId === workflowRunId) {
+      const agentOutput = agentResults
+        .map((result) => result.output)
+        .filter((output): output is string => Boolean(output))
+        .join("\n\n");
+      const approved = approval.status === "approved";
+      const decisionLabel =
+        approval.status === "expired"
+          ? "expired"
+          : approval.status === "cancelled"
+            ? "cancelled"
+            : approval.status === "rejected"
+              ? "rejected"
+              : "not approved";
+      return {
+        summary: approved ? "Human approval granted" : "Human approval denied",
+        detailedResponse: approved
+          ? `Approval granted for “${approval.title}”. The agent completed its planning step; any consequential action must still be executed by an explicitly authorized tool.\n\n${agentOutput}`
+          : `The approval request was ${decisionLabel}.\n\n${approval.decisionNote ?? "No decision note was provided."}`,
+        actionItems: [],
+        successfulAgents: approved
+          ? agentResults
+              .filter((result) => result.success)
+              .map((result) => result.agentName)
+          : [],
+        failedAgents: approved
+          ? agentResults
+              .filter((result) => !result.success)
+              .map((result) => result.agentName)
+          : agentResults.map((result) => result.agentName),
+        overallSuccess: approved,
+        recommendations: [],
+      };
+    }
+  }
 
   // If single agent, return its result directly
   if (agentResults.length === 1) {
@@ -41,6 +92,7 @@ export async function aggregateResultsStep(params: {
       successfulAgents: result.success ? [result.agentName] : [],
       failedAgents: result.success ? [] : [result.agentName],
       overallSuccess: result.success,
+      recommendations: [],
     };
   }
 
@@ -53,10 +105,11 @@ Duration: ${r.durationMs}ms`,
     )
     .join("\n\n---\n\n");
 
-  const { output } = await generateText({
-    model: google("gemini-2.5-flash"),
-    output: Output.object({ schema: aggregatedResultSchema }),
-    system: `You are synthesizing the outputs from multiple AI agents into a coherent final response.
+  try {
+    const { output } = await generateText({
+      model: getLanguageModel(),
+      output: Output.object({ schema: aggregatedResultSchema }),
+      system: `You are synthesizing the outputs from multiple AI agents into a coherent final response.
 
 ORIGINAL REQUEST: "${getTextFromMessages(triggerMessages)}"
 REQUEST TYPE: ${classification.intent}
@@ -70,11 +123,32 @@ Your task:
 5. Give recommendations for improvements
 
 Be concise but comprehensive. The user should understand exactly what happened and what to do next.`,
-    prompt: `AGENT OUTPUTS:
+      prompt: `AGENT OUTPUTS:
 ${agentOutputs}
 
 Synthesize these results into a final response.`,
-  });
+    });
 
-  return output;
+    return output;
+  } catch (error) {
+    console.error("Failed to aggregate agent results", error);
+    return {
+      summary: "Agent execution completed",
+      detailedResponse: agentResults
+        .map(
+          (result) =>
+            result.output || result.error || `${result.agentName} completed`,
+        )
+        .join("\n\n"),
+      actionItems: [],
+      successfulAgents: agentResults
+        .filter((result) => result.success)
+        .map((result) => result.agentName),
+      failedAgents: agentResults
+        .filter((result) => !result.success)
+        .map((result) => result.agentName),
+      overallSuccess: agentResults.every((result) => result.success),
+      recommendations: [],
+    };
+  }
 }

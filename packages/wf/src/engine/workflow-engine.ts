@@ -173,6 +173,17 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
     return workflow.id;
   }
 
+  /** Create and execute a workflow in one call; returns its durable ID. */
+  async createAndRun(
+    definition: WorkflowDefinition<TContext, TInput, TOutput>,
+    input: TInput,
+    transform?: (output: TOutput) => TOutput | Promise<TOutput>,
+  ): Promise<string> {
+    const workflowId = await this.createWorkflow(definition, input);
+    await this.run(workflowId, transform);
+    return workflowId;
+  }
+
   async run(
     workflowId: string,
     transform?: (output: TOutput) => TOutput | Promise<TOutput>,

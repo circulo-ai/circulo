@@ -2,7 +2,7 @@ import type { DbInstance } from "@/db";
 import { chatMember as chatMemberTable } from "@/db/schema/chat";
 import { ChatMember } from "@/domain/chat/chat-member";
 import { Identifier, type Repository } from "@circulo-ai/core";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 function toDomain(row: typeof chatMemberTable.$inferSelect): ChatMember {
   return new ChatMember({
@@ -79,6 +79,22 @@ export class DrizzleChatMemberRepository implements Repository<ChatMember> {
     return entity;
   }
 
+  async createOwner(chatId: string, userId: string): Promise<void> {
+    await this.db
+      .insert(chatMemberTable)
+      .values({
+        chatId,
+        userId,
+        role: "owner",
+        canInvite: true,
+        canManageAgents: true,
+        canManageKnowledge: true,
+      })
+      .onConflictDoNothing({
+        target: [chatMemberTable.chatId, chatMemberTable.userId],
+      });
+  }
+
   async deleteById(id: Identifier): Promise<boolean> {
     const result = await this.db
       .delete(chatMemberTable)
@@ -86,5 +102,30 @@ export class DrizzleChatMemberRepository implements Repository<ChatMember> {
     return "rowCount" in result
       ? (result as { rowCount: number }).rowCount > 0
       : true;
+  }
+
+  async countActiveForChat(chatId: string): Promise<number> {
+    const [result] = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(chatMemberTable)
+      .where(
+        and(
+          eq(chatMemberTable.chatId, chatId),
+          sql`${chatMemberTable.leftAt} IS NULL`,
+        ),
+      );
+
+    return Number(result?.count ?? 0);
+  }
+
+  async isMember(userId: string, chatId: string): Promise<boolean> {
+    const row = await this.db.query.chatMember.findFirst({
+      where: and(
+        eq(chatMemberTable.userId, userId),
+        eq(chatMemberTable.chatId, chatId),
+        sql`${chatMemberTable.leftAt} IS NULL`,
+      ),
+    });
+    return Boolean(row);
   }
 }

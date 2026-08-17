@@ -83,7 +83,7 @@ interface CustomSidebarMenuButtonProps extends ComponentProps<
 
 export function CustomSidebarMenuButton({
   className,
-  variant = "secondary",
+  variant = "default",
   ...props
 }: CustomSidebarMenuButtonProps) {
   return (

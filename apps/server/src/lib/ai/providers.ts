@@ -1,57 +1,50 @@
-import { google } from "@ai-sdk/google";
-import {
-  customProvider,
-  extractReasoningMiddleware,
-  wrapLanguageModel,
-} from "ai";
+import { env } from "@/lib/env";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { customProvider, type LanguageModel } from "ai";
 
-type SupportingLanguageModel = {
-  gateway: any;
-  capabilities: {
-    imageInput: boolean;
-    objectGeneration: boolean;
-    toolUsage: boolean;
-    toolStreaming: boolean;
-  };
-};
+export const defaultModel =
+  env.OPENROUTER_DEFAULT_MODEL ?? "openai/gpt-4o-mini";
 
-export const supportingLanguageModels: {
-  readonly "gemini-2.5-flash": SupportingLanguageModel;
-} = {
-  "gemini-2.5-flash": {
-    gateway: google("gemini-2.5-flash"),
-    capabilities: {
-      imageInput: true,
-      objectGeneration: true,
-      toolUsage: true,
-      toolStreaming: true,
-    },
-  },
-};
-
-export type SupportedModels = keyof typeof supportingLanguageModels;
-
-export const LLM_MODELS = Object.keys(
-  supportingLanguageModels,
-) as SupportedModels[];
-
-export const myProvider: ReturnType<typeof customProvider> = customProvider({
-  languageModels: {
-    ...Object.fromEntries(
-      (
-        Object.keys(supportingLanguageModels) as Array<
-          keyof typeof supportingLanguageModels
-        >
-      ).map((key) => [key, supportingLanguageModels[key].gateway]),
-    ),
-    "chat-model": google("gemini-2.5-flash"),
-    "chat-model-reasoning": wrapLanguageModel({
-      model: google("gemini-2.5-flash"),
-      middleware: extractReasoningMiddleware({ tagName: "think" }),
-    }),
-    "title-model": google("gemini-2.5-flash"),
-    "artifact-model": google("gemini-2.5-flash"),
+export const openRouter = createOpenRouter({
+  apiKey: env.OPENROUTER_API_KEY,
+  baseURL: env.OPENROUTER_BASE_URL,
+  headers: {
+    ...(env.OPENROUTER_HTTP_REFERER
+      ? { "HTTP-Referer": env.OPENROUTER_HTTP_REFERER }
+      : {}),
+    ...(env.OPENROUTER_APP_TITLE
+      ? { "X-Title": env.OPENROUTER_APP_TITLE }
+      : {}),
   },
 });
 
-export const defaultModel: SupportedModels = "gemini-2.5-flash";
+export function getLanguageModel(modelId = defaultModel): LanguageModel {
+  return openRouter(modelId, { usage: { include: true } });
+}
+
+// Compatibility aliases for artifact and legacy callers. New model IDs are
+// resolved dynamically with getLanguageModel so the catalog is not hardcoded.
+export const myProvider: ReturnType<typeof customProvider> = customProvider({
+  languageModels: {
+    "chat-model": getLanguageModel(),
+    "chat-model-reasoning": getLanguageModel(),
+    "title-model": getLanguageModel(),
+    "artifact-model": getLanguageModel(),
+  },
+});
+
+export const supportingLanguageModels = {} as Record<
+  string,
+  {
+    gateway: LanguageModel;
+    capabilities: {
+      imageInput: boolean;
+      objectGeneration: boolean;
+      toolUsage: boolean;
+      toolStreaming: boolean;
+    };
+  }
+>;
+
+export type SupportedModels = string;
+export const LLM_MODELS: SupportedModels[] = [defaultModel];

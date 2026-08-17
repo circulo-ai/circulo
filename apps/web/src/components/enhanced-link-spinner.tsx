@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
-import { Slot } from "@radix-ui/react-slot";
-import { ComponentProps } from "react";
+import { Slot } from "@/lib/slot";
+import { ComponentProps, isValidElement } from "react";
 import { Spinner } from "./ui/spinner";
 
 type Props = ComponentProps<"div"> & ComponentProps<typeof Spinner>;
@@ -14,10 +14,24 @@ export function EnhancedLinkSpinner({
   asChild = false,
   ...props
 }: EnhancedLinkSpinnerProps) {
-  const Comp = asChild ? Slot : Spinner;
+  if (asChild) {
+    if (!isValidElement(props.children)) return null;
+
+    return (
+      <Slot
+        className={cn(
+          "pointer-events-none opacity-0 transition-opacity group-data-loading/link:pointer-events-auto group-data-loading/link:opacity-100",
+          className,
+        )}
+        {...props}
+      >
+        {props.children}
+      </Slot>
+    );
+  }
 
   return (
-    <Comp
+    <Spinner
       className={cn(
         "pointer-events-none opacity-0 transition-opacity group-data-loading/link:pointer-events-auto group-data-loading/link:opacity-100",
         className,
