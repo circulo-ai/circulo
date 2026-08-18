@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.0
+
+### Minor Changes
+
+- 793f85f: Add typed lifecycle hook management and the optional `@circulo-ai/wf/react`
+  integration for React workflow state, events, actions, and lifecycle hooks.
+
 ## Unreleased
 
 ### Minor Changes
