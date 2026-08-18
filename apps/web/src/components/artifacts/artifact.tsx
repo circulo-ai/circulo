@@ -4,7 +4,6 @@ import { sheetArtifact } from "@/artifacts/sheet/client";
 import { textArtifact } from "@/artifacts/text/client";
 import { MultimodalInput } from "@/components/multimodal-input";
 import { Toolbar } from "@/components/toolbar";
-import { useSidebar } from "@/components/ui/sidebar";
 import { VersionFooter } from "@/components/version-footer";
 import type { VisibilityType } from "@/components/visibility-selector";
 import { useArtifact } from "@/hooks/api/chats/use-artifact";
@@ -13,13 +12,15 @@ import type { UseChatHelpers } from "@ai-sdk/react";
 import type { Document, Vote } from "@circulo-ai/db/schema";
 import { formatDistance } from "date-fns";
 import equal from "fast-deep-equal";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AlertCircle, Loader2 } from "lucide-react";
 import {
   type Dispatch,
   memo,
   type SetStateAction,
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import useSWR, { useSWRConfig } from "swr";
@@ -43,6 +44,7 @@ export type UIArtifact = {
   content: string;
   isVisible: boolean;
   status: "streaming" | "idle";
+  error?: string;
   boundingBox: {
     top: number;
     left: number;
@@ -86,6 +88,7 @@ function PureArtifact({
 
   const {
     data: documents,
+    error: documentError,
     isLoading: isDocumentsFetching,
     mutate: mutateDocuments,
   } = useSWR<Document[]>(
@@ -97,8 +100,15 @@ function PureArtifact({
   const [mode, setMode] = useState<"edit" | "diff">("edit");
   const [document, setDocument] = useState<Document | null>(null);
   const [currentVersionIndex, setCurrentVersionIndex] = useState(-1);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState<"saved" | "saving">("saved");
 
-  const { open: isSidebarOpen } = useSidebar();
+  useEffect(() => {
+    setDocument(null);
+    setCurrentVersionIndex(-1);
+    setMode("edit");
+    setSaveError(null);
+  }, [artifact.documentId]);
 
   useEffect(() => {
     if (documents && documents.length > 0) {
@@ -109,6 +119,8 @@ function PureArtifact({
         setCurrentVersionIndex(documents.length - 1);
         setArtifact((currentArtifact) => ({
           ...currentArtifact,
+          title: mostRecentDocument.title,
+          kind: mostRecentDocument.kind as ArtifactKind,
           content: mostRecentDocument.content ?? "",
         }));
       }
@@ -120,54 +132,61 @@ function PureArtifact({
   }, [mutateDocuments]);
 
   const { mutate } = useSWRConfig();
-  const [isContentDirty, setIsContentDirty] = useState(false);
+  const saveQueueRef = useRef(Promise.resolve());
+  const latestContentRef = useRef("");
 
   const handleContentChange = useCallback(
     (updatedContent: string) => {
-      if (!artifact) {
+      if (
+        !artifact ||
+        artifact.documentId === "init" ||
+        artifact.status === "streaming"
+      )
         return;
-      }
-
-      mutate<Document[]>(
-        `/api/artifact?id=${artifact.documentId}`,
-        async (currentDocuments) => {
-          if (!currentDocuments) {
-            return [];
+      latestContentRef.current = updatedContent;
+      setSaveState("saving");
+      saveQueueRef.current = saveQueueRef.current
+        .then(async () => {
+          const contentToSave = latestContentRef.current;
+          if (!document || document.content === contentToSave) {
+            setSaveState("saved");
+            return;
           }
-
-          const currentDocument = currentDocuments.at(-1);
-
-          if (!currentDocument || !currentDocument.content) {
-            setIsContentDirty(false);
-            return currentDocuments;
-          }
-
-          if (currentDocument.content !== updatedContent) {
-            await fetch(`/api/artifact?id=${artifact.documentId}`, {
+          const response = await fetch(
+            `/api/artifact?id=${artifact.documentId}`,
+            {
               method: "POST",
+              headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 title: artifact.title,
-                content: updatedContent,
+                content: contentToSave,
                 kind: artifact.kind,
+                chatId,
               }),
-            });
-
-            setIsContentDirty(false);
-
-            const newDocument = {
-              ...currentDocument,
-              content: updatedContent,
-              createdAt: new Date(),
-            };
-
-            return [...currentDocuments, newDocument];
+            },
+          );
+          if (!response.ok) {
+            const payload = (await response.json().catch(() => null)) as {
+              message?: string;
+            } | null;
+            throw new Error(
+              payload?.message ?? "Artifact changes could not be saved",
+            );
           }
-          return currentDocuments;
-        },
-        { revalidate: false },
-      );
+          setSaveError(null);
+          setSaveState("saved");
+          await mutateDocuments();
+        })
+        .catch((error) => {
+          setSaveState("saved");
+          setSaveError(
+            error instanceof Error
+              ? error.message
+              : "Artifact changes could not be saved",
+          );
+        });
     },
-    [artifact, mutate],
+    [artifact, chatId, document, mutateDocuments],
   );
 
   const debouncedHandleContentChange = useDebounceCallback(
@@ -178,8 +197,6 @@ function PureArtifact({
   const saveContent = useCallback(
     (updatedContent: string, debounce: boolean) => {
       if (document && updatedContent !== document.content) {
-        setIsContentDirty(true);
-
         if (debounce) {
           debouncedHandleContentChange(updatedContent);
         } else {
@@ -236,8 +253,9 @@ function PureArtifact({
       ? currentVersionIndex === documents.length - 1
       : true;
 
-  const { width: windowWidth, height: windowHeight } = useWindowSize();
+  const { width: windowWidth } = useWindowSize();
   const isMobile = windowWidth ? windowWidth < 768 : false;
+  const prefersReducedMotion = useReducedMotion();
 
   const artifactDefinition = artifactDefinitions.find(
     (definition) => definition.kind === artifact.kind,
@@ -256,176 +274,132 @@ function PureArtifact({
     }
   }, [artifact.documentId, artifactDefinition, setMetadata]);
 
+  useEffect(() => {
+    if (!artifact.isVisible) return;
+
+    const previousOverflow = window.document.body.style.overflow;
+    const previousPaddingRight = window.document.body.style.paddingRight;
+    const scrollbarWidth =
+      window.innerWidth - window.document.documentElement.clientWidth;
+
+    window.document.body.style.overflow = "hidden";
+    if (scrollbarWidth > 0) {
+      window.document.body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+
+    return () => {
+      window.document.body.style.overflow = previousOverflow;
+      window.document.body.style.paddingRight = previousPaddingRight;
+    };
+  }, [artifact.isVisible]);
+
   return (
-    <AnimatePresence>
+    <AnimatePresence initial={false}>
       {artifact.isVisible && (
         <motion.div
           animate={{ opacity: 1 }}
-          className="fixed top-0 left-0 z-50 flex h-dvh w-dvw flex-row bg-transparent"
+          className="fixed inset-0 z-50 flex h-dvh w-full max-w-none flex-row overflow-hidden bg-background"
+          role="dialog"
+          aria-modal="true"
+          aria-label={artifact.title || "Artifact"}
           data-testid="artifact"
-          exit={{ opacity: 0, transition: { delay: 0.4 } }}
-          initial={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          initial={{ opacity: 0 }}
+          transition={{
+            duration: prefersReducedMotion ? 0.01 : 0.24,
+            ease: "easeOut",
+          }}
         >
-          {!isMobile && (
-            <motion.div
-              animate={{ width: windowWidth, right: 0 }}
-              className="fixed h-dvh bg-background"
-              exit={{
-                width: isSidebarOpen ? windowWidth - 256 : windowWidth,
-                right: 0,
-              }}
-              initial={{
-                width: isSidebarOpen ? windowWidth - 256 : windowWidth,
-                right: 0,
-              }}
-            />
-          )}
+          <motion.div
+            animate={{ opacity: 1, x: 0 }}
+            className="relative hidden h-dvh w-[clamp(18rem,30vw,26rem)] min-w-0 shrink-0 flex-col overflow-hidden border-r bg-muted/30 md:flex dark:bg-background"
+            exit={{ opacity: 0, x: -12 }}
+            initial={{ opacity: 0, x: -12 }}
+            transition={{
+              duration: prefersReducedMotion ? 0.01 : 0.22,
+              ease: "easeOut",
+            }}
+          >
+            <AnimatePresence>
+              {!isCurrentVersion && (
+                <motion.div
+                  animate={{ opacity: 1 }}
+                  className="absolute inset-0 z-50 bg-zinc-900/50"
+                  exit={{ opacity: 0 }}
+                  initial={{ opacity: 0 }}
+                />
+              )}
+            </AnimatePresence>
 
-          {!isMobile && (
-            <motion.div
-              animate={{
-                opacity: 1,
-                x: 0,
-                scale: 1,
-                transition: {
-                  delay: 0.1,
-                  type: "spring",
-                  stiffness: 300,
-                  damping: 30,
-                },
-              }}
-              className="relative h-dvh w-[400px] shrink-0 bg-muted dark:bg-background"
-              exit={{
-                opacity: 0,
-                x: 0,
-                scale: 1,
-                transition: { duration: 0 },
-              }}
-              initial={{ opacity: 0, x: 10, scale: 1 }}
-            >
-              <AnimatePresence>
-                {!isCurrentVersion && (
-                  <motion.div
-                    animate={{ opacity: 1 }}
-                    className="absolute top-0 left-0 z-50 h-dvh w-[400px] bg-zinc-900/50"
-                    exit={{ opacity: 0 }}
-                    initial={{ opacity: 0 }}
-                  />
-                )}
-              </AnimatePresence>
+            <div className="flex h-full min-h-0 flex-col">
+              <ArtifactMessages
+                artifactStatus={artifact.status}
+                chatId={chatId}
+                isReadonly={isReadonly}
+                messages={messages}
+                sendMessage={sendMessage}
+                setMessages={setMessages}
+                status={status}
+                votes={votes}
+              />
 
-              <div className="flex h-full flex-col items-center justify-between">
-                <ArtifactMessages
-                  artifactStatus={artifact.status}
+              <div className="relative w-full shrink-0 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-4">
+                <MultimodalInput
+                  attachments={attachments}
                   chatId={chatId}
-                  isReadonly={isReadonly}
+                  className="bg-background dark:bg-muted"
+                  input={input}
                   messages={messages}
-                  regenerate={regenerate}
+                  selectedVisibilityType={selectedVisibilityType}
+                  sendMessage={sendMessage}
+                  setAttachments={setAttachments}
+                  setInput={setInput}
                   setMessages={setMessages}
                   status={status}
-                  votes={votes}
+                  stop={stop}
                 />
-
-                <div className="relative flex w-full flex-row items-end gap-2 px-4 pb-4">
-                  <MultimodalInput
-                    attachments={attachments}
-                    chatId={chatId}
-                    className="bg-background dark:bg-muted"
-                    input={input}
-                    messages={messages}
-                    selectedVisibilityType={selectedVisibilityType}
-                    sendMessage={sendMessage}
-                    setAttachments={setAttachments}
-                    setInput={setInput}
-                    setMessages={setMessages}
-                    status={status}
-                    stop={stop}
-                  />
-                </div>
               </div>
-            </motion.div>
-          )}
+            </div>
+          </motion.div>
 
           <motion.div
-            animate={
-              isMobile
-                ? {
-                    opacity: 1,
-                    x: 0,
-                    y: 0,
-                    height: windowHeight,
-                    width: windowWidth ? windowWidth : "calc(100dvw)",
-                    borderRadius: 0,
-                    transition: {
-                      delay: 0,
-                      type: "spring",
-                      stiffness: 300,
-                      damping: 30,
-                      duration: 0.8,
-                    },
-                  }
-                : {
-                    opacity: 1,
-                    x: 400,
-                    y: 0,
-                    height: windowHeight,
-                    width: windowWidth
-                      ? windowWidth - 400
-                      : "calc(100dvw-400px)",
-                    borderRadius: 0,
-                    transition: {
-                      delay: 0,
-                      type: "spring",
-                      stiffness: 300,
-                      damping: 30,
-                      duration: 0.8,
-                    },
-                  }
-            }
-            className="fixed flex h-dvh flex-col overflow-y-scroll border-zinc-200 bg-background md:border-l dark:border-zinc-700 dark:bg-muted"
-            exit={{
+            animate={{ opacity: 1, x: 0, y: 0, borderRadius: 0 }}
+            className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background md:border-l dark:bg-muted"
+            exit={{ opacity: 0, y: 12 }}
+            initial={{
               opacity: 0,
-              scale: 0.5,
-              transition: {
-                delay: 0.1,
-                type: "spring",
-                stiffness: 600,
-                damping: 30,
-              },
+              x: isMobile ? 0 : 12,
+              y: isMobile ? 12 : 0,
             }}
-            initial={
-              isMobile
-                ? {
-                    opacity: 1,
-                    x: artifact.boundingBox.left,
-                    y: artifact.boundingBox.top,
-                    height: artifact.boundingBox.height,
-                    width: artifact.boundingBox.width,
-                    borderRadius: 50,
-                  }
-                : {
-                    opacity: 1,
-                    x: artifact.boundingBox.left,
-                    y: artifact.boundingBox.top,
-                    height: artifact.boundingBox.height,
-                    width: artifact.boundingBox.width,
-                    borderRadius: 50,
-                  }
-            }
+            transition={{
+              duration: prefersReducedMotion ? 0.01 : 0.26,
+              ease: "easeOut",
+            }}
           >
-            <div className="flex flex-row items-start justify-between p-2">
-              <div className="flex flex-row items-start gap-4">
+            <div className="flex shrink-0 flex-row items-start justify-between gap-3 border-b px-3 py-3 sm:px-5">
+              <div className="flex min-w-0 flex-1 flex-row items-start gap-3 sm:gap-4">
                 <ArtifactCloseButton />
 
-                <div className="flex flex-col">
-                  <div className="font-medium">{artifact.title}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-medium">
+                    {artifact.title || "Untitled artifact"}
+                  </div>
 
-                  {isContentDirty ? (
-                    <div className="text-sm text-muted-foreground">
+                  {saveState === "saving" ? (
+                    <div className="text-xs text-muted-foreground sm:text-sm">
                       Saving changes...
                     </div>
+                  ) : artifact.error ? (
+                    <div className="truncate text-xs text-destructive sm:text-sm">
+                      Artifact generation stopped
+                    </div>
+                  ) : artifact.status === "streaming" ? (
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground sm:text-sm">
+                      <Loader2 className="size-3.5 animate-spin" />
+                      Generating content...
+                    </div>
                   ) : document ? (
-                    <div className="text-sm text-muted-foreground">
+                    <div className="truncate text-xs text-muted-foreground sm:text-sm">
                       {`Updated ${formatDistance(
                         new Date(document.createdAt),
                         new Date(),
@@ -451,26 +425,48 @@ function PureArtifact({
               />
             </div>
 
-            <div className="h-full max-w-full! items-center overflow-y-scroll bg-background dark:bg-muted">
-              <artifactDefinition.content
-                content={
-                  isCurrentVersion
-                    ? artifact.content
-                    : getDocumentContentById(currentVersionIndex)
-                }
-                currentVersionIndex={currentVersionIndex}
-                getDocumentContentById={getDocumentContentById}
-                isCurrentVersion={isCurrentVersion}
-                isInline={false}
-                isLoading={isDocumentsFetching && !artifact.content}
-                metadata={metadata}
-                mode={mode}
-                onSaveContent={saveContent}
-                setMetadata={setMetadata}
-                status={artifact.status}
-                suggestions={[]}
-                title={artifact.title}
-              />
+            <div className="relative chat-scrollbar min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain bg-background dark:bg-muted">
+              {artifact.error ? (
+                <ArtifactErrorState message={artifact.error} />
+              ) : saveError ? (
+                <ArtifactErrorState
+                  message={saveError}
+                  title="Couldn’t save artifact changes"
+                />
+              ) : documentError ? (
+                <ArtifactErrorState
+                  message="We couldn’t load the latest artifact version. Try closing and reopening it."
+                  title="Artifact unavailable"
+                />
+              ) : artifact.status === "streaming" &&
+                !artifact.content.trim() ? (
+                <ArtifactStreamingState title={artifact.title} />
+              ) : artifact.status === "idle" &&
+                !artifact.content.trim() &&
+                !document &&
+                !isDocumentsFetching ? (
+                <ArtifactEmptyState />
+              ) : (
+                <artifactDefinition.content
+                  content={
+                    isCurrentVersion
+                      ? artifact.content
+                      : getDocumentContentById(currentVersionIndex)
+                  }
+                  currentVersionIndex={currentVersionIndex}
+                  getDocumentContentById={getDocumentContentById}
+                  isCurrentVersion={isCurrentVersion}
+                  isInline={false}
+                  isLoading={isDocumentsFetching && !artifact.content}
+                  metadata={metadata}
+                  mode={mode}
+                  onSaveContent={saveContent}
+                  setMetadata={setMetadata}
+                  status={artifact.status}
+                  suggestions={[]}
+                  title={artifact.title}
+                />
+              )}
 
               <AnimatePresence>
                 {isCurrentVersion && (
@@ -503,6 +499,57 @@ function PureArtifact({
   );
 }
 
+function ArtifactStreamingState({ title }: { title: string }) {
+  return (
+    <div className="flex min-h-[min(28rem,60dvh)] w-full flex-col items-center justify-center gap-4 px-6 text-center sm:px-10">
+      <div className="flex size-12 items-center justify-center rounded-2xl border bg-muted/50">
+        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+      </div>
+      <div className="max-w-md space-y-1.5">
+        <h2 className="font-medium">Generating {title || "your artifact"}</h2>
+        <p className="text-sm leading-6 text-muted-foreground">
+          The artifact will appear here as the agent produces content. You can
+          continue reading the conversation while it streams.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function ArtifactErrorState({
+  message,
+  title = "Artifact generation stopped",
+}: {
+  message: string;
+  title?: string;
+}) {
+  return (
+    <div className="flex min-h-[min(28rem,60dvh)] w-full flex-col items-center justify-center gap-4 px-6 text-center sm:px-10">
+      <div className="flex size-12 items-center justify-center rounded-2xl border border-destructive/30 bg-destructive/10 text-destructive">
+        <AlertCircle className="size-5" />
+      </div>
+      <div className="max-w-lg space-y-1.5">
+        <h2 className="font-medium">{title}</h2>
+        <p className="text-sm leading-6 text-muted-foreground">
+          {message || "The artifact stream ended before content was generated."}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function ArtifactEmptyState() {
+  return (
+    <div className="flex min-h-[min(28rem,60dvh)] w-full flex-col items-center justify-center gap-2 px-6 text-center sm:px-10">
+      <h2 className="font-medium">No artifact content yet</h2>
+      <p className="text-sm leading-6 text-muted-foreground">
+        The artifact is ready, but no content was returned. Check the workflow
+        activity in the conversation for details.
+      </p>
+    </div>
+  );
+}
+
 export const Artifact = memo(PureArtifact, (prevProps, nextProps) => {
   if (prevProps.status !== nextProps.status) {
     return false;
@@ -513,7 +560,7 @@ export const Artifact = memo(PureArtifact, (prevProps, nextProps) => {
   if (prevProps.input !== nextProps.input) {
     return false;
   }
-  if (!equal(prevProps.messages, nextProps.messages.length)) {
+  if (prevProps.messages.length !== nextProps.messages.length) {
     return false;
   }
   if (prevProps.selectedVisibilityType !== nextProps.selectedVisibilityType) {

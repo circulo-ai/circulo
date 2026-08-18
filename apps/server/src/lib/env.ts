@@ -96,6 +96,7 @@ export const env = createEnv({
     OPENROUTER_APP_TITLE: z.string().optional(),
     OPENROUTER_DEFAULT_MODEL: z.string().min(1).optional(),
     CORS_ALLOWED_ORIGINS: z.string().optional(),
+    TRUSTED_PROXY_HOPS: z.string().optional().default("0"),
     GOOGLE_GENERATIVE_AI_API_KEY: z.string().optional(),
     OLLAMA_URL: z.string().optional(),
 

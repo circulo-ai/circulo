@@ -2,6 +2,8 @@ import createApp from "@/lib/create-app";
 import { env } from "@/lib/env";
 import { getBaseUrl } from "@/lib/urls/utils";
 import { rateLimit } from "@/middleware/rate-limit";
+import { loadAuthContext } from "@/middleware/auth";
+import { auditRequest } from "@/middleware/audit";
 import agent from "@/routes/agent";
 import artifact from "@/routes/artifact";
 import auth from "@/routes/auth";
@@ -11,6 +13,7 @@ import autumn from "@/routes/autumn";
 import billing from "@/routes/billing";
 import capabilities from "@/routes/capabilities";
 import chat from "@/routes/chat";
+import chatResources from "@/routes/chat-resources";
 import chatAgents from "@/routes/chat-agents";
 import chatInvitations from "@/routes/chat-invitations";
 import chatMembers from "@/routes/chat-members";
@@ -47,6 +50,7 @@ const OPENAPI_PATH = "/openapi.json";
 // Middlewares (register before routes)
 app.use("*", logger());
 app.use("*", requestId());
+app.use("*", auditRequest);
 app.use(prettyJSON());
 const allowedOrigins = [
   env.NEXT_PUBLIC_APP_URL,
@@ -71,7 +75,7 @@ const corsMiddleware = cors({
     }
     return getBaseUrl();
   },
-  allowHeaders: ["Content-Type", "Authorization"],
+  allowHeaders: ["Content-Type", "Authorization", "X-API-Key", "X-Request-Id"],
   allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   exposeHeaders: ["Content-Length"],
   maxAge: 600,
@@ -82,6 +86,7 @@ app.use("*", corsMiddleware); // apply globally so preflight never 404s
 // Rate limiting is a production boundary. Keeping it opt-in prevents an unset
 // NODE_ENV from making local development behave like a shared production API.
 if (SHOULD_APPLY_RATE_LIMITING) {
+  app.use("/api/*", loadAuthContext);
   app.use("/api/*", rateLimit());
 }
 
@@ -101,6 +106,7 @@ const routes = [
   chatPin,
   chatStream,
   chat,
+  chatResources,
   chatVisibility,
   files,
   messages,

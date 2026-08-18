@@ -1,6 +1,7 @@
 import { env, getEnv } from "@/lib/env";
 import { isDev } from "@/lib/environment";
 import type { NextConfig } from "next";
+import path from "node:path";
 
 const apiBaseUrl =
   process.env.SERVER_API_URL ??
@@ -80,6 +81,9 @@ const nextConfig: NextConfig = {
   },
   /* config options here */
   turbopack: {
+    // Resolve workspace-linked packages from the monorepo root. This keeps
+    // Turbopack compatible with Bun's symlinked node_modules layout.
+    root: path.resolve(__dirname, "../.."),
     resolveExtensions: [".tsx", ".ts", ".jsx", ".js", ".mjs", ".json"],
   },
   serverExternalPackages: ["pdf-parse", "postgres"],
@@ -87,9 +91,12 @@ const nextConfig: NextConfig = {
     "prettier",
     "@t3-oss/env-nextjs",
     "@t3-oss/env-core",
+    "@circulo-ai/upload",
     "@react-email/components",
     "@react-email/render",
     "@circulo-ai/types",
+    "@better-auth-ui/core",
+    "@better-auth-ui/react",
   ],
   ...(isDev && {
     allowedDevOrigins: [

@@ -9,6 +9,7 @@ import {
 import { RateLimitError } from "@circulo-ai/types";
 import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
+import { env } from "@/lib/env";
 
 type KeyResolver = (
   c: Context<AppEnv>,
@@ -26,10 +27,20 @@ export type RateLimitOptions = {
 
 function getClientIp(c: Context<AppEnv>): string | null {
   const forwarded = c.req.header("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0]?.trim() || null;
+  const trustedHops = Math.max(0, Number(env.TRUSTED_PROXY_HOPS ?? "0"));
+  if (trustedHops > 0 && forwarded) {
+    const addresses = forwarded
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+    const clientIndex = Math.max(0, addresses.length - trustedHops - 1);
+    return addresses[clientIndex] ?? null;
+  }
 
-  const realIp = c.req.header("x-real-ip");
-  if (realIp) return realIp;
+  if (trustedHops > 0) {
+    const realIp = c.req.header("x-real-ip");
+    if (realIp) return realIp;
+  }
 
   const socketIp = (c.req.raw as any)?.socket?.remoteAddress;
   if (typeof socketIp === "string" && socketIp.length > 0) return socketIp;
@@ -58,20 +69,22 @@ export function rateLimit(options: RateLimitOptions = {}) {
       return next();
     }
 
-    const user = c.var.user;
     const activeOrgId = c.var.activeOrgId;
+    const actorIdentifier =
+      c.var.apiKeyId || c.var.user?.id || getClientIp(c) || "anonymous";
     const resolvedIdentifier =
       (options.keyResolver && (await options.keyResolver(c, bucket))) ||
-      activeOrgId ||
-      user?.id ||
-      getClientIp(c) ||
-      "anonymous";
+      actorIdentifier;
 
     const plan =
       options.plan ||
       (activeOrgId ? await limiter.resolvePlan(activeOrgId) : DEFAULT_PLAN);
 
-    const key = limiter.composeKey(bucket, resolvedIdentifier);
+    const scope = activeOrgId ? `org:${activeOrgId}` : "global";
+    const key = limiter.composeKey(
+      bucket,
+      `${scope}:actor:${resolvedIdentifier}:route:${c.req.method}:${c.req.path}`,
+    );
     const decision = await limiter.check({
       key,
       bucket,

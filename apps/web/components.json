@@ -23,6 +23,7 @@
   "menuAccent": "subtle",
   "registries": {
     "@ai-elements": "https://registry.ai-sdk.dev/{name}.json",
-    "@react-bits": "https://reactbits.dev/r/{name}.json"
+    "@react-bits": "https://reactbits.dev/r/{name}.json",
+    "@better-auth-ui": "https://better-auth-ui.com/r/{style}/{name}.json"
   }
 }

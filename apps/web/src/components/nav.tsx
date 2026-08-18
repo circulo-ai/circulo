@@ -1,9 +1,9 @@
 "use client";
 
 import { navItems } from "@/consts/nav";
+import { UserButton } from "@/components/auth/user/user-button";
 import { useSession } from "@/lib/auth-client";
-import { UserButton } from "@daveyplate/better-auth-ui";
-import { ArrowUpRight, Phone, User } from "lucide-react";
+import { Phone, User } from "lucide-react";
 import { Suspense, useId } from "react";
 import { EnhancedLink } from "./enhanced-link";
 import { EnhancedLinkSpinner } from "./enhanced-link-spinner";
@@ -54,19 +54,6 @@ export function Nav() {
         )}
 
         <NavUlDot ulId={ulId} />
-
-        <li className="ms-8">
-          <EnhancedLink
-            href="/docs"
-            buttonProps={{
-              variant: "highlightedText",
-              size: "wide",
-              rounded: "full",
-            }}
-          >
-            Docs <ArrowUpRight className="size-3" />
-          </EnhancedLink>
-        </li>
 
         <li className="-ms-2">
           <Button

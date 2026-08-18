@@ -1,5 +1,7 @@
 "use client";
 
+import { CreateOrganizationDialog } from "@/components/auth/organization/create-organization-dialog";
+import { UserView } from "@/components/auth/user/user-view";
 import {
   CustomDropdownMenuContent,
   CustomDropdownMenuItem,
@@ -9,12 +11,11 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuGroup,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { UserAvatar } from "@/components/ui/user-avatar";
 import { authClient, useSession } from "@/lib/auth-client";
-import { CreateOrganizationDialog } from "@daveyplate/better-auth-ui";
 import {
   Bot,
   Brain,
@@ -27,13 +28,18 @@ import {
   Settings,
   TextAlignJustify,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export function ChatSidebarBurgerMenu() {
+  const router = useRouter();
   const { data: session, isPending } = useSession();
   const { data: activeOrganization } = authClient.useActiveOrganization();
   const { data: organizations } = authClient.useListOrganizations();
   const [open, setOpen] = useState(false);
+  const navigate = (href: string) => {
+    router.push(href, { scroll: false });
+  };
 
   return (
     <DropdownMenu>
@@ -47,14 +53,25 @@ export function ChatSidebarBurgerMenu() {
       </DropdownMenuTrigger>
       <CustomDropdownMenuContent sideOffset={8} align="start">
         <DropdownMenuGroup>
-          <CustomDropdownMenuItem>
-            <UserAvatar user={session?.user} isPending={isPending} size="xs" />
-            {activeOrganization?.name}
-          </CustomDropdownMenuItem>
+          <DropdownMenuLabel className="px-3 py-2">
+            <div className="min-w-0">
+              <UserView
+                user={session?.user}
+                isPending={isPending}
+                hideSubtitle
+                className="gap-2"
+              />
+              {activeOrganization?.name && (
+                <div className="truncate pl-9 text-xs text-muted-foreground">
+                  {activeOrganization.name}
+                </div>
+              )}
+            </div>
+          </DropdownMenuLabel>
           {organizations &&
             organizations
-              .filter((e) => e.id != activeOrganization?.id)
-              .map((e) => (
+              .filter((e: { id: string }) => e.id !== activeOrganization?.id)
+              .map((e: { id: string; name?: string | null }) => (
                 <CustomDropdownMenuItem
                   key={`org-${e.id}`}
                   onClick={async () => {
@@ -77,56 +94,42 @@ export function ChatSidebarBurgerMenu() {
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <CustomDropdownMenuItem
-            onClick={() => window.location.assign("/workspace")}
-          >
+          <CustomDropdownMenuItem onClick={() => navigate("/workspace")}>
             <Settings />
             Workspace
           </CustomDropdownMenuItem>
-          <CustomDropdownMenuItem
-            onClick={() => window.location.assign("/agents")}
-          >
+          <CustomDropdownMenuItem onClick={() => navigate("/agents")}>
             <Bot />
             Agents
           </CustomDropdownMenuItem>
-          <CustomDropdownMenuItem
-            onClick={() => window.location.assign("/knowledge")}
-          >
+          <CustomDropdownMenuItem onClick={() => navigate("/knowledge")}>
             <LibraryBig />
             Knowledge
           </CustomDropdownMenuItem>
-          <CustomDropdownMenuItem
-            onClick={() => window.location.assign("/memory")}
-          >
+          <CustomDropdownMenuItem onClick={() => navigate("/memory")}>
             <Brain />
             Memory
           </CustomDropdownMenuItem>
-          <CustomDropdownMenuItem
-            onClick={() => window.location.assign("/automation")}
-          >
+          <CustomDropdownMenuItem onClick={() => navigate("/automation")}>
             <CalendarClock />
             Automation
           </CustomDropdownMenuItem>
-          <CustomDropdownMenuItem
-            onClick={() => window.location.assign("/plugins")}
-          >
+          <CustomDropdownMenuItem onClick={() => navigate("/plugins")}>
             <Plug />
             Plugins
           </CustomDropdownMenuItem>
           <CustomDropdownMenuItem
-            onClick={() => window.location.assign("/workspace?section=tools")}
+            onClick={() => navigate("/workspace?section=tools")}
           >
             <Settings />
             Tools & MCP
           </CustomDropdownMenuItem>
-          <CustomDropdownMenuItem
-            onClick={() => window.location.assign("/pricing")}
-          >
+          <CustomDropdownMenuItem onClick={() => navigate("/pricing")}>
             <CreditCard />
             Billing
           </CustomDropdownMenuItem>
           <CustomDropdownMenuItem
-            onClick={() => window.location.assign("/workspace?section=account")}
+            onClick={() => navigate("/workspace?section=account")}
           >
             <Settings />
             Settings
@@ -141,5 +144,3 @@ export function ChatSidebarBurgerMenu() {
     </DropdownMenu>
   );
 }
-
-// TODO implement keyboard shortcuts

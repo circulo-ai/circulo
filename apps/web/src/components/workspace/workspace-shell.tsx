@@ -5,10 +5,10 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft01Icon,
+  BookOpen01Icon,
   BrainIcon,
   Building01Icon,
   CalendarClockIcon,
-  BookOpen01Icon,
   CreditCardIcon,
   Home01Icon,
   Robot01Icon,
@@ -24,6 +24,7 @@ import type { ReactNode } from "react";
 export type WorkspaceSection =
   | "overview"
   | "members"
+  | "teams"
   | "permissions"
   | "agents"
   | "knowledge"
@@ -45,27 +46,78 @@ const navigation: Array<{ label: string; items: NavigationItem[] }> = [
   {
     label: "Workspace",
     items: [
-      { id: "overview", label: "Overview", href: "/workspace?section=overview", icon: Home01Icon },
-      { id: "members", label: "Members & roles", href: "/workspace?section=members", icon: UserGroupIcon },
-      { id: "permissions", label: "Permissions", href: "/workspace?section=permissions", icon: ShieldUserIcon },
+      {
+        id: "overview",
+        label: "Overview",
+        href: "/workspace?section=overview",
+        icon: Home01Icon,
+      },
+      {
+        id: "members",
+        label: "Members & roles",
+        href: "/workspace?section=members",
+        icon: UserGroupIcon,
+      },
+      {
+        id: "teams",
+        label: "Teams",
+        href: "/workspace?section=teams",
+        icon: UserGroupIcon,
+      },
+      {
+        id: "permissions",
+        label: "Permissions",
+        href: "/workspace?section=permissions",
+        icon: ShieldUserIcon,
+      },
     ],
   },
   {
     label: "Resources",
     items: [
       { id: "agents", label: "Agents", href: "/agents", icon: Robot01Icon },
-      { id: "knowledge", label: "Knowledge", href: "/knowledge", icon: BookOpen01Icon },
+      {
+        id: "knowledge",
+        label: "Knowledge",
+        href: "/knowledge",
+        icon: BookOpen01Icon,
+      },
       { id: "memory", label: "Memory", href: "/memory", icon: BrainIcon },
-      { id: "tools", label: "Tools & MCP", href: "/workspace?section=tools", icon: ServerStack01Icon },
-      { id: "plugins", label: "Plugins", href: "/plugins", icon: ServerStack01Icon },
-      { id: "automation", label: "Automation", href: "/automation", icon: CalendarClockIcon },
+      {
+        id: "tools",
+        label: "Tools & MCP",
+        href: "/workspace?section=tools",
+        icon: ServerStack01Icon,
+      },
+      {
+        id: "plugins",
+        label: "Plugins",
+        href: "/plugins",
+        icon: ServerStack01Icon,
+      },
+      {
+        id: "automation",
+        label: "Automation",
+        href: "/automation",
+        icon: CalendarClockIcon,
+      },
     ],
   },
   {
     label: "Account",
     items: [
-      { id: "account", label: "Account settings", href: "/workspace?section=account", icon: Settings01Icon },
-      { id: "billing", label: "Billing", href: "/pricing", icon: CreditCardIcon },
+      {
+        id: "account",
+        label: "Account settings",
+        href: "/workspace?section=account",
+        icon: Settings01Icon,
+      },
+      {
+        id: "billing",
+        label: "Billing",
+        href: "/pricing",
+        icon: CreditCardIcon,
+      },
     ],
   },
 ];
@@ -89,7 +141,11 @@ export function WorkspaceShell({
         <header className="flex items-center justify-between gap-4 pb-5">
           <Button asChild size="sm" variant="ghost">
             <Link href="/chat">
-              <HugeiconsIcon icon={ArrowLeft01Icon} data-icon="inline-start" strokeWidth={2} />
+              <HugeiconsIcon
+                icon={ArrowLeft01Icon}
+                data-icon="inline-start"
+                strokeWidth={2}
+              />
               Back to chat
             </Link>
           </Button>
@@ -101,23 +157,36 @@ export function WorkspaceShell({
         <Separator />
         <div className="grid flex-1 items-start gap-8 py-8 lg:grid-cols-[220px_minmax(0,1fr)]">
           <aside className="lg:sticky lg:top-6">
-            <div className="mb-5">
-              <p className="text-sm font-semibold">Workspace</p>
-              <p className="mt-1 text-xs text-muted-foreground">Configure how your team works with Circulo.</p>
-            </div>
-            <nav aria-label="Workspace navigation" className="flex gap-1 overflow-x-auto pb-2 lg:flex-col lg:overflow-visible">
+            <nav
+              aria-label="Workspace navigation"
+              className="flex gap-1 overflow-x-auto pb-2 lg:flex-col lg:overflow-visible"
+            >
               {navigation.map((group) => (
-                <div className="flex shrink-0 flex-col gap-1 lg:mb-4" key={group.label}>
-                  <p className="px-3 pb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{group.label}</p>
+                <div
+                  className="flex shrink-0 flex-col gap-1 lg:mb-4"
+                  key={group.label}
+                >
+                  <p className="px-3 pb-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+                    {group.label}
+                  </p>
                   {group.items.map((item) => (
                     <Button
                       asChild
-                      className={cn("justify-start gap-2", activeSection === item.id && "bg-accent text-accent-foreground")}
+                      className={cn(
+                        "justify-start gap-2",
+                        activeSection === item.id &&
+                          "bg-accent text-accent-foreground",
+                      )}
                       key={item.id}
                       size="sm"
                       variant="ghost"
                     >
-                      <Link href={item.href} aria-current={activeSection === item.id ? "page" : undefined}>
+                      <Link
+                        href={item.href}
+                        aria-current={
+                          activeSection === item.id ? "page" : undefined
+                        }
+                      >
                         <HugeiconsIcon icon={item.icon} strokeWidth={2} />
                         {item.label}
                       </Link>
@@ -130,9 +199,15 @@ export function WorkspaceShell({
           <section className="min-w-0">
             <div className="flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-end sm:justify-between">
               <div className="min-w-0">
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Workspace settings</p>
-                <h1 className="mt-2 text-2xl font-semibold tracking-tight">{title}</h1>
-                <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{description}</p>
+                <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+                  Workspace settings
+                </p>
+                <h1 className="mt-2 text-2xl font-semibold tracking-tight">
+                  {title}
+                </h1>
+                <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+                  {description}
+                </p>
               </div>
               {actions}
             </div>

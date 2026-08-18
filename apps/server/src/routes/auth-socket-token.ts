@@ -5,7 +5,7 @@ import { requireAuth } from "@/middleware/auth";
 const router = createRouter();
 
 router.post("/auth/socket-token", requireAuth, async (c) => {
-  const response = await auth.api.generateOneTimeToken({
+  const response = await (auth.api as any).generateOneTimeToken({
     headers: c.req.raw.headers,
   });
 

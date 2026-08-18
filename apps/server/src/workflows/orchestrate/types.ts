@@ -7,6 +7,8 @@ export interface WorkflowActor {
 
 export interface OrchestrationInput {
   messages: ChatMessage[];
+  /** The durable user-message version that owns this run. */
+  messageId?: string;
   chatId: string;
   triggerType: "user_message" | "webhook_event";
   actor: WorkflowActor;

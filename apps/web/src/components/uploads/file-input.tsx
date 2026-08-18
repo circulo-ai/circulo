@@ -123,7 +123,7 @@ export function FileInput({
       const files = event.dataTransfer.files;
       if (!disabled && files.length > 0) enqueueUploads(files);
     },
-    [],
+    [disabled, enqueueUploads],
   );
 
   const handleChange: ChangeEventHandler<HTMLInputElement> = useCallback(
@@ -131,7 +131,7 @@ export function FileInput({
       const files = event.target.files;
       if (files && files.length > 0) enqueueUploads(files);
     },
-    [],
+    [enqueueUploads],
   );
 
   return (
@@ -191,7 +191,7 @@ function DefaultComponent({
           height={128}
           className="size-full object-cover"
           onLoad={() => setIsLoaded(true)}
-          onError={() => setIsLoaded(true)} // TODO handle error
+          onError={() => setIsLoaded(true)}
         />
       )}
       <div
@@ -208,9 +208,6 @@ function DefaultComponent({
     </div>
   );
 }
-
-// TODO global drag and drop
-// TODO when the form resets, this doesn't
 
 function normalizeValue(value: FileInputProps["value"]): string | undefined {
   if (typeof value === "string") return value;

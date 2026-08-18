@@ -27,6 +27,12 @@ export function DataStreamHandler() {
     setDataStream([]);
 
     for (const delta of newDeltas) {
+      // Data parts can arrive in the same batch. Keep the kind ref in sync
+      // before routing the first content delta so code/sheet/image streams do
+      // not get handled by the previous artifact definition.
+      if (delta.type === "data-kind") {
+        artifactKindRef.current = delta.data;
+      }
       const artifactDefinition = artifactDefinitions.find(
         (currentArtifactDefinition) =>
           currentArtifactDefinition.kind === artifactKindRef.current,
@@ -45,6 +51,8 @@ export function DataStreamHandler() {
           setArtifact((draftArtifact) => ({
             ...(draftArtifact ?? initialArtifactData),
             documentId: delta.data,
+            error: undefined,
+            isVisible: true,
             status: "streaming",
           }));
           break;
@@ -52,6 +60,7 @@ export function DataStreamHandler() {
         case "data-title":
           setArtifact((draftArtifact) => ({
             ...(draftArtifact ?? initialArtifactData),
+            error: undefined,
             title: delta.data,
             status: "streaming",
           }));
@@ -60,6 +69,7 @@ export function DataStreamHandler() {
         case "data-kind":
           setArtifact((draftArtifact) => ({
             ...(draftArtifact ?? initialArtifactData),
+            error: undefined,
             kind: delta.data,
             status: "streaming",
           }));
@@ -69,6 +79,7 @@ export function DataStreamHandler() {
           setArtifact((draftArtifact) => ({
             ...(draftArtifact ?? initialArtifactData),
             content: "",
+            error: undefined,
             status: "streaming",
           }));
           break;

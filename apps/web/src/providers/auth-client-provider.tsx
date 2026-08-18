@@ -1,50 +1,47 @@
 "use client";
 
+import { AuthProvider } from "@/components/auth/auth-provider";
 import { authClient } from "@/lib/auth-client";
+import { emailOtpPlugin } from "@/lib/auth/email-otp-plugin";
+import { magicLinkPlugin } from "@/lib/auth/magic-link-plugin";
+import { organizationPlugin } from "@/lib/auth/organization-plugin";
+import { themePlugin } from "@/lib/auth/theme-plugin";
+import { twoFactorPlugin } from "@/lib/auth/two-factor-plugin";
 import { getBaseUrl } from "@/lib/urls/utils";
-import { AuthUIProvider } from "@daveyplate/better-auth-ui";
+import { useTheme } from "next-themes";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useRef } from "react";
 
 export function AuthClientProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const lastSessionIdRef = useRef<string | null | undefined>(undefined);
+  const { setTheme } = useTheme();
 
   return (
-    <AuthUIProvider
-      gravatar
-      account
-      persistClient
-      deleteUser
-      magicLink={true}
-      organization={false}
-      optimistic={true}
-      multiSession={false}
-      changeEmail={false}
-      credentials={false}
+    <AuthProvider
       authClient={authClient}
-      social={{
-        providers: ["google"],
-      }}
-      navigate={router.push}
-      replace={router.replace}
       baseURL={getBaseUrl()}
-      onSessionChange={async () => {
-        const session = await authClient.getSession();
-        const sessionId = session?.data?.session?.id || null;
-        if (
-          lastSessionIdRef.current !== undefined &&
-          lastSessionIdRef.current !== sessionId
-        ) {
-          router.refresh();
-        }
-        lastSessionIdRef.current = sessionId;
+      redirectTo="/chat"
+      emailAndPassword={{ enabled: false }}
+      socialProviders={["google"]}
+      plugins={[
+        emailOtpPlugin({
+          signIn: true,
+          emailVerification: true,
+          changeEmail: true,
+        }),
+        magicLinkPlugin(),
+        organizationPlugin({ teams: true }),
+        themePlugin({ useTheme: () => ({ setTheme }) }),
+        twoFactorPlugin({ allowPasswordless: true }),
+      ]}
+      navigate={({ to, replace }) => {
+        if (replace) router.replace(to);
+        else router.push(to);
       }}
       Link={Link}
     >
       {children}
-    </AuthUIProvider>
+    </AuthProvider>
   );
 }

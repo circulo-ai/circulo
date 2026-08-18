@@ -28,6 +28,7 @@ export { InMemoryEventStore } from "./store/memory-event-store";
 export { InMemoryWorkflowStore } from "./store/memory-workflow-store";
 export { ConsoleLogger } from "./utils/logger";
 export { InMemoryMetrics } from "./utils/metrics";
+export { WorkflowHookManager, WorkflowHooks } from "./hooks/workflow-hooks";
 
 // Utils
 export { exponentialBackoff } from "./utils/backoff";

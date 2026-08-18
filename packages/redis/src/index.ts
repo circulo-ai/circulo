@@ -163,6 +163,26 @@ export class CirculoRedis {
     return this.raw.incrby(this.key(key), amount);
   }
 
+  async atomicIncrementWithExpiry(
+    key: string,
+    amount: number,
+    ttlMs: number,
+  ): Promise<{ count: number; ttlMs: number }> {
+    const script = [
+      "local count = redis.call('INCRBY', KEYS[1], ARGV[1])",
+      "if count == tonumber(ARGV[1]) then redis.call('PEXPIRE', KEYS[1], ARGV[2]) end",
+      "return { count, redis.call('PTTL', KEYS[1]) }",
+    ].join(" ");
+    const result = (await this.raw.eval(
+      script,
+      1,
+      this.key(key),
+      amount,
+      ttlMs,
+    )) as [number, number];
+    return { count: Number(result[0]), ttlMs: Number(result[1]) };
+  }
+
   async decrBy(key: string, amount = 1): Promise<number> {
     return this.raw.decrby(this.key(key), amount);
   }

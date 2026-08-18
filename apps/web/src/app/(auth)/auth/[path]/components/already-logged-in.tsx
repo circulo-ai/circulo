@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { signOut, useSession } from "@/lib/auth-client";
-import { UserAvatar } from "@daveyplate/better-auth-ui";
+import { UserAvatar } from "@/components/auth/user/user-avatar";
 import { ArrowRight, LogOut } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -33,7 +33,7 @@ export const AlreadyLoggedInCard = () => {
       <CardContent className="px-8 pt-8 pb-4">
         <div className="flex flex-col items-center space-y-6 text-center">
           {/* Avatar */}
-          <UserAvatar className="size-20" user={user} size={"xl"} />
+          <UserAvatar className="size-20" user={user} />
 
           {/* Welcome Message */}
           <div className="space-y-2">

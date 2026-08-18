@@ -1,35 +1,109 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import useSWR from "swr";
 
 type ScrollFlag = ScrollBehavior | false;
+type ScrollSnapshot = {
+  top: number;
+  atBottom: boolean;
+};
 
-export function useScrollToBottom() {
+type UseScrollToBottomOptions = {
+  initialScrollToBottom?: boolean;
+  storageKey?: string;
+};
+
+export function useScrollToBottom({
+  initialScrollToBottom = false,
+  storageKey,
+}: UseScrollToBottomOptions = {}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const shouldFollowRef = useRef(true);
+  const isRestoringRef = useRef(false);
   const [isAtBottom, setIsAtBottom] = useState(true);
 
-  const { data: scrollBehavior = false, mutate: setScrollBehavior } =
-    useSWR<ScrollFlag>("messages:should-scroll", null, { fallbackData: false });
+  // Scroll requests belong to one conversation surface. A process-wide SWR
+  // key made the main chat and artifact transcript scroll each other.
+  const [scrollBehavior, setScrollBehavior] = useState<ScrollFlag>(false);
+
+  const persistScrollPosition = useCallback(
+    (container: HTMLDivElement, atBottom: boolean) => {
+      if (!storageKey || isRestoringRef.current) return;
+
+      try {
+        sessionStorage.setItem(
+          storageKey,
+          JSON.stringify({
+            top: container.scrollTop,
+            atBottom,
+          } satisfies ScrollSnapshot),
+        );
+      } catch {
+        // Storage can be unavailable in private browsing; scrolling still works.
+      }
+    },
+    [storageKey],
+  );
 
   const handleScroll = useCallback(() => {
-    if (!containerRef.current) {
-      return;
-    }
-    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+    const container = containerRef.current;
+    if (!container) return;
+    if (isRestoringRef.current) return;
 
-    // Check if we are within 100px of the bottom (like v0 does)
-    setIsAtBottom(scrollTop + clientHeight >= scrollHeight - 100);
-  }, []);
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const atBottom = scrollTop + clientHeight >= scrollHeight - 100;
+    shouldFollowRef.current = atBottom;
+    setIsAtBottom(atBottom);
+    persistScrollPosition(container, atBottom);
+  }, [persistScrollPosition]);
 
   useEffect(() => {
-    if (!containerRef.current) {
-      return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    let snapshot: ScrollSnapshot | undefined;
+    if (storageKey && !initialScrollToBottom) {
+      try {
+        const stored = sessionStorage.getItem(storageKey);
+        if (stored) {
+          const parsed = JSON.parse(stored) as Partial<ScrollSnapshot>;
+          if (
+            typeof parsed.top === "number" &&
+            typeof parsed.atBottom === "boolean"
+          ) {
+            snapshot = parsed as ScrollSnapshot;
+            shouldFollowRef.current = snapshot.atBottom;
+            setIsAtBottom(snapshot.atBottom);
+          }
+        }
+      } catch {
+        // Ignore malformed or unavailable storage and use the default position.
+      }
     }
 
-    const container = containerRef.current;
+    isRestoringRef.current = Boolean(snapshot) || initialScrollToBottom;
+
+    const restoreScrollPosition = () => {
+      if (initialScrollToBottom) {
+        container.scrollTop = container.scrollHeight;
+      } else if (snapshot) {
+        const maxScrollTop = Math.max(
+          0,
+          container.scrollHeight - container.clientHeight,
+        );
+        container.scrollTop = snapshot.atBottom
+          ? container.scrollHeight
+          : Math.min(snapshot.top, maxScrollTop);
+      }
+
+      isRestoringRef.current = false;
+      handleScroll();
+    };
 
     const resizeObserver = new ResizeObserver(() => {
       requestAnimationFrame(() => {
+        if (shouldFollowRef.current) {
+          container.scrollTop = container.scrollHeight;
+        }
         handleScroll();
       });
     });
@@ -37,6 +111,9 @@ export function useScrollToBottom() {
     const mutationObserver = new MutationObserver(() => {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
+          if (shouldFollowRef.current) {
+            container.scrollTop = container.scrollHeight;
+          }
           handleScroll();
         });
       });
@@ -52,11 +129,16 @@ export function useScrollToBottom() {
 
     handleScroll();
 
+    const restoreFrame = requestAnimationFrame(() => {
+      requestAnimationFrame(restoreScrollPosition);
+    });
+
     return () => {
+      cancelAnimationFrame(restoreFrame);
       resizeObserver.disconnect();
       mutationObserver.disconnect();
     };
-  }, [handleScroll]);
+  }, [handleScroll, initialScrollToBottom, storageKey]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -92,10 +174,12 @@ export function useScrollToBottom() {
   );
 
   function onViewportEnter() {
+    shouldFollowRef.current = true;
     setIsAtBottom(true);
   }
 
   function onViewportLeave() {
+    shouldFollowRef.current = false;
     setIsAtBottom(false);
   }
 

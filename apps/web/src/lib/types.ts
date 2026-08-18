@@ -94,6 +94,7 @@ export type CustomUIDataTypes = {
 	workflowAgentStarted: WorkflowAgentTrace;
 	workflowAgentProgress: {
 		agentId: string;
+		agentName?: string;
 		progress: string;
 		timestamp?: string;
 	};
@@ -124,11 +125,12 @@ export type ChatMessage = UIMessage<
 >;
 
 export type Attachment = {
-	name: string;
-	url: string;
-	contentType: string;
-	size?: number;
-	dataUrl?: string;
+  name: string;
+  url: string;
+  contentType: string;
+  size?: number;
+  dataUrl?: string;
+  downloadUrl?: string;
 };
 
 export type CustomUIMessageChunk = UIMessageChunk<

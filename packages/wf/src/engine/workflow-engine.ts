@@ -1,3 +1,4 @@
+import { WorkflowHookManager } from "../hooks/workflow-hooks";
 import type {
   ErrorType,
   HealthCheck,
@@ -27,7 +28,10 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
   private metrics: NonNullable<
     WorkflowEngineConfig<TContext, TInput, TOutput>["metrics"]
   >;
+  private readonly hookManager: WorkflowHookManager<TContext, TInput, TOutput>;
   private runningWorkflows = new Set<string>();
+  /** Coalesces duplicate run requests in this process into one execution. */
+  private inFlightRuns = new Map<string, Promise<void>>();
   private workflowQueue: QueuedWorkflow<TOutput>[] = [];
   private processing = false;
   private shutdownRequested = false;
@@ -51,6 +55,18 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
     };
     this.logger = logger.child({ component: "WorkflowEngine" });
     this.metrics = metrics;
+    this.hookManager =
+      config.hooks ??
+      new WorkflowHookManager<TContext, TInput, TOutput>({
+        onError: (error, context) => {
+          const logContext = {
+            hook: context.name,
+            registrationId: context.registrationId,
+            ...(context.workflowId ? { workflowId: context.workflowId } : {}),
+          };
+          this.logger.error("Workflow hook failed", toError(error), logContext);
+        },
+      });
     this.runner = new WorkflowRunner(
       this.config.workflowStore,
       this.config.eventStore,
@@ -63,6 +79,7 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
         lockTTL: this.config.lockTTL,
         lockRenewInterval: this.config.lockRenewInterval,
       },
+      this.hookManager,
     );
 
     if (this.config.enableHealthCheck) {
@@ -72,6 +89,15 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
     if (this.config.enableAutoResume !== false) {
       this.startAutoResume();
     }
+
+    // Defer until callers have a chance to register startup listeners while
+    // keeping construction synchronous for all supported runtimes.
+    queueMicrotask(() => {
+      void this.hookManager.emit({
+        name: "engine.started",
+        timestamp: Date.now(),
+      });
+    });
   }
 
   async createWorkflow(
@@ -91,14 +117,20 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
         return existingWorkflowId;
       }
 
-      // Check if workflow exists in store with this idempotency key
-      const existingWorkflows = await this.config.workflowStore.listWorkflows({
-        tags: { idempotencyKey: definition.idempotencyKey },
-        limit: 1,
-      });
+      const existingWorkflow = this.config.workflowStore
+        .findWorkflowByIdempotencyKey
+        ? await this.config.workflowStore.findWorkflowByIdempotencyKey(
+            definition.idempotencyKey,
+          )
+        : (
+            await this.config.workflowStore.listWorkflows({
+              tags: { idempotencyKey: definition.idempotencyKey },
+              limit: 1,
+            })
+          )[0];
 
-      if (existingWorkflows.length > 0) {
-        const workflowId = existingWorkflows[0]!.id;
+      if (existingWorkflow) {
+        const workflowId = existingWorkflow.id;
         this.idempotencyCache.set(definition.idempotencyKey, workflowId);
         this.logger.info(
           "Found existing workflow with idempotency key in store",
@@ -153,7 +185,23 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
       },
     };
 
-    await this.config.workflowStore.saveWorkflow(workflow);
+    try {
+      await this.config.workflowStore.saveWorkflow(workflow);
+    } catch (error) {
+      // A unique idempotency constraint can win a race between workers. Read
+      // the winner and return it instead of creating a duplicate execution.
+      if (
+        definition.idempotencyKey &&
+        this.config.workflowStore.findWorkflowByIdempotencyKey
+      ) {
+        const existingWorkflow =
+          await this.config.workflowStore.findWorkflowByIdempotencyKey(
+            definition.idempotencyKey,
+          );
+        if (existingWorkflow) return existingWorkflow.id;
+      }
+      throw error;
+    }
     if (definition.transform) {
       this.transforms.set(workflow.id, definition.transform);
     }
@@ -164,6 +212,17 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
     if (definition.idempotencyKey) {
       this.idempotencyCache.set(definition.idempotencyKey, workflow.id);
     }
+
+    await this.hookManager.emit({
+      name: "workflow.created",
+      timestamp: workflow.createdAt,
+      workflowId: workflow.id,
+      workflow: snapshotWorkflow(workflow),
+      metadata: {
+        workflowName: definition.name,
+        workflowVersion: definition.version,
+      },
+    });
 
     this.logger.info("Workflow created", {
       workflowId: workflow.id,
@@ -192,30 +251,52 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
       throw new Error("Engine is shutting down");
     }
 
+    const existingRun = this.inFlightRuns.get(workflowId);
+    if (existingRun) return existingRun;
+
     const maxConcurrent = this.config.maxConcurrentWorkflows ?? Infinity;
 
-    if (this.runningWorkflows.size >= maxConcurrent) {
+    const shouldQueue = this.runningWorkflows.size >= maxConcurrent;
+    const execution = shouldQueue
+      ? new Promise<void>((resolve, reject) => {
+          this.workflowQueue.push({
+            workflowId,
+            transform,
+            resolve,
+            reject,
+          });
+          this.processQueue().catch((err: unknown) => {
+            this.logger.error("Queue processing error", toError(err));
+          });
+        })
+      : this.executeWorkflow(
+          workflowId,
+          transform ?? this.transforms.get(workflowId),
+        );
+
+    this.inFlightRuns.set(workflowId, execution);
+    void execution.then(
+      () => {
+        if (this.inFlightRuns.get(workflowId) === execution) {
+          this.inFlightRuns.delete(workflowId);
+        }
+      },
+      () => {
+        if (this.inFlightRuns.get(workflowId) === execution) {
+          this.inFlightRuns.delete(workflowId);
+        }
+      },
+    );
+
+    if (shouldQueue) {
       this.logger.info("Max concurrent workflows reached, queuing", {
         workflowId,
         queueSize: this.workflowQueue.length,
       });
-      return new Promise<void>((resolve, reject) => {
-        this.workflowQueue.push({
-          workflowId,
-          transform,
-          resolve,
-          reject,
-        });
-        this.processQueue().catch((err: unknown) => {
-          this.logger.error("Queue processing error", toError(err));
-        });
-      });
+      return execution;
     }
 
-    await this.executeWorkflow(
-      workflowId,
-      transform ?? this.transforms.get(workflowId),
-    );
+    await execution;
   }
 
   private async executeWorkflow(
@@ -330,6 +411,12 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
     await this.config.workflowStore.deleteWorkflow(workflowId);
     await this.config.eventStore.clear(workflowId);
     this.transforms.delete(workflowId);
+    await this.hookManager.emit({
+      name: "workflow.deleted",
+      timestamp: Date.now(),
+      workflowId,
+      ...(workflow ? { workflow: snapshotWorkflow(workflow) } : {}),
+    });
   }
 
   subscribe(
@@ -401,6 +488,7 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
         this.logger.error("Auto-resume scan failed", toError(err));
       });
     }, interval);
+    unref(this.resumeTimer);
   }
 
   private stopAutoResume(): void {
@@ -436,6 +524,7 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
   }
 
   async shutdown(graceful = true): Promise<void> {
+    if (this.shutdownRequested) return;
     this.logger.info("Shutting down workflow engine", { graceful });
     this.shutdownRequested = true;
     this.stopAutoResume();
@@ -470,6 +559,12 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
     }
 
     await this.runner.shutdown();
+    await this.hooks.emit({
+      name: "engine.shutdown",
+      timestamp: Date.now(),
+      metadata: { graceful },
+    });
+    this.inFlightRuns.clear();
     this.idempotencyCache.clear();
     this.transforms.clear();
     this.logger.info("Workflow engine shutdown complete");
@@ -480,6 +575,16 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
       subscribe: this.subscribe.bind(this),
       subscribeAll: this.subscribeAll.bind(this),
     };
+  }
+
+  /** Lifecycle hooks for metrics, tracing, notifications, and UI adapters. */
+  get lifecycle(): WorkflowHookManager<TContext, TInput, TOutput> {
+    return this.hookManager;
+  }
+
+  /** Alias for integrations that treat hooks as a first-class engine API. */
+  get hooks(): WorkflowHookManager<TContext, TInput, TOutput> {
+    return this.hookManager;
   }
 
   get status() {
@@ -493,6 +598,16 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
 
 function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
+}
+
+function snapshotWorkflow<TContext, TInput, TOutput>(
+  workflow: Workflow<TContext, TInput, TOutput>,
+): Readonly<Workflow<TContext, TInput, TOutput>> {
+  const { steps, ...serializable } = workflow;
+  return Object.freeze({
+    ...structuredClone(serializable),
+    steps: steps.map((step) => Object.freeze({ ...step })),
+  }) as Readonly<Workflow<TContext, TInput, TOutput>>;
 }
 
 function unref(timer: ReturnType<typeof setInterval>): void {

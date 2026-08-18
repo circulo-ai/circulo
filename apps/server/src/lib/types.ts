@@ -73,6 +73,7 @@ export type ChatTools = Record<string, any>;
 export type ActorContext = {
 	userId: string;
 	organizationId?: string;
+	chatId?: string;
 };
 
 export type CustomUIDataTypes = {
@@ -99,6 +100,7 @@ export type CustomUIDataTypes = {
 	workflowAgentStarted: WorkflowAgentTrace;
 	workflowAgentProgress: {
 		agentId: string;
+		agentName?: string;
 		progress: string;
 		timestamp?: string;
 	};
@@ -115,6 +117,7 @@ export type CustomUIDataTypes = {
 	workflowCompleted: { success: boolean; executionTimeMs: number };
 	workflowPaused: { workflowId: string };
 	workflowError: { error: string; agentId?: string };
+	workflowHeartbeat: { timestamp: string };
 	workflowTrace: WorkflowTrace;
 	workflowApprovalRequested: { id: string; title: string; status: string };
 	memoryUpdated: { id: string; key: string };

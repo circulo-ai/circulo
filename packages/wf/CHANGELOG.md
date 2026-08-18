@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Minor Changes
+
+- Add a typed lifecycle hook manager with priorities, wildcard listeners,
+  one-shot subscriptions, error isolation, and engine integration.
+- Add optional `@circulo-ai/wf/react` hooks for workflow state, event history,
+  actions, and component-scoped lifecycle listeners.
+
 ## 1.2.0
 
 ### Minor Changes

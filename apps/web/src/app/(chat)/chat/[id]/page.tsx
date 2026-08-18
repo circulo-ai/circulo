@@ -2,6 +2,7 @@ import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { Chat } from "@/components/chat";
+import type { ChatMessagePagination } from "@/hooks/api/chats/use-message-pagination";
 import { DataStreamHandler } from "@/components/data-stream-handler";
 import { convertToUIMessages } from "@/lib/utils";
 import {
@@ -47,9 +48,16 @@ export default async function Page(props: { params: Promise<{ id: string }> }) {
     notFound();
   }
 
-  const messagesFromDb = await messageRepo.findForChat(id);
+  const messagePage = await messageRepo.findWithCursor(id, {
+    direction: "before",
+    limit: 50,
+  });
 
-  const uiMessages = convertToUIMessages(messagesFromDb);
+  const uiMessages = convertToUIMessages(messagePage.items);
+  const messagePagination: ChatMessagePagination = {
+    cursor: messagePage.nextCursor,
+    hasMore: messagePage.hasMore,
+  };
 
   const cookieStore = await cookies();
   const chatModelFromCookie = cookieStore.get("chat-model");
@@ -60,6 +68,7 @@ export default async function Page(props: { params: Promise<{ id: string }> }) {
         <Chat
           id={chat.id}
           initialMessages={uiMessages}
+          initialMessagePagination={messagePagination}
           initialVisibilityType={chat.visibility}
           isReadonly={false}
         />
@@ -74,6 +83,7 @@ export default async function Page(props: { params: Promise<{ id: string }> }) {
         id={chat.id}
         initialChatModel={chatModelFromCookie.value}
         initialMessages={uiMessages}
+        initialMessagePagination={messagePagination}
         initialVisibilityType={chat.visibility}
         isReadonly={false}
       />

@@ -1,36 +1,64 @@
-import { auth } from "@/lib/auth";
+import { db } from "@/db";
+import * as schema from "@/db/schema";
+import { authenticateRequest } from "@/lib/auth/request";
 import type { AppEnv } from "@/lib/create-app";
-import type { Context } from "hono";
+import { and, eq } from "drizzle-orm";
 import { createMiddleware } from "hono/factory";
 
-// Infer Better Auth session type
-type SessionResponse = Awaited<ReturnType<typeof auth.api.getSession>>;
+async function loadContext(c: any) {
+  const principal = await authenticateRequest(c.req.raw);
+  if (!principal) return null;
 
-// Small helper to read session from Hono context
-async function getSessionFromContext(c: Context): Promise<SessionResponse> {
-  return auth.api.getSession({
-    headers: c.req.raw.headers,
-  });
-}
+  let user = principal.session?.user ?? null;
+  if (!user && principal.userId) {
+    user =
+      (await db.query.user.findFirst({
+        where: eq(schema.user.id, principal.userId),
+      })) ?? null;
+  }
+  if (!user && !principal.organizationId) return null;
 
-/**
- * Loads Better Auth session and stores it on context.
- * If no user, returns 401.
- */
-export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
-  const session = await getSessionFromContext(c);
-
-  if (!session?.user) {
-    return c.json({ error: "Unauthorized" }, 401);
+  let activeOrgId = principal.organizationId;
+  if (activeOrgId && principal.userId) {
+    const membership = await db
+      .select({ id: schema.member.id })
+      .from(schema.member)
+      .where(
+        and(
+          eq(schema.member.userId, principal.userId),
+          eq(schema.member.organizationId, activeOrgId),
+        ),
+      )
+      .limit(1);
+    if (!membership[0]) activeOrgId = undefined;
   }
 
-  const activeOrgId = (session.session as any)?.activeOrganizationId as
-    | string
-    | undefined;
-
-  c.set("session", session.session);
-  c.set("user", session.user);
+  c.set("user", user);
+  c.set("session", principal.session?.session ?? null);
+  c.set("authenticated", true);
+  c.set("authMethod", principal.authMethod);
+  if (principal.apiKeyId) c.set("apiKeyId", principal.apiKeyId);
+  if (principal.apiKeyPermissions) {
+    c.set("apiKeyPermissions", principal.apiKeyPermissions);
+  }
   if (activeOrgId) c.set("activeOrgId", activeOrgId);
+
+  return principal;
+}
+
+/** Populate auth context without rejecting anonymous requests. */
+export const loadAuthContext = createMiddleware<AppEnv>(async (c, next) => {
+  await loadContext(c);
+  await next();
+});
+
+/** Require a Better Auth session or a verified Better Auth API key. */
+export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
+  if (!c.var.user) await loadContext(c);
+
+  if (!c.var.user && c.var.authenticated !== true) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
 
   await next();
 });

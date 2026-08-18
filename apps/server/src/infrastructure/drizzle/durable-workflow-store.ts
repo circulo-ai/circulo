@@ -52,6 +52,15 @@ export class DurableWorkflowStore<
     return row ? this.fromRow(row) : null;
   }
 
+  async findWorkflowByIdempotencyKey(
+    idempotencyKey: string,
+  ): Promise<Workflow<TContext, TInput, TOutput> | null> {
+    const row = await db.query.workflowRun.findFirst({
+      where: eq(workflowRun.idempotencyKey, idempotencyKey),
+    });
+    return row ? this.fromRow(row) : null;
+  }
+
   async updateWorkflow(
     wf: Workflow<TContext, TInput, TOutput>,
     expectedVersion: number,
@@ -198,6 +207,7 @@ export class DurableWorkflowStore<
       status: toStatus(wf.state),
       state: wf.state,
       version: wf.version,
+      idempotencyKey: wf.tags["idempotencyKey"] ?? null,
       currentStep: wf.currentStep,
       retryCount: wf.retryCount,
       maxExecutionTime: wf.maxExecutionTime ?? null,
@@ -280,7 +290,7 @@ export class DurableWorkflowEventStore<TOutput> implements EventStore<TOutput> {
       .select()
       .from(workflowRunEvent)
       .where(eq(workflowRunEvent.workflowId, workflowId))
-      .orderBy(asc(workflowRunEvent.timestamp));
+      .orderBy(asc(workflowRunEvent.sequence), asc(workflowRunEvent.timestamp));
     return rows
       .filter(
         (row) => fromTimestamp === undefined || row.timestamp >= fromTimestamp,

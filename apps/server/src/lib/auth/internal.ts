@@ -75,7 +75,7 @@ export function verifyCronAuth(
   if (authHeader !== expectedAuth) {
     const contextInfo = context ? ` for ${context}` : "";
     logger.warn(`Unauthorized CRON access attempt${contextInfo}`, {
-      providedAuth: authHeader,
+      providedAuth: authHeader ? "present" : "missing",
       ip:
         request.headers.get("x-forwarded-for") ??
         request.headers.get("x-real-ip") ??

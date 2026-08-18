@@ -29,6 +29,7 @@ export interface ChatFilters {
   visibility?: "private" | "public";
   search?: string;
   includeDeleted?: boolean;
+  archived?: boolean;
   limit?: number;
   offset?: number;
 }
@@ -119,10 +120,11 @@ export function createChatRepository(database: DbInstance) {
       id: string,
       data: Omit<
         Partial<typeof chat.$inferInsert>,
-        "description" | "instructions"
+        "description" | "instructions" | "orchestrationAgentId"
       > & {
         description?: string | null;
         instructions?: string | null;
+        orchestrationAgentId?: string | null;
       },
     ) {
       const [row] = await db
@@ -237,6 +239,9 @@ export function createChatRepository(database: DbInstance) {
       if (!filters.includeDeleted) {
         conditions.push(eq(chat.isDeleted, false));
       }
+      if (filters.archived !== undefined) {
+        conditions.push(eq(chat.isArchived, filters.archived));
+      }
       if (filters.search) {
         conditions.push(
           or(
@@ -260,12 +265,14 @@ export function createChatRepository(database: DbInstance) {
       startingAfter,
       endingBefore,
       search,
+      archived = false,
     }: {
       id: string;
       limit: number;
       startingAfter?: string;
       endingBefore?: string;
       search?: string;
+      archived?: boolean;
     }) {
       try {
         const extendedLimit = limit + 1;
@@ -274,6 +281,18 @@ export function createChatRepository(database: DbInstance) {
           ? or(
               ilike(chat.title, `%${search}%`),
               ilike(chat.description, `%${search}%`),
+              inArray(
+                chat.id,
+                db
+                  .select({ chatId: message.chatId })
+                  .from(message)
+                  .where(
+                    and(
+                      eq(message.isDeleted, false),
+                      ilike(message.content, `%${search}%`),
+                    ),
+                  ),
+              ),
             )
           : undefined;
 
@@ -283,12 +302,14 @@ export function createChatRepository(database: DbInstance) {
               ? and(
                   eq(chat.creatorId, id),
                   eq(chat.isDeleted, false),
+                  eq(chat.isArchived, archived),
                   whereCondition,
                   searchCondition,
                 )
               : and(
                   eq(chat.creatorId, id),
                   eq(chat.isDeleted, false),
+                  eq(chat.isArchived, archived),
                   searchCondition,
                 )
             : whereCondition
@@ -296,8 +317,13 @@ export function createChatRepository(database: DbInstance) {
                   whereCondition,
                   eq(chat.creatorId, id),
                   eq(chat.isDeleted, false),
+                  eq(chat.isArchived, archived),
                 )
-              : and(eq(chat.creatorId, id), eq(chat.isDeleted, false));
+              : and(
+                  eq(chat.creatorId, id),
+                  eq(chat.isDeleted, false),
+                  eq(chat.isArchived, archived),
+                );
 
           return db
             .select()
@@ -359,6 +385,7 @@ export function createChatRepository(database: DbInstance) {
       startingAfter,
       endingBefore,
       search,
+      archived = false,
     }: {
       id: string;
       userId: string;
@@ -366,6 +393,7 @@ export function createChatRepository(database: DbInstance) {
       startingAfter?: string;
       endingBefore?: string;
       search?: string;
+      archived?: boolean;
     }) {
       try {
         const extendedLimit = limit + 1;
@@ -374,6 +402,18 @@ export function createChatRepository(database: DbInstance) {
           ? or(
               ilike(chat.title, `%${search}%`),
               ilike(chat.description, `%${search}%`),
+              inArray(
+                chat.id,
+                db
+                  .select({ chatId: message.chatId })
+                  .from(message)
+                  .where(
+                    and(
+                      eq(message.isDeleted, false),
+                      ilike(message.content, `%${search}%`),
+                    ),
+                  ),
+              ),
             )
           : undefined;
 
@@ -391,6 +431,7 @@ export function createChatRepository(database: DbInstance) {
           const baseCondition = and(
             eq(chat.organizationId, id),
             eq(chat.isDeleted, false),
+            eq(chat.isArchived, archived),
             inArray(chat.id, memberChatIds),
           );
           const whereClause = searchCondition
@@ -420,6 +461,7 @@ export function createChatRepository(database: DbInstance) {
                 eq(chat.id, startingAfter),
                 eq(chat.organizationId, id),
                 eq(chat.isDeleted, false),
+                eq(chat.isArchived, archived),
                 inArray(chat.id, memberChatIds),
               ),
             )
@@ -441,6 +483,7 @@ export function createChatRepository(database: DbInstance) {
                 eq(chat.id, endingBefore),
                 eq(chat.organizationId, id),
                 eq(chat.isDeleted, false),
+                eq(chat.isArchived, archived),
                 inArray(chat.id, memberChatIds),
               ),
             )
@@ -459,8 +502,37 @@ export function createChatRepository(database: DbInstance) {
 
         const hasMore = filteredChats.length > limit;
 
+        const chatsPage = hasMore
+          ? filteredChats.slice(0, limit)
+          : filteredChats;
+        const chatIds = chatsPage.map((currentChat) => currentChat.id);
+        const latestMessages = await db
+          .select({
+            chatId: message.chatId,
+            content: message.content,
+          })
+          .from(message)
+          .where(
+            and(inArray(message.chatId, chatIds), eq(message.isDeleted, false)),
+          )
+          .orderBy(desc(message.createdAt));
+
+        const latestMessageByChat = new Map<string, string>();
+        for (const latestMessage of latestMessages) {
+          if (!latestMessageByChat.has(latestMessage.chatId)) {
+            latestMessageByChat.set(
+              latestMessage.chatId,
+              latestMessage.content,
+            );
+          }
+        }
+
         return {
-          chats: hasMore ? filteredChats.slice(0, limit) : filteredChats,
+          chats: chatsPage.map((currentChat) => ({
+            ...currentChat,
+            avatar: "",
+            lastMessage: latestMessageByChat.get(currentChat.id) ?? "",
+          })),
           hasMore,
         };
       } catch (_error) {

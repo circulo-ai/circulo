@@ -1,3 +1,4 @@
+import { WorkflowHookManager } from "../hooks/workflow-hooks";
 import type {
   ErrorType,
   EventBus,
@@ -55,6 +56,11 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
     private logger: Logger,
     private metrics: MetricsCollector,
     private config: RunnerConfig = {},
+    private hooks: WorkflowHookManager<
+      TContext,
+      TInput,
+      TOutput
+    > = new WorkflowHookManager<TContext, TInput, TOutput>(),
   ) {}
 
   async run(
@@ -103,18 +109,26 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
   async pause(workflowId: string): Promise<void> {
     this.pauseFlags.set(workflowId, true);
     const workflow = await this.workflowStore.loadWorkflow(workflowId);
+    if (!workflow || workflow.state === "completed" || workflow.state === "failed") {
+      this.pauseFlags.delete(workflowId);
+      return;
+    }
     if (
-      workflow &&
       workflow.state === "running" &&
       !this.abortControllers.has(workflowId)
     ) {
       const success = await this.updateWorkflowState(workflow, "paused");
       if (success) {
         const currentStep = workflow.steps[workflow.currentStep];
-        await this.emitEvent(workflowId, "workflow.paused", {
-          type: "paused",
-          stepId: currentStep?.id ?? "",
-        });
+        await this.emitEvent(
+          workflowId,
+          "workflow.paused",
+          {
+            type: "paused",
+            stepId: currentStep?.id ?? "",
+          },
+          workflow,
+        );
         this.logger.info("Workflow paused", { workflowId });
       }
     }
@@ -125,6 +139,10 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
     const workflow = await this.workflowStore.loadWorkflow(workflowId);
 
     if (!workflow) return;
+    if (workflow.state === "completed" || workflow.state === "failed") {
+      this.pauseFlags.delete(workflowId);
+      return;
+    }
 
     // A pause request can race with an approval decision while the current
     // step is still executing. In that case the durable row is still
@@ -142,10 +160,15 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
       const success = await this.updateWorkflowState(workflow, "running");
       if (success) {
         const currentStep = workflow.steps[workflow.currentStep];
-        await this.emitEvent(workflowId, "workflow.resumed", {
-          type: "resumed",
-          stepId: currentStep?.id ?? "",
-        });
+        await this.emitEvent(
+          workflowId,
+          "workflow.resumed",
+          {
+            type: "resumed",
+            stepId: currentStep?.id ?? "",
+          },
+          workflow,
+        );
         this.logger.info("Workflow resumed", { workflowId });
         await this.run(workflowId);
       }
@@ -163,7 +186,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
     }
 
     const workflow = await this.workflowStore.loadWorkflow(workflowId);
-    if (workflow) {
+    if (workflow && workflow.state !== "completed" && workflow.state !== "failed") {
       workflow.state = "failed";
       workflow.error = {
         type: errorType,
@@ -176,12 +199,19 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
 
       const success = await this.updateWorkflowWithVersion(workflow);
       if (success) {
-        await this.emitEvent(workflowId, "workflow.failed", {
-          type: "failed",
-          error: workflow.error,
-        });
+        await this.emitEvent(
+          workflowId,
+          "workflow.failed",
+          {
+            type: "failed",
+            error: workflow.error,
+          },
+          workflow,
+        );
         this.logger.info("Workflow aborted", { workflowId, reason });
       }
+    } else {
+      this.pauseFlags.delete(workflowId);
     }
   }
 
@@ -202,11 +232,16 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
     await this.updateWorkflowWithVersion(workflow);
 
     if (workflow.currentStep === 0) {
-      await this.emitEvent(workflow.id, "workflow.started", {
-        type: "started",
-        workflowId: workflow.id,
-        version: workflow.version,
-      });
+      await this.emitEvent(
+        workflow.id,
+        "workflow.started",
+        {
+          type: "started",
+          workflowId: workflow.id,
+          version: workflow.version,
+        },
+        workflow,
+      );
     }
 
     while (workflow.currentStep < workflow.steps.length) {
@@ -219,10 +254,15 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
           workflow.state = "paused";
           await this.updateWorkflowWithVersion(workflow);
           const currentStep = workflow.steps[workflow.currentStep];
-          await this.emitEvent(workflow.id, "workflow.paused", {
-            type: "paused",
-            stepId: currentStep?.id ?? "",
-          });
+          await this.emitEvent(
+            workflow.id,
+            "workflow.paused",
+            {
+              type: "paused",
+              stepId: currentStep?.id ?? "",
+            },
+            workflow,
+          );
         }
         return;
       }
@@ -263,12 +303,17 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
 
       try {
         const stepStartTime = Date.now();
-        await this.emitEvent(workflow.id, "workflow.step.started", {
-          type: "step.started",
-          stepId: step.id,
-          stepName: step.name,
-          attempt: workflow.retryCount,
-        });
+        await this.emitEvent(
+          workflow.id,
+          "workflow.step.started",
+          {
+            type: "step.started",
+            stepId: step.id,
+            stepName: step.name,
+            attempt: workflow.retryCount,
+          },
+          workflow,
+        );
 
         const input =
           workflow.currentStep === 0 ? workflow.input : workflow.output;
@@ -291,12 +336,17 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
             workflow.output = result.data as TOutput;
           }
 
-          await this.emitEvent(workflow.id, "workflow.step.completed", {
-            type: "step.completed",
-            stepId: step.id,
-            data: (result.data ?? workflow.output) as TOutput,
-            duration,
-          });
+          await this.emitEvent(
+            workflow.id,
+            "workflow.step.completed",
+            {
+              type: "step.completed",
+              stepId: step.id,
+              data: (result.data ?? workflow.output) as TOutput,
+              duration,
+            },
+            workflow,
+          );
 
           this.metrics.recordStepSuccess(step.name);
           this.metrics.recordStepDuration(step.name, duration);
@@ -310,11 +360,16 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
           workflow.resumeAt = result.until;
           await this.updateWorkflowWithVersion(workflow);
 
-          await this.emitEvent(workflow.id, "workflow.waiting", {
-            type: "waiting",
-            stepId: step.id,
-            resumeAt: result.until,
-          });
+          await this.emitEvent(
+            workflow.id,
+            "workflow.waiting",
+            {
+              type: "waiting",
+              stepId: step.id,
+              resumeAt: result.until,
+            },
+            workflow,
+          );
 
           stepLogger.info("Step requested wait", {
             resumeAt: result.until,
@@ -325,12 +380,17 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
 
         workflow.output = result.data as TOutput;
 
-        await this.emitEvent(workflow.id, "workflow.step.completed", {
-          type: "step.completed",
-          stepId: step.id,
-          data: result.data as TOutput,
-          duration,
-        });
+        await this.emitEvent(
+          workflow.id,
+          "workflow.step.completed",
+          {
+            type: "step.completed",
+            stepId: step.id,
+            data: result.data as TOutput,
+            duration,
+          },
+          workflow,
+        );
 
         this.metrics.recordStepSuccess(step.name);
         this.metrics.recordStepDuration(step.name, duration);
@@ -414,11 +474,16 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
     const totalDuration = workflow.completedAt - startTime;
     await this.updateWorkflowWithVersion(workflow);
 
-    await this.emitEvent(workflow.id, "workflow.completed", {
-      type: "completed",
-      output: workflow.output as TOutput,
-      duration: totalDuration,
-    });
+    await this.emitEvent(
+      workflow.id,
+      "workflow.completed",
+      {
+        type: "completed",
+        output: workflow.output as TOutput,
+        duration: totalDuration,
+      },
+      workflow,
+    );
 
     this.metrics.recordWorkflowSuccess();
     this.metrics.recordWorkflowDuration(totalDuration);
@@ -438,12 +503,17 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
     const backoff = step.backoff ?? exponentialBackoff;
     const delay = backoff(workflow.retryCount);
 
-    await this.emitEvent(workflow.id, "workflow.retrying", {
-      type: "retrying",
-      stepId: step.id,
-      attempt: workflow.retryCount,
-      delay,
-    });
+    await this.emitEvent(
+      workflow.id,
+      "workflow.retrying",
+      {
+        type: "retrying",
+        stepId: step.id,
+        attempt: workflow.retryCount,
+        delay,
+      },
+      workflow,
+    );
 
     this.metrics.recordStepRetry(step.name, workflow.retryCount);
     this.logger.info("Retrying step", {
@@ -466,10 +536,15 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
     workflow.completedAt = Date.now();
     await this.updateWorkflowWithVersion(workflow);
 
-    await this.emitEvent(workflow.id, "workflow.failed", {
-      type: "failed",
-      error,
-    });
+    await this.emitEvent(
+      workflow.id,
+      "workflow.failed",
+      {
+        type: "failed",
+        error,
+      },
+      workflow,
+    );
 
     this.metrics.recordWorkflowFailure(error.type);
     this.logger.error("Workflow failed", undefined, {
@@ -711,6 +786,7 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
     workflowId: string,
     eventType: WorkflowEventType,
     payload: P,
+    workflow?: Workflow<TContext, TInput, TOutput>,
   ): Promise<void> {
     const event: WorkflowEvent<TOutput> = {
       id: generateId("evt"),
@@ -723,6 +799,22 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
     try {
       await this.eventStore.append(event);
       await this.eventBus.publish(event);
+      const currentWorkflow =
+        workflow ?? (await this.workflowStore.loadWorkflow(workflowId));
+      const currentStep = currentWorkflow?.steps[currentWorkflow.currentStep];
+      const signal = this.abortControllers.get(workflowId)?.signal;
+      const hookContext = {
+        name: eventType,
+        timestamp: event.timestamp,
+        workflowId,
+        event,
+        ...(currentWorkflow
+          ? { workflow: snapshotWorkflow(currentWorkflow) }
+          : {}),
+        ...(currentStep ? { step: { ...currentStep } } : {}),
+        ...(signal ? { signal } : {}),
+      };
+      await this.hooks.emit(hookContext);
     } catch (err) {
       this.logger.error("Failed to emit event", err as Error, {
         workflowId,
@@ -859,4 +951,14 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
 
 function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
+}
+
+function snapshotWorkflow<TContext, TInput, TOutput>(
+  workflow: Workflow<TContext, TInput, TOutput>,
+): Readonly<Workflow<TContext, TInput, TOutput>> {
+  const { steps, ...serializable } = workflow;
+  return Object.freeze({
+    ...structuredClone(serializable),
+    steps: steps.map((step) => Object.freeze({ ...step })),
+  }) as Readonly<Workflow<TContext, TInput, TOutput>>;
 }

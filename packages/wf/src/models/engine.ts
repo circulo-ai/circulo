@@ -3,6 +3,7 @@ import type { MetricsCollector } from "./metrics";
 import type { EventBus } from "./pubsub";
 import type { EventStore, WorkflowStore } from "./store";
 import type { Step } from "./workflow";
+import type { WorkflowHookManager } from "../hooks/workflow-hooks";
 
 export interface WorkflowEngineConfig<TContext, TInput, TOutput> {
   workflowStore: WorkflowStore<TContext, TInput, TOutput>;
@@ -19,6 +20,8 @@ export interface WorkflowEngineConfig<TContext, TInput, TOutput> {
   enableHealthCheck?: boolean | undefined;
   enableAutoResume?: boolean | undefined;
   autoResumeIntervalMs?: number | undefined;
+  /** Optional lifecycle hooks. Hook failures are isolated by default. */
+  hooks?: WorkflowHookManager<TContext, TInput, TOutput> | undefined;
 }
 
 export interface WorkflowDefinition<TContext, TInput, TOutput> {

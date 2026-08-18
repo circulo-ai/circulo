@@ -1,8 +1,15 @@
 "use client";
 
+import {
+  useActiveOrganization,
+  useListOrganizations,
+  useSetActiveOrganization,
+} from "@better-auth-ui/react/plugins/organization";
+
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { WorkspaceMembers } from "@/components/workspace/workspace-members";
+import { OrganizationPeople } from "@/components/auth/organization/organization-people";
+import { OrganizationTeams } from "@/components/auth/organization/organization-teams";
 import { WorkspaceAccount } from "@/components/workspace/workspace-account";
 import { WorkspacePermissions } from "@/components/workspace/workspace-permissions";
 import { WorkspaceShell, type WorkspaceSection } from "@/components/workspace/workspace-shell";
@@ -12,10 +19,12 @@ import { Building01Icon, ArrowRight01Icon, UserGroupIcon } from "@hugeicons/core
 import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const sectionCopy: Record<WorkspaceSection, { title: string; description: string }> = {
   overview: { title: "Overview", description: "A single control center for your people, AI resources, tools, and workspace defaults." },
   members: { title: "Members & roles", description: "Invite collaborators and make access predictable across the workspace." },
+  teams: { title: "Teams", description: "Create focused teams and manage their members inside the workspace." },
   permissions: { title: "Permissions", description: "Understand what each role can do before changing access or sharing a chat." },
   agents: { title: "Agents", description: "Manage agents from the workspace resource library." },
   knowledge: { title: "Knowledge", description: "Organize durable sources that agents can use in the right chats." },
@@ -31,11 +40,57 @@ export default function WorkspacePage() {
   const searchParams = useSearchParams();
   const requested = searchParams.get("section") as WorkspaceSection | null;
   const activeSection = requested && requested in sectionCopy ? requested : "overview";
-  const { data: organization } = authClient.useActiveOrganization();
-  const { data: session } = authClient.useSession();
+  const {
+    data: organization,
+    isPending: isOrganizationPending,
+  } = useActiveOrganization(authClient);
+  const { data: organizations, isPending: isOrganizationsPending } =
+    useListOrganizations(authClient);
+  const { mutate: setActiveOrganization } = useSetActiveOrganization(authClient);
+  const { data: session, isPending: isSessionPending } = authClient.useSession();
+  const [selectingOrganizationId, setSelectingOrganizationId] = useState<string>();
   const copy = sectionCopy[activeSection];
 
-  const content = activeSection === "members" ? <WorkspaceMembers /> : activeSection === "permissions" ? <WorkspacePermissions /> : activeSection === "tools" ? <WorkspaceTools /> : activeSection === "account" ? <WorkspaceAccount /> : activeSection === "overview" ? <Overview organization={organization} session={session} /> : <RedirectCard section={activeSection} />;
+  useEffect(() => {
+    if (
+      isOrganizationPending ||
+      isOrganizationsPending ||
+      organization ||
+      selectingOrganizationId
+    ) {
+      return;
+    }
+
+    const firstOrganization = organizations?.[0];
+    if (!firstOrganization) return;
+
+    setSelectingOrganizationId(firstOrganization.id);
+    setActiveOrganization({ organizationId: firstOrganization.id });
+  }, [
+    isOrganizationPending,
+    isOrganizationsPending,
+    organization,
+    organizations,
+    selectingOrganizationId,
+    setActiveOrganization,
+  ]);
+
+  const content =
+    activeSection === "members" ? (
+      <OrganizationPeople />
+    ) : activeSection === "teams" ? (
+      <OrganizationTeams />
+    ) : activeSection === "permissions" ? (
+      <WorkspacePermissions />
+    ) : activeSection === "tools" ? (
+      <WorkspaceTools organization={organization} />
+    ) : activeSection === "account" ? (
+      <WorkspaceAccount />
+    ) : activeSection === "overview" ? (
+      <Overview organization={organization} session={session} />
+    ) : (
+      <RedirectCard section={activeSection} />
+    );
 
   return <WorkspaceShell activeSection={activeSection} description={copy.description} title={copy.title}>{content}</WorkspaceShell>;
 }

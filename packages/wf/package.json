@@ -49,9 +49,24 @@
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
+    },
+    "./react": {
+      "types": "./dist/react.d.mts",
+      "import": "./dist/react.mjs",
+      "default": "./dist/react.mjs"
+    }
+  },
+  "peerDependencies": {
+    "react": ">=18.2.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
     }
   },
   "devDependencies": {
+    "@types/react": "19.2.2",
+    "react": "19.2.0",
     "@types/node": "^20.0.0",
     "tsdown": "^0.17.0",
     "typescript": "^5.9.3",

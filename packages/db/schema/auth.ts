@@ -1,7 +1,6 @@
-import { relations, sql } from "drizzle-orm";
+import { relations } from "drizzle-orm";
 import {
   boolean,
-  check,
   index,
   integer,
   json,
@@ -27,6 +26,13 @@ export const user = pgTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   image: text("image"),
+  username: text("username").unique(),
+  displayUsername: text("display_username"),
+  twoFactorEnabled: boolean("two_factor_enabled").default(false).notNull(),
+  role: text("role").default("user"),
+  banned: boolean("banned").default(false).notNull(),
+  banReason: text("ban_reason"),
+  banExpires: timestamp("ban_expires"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
@@ -50,6 +56,7 @@ export const session = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     activeOrganizationId: text("active_organization_id"),
+    impersonatedBy: text("impersonated_by"),
   },
   (table) => [index("session_userId_idx").on(table.userId)],
 );
@@ -60,6 +67,9 @@ export const account = pgTable(
     id: text("id").primaryKey(),
     accountId: text("account_id").notNull(),
     providerId: text("provider_id").notNull(),
+    // Better Auth 1.7 scopes OAuth identities by issuer. Keep this nullable
+    // for existing local/passwordless rows; new OAuth rows always populate it.
+    issuer: text("issuer"),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
@@ -130,34 +140,54 @@ export const invitation = pgTable("invitation", {
     .references(() => user.id, { onDelete: "cascade" }),
 });
 
-export const apiKey = pgTable(
-  "api_key",
+export const apikey = pgTable(
+  "apikey",
+  {
+    id: text("id").primaryKey(),
+    configId: text("config_id").notNull().default("default"),
+    name: text("name"),
+    start: text("start"),
+    referenceId: text("reference_id").notNull(),
+    prefix: text("prefix"),
+    key: text("key").notNull(),
+    refillInterval: integer("refill_interval"),
+    refillAmount: integer("refill_amount"),
+    lastRefillAt: timestamp("last_refill_at"),
+    enabled: boolean("enabled").default(true).notNull(),
+    rateLimitEnabled: boolean("rate_limit_enabled").default(true).notNull(),
+    rateLimitTimeWindow: integer("rate_limit_time_window").default(86_400_000),
+    rateLimitMax: integer("rate_limit_max").default(10),
+    requestCount: integer("request_count").default(0).notNull(),
+    remaining: integer("remaining"),
+    lastRequest: timestamp("last_request"),
+    expiresAt: timestamp("expires_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    permissions: text("permissions"),
+    metadata: text("metadata"),
+  },
+  (table) => [
+    index("apikey_config_reference_idx").on(table.configId, table.referenceId),
+    index("apikey_key_idx").on(table.key),
+  ],
+);
+
+export const twoFactor = pgTable(
+  "two_factor",
   {
     id: text("id").primaryKey(),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    organizationId: text("organization_id").references(() => organization.id, {
-      onDelete: "cascade",
-    }), // Only set for organization keys
-    createdBy: text("created_by").references(() => user.id, {
-      onDelete: "set null",
-    }), // Who created the organization key
-    name: text("name").notNull(),
-    key: text("key").notNull().unique(),
-    type: text("type").notNull().default("personal"), // 'personal' or 'organization'
-    lastUsed: timestamp("last_used"),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
-    expiresAt: timestamp("expires_at"),
+    secret: text("secret").notNull(),
+    backupCodes: text("backup_codes").notNull(),
+    verified: boolean("verified").default(true).notNull(),
+    failedVerificationCount: integer("failed_verification_count")
+      .default(0)
+      .notNull(),
+    lockedUntil: timestamp("locked_until"),
   },
-  (table) => ({
-    // Ensure organization keys have a organization_id and personal keys don't
-    organizationTypeCheck: check(
-      "organization_type_check",
-      sql`(type = 'organization' AND organization_id IS NOT NULL) OR (type = 'personal' AND organization_id IS NULL)`,
-    ),
-  }),
+  (table) => [index("two_factor_user_idx").on(table.userId)],
 );
 
 export const settings = pgTable("settings", {
@@ -204,23 +234,7 @@ export const userRelations = relations(user, ({ many }) => ({
   documents: many(artifact),
   suggestions: many(suggestion),
   votes: many(vote),
-  apiKeys: many(apiKey),
-}));
-
-export const apiKeyRelations = relations(apiKey, ({ one }) => ({
-  user: one(user, {
-    fields: [apiKey.userId],
-    references: [user.id],
-  }),
-  organization: one(organization, {
-    fields: [apiKey.organizationId],
-    references: [organization.id],
-  }),
-  createdByUser: one(user, {
-    fields: [apiKey.createdBy],
-    references: [user.id],
-    relationName: "apiKeyCreator",
-  }),
+  twoFactor: many(twoFactor),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -242,7 +256,6 @@ export const organizationRelations = relations(organization, ({ many }) => ({
   invitations: many(invitation),
   agents: many(agent),
   chats: many(chat),
-  apiKeys: many(apiKey),
 }));
 
 export const memberRelations = relations(member, ({ one }) => ({
@@ -263,6 +276,13 @@ export const invitationRelations = relations(invitation, ({ one }) => ({
   }),
   user: one(user, {
     fields: [invitation.inviterId],
+    references: [user.id],
+  }),
+}));
+
+export const twoFactorRelations = relations(twoFactor, ({ one }) => ({
+  user: one(user, {
+    fields: [twoFactor.userId],
     references: [user.id],
   }),
 }));

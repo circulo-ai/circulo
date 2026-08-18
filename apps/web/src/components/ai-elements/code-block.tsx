@@ -30,7 +30,7 @@ const CodeBlockContext = createContext<CodeBlockContextType>({
 
 const lineNumberTransformer: ShikiTransformer = {
   name: "line-numbers",
-  line(node: any, line: number) {
+  line(node, line) {
     node.children.unshift({
       type: "element",
       tagName: "span",
@@ -109,11 +109,11 @@ export const CodeBlock = ({
       >
         <div className="relative">
           <div
-            className="overflow-hidden dark:hidden [&_code]:font-mono [&_code]:text-sm [&>pre]:m-0 [&>pre]:bg-background! [&>pre]:p-4 [&>pre]:text-sm [&>pre]:text-foreground!"
+            className="overflow-auto dark:hidden [&_code]:font-mono [&_code]:text-sm [&>pre]:m-0 [&>pre]:bg-background! [&>pre]:p-4 [&>pre]:text-sm [&>pre]:text-foreground!"
             dangerouslySetInnerHTML={{ __html: html }}
           />
           <div
-            className="hidden overflow-hidden dark:block [&_code]:font-mono [&_code]:text-sm [&>pre]:m-0 [&>pre]:bg-background! [&>pre]:p-4 [&>pre]:text-sm [&>pre]:text-foreground!"
+            className="hidden overflow-auto dark:block [&_code]:font-mono [&_code]:text-sm [&>pre]:m-0 [&>pre]:bg-background! [&>pre]:p-4 [&>pre]:text-sm [&>pre]:text-foreground!"
             dangerouslySetInnerHTML={{ __html: darkHtml }}
           />
           {children && (

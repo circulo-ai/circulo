@@ -176,7 +176,7 @@ export class McpClient {
 export async function getMcpToolsForAgent(params: {
 	organizationId: string;
 	chatId: string;
-	agentId: string;
+	agentId?: string;
 	session: ActorContext;
 	workflowId: string;
 	dataStream: UIMessageStreamWriter<ChatMessage>;
@@ -197,7 +197,9 @@ export async function getMcpToolsForAgent(params: {
 				link.enabled &&
 				(link.scope === "organization" ||
 					(link.scope === "chat" && link.chatId === params.chatId) ||
-					(link.scope === "agent" && link.agentId === params.agentId)),
+					(link.scope === "agent" &&
+						params.agentId !== undefined &&
+						link.agentId === params.agentId)),
 		);
 		if (links.length === 0) continue;
 

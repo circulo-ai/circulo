@@ -1,17 +1,37 @@
 import { env } from "@/lib/env";
 import { BILLING_FEATURES, getBillingPlan } from "@circulo-ai/types";
-import {
-  type CustomerFeature,
-  type CustomerProduct,
-  Autumn,
-  ProductStatus,
-} from "autumn-js";
+
+import { Autumn } from "autumn-js";
+
+/**
+ * Compatibility shape used by the application billing layer.
+ *
+ * Autumn 1.x exposes balances and flags rather than the legacy
+ * `CustomerFeature`/`CustomerProduct` response shape. Keeping this small
+ * application-owned shape prevents the provider SDK from leaking into the
+ * rest of the authorization and limits code.
+ */
+export type BillingFeature = {
+  id: string;
+  name: string;
+  type: string;
+  included_usage?: number;
+  usage?: number;
+  unlimited?: boolean;
+};
+
+export type BillingProduct = {
+  id: string;
+  status: string;
+};
+
+type ProductStatus = BillingProduct["status"];
 
 export type SubscriptionInfo = {
   plan: string | null;
   status: ProductStatus | null;
-  products: CustomerProduct[];
-  features: Record<string, CustomerFeature>;
+  products: BillingProduct[];
+  features: Record<string, BillingFeature>;
 };
 
 function getAutumnClient(): Autumn | null {
@@ -34,7 +54,7 @@ function createLocalDevSubscription(planId: string): SubscriptionInfo | null {
     rate_limit_per_minute: plan.features.rateLimitPerMinute,
   } as const;
 
-  const features: Record<string, CustomerFeature> = {};
+  const features: Record<string, BillingFeature> = {};
   for (const [id, value] of Object.entries(featureValues)) {
     features[id] = {
       id,
@@ -70,7 +90,7 @@ function createLocalDevSubscription(planId: string): SubscriptionInfo | null {
 
   return {
     plan: plan.id,
-    status: ProductStatus.Active,
+    status: "active",
     products: [],
     features,
   };
@@ -92,21 +112,49 @@ export async function getSubscriptionForOrg(
   if (!autumn) return null;
 
   try {
-    const getCustomer = await autumn.customers.get(organizationId);
-    const customer = getCustomer.data;
+    const customer = await autumn.customers.get({
+      customerId: organizationId,
+    });
 
-    if (!customer) {
-      return null;
+    const products: BillingProduct[] = customer.subscriptions.map(
+      (subscription) => ({
+        id: subscription.planId,
+        status: subscription.status,
+      }),
+    );
+
+    const features: Record<string, BillingFeature> = {};
+    for (const [id, balance] of Object.entries(customer.balances)) {
+      features[id] = {
+        id,
+        name: balance.feature?.name ?? id,
+        type: balance.feature?.type ?? "metered",
+        included_usage: balance.granted,
+        usage: balance.usage,
+        unlimited: balance.unlimited,
+      };
     }
 
-    // Extract the active product (plan)
-    const activeProduct = customer.products?.find((p) => p.status === "active");
+    for (const [id, flag] of Object.entries(customer.flags)) {
+      if (features[id]) continue;
+      features[id] = {
+        id,
+        name: flag.feature?.name ?? id,
+        type: flag.feature?.type ?? "boolean",
+        included_usage: 1,
+        usage: 0,
+        unlimited: false,
+      };
+    }
+
+    // Extract the active subscription (plan)
+    const activeProduct = products.find((product) => product.status === "active");
 
     return {
       plan: activeProduct?.id ?? null, // e.g., "free", "pro", "team"
       status: activeProduct?.status ?? null,
-      products: customer.products ?? [],
-      features: customer.features ?? {},
+      products,
+      features,
     };
   } catch (error) {
     console.error("Failed to get subscription for org:", organizationId, error);

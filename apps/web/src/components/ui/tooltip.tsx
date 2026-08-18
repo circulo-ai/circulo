@@ -19,28 +19,18 @@ function TooltipProvider({
   )
 }
 
-function Tooltip({ disableHoverableContent, ...props }: TooltipPrimitive.Root.Props & {
-  disableHoverableContent?: boolean
-}) {
-  return (
-    <TooltipPrimitive.Root
-      data-slot="tooltip"
-      disableHoverablePopup={disableHoverableContent}
-      {...props}
-    />
-  )
+function Tooltip({ disableHoverableContent: _disableHoverableContent, ...props }: TooltipPrimitive.Root.Props & { disableHoverableContent?: boolean }) {
+  return <TooltipPrimitive.Root data-slot="tooltip" {...props} />
 }
 
-function TooltipTrigger({ asChild = false, children, ...props }: TooltipPrimitive.Trigger.Props & {
-  asChild?: boolean
-}) {
+function TooltipTrigger({ asChild, children, ...props }: TooltipPrimitive.Trigger.Props & { asChild?: boolean }) {
   return (
     <TooltipPrimitive.Trigger
       data-slot="tooltip-trigger"
       render={asChild && React.isValidElement(children) ? children : undefined}
       {...props}
     >
-      {children}
+      {asChild && React.isValidElement(children) ? null : children}
     </TooltipPrimitive.Trigger>
   )
 }
@@ -51,14 +41,14 @@ function TooltipContent({
   sideOffset = 4,
   align = "center",
   alignOffset = 0,
-  collisionPadding,
+  collisionPadding: _collisionPadding,
   children,
   ...props
 }: TooltipPrimitive.Popup.Props &
   Pick<
     TooltipPrimitive.Positioner.Props,
-    "align" | "alignOffset" | "side" | "sideOffset" | "collisionPadding"
-  >) {
+    "align" | "alignOffset" | "side" | "sideOffset"
+  > & { collisionPadding?: number }) {
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Positioner
@@ -66,7 +56,6 @@ function TooltipContent({
         alignOffset={alignOffset}
         side={side}
         sideOffset={sideOffset}
-        collisionPadding={collisionPadding}
         className="isolate z-50"
       >
         <TooltipPrimitive.Popup

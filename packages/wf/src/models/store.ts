@@ -3,6 +3,10 @@ import type { Workflow, WorkflowEvent, WorkflowState } from "./workflow";
 export interface WorkflowStore<TContext, TInput, TOutput> {
   saveWorkflow(wf: Workflow<TContext, TInput, TOutput>): Promise<void>;
   loadWorkflow(id: string): Promise<Workflow<TContext, TInput, TOutput> | null>;
+  /** Optional lookup used by durable stores for cross-worker idempotency. */
+  findWorkflowByIdempotencyKey?(
+    idempotencyKey: string,
+  ): Promise<Workflow<TContext, TInput, TOutput> | null>;
   updateWorkflow(
     wf: Workflow<TContext, TInput, TOutput>,
     expectedVersion: number,

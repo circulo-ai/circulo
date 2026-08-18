@@ -4,8 +4,8 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { cn } from "@/lib/utils";
-import { Pin, PinOff } from "lucide-react";
-import { ComponentProps } from "react";
+import { Archive, ArchiveRestore, Pin, PinOff, Trash2 } from "lucide-react";
+import { ComponentProps, forwardRef } from "react";
 import {
   Sidebar,
   SidebarGroup,
@@ -14,6 +14,7 @@ import {
   SidebarInset,
   SidebarMenuButton,
   SidebarMenuSkeleton,
+  useSidebar,
 } from "../ui/sidebar";
 import {
   CustomContextMenuContent,
@@ -54,7 +55,10 @@ export function CustomSidebarGroup({
 }: CustomSidebarGroupProps) {
   return (
     <SidebarGroup
-      className={cn("h-full overflow-hidden", className)}
+      className={cn(
+        "relative min-h-0 flex-1 overflow-visible pb-16",
+        className,
+      )}
       {...props}
     />
   );
@@ -125,25 +129,34 @@ interface CustomSidebarGroupActionProps extends ComponentProps<
   typeof SidebarGroupAction
 > {}
 
-export function CustomSidebarGroupAction({
-  className,
-  children,
-  ...props
-}: CustomSidebarGroupActionProps) {
+export const CustomSidebarGroupAction = forwardRef<
+  HTMLButtonElement,
+  CustomSidebarGroupActionProps
+>(function CustomSidebarGroupAction(
+  { className, children, style, ...props },
+  ref,
+) {
+  const { open } = useSidebar();
+
   return (
-    <Ripple asChild>
-      <SidebarGroupAction
-        className={cn(
-          "absolute right-2 bottom-2 mt-auto size-12 rounded-full bg-teal-700 transition-all group-data-[collapsible=icon]:flex hover:bg-teal-600 data-[state=open]:bg-teal-600",
-          className,
-        )}
-        {...props}
-      >
-        {children}
-      </SidebarGroupAction>
-    </Ripple>
+    <SidebarGroupAction
+      ref={ref}
+      className={cn(
+        "top-auto bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-20 mt-auto size-11 overflow-visible rounded-full bg-teal-700 p-0 shadow-md shadow-black/20 transition-[background-color,transform] hover:bg-teal-600 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-teal-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar active:scale-95 group-data-[collapsible=icon]:flex data-[state=open]:bg-teal-600",
+        className,
+      )}
+      style={{
+        left: "auto",
+        right: open ? "0.75rem" : "0.5rem",
+        transform: "none",
+        ...style,
+      }}
+      {...props}
+    >
+      {children}
+    </SidebarGroupAction>
   );
-}
+});
 
 interface CustomSidebarMenuAvatarProps extends ComponentProps<"div"> {}
 
@@ -167,11 +180,17 @@ interface CustomSidebarContextMenuProps extends ComponentProps<
 > {
   isPinned: boolean;
   onPinChange: (isPinned: boolean) => void;
+  isArchived?: boolean;
+  onArchiveChange?: (isArchived: boolean) => void;
+  onDelete?: () => void;
 }
 
 export function CustomSidebarContextMenu({
   isPinned,
   onPinChange,
+  isArchived = false,
+  onArchiveChange,
+  onDelete,
   children,
   ...props
 }: CustomSidebarContextMenuProps) {
@@ -190,6 +209,26 @@ export function CustomSidebarContextMenu({
             </>
           )}
         </CustomContextMenuItem>
+        {onArchiveChange && (
+          <CustomContextMenuItem
+            onClick={() => onArchiveChange(!isArchived)}
+          >
+            {isArchived ? <ArchiveRestore /> : <Archive />}
+            {isArchived ? "Restore to chats" : "Archive"}
+          </CustomContextMenuItem>
+        )}
+        {isArchived && onDelete && (
+          <>
+            <ContextMenuSeparator />
+            <CustomContextMenuItem
+              onClick={onDelete}
+              className="text-destructive focus:bg-destructive/15 focus:text-destructive"
+            >
+              <Trash2 />
+              Delete archived chat
+            </CustomContextMenuItem>
+          </>
+        )}
         <ContextMenuSeparator />
         <CustomContextMenuItem disabled inset>
           More features soon...

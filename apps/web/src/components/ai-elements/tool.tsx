@@ -22,6 +22,11 @@ import { CodeBlock } from "./code-block";
 
 export type ToolProps = ComponentProps<typeof Collapsible>;
 
+export type ToolState =
+  | ToolUIPart["state"]
+  | "approval-requested"
+  | "approval-responded";
+
 export const Tool = ({ className, ...props }: ToolProps) => (
   <Collapsible
     className={cn("not-prose mb-4 w-full rounded-md border", className)}
@@ -35,12 +40,6 @@ export type ToolHeaderProps = {
   state: ToolState;
   className?: string;
 };
-
-type ToolState =
-  | ToolUIPart["state"]
-  | "approval-requested"
-  | "approval-responded"
-  | "output-denied";
 
 const getStatusBadge = (status: ToolState) => {
   const labels: Record<ToolState, string> = {
@@ -81,13 +80,13 @@ export const ToolHeader = ({
   <CollapsibleTrigger
     className={cn(
       "flex w-full items-center justify-between gap-4 p-3",
-      className,
+      className
     )}
     {...props}
   >
     <div className="flex items-center gap-2">
       <WrenchIcon className="size-4 text-muted-foreground" />
-      <span className="text-sm font-medium">
+      <span className="font-medium text-sm">
         {title ?? type.split("-").slice(1).join("-")}
       </span>
       {getStatusBadge(state)}
@@ -101,8 +100,8 @@ export type ToolContentProps = ComponentProps<typeof CollapsibleContent>;
 export const ToolContent = ({ className, ...props }: ToolContentProps) => (
   <CollapsibleContent
     className={cn(
-      "text-popover-foreground outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:animate-in data-[state=open]:slide-in-from-top-2",
-      className,
+      "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-popover-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in",
+      className
     )}
     {...props}
   />
@@ -114,7 +113,7 @@ export type ToolInputProps = ComponentProps<"div"> & {
 
 export const ToolInput = ({ className, input, ...props }: ToolInputProps) => (
   <div className={cn("space-y-2 overflow-hidden p-4", className)} {...props}>
-    <h4 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+    <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
       Parameters
     </h4>
     <div className="rounded-md bg-muted/50">
@@ -150,7 +149,7 @@ export const ToolOutput = ({
 
   return (
     <div className={cn("space-y-2 p-4", className)} {...props}>
-      <h4 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+      <h4 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
         {errorText ? "Error" : "Result"}
       </h4>
       <div
@@ -158,7 +157,7 @@ export const ToolOutput = ({
           "overflow-x-auto rounded-md text-xs [&_table]:w-full",
           errorText
             ? "bg-destructive/10 text-destructive"
-            : "bg-muted/50 text-foreground",
+            : "bg-muted/50 text-foreground"
         )}
       >
         {errorText && <div>{errorText}</div>}

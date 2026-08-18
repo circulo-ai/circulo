@@ -18,9 +18,12 @@ import { cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
 import { ComponentProps } from "react";
 
-interface ChatSidebarEmptyProps extends ComponentProps<"div"> {}
+interface ChatSidebarEmptyProps extends ComponentProps<"div"> {
+  archived?: boolean;
+}
 
 export function ChatSidebarEmpty({
+  archived = false,
   className,
   ...props
 }: ChatSidebarEmptyProps) {
@@ -47,27 +50,31 @@ export function ChatSidebarEmpty({
             </div>
           </EmptyMedia>
           <EmptyTitle className="truncate tracking-normal">
-            "One chat to rule them all"
+            {archived ? "No archived chats" : "One chat to rule them all"}
           </EmptyTitle>
           <EmptyDescription>
-            Create a chat to start orchestrating your AI agents
+            {archived
+              ? "Chats you archive will appear here."
+              : "Create a chat to start orchestrating your AI agents"}
           </EmptyDescription>
         </EmptyHeader>
-        <EmptyContent>
-          <Ripple tabIndex={open ? undefined : -1} asChild>
-            <EnhancedLink
-              enableLinkStatus={false}
-              href={`/chat`}
-              className={cn("[&>.base-ripple]:bg-neutral-950/15")}
-              buttonProps={{
-                size: "sm",
-                variant: "primary",
-              }}
-            >
-              <Plus /> Add Chat
-            </EnhancedLink>
-          </Ripple>
-        </EmptyContent>
+        {!archived && (
+          <EmptyContent>
+            <Ripple tabIndex={open ? undefined : -1} asChild>
+              <EnhancedLink
+                enableLinkStatus={false}
+                href={`/chat`}
+                className={cn("[&>.base-ripple]:bg-neutral-950/15")}
+                buttonProps={{
+                  size: "sm",
+                  variant: "primary",
+                }}
+              >
+                <Plus /> Add Chat
+              </EnhancedLink>
+            </Ripple>
+          </EmptyContent>
+        )}
       </Empty>
 
       <SidebarMenuItem className="pointer-events-none mt-6 opacity-0 transition-all group-data-[state=collapsed]:pointer-events-auto group-data-[state=collapsed]:-translate-x-0.75 group-data-[state=collapsed]:opacity-100">

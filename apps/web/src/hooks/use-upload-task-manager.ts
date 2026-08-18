@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  MAX_FILE_SIZE,
+  getMimeTypeFromExtension,
+  validateFileSize,
+  validateFileType,
+} from "@circulo-ai/upload/validation";
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import useSWR from "swr";
@@ -7,7 +13,6 @@ import useSWRMutation from "swr/mutation";
 
 import { getFetcher } from "@/lib/swr";
 
-// TODO use the shared type
 type StorageContext =
   | "general"
   | "knowledge-base"
@@ -33,6 +38,7 @@ interface UploadManagerOptions {
   enableApiFallback?: boolean;
   maxConcurrentUploads?: number;
   onTaskComplete?: (task: UploadTask) => void;
+  onTaskError?: (task: UploadTask) => void;
   onTasksChange?: (tasks: UploadTask[]) => void;
   presignEndpoint?: string;
   uploadEndpoint?: string;
@@ -90,6 +96,7 @@ export function useUploadTaskManager({
   enableApiFallback = UPLOAD_MANAGER_DEFAULTS.enableApiFallback,
   maxConcurrentUploads = UPLOAD_MANAGER_DEFAULTS.maxConcurrentUploads,
   onTaskComplete,
+  onTaskError,
   onTasksChange,
   presignEndpoint = UPLOAD_MANAGER_DEFAULTS.presignEndpoint,
   uploadEndpoint = UPLOAD_MANAGER_DEFAULTS.uploadEndpoint,
@@ -260,7 +267,7 @@ export function useUploadTaskManager({
         xhr.onload = () => {
           if (xhr.status >= 200 && xhr.status < 300) {
             resolve({
-              url: fileInfo?.path,
+              url: fileInfo?.path ?? presignData.downloadUrl,
               path: fileInfo?.path,
               key: fileInfo?.key,
               downloadUrl: presignData.downloadUrl,
@@ -327,6 +334,8 @@ export function useUploadTaskManager({
           result = {
             url: apiResult.url,
             key: apiResult.key,
+            path: apiResult.path,
+            downloadUrl: apiResult.downloadUrl,
           };
         } else {
           throw new Error(
@@ -359,6 +368,9 @@ export function useUploadTaskManager({
           completedAt: Date.now(),
         }));
         onTaskComplete?.(taskStoreRef.current[taskId]);
+        if (message !== "Upload aborted") {
+          onTaskError?.(taskStoreRef.current[taskId]);
+        }
       } finally {
         releaseTaskSlot(taskId);
         drainQueueRef.current();
@@ -367,6 +379,7 @@ export function useUploadTaskManager({
     [
       enableApiFallback,
       onTaskComplete,
+      onTaskError,
       releaseTaskSlot,
       requestPresignedUpload,
       triggerApiUpload,
@@ -395,30 +408,50 @@ export function useUploadTaskManager({
       context: StorageContext = defaultStorageContext,
       metadata?: Record<string, string>,
     ) => {
-      // TODO check files.length > 0
       const addedTaskIds: string[] = [];
       updateTasks((tasks) => {
         const nextTasks = { ...tasks };
         Array.from(files).forEach((file) => {
           const taskId = nanoid();
+          const typeError = validateFileType(
+            file.name,
+            file.type ||
+              getMimeTypeFromExtension(file.name.split(".").pop() ?? ""),
+          );
+          const sizeError = validateFileSize(file.size, MAX_FILE_SIZE);
+          const validationError = typeError ?? sizeError;
+
           nextTasks[taskId] = {
             id: taskId,
             file,
             context,
-            status: "queued",
+            status: validationError ? "error" : "queued",
             progress: 0,
             bytesSent: 0,
             metadata,
+            ...(validationError
+              ? { error: validationError.message, completedAt: Date.now() }
+              : {}),
           };
-          pendingTaskIdsRef.current.push(taskId);
+          if (!validationError) pendingTaskIdsRef.current.push(taskId);
           addedTaskIds.push(taskId);
         });
         return nextTasks;
       });
+      addedTaskIds.forEach((taskId) => {
+        const task = taskStoreRef.current[taskId];
+        if (task?.status === "error") onTaskError?.(task);
+      });
       if (autoStartUploads) runUploadQueue();
       return addedTaskIds;
     },
-    [autoStartUploads, defaultStorageContext, runUploadQueue, updateTasks],
+    [
+      autoStartUploads,
+      defaultStorageContext,
+      onTaskError,
+      runUploadQueue,
+      updateTasks,
+    ],
   );
 
   const cancelUploadTask = useCallback(
@@ -558,7 +591,3 @@ export function useUploadTaskManager({
     uploadTasks,
   };
 }
-
-// TODO add file type and size checks
-// TODO useState or useRef?
-// TODO add error handling + error callbacks
