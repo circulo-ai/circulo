@@ -11,6 +11,12 @@ It runs in Node.js, Bun, Deno, serverless handlers, queues, and TypeScript web
 backends. React support is available through the optional
 `@circulo-ai/wf/react` entry point.
 
+The v2 durable runtime adds a replay-safe execution model for activities and
+long-running workflows, leased workers with recovery, parallel/fan-out/fan-in
+execution, external events, signed webhooks, queries, cron scheduling, Saga
+compensation, duplicate-run coalescing, rate limits, tenant admission, secure
+stream access, and OpenTelemetry-compatible adapters.
+
 ## Contents
 
 - [Install](#install)
@@ -21,6 +27,11 @@ backends. React support is available through the optional
 - [Context and cancellation](#context-and-cancellation)
 - [Retries and timeouts](#retries-and-timeouts)
 - [Waiting and polling](#waiting-and-polling)
+- [Durable replay workflows](#durable-replay-workflows)
+- [Platform comparison](#platform-comparison)
+- [Workers and recovery](#workers-and-recovery)
+- [Triggers, webhooks, queries, and scheduling](#triggers-webhooks-queries-and-scheduling)
+- [Limits, tenancy, and observability](#limits-tenancy-and-observability)
 - [Streaming](#streaming)
 - [Dynamic plans and compensation](#dynamic-plans-and-compensation)
 - [Validation and idempotency](#validation-and-idempotency)
@@ -83,6 +94,53 @@ definition -> create -> pending -> running -> step transitions
 
 Use in-memory implementations for local development and tests. Use a durable
 store, event store, and pub/sub adapter for production workers.
+
+## Platform comparison
+
+The table below compares the v2 durable runtime with the four products most
+often evaluated alongside it. “Native” means the capability is part of the
+product's primary execution model. “Adapter” means wf defines the production
+contract and ships a reference implementation, while the application supplies
+the durable Redis, SQL, broker, or service adapter. “Partial” means the
+product can model the behavior, but it is not a first-class primitive with the
+same guarantees.
+
+| Capability | wf v2 | BullMQ | Inngest | Trigger.dev | Temporal |
+| --- | --- | --- | --- | --- | --- |
+| Primary abstraction | Replay-safe workflows plus leased tasks | Redis-backed jobs and queues | Event-triggered durable functions and steps | Long-running tasks and runs | Durable workflow executions and activities |
+| Runtime/deployment | Framework-agnostic TypeScript library; self-hosted | Node.js library; Redis required | Managed/self-hosted execution service with app compute | Cloud or self-hosted task platform | Temporal Service/Cloud plus application workers |
+| Workflow replay | **Native** ordered history and replay cursor | No workflow replay engine | Durable checkpoint/memoization; not a general event-history replay API | Durable run checkpoints; not Temporal-style deterministic replay | **Native** event-history replay and deterministic workflow runtime |
+| Activity/step execution | **Native** activities, at-least-once task delivery, retry policy | Jobs are at-least-once in failure cases; no activity abstraction | Retriable durable steps | Retriable task runs/steps | **Native** activities with retry policies and recorded results |
+| Determinism/versioning | Definition name/version validation; deterministic IDs | Application responsibility | SDK/platform manages step state; application code must remain compatible | Task versioning/deploy model | Strong deterministic constraints plus worker versioning/patching |
+| Workers | **Native** pull workers, heartbeats, leases, graceful stop | **Native** workers and concurrency | Platform manages execution; no user worker fleet required | Platform-managed queues/workers | **Native** workflow/activity workers and task queues |
+| Multi-worker recovery | **Native** expired-lease reclamation and recovery worker | Redis lock/stall recovery | Platform-managed | Platform-managed | Service redispatches tasks; workers are stateless |
+| Parallel steps | **Native** `parallel()` | Application orchestration / flows | Native parallel step patterns | Native batch/child-task fan-out | Native promises/child workflows/activities |
+| Fan-out/fan-in | **Native** `fanOut()` and `batch()` join | Flows/parent-child dependencies; application join logic | Batching and parallel steps | `batchTriggerAndWait()` | Child workflows/activities and application join logic |
+| External event / approval wait | **Native** `waitForEvent()` plus durable signal | Application state and queue coordination | Events, sleeps, and waits | Waits, tokens, and HTTP callbacks | Signals, updates, and durable timers |
+| Query current state | **Native** history projection service | Queue/job inspection; workflow projection is application code | Platform run/event observability APIs | Runs and Realtime APIs | Native workflow queries and visibility APIs |
+| Event-triggered execution | **Native** typed trigger gateway | Queue/job enqueue; event mapping is application code | **Native** event triggers | **Native** task triggering | Signals/start APIs; event routing is application code |
+| Webhook triggers | **Native** signed HMAC verification and dispatch | Application endpoint | Native webhook/event ingestion | Native HTTP/task trigger patterns | Application endpoint or integration |
+| Cron/scheduled workflows | **Native** leased scheduler and UTC 5/6-field cron | Native delayed/repeatable jobs and cron schedules | Native cron triggers | Native scheduled tasks | Native schedules and cron workflows |
+| Saga/compensation | **Native** reverse-order compensation scope | Application pattern | Application pattern / steps | Application pattern | Application pattern, commonly implemented in workflow code |
+| Duplicate-run coalescing | **Native** atomic idempotency contract, fingerprint conflict detection, distributed wait | Job IDs/deduplication patterns; queue-level scope | Event/function-level dedupe controls | Idempotency keys and run controls | Workflow IDs/ID-reuse policies and application idempotency |
+| Throttling/rate limits | **Native contracts** for token bucket and tenant admission | Queue rate limiter | Native concurrency, throttling, rate limiting, debounce | Queue concurrency and platform rate limits | Worker/task-queue limits; application/service rate limiting |
+| Tenant isolation | **Native** tenant IDs, policies, scoped tokens, concurrency gates | Application/Redis namespace design | Native concurrency keys/scopes; tenancy policy is application/platform configuration | Project/environment/account scopes; tenant policy is application code | Namespaces and task queues; tenant model is application/platform design |
+| Batch processing | **Native** bounded-concurrency batch with partial failures | Job bulk APIs/flows; application result aggregation | Native batching and flow-control features | Native batch trigger and streaming batch APIs | Activities/child workflows; application batching |
+| Long-running execution | **Native** persisted waits/timers/events; adapter durability determines retention | Jobs can be delayed, but no workflow state machine | **Native** durable long-running functions | **Native** long-running tasks with waits | **Native** executions designed to run for years |
+| Production scheduler | **Native** leased schedule store/worker with ack/release | Redis-backed scheduler semantics | Managed scheduler | Managed scheduler | Temporal Schedule service |
+| Secure browser streams | **Native** scoped HMAC tokens, revocation, bounded history/event streams | Application layer | Realtime tokens and React hooks | Realtime API and React hooks | Application/API layer; SDKs provide workflow messaging, not a browser stream product |
+| React adapters/hooks | **Native optional entry point**: provider, remote query, event stream, controls | None in core | Native React/realtime integrations | Native React hooks package | No comparable first-party React workflow hook layer |
+| OpenTelemetry | **Native structural adapters** for tracing, metrics, and logs | Instrumentation/integration required | Platform observability plus integrations | Built-in observability and integrations | Strong SDK/service observability and integrations |
+| Persistence boundary | Explicit `WorkflowHistoryStore`, `TaskQueueAdapter`, idempotency, schedule, limit, and token contracts | Redis is the core persistence boundary | Platform-managed state/queue | Platform-managed state/queue | Temporal Service persistence/history is the core boundary |
+| Best fit | Teams wanting an embeddable, provider-neutral durable runtime with full control | High-throughput Redis job processing | Managed event-driven durable functions with low infrastructure overhead | Managed/self-hosted long-running AI/background tasks and realtime UX | Strongest general-purpose durable execution and workflow correctness model |
+
+The comparison is based on the products' official documentation: [BullMQ
+overview](https://docs.bullmq.io/), [Inngest durable functions and
+flow-control](https://www.inngest.com/docs/learn/inngest-functions), [Trigger.dev
+tasks and queues](https://trigger.dev/docs/introduction), and [Temporal
+workflows, replay, activities, and workers](https://docs.temporal.io/workflows).
+Product capabilities and limits change over time; recheck the linked primary
+documentation when making a procurement decision.
 
 ## First workflow
 
@@ -427,6 +485,124 @@ const workflow = defineWorkflow<Context, { files: string[] }>()
 
 `streamStep(items)` is a convenience generator for non-empty arrays. It
 rejects empty arrays because there is no final value.
+
+## Durable replay workflows
+
+For activities, approvals, agent orchestration, and processes that can outlive
+any one process, use `ReplayWorkflowRunner`. Workflow code is replayed from an
+append-only history; activity side effects are recorded as scheduled, started,
+completed, or failed. Activity delivery is at-least-once, so every external
+side effect must be idempotent or protected by its own idempotency key.
+
+```typescript
+import {
+  defineActivity,
+  InMemoryActivityRegistry,
+  InMemoryTaskQueue,
+  InMemoryWorkflowHistoryStore,
+  ReplayWorkflowRunner,
+} from "@circulo-ai/wf";
+
+const activities = new InMemoryActivityRegistry();
+activities.register(defineActivity("charge", async (input: { cents: number }) =>
+  chargeCardWithIdempotencyKey(input), { retryPolicy: { maxAttempts: 5 } }));
+
+const workflow = {
+  name: "approval-and-charge",
+  version: 1,
+  activityRegistry: activities,
+  run: async (wf: import("@circulo-ai/wf").ReplayWorkflowContext) => {
+    const approval = await wf.waitForEvent<{ approved: boolean }>(
+      "approval",
+      "payment.approved",
+    );
+    if (!approval.approved) throw new Error("Payment was rejected");
+    return wf.activity("charge", { cents: 4999 });
+  },
+};
+
+const runner = new ReplayWorkflowRunner(
+  new InMemoryWorkflowHistoryStore(),
+  new InMemoryTaskQueue(),
+);
+const started = await runner.start(workflow, undefined);
+// Signal the durable approval later, possibly from another process.
+await runner.signal(
+  started.workflowId,
+  started.runId,
+  `${started.workflowId}:${started.runId}:event:approval:1`,
+  "payment.approved",
+  { approved: true },
+);
+```
+
+`parallel()` and `fanOut()` execute independent branches concurrently and
+replay completed activities by deterministic activity ID. `batch()` adds
+bounded concurrency and returns partial failures. `saga()` records reverse-order
+compensation activities and keeps compensation retryable. `sleep()` persists a
+timer task, and `waitForEvent()` persists an approval/event subscription.
+
+## Workers and recovery
+
+`Worker` is a pull worker over the `TaskQueueAdapter` contract. Claims are
+exclusive leases with heartbeats, retry backoff, acknowledgement, rejection,
+tenant filtering, graceful shutdown, and abort-on-force-stop. Run a separate
+`RecoveryWorker` to reclaim expired leases after a worker crash. `ActivityWorker`
+and `TimerWorker` provide the durable activity/timer handlers used by replay
+workflows. Queue implementations for Redis, Postgres, SQS, or another broker
+should make claim, heartbeat, acknowledgement, reschedule, and rejection
+atomic.
+
+## Triggers, webhooks, queries, and scheduling
+
+`WorkflowEventGateway` maps typed events to workflow definitions, applies
+filters, signs/verifies webhook requests, and uses an atomic idempotency store
+to coalesce duplicates. In-flight duplicates share the same result in a
+process; distributed stores must implement the same atomic claim contract.
+Claims also carry a stable payload fingerprint, so reuse of an idempotency key
+with different input is rejected as an explicit conflict.
+`WorkflowQueryService` projects current status, pending activities, waiting
+events, output, errors, and history length from authoritative history.
+
+`InMemoryScheduleStore` and `ScheduleWorker` implement leased production-style
+cron dispatch. `nextCronOccurrence()` supports standard 5-field and 6-field
+UTC cron expressions. A dispatch is acknowledged only after the application
+has durably accepted it; expired schedule leases are available to another
+scheduler worker.
+
+For replay workflows, `createReplayScheduleDispatcher()` maps a schedule name
+to a registered definition and derives a stable workflow/run identity from the
+schedule ID and occurrence timestamp. This makes scheduler retries converge
+on the same durable run.
+
+## Limits, tenancy, and observability
+
+Use `TokenBucketRateLimiter` with a distributed `TokenBucketStore` for atomic
+rate limits, `TenantConcurrencyGate` with a distributed
+`TenantConcurrencyStore` for per-tenant admission, and
+`InMemoryTenantPolicyStore` as the local reference policy implementation.
+Tenant IDs flow through task envelopes, history, triggers, schedule records,
+queries, and access-token claims.
+
+Secure backend access uses `WorkflowAccessTokenSigner` and
+`SecureWorkflowStreamGateway`. Tokens carry explicit workflow, tenant, scope,
+expiry, and revocation claims. For browser clients, bind a token provider to
+`SecureWorkflowClient`, use `WorkflowHttpAdapter` for bearer-token query/SSE
+transport, and wrap the application in `WorkflowClientProvider` from the
+React entry point. The remote hooks are `useRemoteWorkflow`,
+`useRemoteWorkflowEvents`, and `useWorkflowControls`; the existing local
+engine hooks remain available.
+
+Replay histories can be streamed too: wrap a durable history store with
+`EventPublishingWorkflowHistoryStore`, publish through a durable
+`WorkflowHistoryEventBus`, and expose it through
+`SecureWorkflowHistoryStreamGateway`. This keeps live UI updates attached to
+the authoritative replay log rather than to process-local state.
+
+OpenTelemetry remains an optional peer integration: inject the SDK's meter,
+tracer, and log bridge into `OpenTelemetryMetricsAdapter`,
+`OpenTelemetryTracerAdapter`, and `OpenTelemetryLoggerAdapter`. No specific
+OpenTelemetry package is forced on applications.
 
 ## Dynamic plans and compensation
 
@@ -998,6 +1174,16 @@ The repository covers these scenarios in `test/workflow.test.ts` and
 | `InMemory*`                             | Local stores, bus, metrics, and testing implementations.                 |
 | `JsonWorkflowStore` / `JsonEventStore`  | JSON-backed durable adapters.                                            |
 | `AdapterEventBus`                       | Pub/sub transport bridge.                                                |
+| `ReplayWorkflowRunner` / `WorkflowReplayCursor` | Replay-safe durable workflow execution and history validation.       |
+| `Worker` / `RecoveryWorker`              | Leased at-least-once task processing and expired-lease recovery.          |
+| `ActivityWorker` / `TimerWorker`         | Durable activity and timer task handlers.                                 |
+| `WorkflowEventGateway` / `WorkflowQueryService` | Event/webhook triggers and current-state projections.               |
+| `ScheduleWorker` / `nextCronOccurrence`  | Leased production scheduler and UTC cron calculation.                    |
+| `TokenBucketRateLimiter` / `TenantConcurrencyGate` | Rate limits and per-tenant admission.                            |
+| `WorkflowAccessTokenSigner` / `SecureWorkflowStreamGateway` | Scoped secure stream access.                         |
+| `EventPublishingWorkflowHistoryStore` / `SecureWorkflowHistoryStreamGateway` | Secure replay-history streaming. |
+| `SecureWorkflowClient` / `WorkflowHttpAdapter` | Bearer-token query and SSE client adapters.                        |
+| `OpenTelemetry*Adapter`                  | Optional structural OpenTelemetry metrics, traces, and logs.              |
 
 Workflow states are `pending`, `running`, `paused`, `failed`, and `completed`.
 Error types are `transient`, `permanent`, `timeout`, `validation`, and
