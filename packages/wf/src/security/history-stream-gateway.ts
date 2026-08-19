@@ -5,6 +5,7 @@ import type {
   WorkflowHistoryStreamOptions,
 } from "../models";
 import { WorkflowAccessTokenSigner } from "./access-token";
+import { createBufferedAsyncStream } from "./buffered-stream";
 
 export class SecureWorkflowHistoryStreamGateway implements WorkflowHistoryEventStreamGateway {
   constructor(
@@ -28,48 +29,30 @@ export class SecureWorkflowHistoryStreamGateway implements WorkflowHistoryEventS
     return this.eventBus.subscribe(workflowId, runId, callback);
   }
 
-  async *stream(
+  stream(
     workflowId: string,
     token: string,
     options: WorkflowHistoryStreamOptions,
   ): AsyncIterable<WorkflowHistoryEvent> {
     const maxBufferedEvents = options.maxBufferedEvents ?? 1000;
     if (maxBufferedEvents < 1) throw new RangeError("maxBufferedEvents must be positive");
-    const events: WorkflowHistoryEvent[] = [];
-    let wake: (() => void) | undefined;
-    let closed = false;
-    const unsubscribe = await this.subscribe(
-      workflowId,
-      options.runId,
-      token,
-      (event) => {
-        if (events.length >= maxBufferedEvents) events.shift();
-        events.push(event);
-        wake?.();
-        wake = undefined;
-      },
-      options,
-    );
-    const abort = () => {
-      closed = true;
-      wake?.();
-      wake = undefined;
-    };
-    if (options.signal?.aborted) closed = true;
-    options.signal?.addEventListener("abort", abort, { once: true });
-    try {
-      while (!closed) {
-        const event = events.shift();
-        if (event) {
-          yield event;
-          continue;
+    return createBufferedAsyncStream<WorkflowHistoryEvent>(
+      async (push) => {
+        const unsubscribe = this.eventBus.subscribe(workflowId, options.runId, (event) => {
+          push(event);
+        });
+        try {
+          const claims = await this.tokens.verify(token);
+          const tenantId = options.tenantId ?? (await this.tenantResolver?.(workflowId, options.runId));
+          this.tokens.authorize(claims, workflowId, "workflow:stream", tenantId);
+          return unsubscribe;
+        } catch (error) {
+          unsubscribe();
+          throw error;
         }
-        await new Promise<void>((resolve) => { wake = resolve; });
-      }
-    } finally {
-      closed = true;
-      unsubscribe();
-      options.signal?.removeEventListener("abort", abort);
-    }
+      },
+      maxBufferedEvents,
+      options.signal,
+    );
   }
 }

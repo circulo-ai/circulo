@@ -5,6 +5,7 @@ import type {
   WorkflowStreamOptions,
 } from "../models";
 import { WorkflowAccessTokenSigner } from "./access-token";
+import { createBufferedAsyncStream } from "./buffered-stream";
 
 export class SecureWorkflowStreamGateway implements WorkflowEventStreamGateway {
   constructor(
@@ -27,50 +28,30 @@ export class SecureWorkflowStreamGateway implements WorkflowEventStreamGateway {
     return this.eventBus.subscribe(workflowId, callback);
   }
 
-  async *stream(
+  stream(
     workflowId: string,
     token: string,
     options: WorkflowStreamOptions = {},
   ): AsyncIterable<WorkflowEvent<unknown>> {
     const maxBufferedEvents = options.maxBufferedEvents ?? 1000;
     if (maxBufferedEvents < 1) throw new RangeError("maxBufferedEvents must be positive");
-    const events: WorkflowEvent<unknown>[] = [];
-    let wake: (() => void) | undefined;
-    let closed = false;
-    const unsubscribe = await this.subscribe(
-      workflowId,
-      token,
-      (event) => {
-        if (events.length >= maxBufferedEvents) events.shift();
-        events.push(event);
-        wake?.();
-        wake = undefined;
-      },
-      options,
-    );
-    const abort = () => {
-      closed = true;
-      wake?.();
-      wake = undefined;
-    };
-    if (options.signal?.aborted) closed = true;
-    options.signal?.addEventListener("abort", abort, { once: true });
-
-    try {
-      while (!closed) {
-        const event = events.shift();
-        if (event) {
-          yield event;
-          continue;
-        }
-        await new Promise<void>((resolve) => {
-          wake = resolve;
+    return createBufferedAsyncStream<WorkflowEvent<unknown>>(
+      async (push) => {
+        const unsubscribe = this.eventBus.subscribe(workflowId, (event) => {
+          push(event);
         });
-      }
-    } finally {
-      closed = true;
-      unsubscribe();
-      options.signal?.removeEventListener("abort", abort);
-    }
+        try {
+          const claims = await this.tokens.verify(token);
+          const tenantId = options.tenantId ?? (await this.tenantResolver?.(workflowId));
+          this.tokens.authorize(claims, workflowId, "workflow:stream", tenantId);
+          return unsubscribe;
+        } catch (error) {
+          unsubscribe();
+          throw error;
+        }
+      },
+      maxBufferedEvents,
+      options.signal,
+    );
   }
 }
