@@ -136,8 +136,8 @@ export function WorkspaceShell({
   children: ReactNode;
 }) {
   return (
-    <main className="min-h-svh bg-background text-foreground">
-      <div className="mx-auto flex min-h-svh w-full max-w-7xl flex-col px-4 py-5 sm:px-6 lg:px-8">
+    <main className="flex h-svh min-h-0 flex-col overflow-hidden bg-background text-foreground">
+      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col px-4 py-5 sm:px-6 lg:px-8">
         <header className="flex items-center justify-between gap-4 pb-5">
           <Button asChild size="sm" variant="ghost">
             <Link href="/chat">
@@ -155,7 +155,7 @@ export function WorkspaceShell({
           </div>
         </header>
         <Separator />
-        <div className="grid flex-1 items-start gap-8 py-8 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <div className="grid min-h-0 flex-1 items-start gap-8 py-8 lg:grid-cols-[220px_minmax(0,1fr)]">
           <aside className="lg:sticky lg:top-6">
             <nav
               aria-label="Workspace navigation"
@@ -196,7 +196,7 @@ export function WorkspaceShell({
               ))}
             </nav>
           </aside>
-          <section className="min-w-0">
+          <section className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-1">
             <div className="flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-end sm:justify-between">
               <div className="min-w-0">
                 <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
