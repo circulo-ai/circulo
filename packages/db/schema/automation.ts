@@ -219,7 +219,10 @@ export const mcpTool = pgTable(
 			.notNull()
 			.default({}),
 		readOnlyHint: boolean("read_only_hint"),
-		enabled: boolean("enabled").notNull().default(false),
+		// Discovered tools are available by default after an administrator has
+		// explicitly scanned and published the MCP integration. Managers can
+		// still disable individual tools from the workspace tools UI.
+		enabled: boolean("enabled").notNull().default(true),
 		approvalMode: mcpToolApprovalModeEnum("approval_mode")
 			.notNull()
 			.default("prompt"),

@@ -84,6 +84,8 @@ type Integration = {
   tools: Array<{
     id: string;
     name: string;
+    title: string | null;
+    description: string | null;
     enabled: boolean;
     approvalMode: string;
   }>;
@@ -343,6 +345,26 @@ export function WorkspaceTools({
       );
     }
   };
+  const updateTool = async (
+    integrationId: string,
+    toolId: string,
+    update: { enabled?: boolean; approvalMode?: string },
+  ) => {
+    try {
+      await request(
+        `/api/automation/mcp/${integrationId}/tools/${toolId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(update),
+        },
+      );
+      await mutate();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Unable to update MCP tool",
+      );
+    }
+  };
   const availableTargets = useMemo(
     () =>
       scope.type === "chat"
@@ -556,14 +578,56 @@ export function WorkspaceTools({
                     )}
                   </div>
                   {integration.tools.length ? (
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-col gap-2">
                       {integration.tools.map((tool) => (
-                        <Badge
+                        <div
                           key={tool.id}
-                          variant={tool.enabled ? "secondary" : "outline"}
+                          className="flex flex-col gap-2 rounded-lg border bg-background px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
                         >
-                          {tool.name}
-                        </Badge>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">
+                              {tool.title ?? tool.name}
+                            </p>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {tool.description ?? tool.name}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 self-end sm:self-auto">
+                            <Select
+                              value={tool.approvalMode}
+                              onValueChange={(approvalMode) =>
+                                void updateTool(integration.id, tool.id, {
+                                  approvalMode: approvalMode ?? "prompt",
+                                })
+                              }
+                            >
+                              <SelectTrigger className="h-8 w-[7.5rem]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectGroup>
+                                  <SelectItem value="auto">Auto</SelectItem>
+                                  <SelectItem value="prompt">Ask first</SelectItem>
+                                  <SelectItem value="writes">
+                                    Ask for writes
+                                  </SelectItem>
+                                  <SelectItem value="approve">
+                                    Always approve
+                                  </SelectItem>
+                                </SelectGroup>
+                              </SelectContent>
+                            </Select>
+                            <Switch
+                              checked={tool.enabled}
+                              onCheckedChange={(enabled) =>
+                                void updateTool(integration.id, tool.id, {
+                                  enabled,
+                                })
+                              }
+                              aria-label={`Enable ${tool.title ?? tool.name}`}
+                            />
+                          </div>
+                        </div>
                       ))}
                     </div>
                   ) : (

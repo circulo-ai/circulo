@@ -787,6 +787,13 @@ function publishTextResult(
   text: string,
   existingMessageId?: string,
 ): void {
+  // Direct responses stream their text while the model is running. Reuse
+  // that message and only close it here; otherwise the completed workflow
+  // would append a second assistant message containing the same response.
+  if (getWorkflowOutputChannel(runId)?.hasTextMessage) {
+    publishWorkflowChunk(runId, { type: "finish", finishReason: "stop" });
+    return;
+  }
   const messageId = existingMessageId ?? crypto.randomUUID();
   // Every HTTP stream starts with a fresh UI message state, including a
   // reconnect that reuses the durable database message ID. Always announce

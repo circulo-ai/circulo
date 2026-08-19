@@ -2,7 +2,7 @@ import { db, humanApproval } from "@/db";
 import { getLanguageModel } from "@/lib/ai/providers";
 import type { ChatMessage } from "@/lib/types";
 import { getTextFromMessages } from "@/lib/utils";
-import { generateText, Output } from "ai";
+import { Output, streamText, type UIMessageStreamWriter } from "ai";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import type { RequestClassification } from "./classify-request-step";
@@ -30,6 +30,7 @@ export async function aggregateResultsStep(params: {
   triggerMessages: ChatMessage[];
   pendingApprovalId?: string;
   workflowRunId?: string;
+  dataStream?: UIMessageStreamWriter<ChatMessage>;
 }): Promise<AggregatedResult> {
   const {
     agentResults,
@@ -106,7 +107,7 @@ Duration: ${r.durationMs}ms`,
     .join("\n\n---\n\n");
 
   try {
-    const { output } = await generateText({
+    const result = streamText({
       model: getLanguageModel(),
       output: Output.object({ schema: aggregatedResultSchema }),
       system: `You are synthesizing the outputs from multiple AI agents into a coherent final response.
@@ -128,6 +129,38 @@ ${agentOutputs}
 
 Synthesize these results into a final response.`,
     });
+
+    let streamedText = "";
+    let streamedMessageId: string | undefined;
+    for await (const partial of result.partialOutputStream) {
+      const nextText = partial.detailedResponse;
+      if (typeof nextText !== "string" || !nextText) continue;
+      const delta = nextText.startsWith(streamedText)
+        ? nextText.slice(streamedText.length)
+        : nextText;
+      if (!delta) continue;
+      streamedMessageId ??= crypto.randomUUID();
+      if (streamedText.length === 0) {
+        params.dataStream?.write({
+          type: "text-start",
+          id: streamedMessageId,
+        });
+      }
+      params.dataStream?.write({
+        type: "text-delta",
+        id: streamedMessageId,
+        delta,
+      });
+      streamedText = nextText;
+    }
+
+    const { output } = await result;
+    if (streamedMessageId) {
+      params.dataStream?.write({
+        type: "text-end",
+        id: streamedMessageId,
+      });
+    }
 
     return output;
   } catch (error) {

@@ -10,6 +10,7 @@ import {
   getAgentExecutionKey,
   loadDurableAgentResults,
   persistDurableAgentResult,
+  toUIMessageStreamWriter,
 } from "@/workflows/orchestrate/steps/execute-agent-task-step";
 import {
   type ChatContext,
@@ -560,7 +561,7 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
       OrchestrationWorkflowState,
       OrchestrationWorkflowState
     >("aggregate-results", {
-      run: async (state) => {
+      run: async (state, workflowContext) => {
         if (
           state.failureReason ||
           !state.classification ||
@@ -583,7 +584,9 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
           triggerMessages: state.input.messages,
           pendingApprovalId: state.pendingApprovalId,
           workflowRunId: state.workflowRunId,
+          dataStream: toUIMessageStreamWriter(workflowContext.workflow.id),
         });
+        await flushDurableUIChunks(workflowContext.workflow.id);
 
         return complete({ ...state, finalResult });
       },
