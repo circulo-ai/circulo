@@ -39,19 +39,18 @@ type ToolUIPartApproval =
     }
   | undefined;
 
-type ToolState =
+type ConfirmationState =
   | ToolUIPart["state"]
   | "approval-requested"
-  | "approval-responded"
-  | "output-denied";
+  | "approval-responded";
 
 type ConfirmationContextValue = {
   approval: ToolUIPartApproval;
-  state: ToolState;
+  state: ConfirmationState;
 };
 
 const ConfirmationContext = createContext<ConfirmationContextValue | null>(
-  null,
+  null
 );
 
 const useConfirmation = () => {
@@ -66,7 +65,7 @@ const useConfirmation = () => {
 
 export type ConfirmationProps = ComponentProps<typeof Alert> & {
   approval?: ToolUIPartApproval;
-  state: ToolState;
+  state: ConfirmationState;
 };
 
 export const Confirmation = ({

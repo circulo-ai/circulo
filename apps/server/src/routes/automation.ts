@@ -282,8 +282,6 @@ router.post(
 			!(await chatMemberRepo.isMember(body.toUserId, body.chatId))
 		)
 			throw new ForbiddenError("The target user is not a member of this chat");
-		if (body.fromAgentId && body.fromAgentId === body.toAgentId)
-			throw new BadRequestError("An agent cannot hand off a task to itself");
 		for (const agentId of [body.fromAgentId, body.toAgentId]) {
 			if (!agentId) continue;
 			const linkedAgent = await db.query.chatAgent.findFirst({

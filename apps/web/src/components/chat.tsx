@@ -1,11 +1,17 @@
 "use client";
 
 import { Artifact } from "@/components/artifacts/artifact";
+import { ChatResourceLibrary } from "@/components/chat-resource-library";
 import { ChatSettingsDialog } from "@/components/chat-settings-dialog";
 import { Messages } from "@/components/messages/messages";
 import { getChatHistoryPaginationKey } from "@/components/sidebar/sidebar-history";
-import { useArtifactSelector } from "@/hooks/api/chats/use-artifact";
+import {
+  useArtifact,
+  useArtifactSelector,
+} from "@/hooks/api/chats/use-artifact";
 import { useChatVisibility } from "@/hooks/api/chats/use-chat-visibility";
+import type { ChatMessagePagination } from "@/hooks/api/chats/use-message-pagination";
+import { useMessagePagination } from "@/hooks/api/chats/use-message-pagination";
 import { ApiRequestError } from "@/lib/api/client";
 import {
   clearCachePattern,
@@ -48,12 +54,14 @@ const ARTIFACT_STREAM_PART_TYPES: ReadonlySet<string> = new Set([
 export function Chat({
   id,
   initialMessages,
+  initialMessagePagination,
   initialVisibilityType,
   isReadonly,
   initialLastContext,
 }: {
   id: string;
   initialMessages: ChatMessage[];
+  initialMessagePagination?: ChatMessagePagination;
   initialChatModel?: string;
   initialVisibilityType: VisibilityType;
   isReadonly: boolean;
@@ -68,7 +76,16 @@ export function Chat({
 
   const { mutate } = useSWRConfig();
   const setDataStream = useDataStreamActions();
+  const { setArtifact } = useArtifact();
   const workflowRunStorageKey = `${WORKFLOW_RUN_ID_KEY_PREFIX}${id}`;
+
+  useEffect(() => {
+    setArtifact((currentArtifact) =>
+      currentArtifact.isVisible
+        ? { ...currentArtifact, isVisible: false }
+        : currentArtifact,
+    );
+  }, [id, setArtifact]);
 
   const [input, setInput] = useState<string>("");
   const [usage, setUsage] = useState<AppUsage | undefined>(initialLastContext);
@@ -244,6 +261,20 @@ export function Chat({
             break;
 
           case "data-workflowCompleted":
+            setArtifact((currentArtifact) => {
+              if (currentArtifact.status !== "streaming") {
+                return currentArtifact;
+              }
+
+              return {
+                ...currentArtifact,
+                status: "idle",
+                error:
+                  dataPart.data.success === false
+                    ? "The workflow ended before the artifact finished generating."
+                    : undefined,
+              };
+            });
             setWorkflowStatus({
               isRunning: false,
               currentPhase: "completed",
@@ -259,6 +290,20 @@ export function Chat({
             break;
 
           case "data-workflowError":
+            setArtifact((currentArtifact) => {
+              if (
+                currentArtifact.status !== "streaming" &&
+                currentArtifact.documentId === "init"
+              ) {
+                return currentArtifact;
+              }
+
+              return {
+                ...currentArtifact,
+                status: "idle",
+                error: dataPart.data.error,
+              };
+            });
             setWorkflowStatus({
               isRunning: false,
               currentPhase: "error",
@@ -274,6 +319,7 @@ export function Chat({
       },
 
       onFinish: async () => {
+        await mutate(`/api/chat/${id}/resources`);
         mutate(unstable_serialize(getChatHistoryPaginationKey));
         await clearCachePattern(/\/api\/conversations.*/);
         await globalMutate(
@@ -284,6 +330,23 @@ export function Chat({
 
       onError: (error) => {
         console.error("Chat error:", error);
+        setArtifact((currentArtifact) => {
+          if (
+            currentArtifact.status !== "streaming" &&
+            currentArtifact.documentId === "init"
+          ) {
+            return currentArtifact;
+          }
+
+          return {
+            ...currentArtifact,
+            status: "idle",
+            error:
+              error instanceof ApiRequestError
+                ? error.message
+                : "The response stream ended unexpectedly.",
+          };
+        });
         handleChatEnd();
 
         toast({
@@ -325,19 +388,22 @@ export function Chat({
     <>
       <div className="overscroll-behavior-contain relative flex h-dvh min-w-0 touch-pan-y flex-col">
         {!isReadonly && <ChatSettingsDialog chatId={id} />}
+        <ChatResourceLibrary chatId={id} />
         <Messages
+          key={id}
           chatId={id}
+          initialMessagePagination={initialMessagePagination}
           isArtifactVisible={isArtifactVisible}
           isReadonly={isReadonly}
           messages={messages}
-          regenerate={regenerate}
+          sendMessage={sendMessage}
           setMessages={setMessages}
           status={status}
           votes={votes}
           canEditMessages={chatMemberAccess?.canEditMessages ?? false}
         />
 
-        <div className="sticky bottom-0 z-1 mx-auto flex w-full max-w-4xl gap-2 border-t-0 px-2 pb-3 md:px-4 md:pb-4">
+        <div className="sticky bottom-0 z-1 mx-auto flex w-full max-w-none min-w-0 gap-2 border-t-0 px-3 pb-3 sm:px-4 md:pb-4">
           {!isReadonly && (
             <MultimodalInput
               attachments={attachments}
@@ -358,6 +424,7 @@ export function Chat({
       </div>
 
       <Artifact
+        key={id}
         attachments={attachments}
         chatId={id}
         input={input}

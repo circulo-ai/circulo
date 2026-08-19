@@ -12,6 +12,7 @@ import {
   SidebarGroupContent,
   SidebarMenu,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { useChatHistory } from "@/hooks/api/chats/use-chat-history";
 import { useState } from "react";
@@ -24,12 +25,14 @@ import { ChatSidebarSearch } from "./chat-sidebar-search";
 
 export function ChatSidebarInside() {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [view, setView] = useState<"all" | "archived">("all");
+  const { open } = useSidebar();
   const {
     history: { data, isLoading },
     search,
     setSearch,
     debouncedSearch,
-  } = useChatHistory();
+  } = useChatHistory({ view });
 
   return (
     <>
@@ -39,8 +42,32 @@ export function ChatSidebarInside() {
         <ChatSidebarSearch search={search} setSearch={setSearch} />
       </CustomSidebarHeader>
       <SidebarContent>
+        {open && (
+          <div
+            aria-label="Chat history views"
+            className="sticky top-0 z-10 flex shrink-0 border-b border-sidebar-border/70 bg-sidebar/95 px-3 pt-1 backdrop-blur-sm"
+            role="tablist"
+          >
+            {([
+              ["all", "All chats"],
+              ["archived", "Archived"],
+            ] as const).map(([value, label]) => (
+              <button
+                aria-selected={view === value}
+                className="relative min-h-9 flex-1 px-2 text-xs font-medium text-sidebar-foreground/60 transition-colors hover:text-sidebar-foreground focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/70 focus-visible:ring-inset data-[active=true]:text-sidebar-foreground after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-teal-400 after:opacity-0 after:transition-opacity data-[active=true]:after:opacity-100"
+                data-active={view === value}
+                key={value}
+                onClick={() => setView(value)}
+                role="tab"
+                type="button"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         <CustomSidebarGroup>
-          <SidebarGroupContent>
+          <SidebarGroupContent className="min-h-0 flex-1 overflow-y-auto pb-2">
             <AnimatedList asChild>
               <SidebarMenu>
                 {isLoading &&
@@ -53,7 +80,9 @@ export function ChatSidebarInside() {
                 {!isLoading &&
                   data &&
                   data.chats.length === 0 &&
-                  debouncedSearch.length === 0 && <ChatSidebarEmpty />}
+                  debouncedSearch.length === 0 && (
+                    <ChatSidebarEmpty archived={view === "archived"} />
+                  )}
 
                 {!isLoading &&
                   data &&

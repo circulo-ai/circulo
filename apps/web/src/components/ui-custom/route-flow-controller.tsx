@@ -119,18 +119,24 @@ function RouteFlowView({ leveledRoute }: RouteFlowViewProps) {
 
   const RouteView = useMemo(() => leveledRoute.view, [leveledRoute.view]);
 
+  const shouldRenderRoute = isCurrentRoute || isBehindCurrent;
+
   return (
     <>
-      <RouteFlowViewContext.Provider
-        value={{
-          redirect: setCurrentRoute,
-          currentRoute,
-          isCurrentRoute,
-          isBehindCurrent,
-        }}
-      >
-        <RouteView />
-      </RouteFlowViewContext.Provider>
+      {shouldRenderRoute && (
+        <RouteFlowViewContext.Provider
+          value={{
+            redirect: setCurrentRoute,
+            currentRoute,
+            isCurrentRoute,
+            isBehindCurrent,
+          }}
+        >
+          <div aria-hidden={!isCurrentRoute} inert={!isCurrentRoute}>
+            <RouteView />
+          </div>
+        </RouteFlowViewContext.Provider>
+      )}
       {leveledRoute.children?.map((child) => (
         <RouteFlowView key={child.id} leveledRoute={child} />
       ))}
@@ -188,5 +194,3 @@ function annotateRouteLevels(route: Route, level = 0): LeveledRoute {
     ),
   };
 }
-
-// TODO make the inactive routes unreachable by keyboard

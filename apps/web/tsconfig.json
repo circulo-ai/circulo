@@ -40,5 +40,28 @@
     "trigger.config.ts",
     "../server/drizzle.config.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "src/components/auth/anonymous/**",
+    "src/components/auth/api-key/**",
+    "src/components/auth/delete-user/**",
+    "src/components/auth/device-authorization/**",
+    "src/components/auth/email-otp/**",
+    "src/components/auth/multi-session/**",
+    "src/components/auth/oauth-provider/**",
+    "src/components/auth/organization/**",
+    "src/components/auth/passkey/**",
+    "src/components/auth/two-factor/**",
+    "src/components/auth/username/**",
+    "src/lib/auth/anonymous-plugin.ts",
+    "src/lib/auth/api-key-plugin.ts",
+    "src/lib/auth/delete-user-plugin.ts",
+    "src/lib/auth/device-authorization-plugin.ts",
+    "src/lib/auth/email-otp-plugin.ts",
+    "src/lib/auth/multi-session-plugin.ts",
+    "src/lib/auth/oauth-provider-plugin.ts",
+    "src/lib/auth/passkey-plugin.ts",
+    "src/lib/auth/two-factor-plugin.ts",
+    "src/lib/auth/username-plugin.ts"
+  ]
 }

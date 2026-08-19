@@ -107,6 +107,7 @@ import {
   useState,
 } from "react";
 import { Path, useForm } from "react-hook-form";
+import { toast } from "sonner";
 import useSWR, { Key, useSWRConfig } from "swr";
 import { unstable_serialize } from "swr/infinite";
 import useSWRMutation from "swr/mutation";
@@ -146,6 +147,7 @@ export function NewChat({ id }: NewChatProps) {
   );
   const [inputText, setInputText] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [isReadingAttachments, setIsReadingAttachments] = useState(false);
   const isMobile = useIsMobile();
   const router = useRouter();
   const { mutate } = useSWRConfig();
@@ -160,6 +162,7 @@ export function NewChat({ id }: NewChatProps) {
     const completedTasks = uploadManager.uploadTasks.filter(
       (task) => task.status === "success" && task.url,
     );
+    setIsReadingAttachments(completedTasks.length > 0);
     void Promise.all(completedTasks.map(attachmentFromUploadTask)).then(
       (completedAttachments) => {
         if (!active) return;
@@ -172,6 +175,7 @@ export function NewChat({ id }: NewChatProps) {
           });
           return Array.from(map.values());
         });
+        setIsReadingAttachments(false);
       },
     );
     return () => {
@@ -181,6 +185,7 @@ export function NewChat({ id }: NewChatProps) {
 
   const voiceRecorder = useVoiceRecorder({
     onRecordingComplete: (file) => uploadManager.enqueueUploads([file], "chat"),
+    onRecordingError: (error) => toast.error(error.message),
   });
 
   // Use a ref so the transport closure always reads the latest agentIds at send time
@@ -252,7 +257,14 @@ export function NewChat({ id }: NewChatProps) {
     const hasActiveUploads = uploadManager.uploadTasks.some((task) =>
       ["queued", "preparing", "uploading"].includes(task.status),
     );
-    if (hasActiveUploads || voiceRecorder.isRecording) return;
+    if (
+      hasActiveUploads ||
+      uploadManager.hasUploadErrors ||
+      isReadingAttachments ||
+      voiceRecorder.isRecording
+    ) {
+      return;
+    }
     if (!text && attachments.length === 0) return;
     setInputText("");
     sendMessage({
@@ -261,8 +273,9 @@ export function NewChat({ id }: NewChatProps) {
         ...attachments.map((attachment) => ({
           type: "file" as const,
           url: attachment.dataUrl ?? attachment.url,
-          name: attachment.name,
+          filename: attachment.name,
           mediaType: attachment.contentType,
+          downloadUrl: attachment.downloadUrl,
         })),
         ...(text ? [{ type: "text" as const, text }] : []),
       ],
@@ -272,6 +285,7 @@ export function NewChat({ id }: NewChatProps) {
   }, [
     attachments,
     inputText,
+    isReadingAttachments,
     sendMessage,
     status,
     uploadManager,
@@ -343,6 +357,34 @@ export function NewChat({ id }: NewChatProps) {
                   }}
                 />
               ))}
+              {uploadManager.uploadTasks
+                .filter((item) =>
+                  ["queued", "preparing", "uploading", "error"].includes(
+                    item.status,
+                  ),
+                )
+                .map((item) => (
+                  <PreviewAttachment
+                    attachment={{
+                      url: "",
+                      name: item.file.name,
+                      contentType: item.file.type,
+                    }}
+                    error={item.error}
+                    isUploading={
+                      item.status === "queued" ||
+                      item.status === "preparing" ||
+                      item.status === "uploading"
+                    }
+                    key={item.id}
+                    onRemove={() => uploadManager.removeUploadTask(item.id)}
+                    onRetry={
+                      item.status === "error"
+                        ? () => uploadManager.retryUploadTask(item.id)
+                        : undefined
+                    }
+                  />
+                ))}
             </div>
           )}
           <CustomInputGroup className="h-14 w-full rounded-full! bg-sidebar!">
@@ -411,13 +453,7 @@ export function NewChat({ id }: NewChatProps) {
                       if (voiceRecorder.isRecording) {
                         voiceRecorder.stop();
                       } else {
-                        void voiceRecorder
-                          .start()
-                          .catch(() =>
-                            window.alert(
-                              "Microphone permission is required to record voice.",
-                            ),
-                          );
+                        void voiceRecorder.start().catch(() => undefined);
                       }
                     }}
                   >
@@ -441,7 +477,10 @@ export function NewChat({ id }: NewChatProps) {
                 disabled={
                   status === "submitted" ||
                   status === "streaming" ||
+                  voiceRecorder.isStarting ||
+                  isReadingAttachments ||
                   voiceRecorder.isRecording ||
+                  uploadManager.hasUploadErrors ||
                   uploadManager.uploadTasks.some((task) =>
                     ["queued", "preparing", "uploading"].includes(task.status),
                   )
@@ -517,7 +556,7 @@ function SelectAgents() {
       </div>
 
       <AnimatedList asChild>
-        <CustomScrollArea className="overflow-auto *:*:block!">
+        <CustomScrollArea className="min-h-0 flex-1 overflow-auto">
           {!data && (
             // TODO skeleton
             <PageSpinner />
@@ -593,9 +632,9 @@ const SelectableAgent = forwardRef<HTMLButtonElement, SelectableAgentProps>(
                   ref={agentRef}
                   onClick={handleSelect}
                   data-active={isSelected}
-                  className="flex w-full items-center gap-2 bg-sidebar px-3 py-2 transition-colors active:bg-teal-50/5! data-[active=true]:bg-teal-50/5"
+                  className="group/agent relative flex h-14 w-full items-center gap-3 bg-sidebar px-3 py-2 transition-colors active:bg-teal-50/5! data-[active=true]:bg-teal-50/5"
                 >
-                  <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-teal-50/15">
+                  <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-teal-50/15">
                     {agent.avatarUrl && (
                       <EnhancedImage
                         src={agent.avatarUrl}
@@ -606,29 +645,30 @@ const SelectableAgent = forwardRef<HTMLButtonElement, SelectableAgentProps>(
                       />
                     )}
                     {!agent.avatarUrl && <Bot className="size-5" />}
-                  </div>
+                  </span>
 
-                  <div
+                  <span
                     className={cn(
                       "absolute start-11 top-10 flex size-5 scale-0 items-center justify-center rounded-full border-3 border-sidebar bg-green-600 opacity-0 transition-all",
                       isSelected && "scale-100 border-[#303131] opacity-100",
                     )}
                   >
                     <Check className="size-3" />
-                  </div>
+                  </span>
 
-                  <div className="flex flex-col items-start gap-1 overflow-hidden">
-                    <div className="w-full truncate text-start text-sm font-medium">
+                  <span className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 text-start">
+                    <span className="truncate text-sm font-medium">
                       {agent.name}
-                    </div>
-                    <div className="w-full truncate text-start text-xs text-foreground/75">
+                    </span>
+                    <span className="truncate text-xs text-foreground/75">
                       {agent.description || "Isn't described"}
-                    </div>
-                  </div>
-
-                  <div className="ms-auto truncate overflow-hidden rounded-full bg-teal-50/15 px-1 text-[0.625rem]">
-                    {agent.model}
-                  </div>
+                    </span>
+                  </span>
+                  <span className="flex max-w-28 shrink-0 flex-col items-end gap-1">
+                    <span className="max-w-full truncate rounded-full bg-teal-50/15 px-1 text-[0.625rem] text-foreground/75">
+                      {agent.model}
+                    </span>
+                  </span>
                 </Ripple>
               </TooltipTrigger>
             </ContextMenuTrigger>

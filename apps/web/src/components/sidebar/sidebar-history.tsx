@@ -1,6 +1,7 @@
 "use client";
 
 import { LoaderIcon } from "@/components/icons/icons";
+import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -73,28 +74,34 @@ const groupChatsByDate = (chats: Chat[]): GroupedChats => {
 
 export function getChatHistoryPaginationKey(
   pageIndex: number,
-  previousPageData: GetChatHistoryResponse,
+  previousPageData: GetChatHistoryResponse | null | undefined,
+  archived = false,
 ) {
   if (previousPageData && previousPageData.hasMore === false) {
     return null;
   }
 
-  if (pageIndex === 0) {
-    return `/api/history?limit=${PAGE_SIZE}`;
+  if (pageIndex > 0 && !previousPageData) {
+    return null;
   }
 
-  const firstChatFromPage = previousPageData.chats.at(-1);
+  if (pageIndex === 0) {
+    return `/api/history?limit=${PAGE_SIZE}${archived ? "&archived=true" : ""}`;
+  }
+
+  const firstChatFromPage = previousPageData?.chats.at(-1);
 
   if (!firstChatFromPage) {
     return null;
   }
 
-  return `/api/history?ending_before=${firstChatFromPage.id}&limit=${PAGE_SIZE}`;
+  return `/api/history?ending_before=${firstChatFromPage.id}&limit=${PAGE_SIZE}${archived ? "&archived=true" : ""}`;
 }
 
 export function SidebarHistory({ user }: { user: User | undefined }) {
   const { setOpenMobile } = useSidebar();
   const { id } = useParams();
+  const [showArchived, setShowArchived] = useState(false);
 
   const {
     data: paginatedChatHistories,
@@ -102,7 +109,9 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     isValidating,
     isLoading,
     mutate,
-  } = useSWRInfinite<GetChatHistoryResponse>(getChatHistoryPaginationKey);
+  } = useSWRInfinite<GetChatHistoryResponse>((pageIndex, previousPageData) =>
+    getChatHistoryPaginationKey(pageIndex, previousPageData, showArchived),
+  );
 
   const router = useRouter();
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -143,6 +152,21 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     if (deleteId === id) {
       router.push("/");
     }
+  };
+
+  const handleArchive = async (chatId: string, archived: boolean) => {
+    const response = await fetch("/api/chat/archive", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: chatId, archived: !archived }),
+    });
+    if (!response.ok) {
+      toast.error("Unable to update archive status");
+      return;
+    }
+    await mutate();
+    toast.success(archived ? "Chat restored" : "Chat archived");
+    if (chatId === id && !archived) router.push("/");
   };
 
   if (!user) {
@@ -202,6 +226,24 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     <>
       <SidebarGroup>
         <SidebarGroupContent>
+          <div className="mb-2 flex items-center gap-1 px-2">
+            <Button
+              className="h-7 flex-1 text-xs"
+              onClick={() => setShowArchived(false)}
+              size="sm"
+              variant={showArchived ? "ghost" : "secondary"}
+            >
+              Chats
+            </Button>
+            <Button
+              className="h-7 flex-1 text-xs"
+              onClick={() => setShowArchived(true)}
+              size="sm"
+              variant={showArchived ? "secondary" : "ghost"}
+            >
+              Archived
+            </Button>
+          </div>
           <SidebarMenu>
             {paginatedChatHistories &&
               (() => {
@@ -227,6 +269,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
                               setDeleteId(chatId);
                               setShowDeleteDialog(true);
                             }}
+                            onArchive={handleArchive}
                             setOpenMobile={setOpenMobile}
                           />
                         ))}
@@ -247,6 +290,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
                               setDeleteId(chatId);
                               setShowDeleteDialog(true);
                             }}
+                            onArchive={handleArchive}
                             setOpenMobile={setOpenMobile}
                           />
                         ))}
@@ -267,6 +311,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
                               setDeleteId(chatId);
                               setShowDeleteDialog(true);
                             }}
+                            onArchive={handleArchive}
                             setOpenMobile={setOpenMobile}
                           />
                         ))}
@@ -287,6 +332,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
                               setDeleteId(chatId);
                               setShowDeleteDialog(true);
                             }}
+                            onArchive={handleArchive}
                             setOpenMobile={setOpenMobile}
                           />
                         ))}
@@ -307,6 +353,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
                               setDeleteId(chatId);
                               setShowDeleteDialog(true);
                             }}
+                            onArchive={handleArchive}
                             setOpenMobile={setOpenMobile}
                           />
                         ))}
@@ -345,8 +392,9 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete your
-              chat and remove it from our servers.
+              This removes the chat from the app using soft-delete semantics.
+              The record is retained for recovery and is never physically
+              deleted by this action.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

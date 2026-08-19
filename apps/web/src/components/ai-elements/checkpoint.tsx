@@ -19,10 +19,7 @@ export const Checkpoint = ({
   ...props
 }: CheckpointProps) => (
   <div
-    className={cn(
-      "flex items-center gap-0.5 overflow-hidden text-muted-foreground",
-      className,
-    )}
+    className={cn("flex items-center gap-0.5 text-muted-foreground overflow-hidden", className)}
     {...props}
   >
     {children}
@@ -55,11 +52,7 @@ export const CheckpointTrigger = ({
 }: CheckpointTriggerProps) =>
   tooltip ? (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <Button size={size} type="button" variant={variant} {...props}>
-          {children}
-        </Button>
-      </TooltipTrigger>
+      <TooltipTrigger render={<Button size={size} type="button" variant={variant} {...props} />}>{children}</TooltipTrigger>
       <TooltipContent align="start" side="bottom">
         {tooltip}
       </TooltipContent>

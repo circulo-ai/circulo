@@ -5,6 +5,9 @@ import { customProvider, type LanguageModel } from "ai";
 export const defaultModel =
   env.OPENROUTER_DEFAULT_MODEL ?? "openai/gpt-4o-mini";
 
+/** Always-available last-resort model for orchestration control-plane calls. */
+export const orchestrationFallbackModel = defaultModel;
+
 export const openRouter = createOpenRouter({
   apiKey: env.OPENROUTER_API_KEY,
   baseURL: env.OPENROUTER_BASE_URL,
@@ -20,6 +23,33 @@ export const openRouter = createOpenRouter({
 
 export function getLanguageModel(modelId = defaultModel): LanguageModel {
   return openRouter(modelId, { usage: { include: true } });
+}
+
+export async function withModelFallback<T>(options: {
+  modelId?: string | null;
+  fallbackModelId?: string | null;
+  run: (model: LanguageModel) => Promise<T>;
+}): Promise<T> {
+  const modelIds = [
+    options.modelId?.trim(),
+    options.fallbackModelId?.trim(),
+    orchestrationFallbackModel,
+  ].filter((modelId): modelId is string => Boolean(modelId));
+  const uniqueModelIds = [...new Set(modelIds)];
+  const errors: unknown[] = [];
+
+  for (const modelId of uniqueModelIds) {
+    try {
+      return await options.run(getLanguageModel(modelId));
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+
+  throw new AggregateError(
+    errors,
+    `All orchestration models failed: ${uniqueModelIds.join(", ")}`,
+  );
 }
 
 // Compatibility aliases for artifact and legacy callers. New model IDs are

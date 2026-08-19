@@ -40,11 +40,14 @@ export class WorkflowOutputChannel {
     let index = startIndex;
     let controller: ReadableStreamDefaultController<CustomUIMessageChunk>;
     let listener: Listener | undefined;
+    let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
     let settled = false;
 
     const cleanup = () => {
       if (listener) this.listeners.delete(listener);
       listener = undefined;
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
+      heartbeatTimer = undefined;
     };
 
     const pump = () => {
@@ -68,6 +71,22 @@ export class WorkflowOutputChannel {
         listener = pump;
         this.listeners.add(listener);
         pump();
+
+        // Keep long-running model/tool calls alive through Bun, proxies, and
+        // load balancers without polluting the replay buffer. AI SDK accepts
+        // custom data chunks and the client intentionally ignores this one.
+        heartbeatTimer = setInterval(() => {
+          if (settled || this.closed) return;
+          try {
+            controller.enqueue({
+              type: "data-workflowHeartbeat",
+              data: { timestamp: new Date().toISOString() },
+            });
+          } catch {
+            settled = true;
+            cleanup();
+          }
+        }, 5_000);
       },
       cancel: () => {
         settled = true;
@@ -108,5 +127,16 @@ export function publishWorkflowChunk(
 }
 
 export function closeWorkflowOutputChannel(workflowId: string): void {
-  channels.get(workflowId)?.close();
+  const channel = channels.get(workflowId);
+  if (!channel) return;
+
+	channel.close();
+	// Completed channels are replayed from the durable event store on demand.
+	// Remove the in-memory instance so long-lived server processes do not retain
+	// every completed workflow and its full chunk buffer indefinitely.
+	// Defer removal by one microtask so the request that just completed can still
+	// obtain the closed channel and return its terminal stream to the caller.
+	queueMicrotask(() => {
+		if (channels.get(workflowId) === channel) channels.delete(workflowId);
+	});
 }

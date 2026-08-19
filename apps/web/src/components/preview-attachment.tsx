@@ -2,17 +2,22 @@ import { CrossSmallIcon } from "@/components/icons/icons";
 import type { Attachment } from "@/lib/types";
 import Image from "next/image";
 import Link from "next/link";
+import { RotateCcw } from "lucide-react";
 import { Loader } from "./ai-elements/loader";
 import { Button } from "./ui/button";
 
 export const PreviewAttachment = ({
   attachment,
   isUploading = false,
+  error,
   onRemove,
+  onRetry,
 }: {
   attachment: Attachment;
   isUploading?: boolean;
+  error?: string;
   onRemove?: () => void;
+  onRetry?: () => void;
 }) => {
   const { name, url, contentType, dataUrl } = attachment;
   const previewUrl = (dataUrl ?? url)?.trim() || undefined;
@@ -24,7 +29,27 @@ export const PreviewAttachment = ({
       className="group relative size-16 overflow-hidden rounded-lg border bg-muted"
       data-testid="input-attachment-preview"
     >
-      {isImage && previewUrl ? (
+      {error ? (
+        <div className="flex size-full flex-col items-center justify-center gap-1 px-1 text-center text-[10px] text-destructive">
+          <span>Upload failed</span>
+          {onRetry && (
+            <Button
+              aria-label="Retry upload"
+              className="size-5 rounded-full p-0"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onRetry();
+              }}
+              size="sm"
+              type="button"
+              variant="ghost"
+            >
+              <RotateCcw className="size-3" />
+            </Button>
+          )}
+        </div>
+      ) : isImage && previewUrl ? (
         <Image
           alt={name ?? "An image attachment"}
           className="size-full object-cover"

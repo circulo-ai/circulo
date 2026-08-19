@@ -28,5 +28,6 @@ export async function attachmentFromUploadTask(
     contentType: task.file.type || "application/octet-stream",
     size: task.file.size,
     dataUrl: await readFileAsDataUrl(task.file),
+    downloadUrl: task.downloadUrl,
   };
 }

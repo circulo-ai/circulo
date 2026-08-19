@@ -1,10 +1,10 @@
 "use client";
 
-import { deleteTrailingMessages } from "@/app/(chat)/actions";
+import { editMessage } from "@/app/(chat)/actions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { ChatMessage } from "@/lib/types";
-import { getTextFromMessage } from "@/lib/utils";
+import { generateUUID, getTextFromMessage } from "@/lib/utils";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import {
   type Dispatch,
@@ -20,14 +20,14 @@ export type MessageEditorProps = {
   message: ChatMessage;
   setMode: Dispatch<SetStateAction<"view" | "edit">>;
   setMessages: UseChatHelpers<ChatMessage>["setMessages"];
-  regenerate: UseChatHelpers<ChatMessage>["regenerate"];
+  sendMessage: UseChatHelpers<ChatMessage>["sendMessage"];
 };
 
 export function MessageEditor({
   message,
   setMode,
   setMessages,
-  regenerate,
+  sendMessage,
 }: MessageEditorProps) {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
@@ -77,31 +77,50 @@ export function MessageEditor({
         <Button
           className="h-fit px-3 py-2"
           data-testid="message-editor-send-button"
-          disabled={isSubmitting}
+          disabled={isSubmitting || draftContent.trim().length === 0}
           onClick={async () => {
+            const content = draftContent;
+            if (!content.trim()) return;
+
             setIsSubmitting(true);
             try {
-              await deleteTrailingMessages({
+              const replacementId = generateUUID();
+              const attachmentParts = message.parts.filter(
+                (part) => part.type === "file",
+              );
+              await editMessage({
                 id: message.id,
+                replacementId,
+                content,
+                parts: [
+                  ...attachmentParts,
+                  { type: "text", text: content },
+                ],
+                attachments: attachmentParts,
               });
 
               setMessages((messages) => {
                 const index = messages.findIndex((m) => m.id === message.id);
 
                 if (index !== -1) {
-                  const updatedMessage: ChatMessage = {
-                    ...message,
-                    parts: [{ type: "text", text: draftContent }],
-                  };
-
-                  return [...messages.slice(0, index), updatedMessage];
+                  return messages.slice(0, index);
                 }
 
                 return messages;
               });
 
               setMode("view");
-              regenerate();
+              // The API has already durably created this replacement. Sending
+              // the same ID makes the chat endpoint idempotently acknowledge
+              // it before starting the new workflow run.
+              await sendMessage({
+                id: replacementId,
+                role: "user",
+                parts: [
+                  ...attachmentParts,
+                  { type: "text", text: content },
+                ],
+              });
             } catch (error) {
               toast.error(
                 error instanceof Error

@@ -38,6 +38,15 @@ export const updateDocument = ({
         };
       }
 
+      const canUpdate =
+        document.userId === session.userId ||
+        (Boolean(session.chatId) && document.chatId === session.chatId);
+      if (!canUpdate) {
+        return {
+          error: "You do not have access to update this document",
+        };
+      }
+
       dataStream.write({
         type: "data-clear",
         data: null,

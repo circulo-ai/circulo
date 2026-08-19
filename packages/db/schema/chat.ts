@@ -1,3 +1,4 @@
+import { defaultModel } from "@circulo-ai/types";
 import { type InferSelectModel, relations, sql } from "drizzle-orm";
 import {
   bigint,
@@ -67,9 +68,21 @@ export const chat = pgTable(
     orchestrationEnabled: boolean("orchestration_enabled")
       .notNull()
       .default(true),
+    orchestrationAgentId: uuid("orchestration_agent_id").references(
+      () => agent.id,
+      { onDelete: "set null" },
+    ),
+    orchestrationModel: text("orchestration_model")
+      .notNull()
+      .default(defaultModel),
+    orchestrationFallbackModel: text("orchestration_fallback_model")
+      .notNull()
+      .default(defaultModel),
 
     isDeleted: boolean("is_deleted").notNull().default(false),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    isArchived: boolean("is_archived").notNull().default(false),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
 
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -83,6 +96,7 @@ export const chat = pgTable(
     index("chats_org_idx").on(t.organizationId),
     index("chats_creator_idx").on(t.creatorId),
     index("chats_org_created_idx").on(t.organizationId, t.createdAt),
+    index("chats_org_archived_idx").on(t.organizationId, t.isArchived),
   ],
 );
 
@@ -333,6 +347,8 @@ export const workflowRun = pgTable(
     status: workflowRunStatusEnum("status").notNull().default("running"),
     state: text("state").notNull().default("pending"),
     version: integer("version").notNull().default(0),
+    /** Stable request key used to make workflow creation safe across workers. */
+    idempotencyKey: text("idempotency_key"),
     currentStep: integer("current_step").notNull().default(0),
     retryCount: integer("retry_count").notNull().default(0),
     maxExecutionTime: integer("max_execution_time"),
@@ -364,6 +380,7 @@ export const workflowRun = pgTable(
   (t) => [
     index("workflow_runs_chat_idx").on(t.chatId, t.createdAt),
     index("workflow_runs_user_idx").on(t.userId, t.createdAt),
+    uniqueIndex("workflow_runs_idempotency_key_idx").on(t.idempotencyKey),
   ],
 );
 
@@ -378,6 +395,10 @@ export const workflowRunEvent = pgTable(
     // Workflow event timestamps are JavaScript epoch milliseconds. PostgreSQL
     // integer is 32-bit and overflows for every modern epoch timestamp.
     timestamp: bigint("timestamp", { mode: "number" }).notNull(),
+    /** Global monotonic sequence makes replay deterministic when timestamps tie. */
+    sequence: bigint("sequence", {
+      mode: "number",
+    }).generatedAlwaysAsIdentity(),
     eventType: text("event_type").notNull(),
     payload: jsonb("payload").notNull(),
     correlationId: text("correlation_id"),

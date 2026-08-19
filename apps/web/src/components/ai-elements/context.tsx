@@ -112,7 +112,7 @@ export const ContextTrigger = ({ children, ...props }: ContextTriggerProps) => {
   }).format(usedPercent);
 
   return (
-    <HoverCardTrigger asChild>
+    <HoverCardTrigger>
       {children ?? (
         <Button type="button" variant="ghost" {...props}>
           <span className="font-medium text-muted-foreground">
@@ -214,7 +214,7 @@ export const ContextContentFooter = ({
     <div
       className={cn(
         "flex w-full items-center justify-between gap-3 bg-secondary p-3 text-xs",
-        className,
+        className
       )}
       {...props}
     >
@@ -316,7 +316,10 @@ export const ContextReasoningUsage = ({
   ...props
 }: ContextReasoningUsageProps) => {
   const { usage, modelId } = useContextValue();
-  const reasoningTokens = usage?.outputTokenDetails.reasoningTokens ?? 0;
+  const extendedUsage = usage as
+    | (LanguageModelUsage & { reasoningTokens?: number })
+    | undefined;
+  const reasoningTokens = extendedUsage?.reasoningTokens ?? 0;
 
   if (children) {
     return children;
@@ -356,7 +359,10 @@ export const ContextCacheUsage = ({
   ...props
 }: ContextCacheUsageProps) => {
   const { usage, modelId } = useContextValue();
-  const cacheTokens = usage?.inputTokenDetails.cacheReadTokens ?? 0;
+  const extendedUsage = usage as
+    | (LanguageModelUsage & { cachedInputTokens?: number })
+    | undefined;
+  const cacheTokens = extendedUsage?.cachedInputTokens ?? 0;
 
   if (children) {
     return children;

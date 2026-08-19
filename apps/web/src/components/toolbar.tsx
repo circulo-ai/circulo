@@ -402,7 +402,7 @@ const PureToolbar = ({
                 }
             : { opacity: 1, y: 0, height: 54, transition: { delay: 0 } }
         }
-        className="absolute right-6 bottom-6 flex cursor-pointer flex-col justify-end rounded-full border bg-background p-1.5 shadow-lg"
+        className="absolute right-4 bottom-4 flex max-w-[calc(100%-2rem)] cursor-pointer flex-col justify-end rounded-full border bg-background p-1.5 shadow-lg sm:right-6 sm:bottom-6"
         exit={{ opacity: 0, y: -20, transition: { duration: 0.1 } }}
         initial={{ opacity: 0, y: -20, scale: 1 }}
         onAnimationComplete={() => {

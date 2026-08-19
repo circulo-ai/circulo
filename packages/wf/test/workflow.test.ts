@@ -15,6 +15,7 @@ import {
   waitFor,
   waitForAndRetry,
   WorkflowEngine,
+  WorkflowHookManager,
   type Workflow,
 } from "../src";
 
@@ -80,7 +81,128 @@ describe("workflow DSL", () => {
   });
 });
 
+describe("workflow lifecycle hooks", () => {
+  it("supports priorities, wildcard listeners, one-shot listeners, and cleanup", async () => {
+    const hooks = new WorkflowHookManager<void, void, string>();
+    const calls: string[] = [];
+
+    hooks.on("workflow.started", () => {
+      calls.push("normal");
+    }, {
+      priority: 1,
+    });
+    hooks.onAny(() => {
+      calls.push("any");
+    }, { priority: -1 });
+    hooks.once("workflow.started", () => {
+      calls.push("once");
+    });
+
+    await hooks.emit({ name: "workflow.started", timestamp: 1 });
+    await hooks.emit({ name: "workflow.started", timestamp: 2 });
+
+    expect(calls).toEqual(["normal", "once", "any", "normal", "any"]);
+    expect(hooks.size).toBe(2);
+    hooks.clear();
+    expect(hooks.size).toBe(0);
+  });
+
+  it("isolates listener failures by default and reports them", async () => {
+    const errors: string[] = [];
+    const hooks = new WorkflowHookManager<void, void, void>({
+      onError: (error, context) => {
+        errors.push(`${context.name}:${String(error)}`);
+      },
+    });
+    let completed = false;
+    hooks.on("workflow.completed", () => {
+      throw new Error("telemetry unavailable");
+    });
+    hooks.on("workflow.completed", () => {
+      completed = true;
+    });
+
+    await hooks.emit({ name: "workflow.completed", timestamp: 1 });
+
+    expect(completed).toBe(true);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("workflow.completed");
+  });
+
+  it("is available from the engine for backend integrations", async () => {
+    const hooks = new WorkflowHookManager<Context, void, string>();
+    const seen: string[] = [];
+    hooks.onAny((context) => {
+      seen.push(context.name);
+    });
+    const engine = new WorkflowEngine<Context, void, string>({
+      workflowStore: new InMemoryWorkflowStore<Context, void, string>(),
+      eventStore: new InMemoryEventStore<string>(),
+      eventBus: new InMemoryEventBus<string>(),
+      hooks,
+      enableAutoResume: false,
+    });
+    const workflow = defineWorkflow<Context, void>()
+      .context({ attempts: 0 })
+      .step("run", { run: async () => complete("ok") })
+      .build();
+
+    const id = await engine.createWorkflow(workflow, undefined);
+    await engine.run(id);
+
+    await new Promise<void>((resolve) => queueMicrotask(() => resolve()));
+    expect(seen).toEqual([
+      "engine.started",
+      "workflow.created",
+      "workflow.started",
+      "workflow.step.started",
+      "workflow.step.completed",
+      "workflow.completed",
+    ]);
+    await engine.shutdown();
+    expect(seen.at(-1)).toBe("engine.shutdown");
+  });
+});
+
 describe("WorkflowEngine", () => {
+  it("coalesces duplicate run requests for the same workflow", async () => {
+    const engine = createEngine<void, string>();
+    let executions = 0;
+    const workflow = defineWorkflow<Context, void>()
+      .context({ attempts: 0 })
+      .step("run-once", {
+        run: async () => {
+          executions += 1;
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          return complete("done");
+        },
+      })
+      .build();
+    const id = await engine.createWorkflow(workflow, undefined);
+
+    await Promise.all([engine.run(id), engine.run(id), engine.run(id)]);
+
+    expect(executions).toBe(1);
+    expect((await engine.getWorkflow(id))?.output).toBe("done");
+    await engine.shutdown();
+  });
+
+  it("returns the existing workflow for an idempotency key", async () => {
+    const engine = createEngine<string, string>();
+    const workflow = defineWorkflow<Context, string>()
+      .context({ attempts: 0 })
+      .idempotencyKey("request-1")
+      .step("run", { run: async (input) => complete(input) })
+      .build();
+
+    const first = await engine.createWorkflow(workflow, "first");
+    const second = await engine.createWorkflow(workflow, "second");
+
+    expect(second).toBe(first);
+    expect((await engine.getWorkflow(first))?.input).toBe("first");
+    await engine.shutdown();
+  });
+
   it("works with only the required stores and delivers events before run resolves", async () => {
     const engine = createEngine<{ value: number }, number>();
     const events: string[] = [];

@@ -14,7 +14,7 @@ type ArtifactMessagesProps = {
   votes: Vote[] | undefined;
   messages: ChatMessage[];
   setMessages: UseChatHelpers<ChatMessage>["setMessages"];
-  regenerate: UseChatHelpers<ChatMessage>["regenerate"];
+  sendMessage: UseChatHelpers<ChatMessage>["sendMessage"];
   isReadonly: boolean;
   artifactStatus: UIArtifact["status"];
 };
@@ -25,7 +25,7 @@ function PureArtifactMessages({
   votes,
   messages,
   setMessages,
-  regenerate,
+  sendMessage,
   isReadonly,
 }: ArtifactMessagesProps) {
   const {
@@ -35,12 +35,13 @@ function PureArtifactMessages({
     onViewportLeave,
     hasSentMessage,
   } = useMessages({
+    storageKey: `chat-scroll:${chatId}:artifact`,
     status,
   });
 
   return (
     <div
-      className="flex h-full flex-col items-center gap-4 overflow-y-scroll px-4 pt-20"
+      className="chat-scrollbar min-h-0 w-full min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-3 sm:px-4 sm:py-4"
       ref={messagesContainerRef}
     >
       {messages.map((message, index) => (
@@ -51,7 +52,7 @@ function PureArtifactMessages({
           isLoading={status === "streaming" && index === messages.length - 1}
           isReadonly={isReadonly}
           message={message}
-          regenerate={regenerate}
+          sendMessage={sendMessage}
           requiresScrollPadding={
             hasSentMessage && index === messages.length - 1
           }
@@ -82,20 +83,16 @@ function areEqual(
   prevProps: ArtifactMessagesProps,
   nextProps: ArtifactMessagesProps,
 ) {
-  if (
-    prevProps.artifactStatus === "streaming" &&
-    nextProps.artifactStatus === "streaming"
-  ) {
-    return true;
-  }
-
   if (prevProps.status !== nextProps.status) {
     return false;
   }
-  if (prevProps.status && nextProps.status) {
+  if (prevProps.artifactStatus !== nextProps.artifactStatus) {
     return false;
   }
   if (prevProps.messages.length !== nextProps.messages.length) {
+    return false;
+  }
+  if (!equal(prevProps.messages, nextProps.messages)) {
     return false;
   }
   if (!equal(prevProps.votes, nextProps.votes)) {

@@ -1,28 +1,22 @@
 "use client";
 import { MessageContent } from "@/components/ai-elements/message";
 import { Response } from "@/components/ai-elements/response";
-import {
-  Tool,
-  ToolContent,
-  ToolHeader,
-  ToolInput,
-  ToolOutput,
-} from "@/components/ai-elements/tool";
-import { useDataStream } from "@/components/data-stream-provider";
-import { DocumentToolResult } from "@/components/document/document";
-import { DocumentPreview } from "@/components/document/document-preview";
+import type { ArtifactKind } from "@/components/artifacts/artifact";
 import { SparklesIcon } from "@/components/icons/icons";
 import { PreviewAttachment } from "@/components/preview-attachment";
 import type { ChatMessage } from "@/lib/types";
 import { cn, sanitizeText } from "@/lib/utils";
+import { useArtifact } from "@/hooks/api/chats/use-artifact";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import type { Vote } from "@circulo-ai/db/schema";
 import equal from "fast-deep-equal";
 import { motion } from "framer-motion";
+import { ArrowUpRight, ExternalLink, FileText } from "lucide-react";
 import { memo, useState } from "react";
 import { MessageActions } from "./message-actions";
 import { MessageEditor } from "./message-editor";
 import { MessageReasoning } from "./message-reasoning";
+import { ToolCallPart } from "./tool-call-part";
 import { WorkflowProcess } from "./workflow-process";
 
 const PurePreviewMessage = ({
@@ -31,7 +25,7 @@ const PurePreviewMessage = ({
   vote,
   isLoading,
   setMessages,
-  regenerate,
+  sendMessage,
   isReadonly,
   requiresScrollPadding,
   canEdit,
@@ -41,18 +35,41 @@ const PurePreviewMessage = ({
   vote: Vote | undefined;
   isLoading: boolean;
   setMessages: UseChatHelpers<ChatMessage>["setMessages"];
-  regenerate: UseChatHelpers<ChatMessage>["regenerate"];
+  sendMessage: UseChatHelpers<ChatMessage>["sendMessage"];
   isReadonly: boolean;
   requiresScrollPadding: boolean;
   canEdit: boolean;
 }) => {
   const [mode, setMode] = useState<"view" | "edit">("view");
 
-  const attachmentsFromMessage = message.parts.filter(
-    (part) => part.type === "file",
-  );
-
-  useDataStream();
+	const attachmentsFromMessage = message.parts.filter(
+		(part) => part.type === "file",
+	);
+	const completedArtifacts = message.parts.flatMap((part) => {
+		if (!part.type.startsWith("tool-") && part.type !== "dynamic-tool") {
+			return [];
+		}
+		const name = part.type.replace(/^tool-/, "");
+		if (name !== "createDocument" && name !== "updateDocument") return [];
+		const output = (part as unknown as { output?: unknown }).output;
+		if (!output || typeof output !== "object") return [];
+		const result = output as { id?: unknown; title?: unknown; kind?: unknown };
+		if (
+			typeof result.id !== "string" ||
+			typeof result.title !== "string" ||
+			!isArtifactKind(result.kind)
+		) {
+			return [];
+		}
+		const action: "Created" | "Updated" =
+			name === "updateDocument" ? "Updated" : "Created";
+		return [{
+			id: result.id,
+			title: result.title,
+			kind: result.kind,
+			action,
+		}];
+	});
 
   return (
     <motion.div
@@ -63,7 +80,7 @@ const PurePreviewMessage = ({
       initial={{ opacity: 0 }}
     >
       <div
-        className={cn("flex w-full items-start gap-2 md:gap-3", {
+        className={cn("flex w-full min-w-0 items-start gap-2 md:gap-3", {
           "justify-end": message.role === "user" && mode !== "edit",
           "justify-start": message.role === "assistant",
         })}
@@ -75,7 +92,7 @@ const PurePreviewMessage = ({
         )}
 
         <div
-          className={cn("flex flex-col", {
+          className={cn("flex max-w-full min-w-0 flex-col", {
             "gap-2 md:gap-4": message.parts?.some(
               (p) => p.type === "text" && p.text?.trim(),
             ),
@@ -92,15 +109,24 @@ const PurePreviewMessage = ({
         >
           {attachmentsFromMessage.length > 0 && (
             <div
-              className="flex flex-row justify-end gap-2"
+              className="flex chat-scrollbar max-w-full flex-row justify-end gap-2 overflow-x-auto"
               data-testid={"message-attachments"}
             >
               {attachmentsFromMessage.map((attachment, index) => (
                 <PreviewAttachment
                   attachment={{
-                    name: attachment.filename ?? "file",
+                    name:
+                      attachment.filename ??
+                      (attachment as typeof attachment & { name?: string })
+                        .name ??
+                      "file",
                     contentType: attachment.mediaType,
                     url: attachment.url,
+                    downloadUrl: (
+                      attachment as typeof attachment & {
+                        downloadUrl?: string;
+                      }
+                    ).downloadUrl,
                   }}
                   key={`${message.id}-attachment-${attachment.url || index}`}
                 />
@@ -108,7 +134,7 @@ const PurePreviewMessage = ({
             </div>
           )}
 
-          <WorkflowProcess parts={message.parts} />
+          <WorkflowProcess isReadonly={isReadonly} parts={message.parts} />
 
           {message.parts?.map((part, index) => {
             const { type } = part;
@@ -130,11 +156,12 @@ const PurePreviewMessage = ({
                   <div key={key}>
                     <MessageContent
                       className={cn({
-                        "w-fit rounded-2xl px-3 py-2 text-right wrap-break-word text-white":
+                        "w-fit max-w-full rounded-2xl px-3 py-2 text-right wrap-break-word text-white":
                           message.role === "user",
                         "bg-transparent px-0 py-0 text-left":
                           message.role === "assistant",
-                      })}
+					})}
+
                       data-testid="message-content"
                       style={
                         message.role === "user"
@@ -159,7 +186,7 @@ const PurePreviewMessage = ({
                       <MessageEditor
                         key={message.id}
                         message={message}
-                        regenerate={regenerate}
+                        sendMessage={sendMessage}
                         setMessages={setMessages}
                         setMode={setMode}
                       />
@@ -169,91 +196,81 @@ const PurePreviewMessage = ({
               }
             }
 
-            if (type.startsWith("data-workflow")) return null;
+            if (type === "source-url" || type === "source-document") {
+              const source = part as unknown as {
+                url?: string;
+                title?: string;
+                filename?: string;
+                sourceId?: string;
+              };
+              const label =
+                source.title ??
+                source.filename ??
+                source.url ??
+                source.sourceId ??
+                "Source";
 
-            if (type === "tool-createDocument") {
-              const { toolCallId } = part;
-
-              if (part.output && "error" in part.output) {
-                return (
-                  <div
-                    className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-500 dark:bg-red-950/50"
-                    key={toolCallId}
-                  >
-                    Error creating document: {String(part.output.error)}
-                  </div>
-                );
-              }
-
-              return (
-                <DocumentPreview
-                  isReadonly={isReadonly}
-                  key={toolCallId}
-                  result={part.output}
-                />
-              );
-            }
-
-            if (type === "tool-updateDocument") {
-              const { toolCallId } = part;
-
-              if (part.output && "error" in part.output) {
-                return (
-                  <div
-                    className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-500 dark:bg-red-950/50"
-                    key={toolCallId}
-                  >
-                    Error updating document: {String(part.output.error)}
-                  </div>
-                );
-              }
-
-              return (
-                <div className="relative" key={toolCallId}>
-                  <DocumentPreview
-                    args={{ ...part.output, isUpdate: true }}
-                    isReadonly={isReadonly}
-                    result={part.output}
-                  />
+              return source.url ? (
+                <a
+                  className="inline-flex max-w-full min-w-0 items-center gap-1.5 self-start rounded-full border bg-background/60 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  href={source.url}
+                  key={key}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  <ExternalLink className="size-3.5 shrink-0" />
+                  <span className="truncate">{label}</span>
+                </a>
+              ) : (
+                <div
+                  className="inline-flex max-w-full min-w-0 items-center gap-1.5 self-start rounded-full border bg-background/60 px-2.5 py-1 text-xs text-muted-foreground"
+                  key={key}
+                >
+                  <FileText className="size-3.5 shrink-0" />
+                  <span className="truncate">{label}</span>
                 </div>
               );
             }
 
-            if (type === "tool-requestSuggestions") {
-              const { toolCallId, state } = part;
+            if (type.startsWith("data-workflow")) return null;
+            if (type === "file" || type === "step-start") return null;
 
+            if (type.startsWith("tool-") || type === "dynamic-tool") {
               return (
-                <Tool defaultOpen={true} key={toolCallId}>
-                  <ToolHeader state={state} type="tool-requestSuggestions" />
-                  <ToolContent>
-                    {state === "input-available" && (
-                      <ToolInput input={part.input} />
-                    )}
-                    {state === "output-available" && (
-                      <ToolOutput
-                        errorText={undefined}
-                        output={
-                          "error" in part.output ? (
-                            <div className="rounded border p-2 text-red-500">
-                              Error: {String(part.output.error)}
-                            </div>
-                          ) : (
-                            <DocumentToolResult
-                              isReadonly={isReadonly}
-                              result={part.output}
-                              type="request-suggestions"
-                            />
-                          )
-                        }
-                      />
-                    )}
-                  </ToolContent>
-                </Tool>
+                <ToolCallPart
+                  isReadonly={isReadonly}
+                  key={
+                    (part as unknown as { toolCallId?: string }).toolCallId ??
+                    key
+                  }
+                  part={
+                    part as unknown as Parameters<
+                      typeof ToolCallPart
+                    >[0]["part"]
+                  }
+                />
               );
             }
 
             return null;
-          })}
+					})}
+
+					{completedArtifacts.length > 0 && (
+						<div className="flex flex-col gap-2 pt-1" data-testid="message-artifacts">
+							<div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+								<FileText className="size-3.5" />
+								Artifacts from this message
+							</div>
+							<div className="grid min-w-0 gap-2 sm:grid-cols-2">
+								{completedArtifacts.map((artifact) => (
+									<MessageArtifactCard
+										artifact={artifact}
+										key={`${artifact.id}:${artifact.action}`}
+									/>
+								))}
+							</div>
+						</div>
+					)}
 
           {!isReadonly && (
             <MessageActions
@@ -271,6 +288,55 @@ const PurePreviewMessage = ({
     </motion.div>
   );
 };
+
+function isArtifactKind(value: unknown): value is ArtifactKind {
+	return value === "text" || value === "code" || value === "image" || value === "sheet";
+}
+
+function MessageArtifactCard({
+	artifact,
+}: {
+	artifact: {
+		id: string;
+		title: string;
+		kind: ArtifactKind;
+		action: "Created" | "Updated";
+	};
+}) {
+	const { setArtifact } = useArtifact();
+
+	return (
+		<button
+			className="group flex min-w-0 items-center gap-3 rounded-2xl border bg-background/70 p-3 text-left transition-colors hover:bg-muted"
+			onClick={() => {
+				setArtifact((currentArtifact) => ({
+					...currentArtifact,
+					documentId: artifact.id,
+					title: artifact.title,
+					kind: artifact.kind,
+					content: "",
+					status: "idle",
+					error: undefined,
+					isVisible: true,
+				}));
+			}}
+			type="button"
+		>
+			<div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+				<FileText className="size-4" />
+			</div>
+			<div className="min-w-0 flex-1">
+				<div className="truncate text-sm font-medium">{artifact.title}</div>
+				<div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+					<span>{artifact.action}</span>
+					<span aria-hidden="true">·</span>
+					<span className="truncate">{artifact.kind}</span>
+				</div>
+			</div>
+			<ArrowUpRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+		</button>
+	);
+}
 
 export const PreviewMessage = memo(
   PurePreviewMessage,

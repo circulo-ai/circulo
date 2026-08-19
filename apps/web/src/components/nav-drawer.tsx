@@ -1,7 +1,7 @@
 "use client";
 
 import { navItems } from "@/consts/nav";
-import { ArrowUpRight, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { EnhancedLink } from "./enhanced-link";
 import { Button } from "./ui/button";
 import {
@@ -47,20 +47,6 @@ export function NavDrawer() {
               </DrawerClose>
             </li>
           ))}
-
-          <li className="flex grow items-center justify-center text-center">
-            <EnhancedLink
-              target="_blank"
-              href="/docs"
-              buttonProps={{
-                variant: "reversedText",
-                size: "text",
-              }}
-              className="text-xl"
-            >
-              Docs <ArrowUpRight className="size-3" />
-            </EnhancedLink>
-          </li>
         </ul>
       </DrawerContent>
     </Drawer>

@@ -1,28 +1,33 @@
 // @ts-nocheck
-import { renderMagicLinkEmail } from "@/components/emails";
+import { renderMagicLinkEmail, renderOTPEmail } from "@/components/emails";
 import { renderInvitationEmail } from "@/components/emails/render-email";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { canCreateTeamOrg } from "@/lib/billing/autumn";
 import { sendEmail } from "@/lib/email/mailer";
 import { createLogger } from "@/lib/logs/console/logger";
+import { apiKey } from "@better-auth/api-key";
 import { autumn } from "autumn-js/better-auth";
-import { betterAuth } from "better-auth";
+import { betterAuth, type Auth, type BetterAuthOptions } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import {
+  admin,
   customSession,
+  emailOTP,
   genericOAuth,
   magicLink,
   oneTimeToken,
   openAPI,
   organization,
+  twoFactor,
 } from "better-auth/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
+import { adminAc, userAc } from "better-auth/plugins/admin/access";
 import {
-  adminAc,
   defaultStatements,
   memberAc,
+  adminAc as organizationAdminAc,
   ownerAc,
 } from "better-auth/plugins/organization/access";
 import { and, eq, sql } from "drizzle-orm";
@@ -34,6 +39,7 @@ const isProduction = env.NODE_ENV === "production";
 
 export const statement = {
   ...defaultStatements,
+  apiKey: ["create", "read", "update", "delete"],
   chat: ["create", "share", "update", "delete"],
 } as const;
 
@@ -41,18 +47,25 @@ const ac = createAccessControl(statement);
 
 const ownerRole = ac.newRole({
   ...ownerAc.statements,
+  apiKey: ["create", "read", "update", "delete"],
   chat: ["create", "share", "update", "delete"],
 });
 
 const adminRole = ac.newRole({
-  ...adminAc.statements,
+  ...organizationAdminAc.statements,
+  apiKey: ["create", "read", "update", "delete"],
   chat: ["create", "share", "update"],
 });
 
 const memberRole = ac.newRole({
   ...memberAc.statements,
+  apiKey: [],
   chat: ["create", "share"],
 });
+
+// Export the Better Auth AC and role definitions so application-level checks
+// never maintain a second, drifting permission matrix.
+export { adminRole, memberRole, ac as organizationAccessControl, ownerRole };
 
 const createPersonalOrganization = async (user: User) => {
   try {
@@ -101,7 +114,7 @@ const createPersonalOrganization = async (user: User) => {
   }
 };
 
-export const auth = betterAuth({
+const authOptions: BetterAuthOptions = {
   appName: "circulo",
   baseURL: env.BETTER_AUTH_URL ?? "http://localhost:3002",
   databaseHooks: {
@@ -244,6 +257,33 @@ export const auth = betterAuth({
     freshAge: 60 * 60, // 1 hour (or set to 0 to disable completely)
   },
   plugins: [
+    admin({
+      defaultRole: "user",
+      adminRoles: ["admin", "superadmin"],
+      roles: {
+        admin: adminAc,
+        superadmin: adminAc,
+        user: userAc,
+      },
+    }),
+    apiKey([
+      {
+        configId: "default",
+        references: "user",
+        enableMetadata: true,
+        requireName: true,
+        defaultPrefix: "circ_",
+        rateLimit: { enabled: true, timeWindow: 60_000, maxRequests: 120 },
+      },
+      {
+        configId: "organization",
+        references: "organization",
+        enableMetadata: true,
+        requireName: true,
+        defaultPrefix: "circ_org_",
+        rateLimit: { enabled: true, timeWindow: 60_000, maxRequests: 240 },
+      },
+    ]),
     openAPI(),
     magicLink({
       sendMagicLink: async ({ email, token, url }, request) => {
@@ -254,6 +294,40 @@ export const auth = betterAuth({
           html: await renderMagicLinkEmail(url, email, "sign-in"),
           emailType: "transactional",
         });
+      },
+    }),
+    emailOTP({
+      sendVerificationOTP: async ({ email, otp, type }) => {
+        const templateType =
+          type === "sign-in" ? "sign-in" : "email-verification";
+        await sendEmail({
+          from: "onboarding@resend.dev",
+          to: email,
+          subject:
+            type === "sign-in"
+              ? "Your Circulo sign-in code"
+              : "Your Circulo verification code",
+          html: await renderOTPEmail(otp, email, templateType),
+          emailType: "transactional",
+        });
+      },
+      sendVerificationOnSignUp: true,
+      overrideDefaultEmailVerification: true,
+      changeEmail: { enabled: true },
+    }),
+    twoFactor({
+      issuer: "Circulo AI",
+      allowPasswordless: true,
+      otpOptions: {
+        sendOTP: async ({ user, otp }) => {
+          await sendEmail({
+            from: "onboarding@resend.dev",
+            to: user.email,
+            subject: "Your Circulo two-factor code",
+            html: await renderOTPEmail(otp, user.email, "sign-in"),
+            emailType: "transactional",
+          });
+        },
       },
     }),
     oneTimeToken({
@@ -1228,7 +1302,13 @@ export const auth = betterAuth({
             }
           },
         },
-      ],
+      ].filter(
+        (provider) =>
+          typeof provider.clientId === "string" &&
+          provider.clientId.length > 0 &&
+          typeof provider.clientSecret === "string" &&
+          provider.clientSecret.length > 0,
+      ),
     }),
     autumn({
       customerScope: "organization",
@@ -1316,8 +1396,8 @@ export const auth = betterAuth({
           return false;
         }
       },
-      organizationCreation: {
-        beforeCreate: async ({ organization, user }) => {
+      organizationHooks: {
+        beforeCreateOrganization: async ({ organization, user }) => {
           // Mark new orgs as "team" type (personal orgs are created separately)
           const rawMetadata = (organization as any).metadata;
           let existingMetadata: Record<string, unknown> = {};
@@ -1345,11 +1425,11 @@ export const auth = betterAuth({
           return {
             data: {
               ...organization,
-              metadata: JSON.stringify(metadata),
+              metadata,
             },
           };
         },
-        afterCreate: async ({ organization, user }) => {
+        afterCreateOrganization: async ({ organization, user }) => {
           logger.info("[organizationCreation.afterCreate] Team org created", {
             organizationId: organization.id,
             creatorId: user.id,
@@ -1375,11 +1455,17 @@ export const auth = betterAuth({
       enabled: isProduction,
     },
   },
-});
+};
+
+export const auth: Auth<BetterAuthOptions> = betterAuth(authOptions);
 
 export type AuthType = {
   user: typeof auth.$Infer.Session.user | null;
   session: typeof auth.$Infer.Session.session | null;
+  authenticated?: boolean;
+  authMethod?: "session" | "api_key";
+  apiKeyId?: string;
+  apiKeyPermissions?: Record<string, string[]> | null;
 };
 
 export type SessionResponse = Awaited<ReturnType<typeof auth.api.getSession>>;
@@ -1393,10 +1479,61 @@ export async function getSession(
     headersOrRequest instanceof Request
       ? headersOrRequest.headers
       : headersOrRequest;
-
-  return auth.api.getSession({
+  const session = await auth.api.getSession({
     headers: headers ? new Headers(headers) : undefined,
   });
+
+  if (session || !headers) return session;
+
+  const apiKey = new Headers(headers).get("x-api-key")?.trim();
+  if (!apiKey) return session;
+
+  const verified = await (auth.api as any).verifyApiKey({
+    body: { key: apiKey },
+  });
+  if (!verified.valid || !verified.key?.referenceId) return null;
+
+  const isOrganizationKey = verified.key.configId === "organization";
+  if (isOrganizationKey) {
+    return {
+      user: null,
+      session: {
+        activeOrganizationId: verified.key.referenceId,
+        apiKeyPermissions: verified.key.permissions ?? null,
+      },
+    } as SessionResponse;
+  }
+
+  const user = await db.query.user.findFirst({
+    where: eq(schema.user.id, verified.key.referenceId),
+  });
+  if (!user) return null;
+
+  let metadata: Record<string, unknown> = {};
+  if (verified.key.metadata) {
+    try {
+      const parsed =
+        typeof verified.key.metadata === "string"
+          ? JSON.parse(verified.key.metadata)
+          : verified.key.metadata;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        metadata = parsed;
+      }
+    } catch {
+      // Invalid optional metadata does not turn a valid key into a session.
+    }
+  }
+
+  return {
+    user,
+    session: {
+      activeOrganizationId:
+        typeof metadata.organizationId === "string"
+          ? metadata.organizationId
+          : undefined,
+      apiKeyPermissions: verified.key.permissions ?? null,
+    },
+  } as SessionResponse;
 }
 
 export async function getActiveOrganizationId(

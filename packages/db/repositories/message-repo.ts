@@ -255,7 +255,11 @@ export function createMessageRepository(database: DbInstance) {
       return {
         items: direction === "before" ? items.reverse() : items,
         hasMore,
-        nextCursor: hasMore ? items[items.length - 1]?.id : undefined,
+        nextCursor: hasMore
+          ? direction === "before"
+            ? items[0]?.id
+            : items[items.length - 1]?.id
+          : undefined,
       };
     },
 

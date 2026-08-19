@@ -1,5 +1,5 @@
 import { chat, db } from "@/db";
-import { getSession } from "@/lib/auth";
+import { authenticateRequest } from "@/lib/auth/request";
 import { verifyInternalToken } from "@/lib/auth/internal";
 import { createLogger } from "@/lib/logs/console/logger";
 import { eq } from "drizzle-orm";
@@ -75,13 +75,13 @@ export async function checkHybridAuth(
       }
     }
 
-    // 2. Session auth
-    const session = await getSession(request);
-    if (session?.user?.id) {
+    // 2. Better Auth API-key or session auth
+    const principal = await authenticateRequest(request);
+    if (principal?.userId) {
       return {
         success: true,
-        userId: session.user.id,
-        authType: "session",
+        userId: principal.userId,
+        authType: principal.authMethod,
       };
     }
 

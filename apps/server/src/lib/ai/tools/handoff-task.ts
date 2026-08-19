@@ -36,11 +36,8 @@ export function handoffTask(params: {
           "The target user must be an active member of this chat",
         );
       }
-      if (input.toAgentId) {
-        if (input.toAgentId === params.fromAgentId) {
-          throw new Error("An agent cannot hand off a task to itself");
-        }
-        const target = await chatAgentRepo.findAgentInChat(
+		if (input.toAgentId) {
+			const target = await chatAgentRepo.findAgentInChat(
           input.toAgentId,
           params.chatId,
         );

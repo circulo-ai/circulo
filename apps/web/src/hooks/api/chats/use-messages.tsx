@@ -5,8 +5,12 @@ import { useEffect, useState } from "react";
 
 export function useMessages({
   status,
+  initialScrollToBottom,
+  storageKey,
 }: {
+  initialScrollToBottom?: boolean;
   status: UseChatHelpers<ChatMessage>["status"];
+  storageKey?: string;
 }) {
   const {
     containerRef,
@@ -15,7 +19,7 @@ export function useMessages({
     scrollToBottom,
     onViewportEnter,
     onViewportLeave,
-  } = useScrollToBottom();
+  } = useScrollToBottom({ initialScrollToBottom, storageKey });
 
   const [hasSentMessage, setHasSentMessage] = useState(false);
 

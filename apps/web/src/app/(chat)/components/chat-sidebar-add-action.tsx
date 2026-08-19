@@ -30,7 +30,11 @@ export function ChatSidebarAddAction(props: ChatSidebarAddActionProps) {
           <Pencil /> <span className="sr-only">Add</span>
         </CustomSidebarGroupAction>
       </DropdownMenuTrigger>
-      <CustomDropdownMenuContent sideOffset={8} align={open ? "end" : "start"}>
+      <CustomDropdownMenuContent
+        side="top"
+        sideOffset={12}
+        align={open ? "end" : "center"}
+      >
         <DropdownMenuGroup>
           <CustomDropdownMenuItem asChild>
             <EnhancedLink

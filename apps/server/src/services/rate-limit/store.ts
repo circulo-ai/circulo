@@ -32,21 +32,13 @@ export class RedisRateLimitStore implements RateLimitStore {
     windowMs: number,
   ): Promise<RateLimitState> {
     const namespacedKey = this.namespaced(key);
-    const ttlSeconds = Math.max(1, Math.ceil(windowMs / 1000));
-
-    const count = await this.redis.incrBy(namespacedKey, 1);
-    if (count === 1) {
-      await this.redis.expire(namespacedKey, ttlSeconds);
-    } else {
-      const ttl = await this.redis.ttl(namespacedKey);
-      if (ttl < 0) {
-        await this.redis.expire(namespacedKey, ttlSeconds);
-      }
-    }
-
-    const remainingTtl = await this.redis.ttl(namespacedKey);
+    const { count, ttlMs } = await this.redis.atomicIncrementWithExpiry(
+      namespacedKey,
+      1,
+      windowMs,
+    );
     const resetAt = new Date(
-      Date.now() + (remainingTtl > 0 ? remainingTtl * 1000 : windowMs),
+      Date.now() + (ttlMs > 0 ? ttlMs : windowMs),
     );
 
     return { count, resetAt };
@@ -197,8 +189,6 @@ export class CompositeRateLimitStore implements RateLimitStore {
     bucket: RateLimitBucket,
     windowMs: number,
   ): Promise<RateLimitState> {
-    const resetAt = new Date(Date.now() + windowMs);
-
     if (this.primary) {
       try {
         return await this.primary.increment(key, bucket, windowMs);
@@ -223,7 +213,7 @@ export class CompositeRateLimitStore implements RateLimitStore {
       }
     }
 
-    return { count: 1, resetAt };
+    throw new Error("No rate-limit store is available");
   }
 
   async reset(key: string): Promise<void> {
@@ -244,5 +234,7 @@ export class CompositeRateLimitStore implements RateLimitStore {
         logger.error("Fallback store failed to reset key", { key, error });
       }
     }
+
+    throw new Error("All rate-limit stores failed to reset the key");
   }
 }

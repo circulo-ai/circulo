@@ -5,25 +5,28 @@ import { EnhancedLink } from "./enhanced-link";
 import { Logo } from "./logo";
 import { Button } from "./ui/button";
 
+const starPositions = Array.from({ length: 128 }, (_, index) => ({
+  top: `${(index * 47 + 13) % 100}%`,
+  left: `${(index * 71 + 29) % 100}%`,
+}));
+
 export function HeroSection() {
   return (
     <section id="home" className="main-section flex flex-col">
       <div className="relative mx-8 mb-4 grid grow grid-cols-2 grid-rows-1 overflow-hidden rounded-4xl [clip-path:inset(0_round_var(--radius-4xl))]">
         {/* stars */}
         <div className="absolute inset-0">
-          {Array.from({ length: 128 })
-            .fill(null)
-            .map((_, i) => (
-              <div
-                key={i}
-                className="absolute size-px animate-pulse rounded-full bg-teal-50/50"
-                style={{
-                  top: Math.random() * 100 + "%",
-                  left: Math.random() * 100 + "%",
-                  animationDelay: `-${i * 750}ms`,
-                }}
-              />
-            ))}
+          {starPositions.map((position, i) => (
+            <div
+              key={i}
+              className="absolute size-px animate-pulse rounded-full bg-teal-50/50"
+              style={{
+                top: position.top,
+                left: position.left,
+                animationDelay: `-${i * 750}ms`,
+              }}
+            />
+          ))}
         </div>
 
         {/* lines down */}

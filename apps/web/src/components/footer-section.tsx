@@ -46,7 +46,6 @@ export function FooterSection() {
       </div>
 
       <div className="relative mt-auto border-t-2 border-teal-900/5 text-teal-950">
-        footre
       </div>
       {/* to here */}
     </footer>

@@ -1,27 +1,38 @@
-"use client";
+"use client"
 
-import * as React from "react";
-import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
+import * as React from "react"
+import { Popover as PopoverPrimitive } from "@base-ui/react/popover"
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 
 function Popover({ ...props }: PopoverPrimitive.Root.Props) {
-  return <PopoverPrimitive.Root data-slot="popover" {...props} />;
+  return <PopoverPrimitive.Root data-slot="popover" {...props} />
 }
 
-function PopoverTrigger({ asChild = false, children, ...props }: PopoverPrimitive.Trigger.Props & {
+function PopoverTrigger({
+  asChild,
+  nativeButton,
+  children,
+  ...props
+}: PopoverPrimitive.Trigger.Props & {
   asChild?: boolean;
+  nativeButton?: boolean;
 }) {
+  const child = asChild && React.isValidElement(children) ? children : null;
+
   return (
     <PopoverPrimitive.Trigger
       data-slot="popover-trigger"
-      render={asChild && React.isValidElement(children) ? children : undefined}
-      nativeButton={asChild ? false : undefined}
+      // A composed non-button trigger (for example inside a CollapsibleTrigger)
+      // must opt out of Base UI's native button assertion. Callers can still
+      // force native semantics for a real button with `nativeButton`.
+      nativeButton={nativeButton ?? !asChild}
+      render={child ?? undefined}
       {...props}
     >
-      {children}
+      {child ? null : children}
     </PopoverPrimitive.Trigger>
-  );
+  )
 }
 
 function PopoverContent({
@@ -30,12 +41,11 @@ function PopoverContent({
   alignOffset = 0,
   side = "bottom",
   sideOffset = 4,
-  collisionPadding,
   ...props
 }: PopoverPrimitive.Popup.Props &
   Pick<
     PopoverPrimitive.Positioner.Props,
-    "align" | "alignOffset" | "side" | "sideOffset" | "collisionPadding"
+    "align" | "alignOffset" | "side" | "sideOffset"
   >) {
   return (
     <PopoverPrimitive.Portal>
@@ -44,7 +54,6 @@ function PopoverContent({
         alignOffset={alignOffset}
         side={side}
         sideOffset={sideOffset}
-        collisionPadding={collisionPadding}
         className="isolate z-50"
       >
         <PopoverPrimitive.Popup
@@ -57,7 +66,7 @@ function PopoverContent({
         />
       </PopoverPrimitive.Positioner>
     </PopoverPrimitive.Portal>
-  );
+  )
 }
 
 function PopoverHeader({ className, ...props }: React.ComponentProps<"div">) {
@@ -67,7 +76,7 @@ function PopoverHeader({ className, ...props }: React.ComponentProps<"div">) {
       className={cn("flex flex-col gap-1 text-sm", className)}
       {...props}
     />
-  );
+  )
 }
 
 function PopoverTitle({ className, ...props }: PopoverPrimitive.Title.Props) {
@@ -77,7 +86,7 @@ function PopoverTitle({ className, ...props }: PopoverPrimitive.Title.Props) {
       className={cn("text-base font-medium", className)}
       {...props}
     />
-  );
+  )
 }
 
 function PopoverDescription({
@@ -90,7 +99,7 @@ function PopoverDescription({
       className={cn("text-muted-foreground", className)}
       {...props}
     />
-  );
+  )
 }
 
 export {

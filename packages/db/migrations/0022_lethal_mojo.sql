@@ -1,0 +1,3 @@
+ALTER TABLE "workflow_runs" ADD COLUMN "idempotency_key" text;--> statement-breakpoint
+ALTER TABLE "workflow_run_events" ADD COLUMN "sequence" bigint NOT NULL GENERATED ALWAYS AS IDENTITY (sequence name "workflow_run_events_sequence_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1);--> statement-breakpoint
+CREATE UNIQUE INDEX "workflow_runs_idempotency_key_idx" ON "workflow_runs" USING btree ("idempotency_key");

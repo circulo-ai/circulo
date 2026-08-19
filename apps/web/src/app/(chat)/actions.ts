@@ -19,6 +19,38 @@ export async function deleteTrailingMessages({ id }: { id: string }) {
   throw new Error(payload?.message ?? "Unable to edit this message");
 }
 
+export async function editMessage({
+  id,
+  replacementId,
+  content,
+  parts,
+  attachments,
+}: {
+  id: string;
+  replacementId: string;
+  content: string;
+  parts?: unknown[];
+  attachments?: unknown[];
+}) {
+  const response = await fetch(
+    `/api/messages/${encodeURIComponent(id)}/edit`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({ replacementId, content, parts, attachments }),
+    },
+  );
+  if (response.ok) return;
+
+  const payload = (await response.json().catch(() => null)) as {
+    message?: string;
+  } | null;
+  throw new Error(payload?.message ?? "Unable to edit this message");
+}
+
 export async function updateChatVisibility({
   chatId,
   visibility,

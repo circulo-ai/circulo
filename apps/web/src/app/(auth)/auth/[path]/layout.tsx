@@ -88,7 +88,7 @@ const agents = [
     name: "Sheryl Sandberg",
     role: "Leadership",
     initials: "SS",
-    color: "from-violet-500 to-purple-600",
+    color: "from-amber-500 to-orange-600",
     angle: 315,
     message: "Let's empower the team to execute.",
   },
@@ -144,9 +144,7 @@ export default function AuthLayout({
             <h2 className="text-3xl leading-tight font-bold text-white">
               A new era of
               <br />
-              <span className="text-teal-300">
-                AI collaboration
-              </span>
+              <span className="text-teal-300">AI collaboration</span>
             </h2>
 
             <p className="text-md mx-auto max-w-xl leading-relaxed text-slate-400">

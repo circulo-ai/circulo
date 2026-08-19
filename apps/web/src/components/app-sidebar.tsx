@@ -16,7 +16,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { User } from "@/providers/session-provider";
-import { UserButton } from "@daveyplate/better-auth-ui";
+import { UserButton } from "@/components/auth/user/user-button";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -260,11 +260,6 @@ export function AppSidebar({ user }: { user: User }) {
           {user && (
             <UserButton
               className="mb-1"
-              classNames={{
-                trigger: {
-                  base: "mx-auto",
-                },
-              }}
               size={state == "collapsed" ? "icon" : "default"}
               variant={"ghost"}
             />

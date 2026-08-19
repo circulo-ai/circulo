@@ -1,7 +1,6 @@
 "use client";
 
-import { AuthUIContext } from "@daveyplate/better-auth-ui";
-import { useContext } from "react";
+import { authClient } from "@/lib/auth-client";
 
 export type User = {
   id: string;
@@ -14,12 +13,9 @@ export type User = {
 };
 
 export function useOrganizationsHooks() {
-  const {
-    hooks: { useListOrganizations, useActiveOrganization },
-  } = useContext(AuthUIContext);
   return {
-    useListOrganizations,
-    useActiveOrganization,
+    useListOrganizations: authClient.useListOrganizations,
+    useActiveOrganization: authClient.useActiveOrganization,
   };
 }
 

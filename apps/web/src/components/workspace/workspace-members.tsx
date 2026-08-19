@@ -21,13 +21,35 @@ type OrganizationMember = {
   email?: string;
 };
 
-export function WorkspaceMembers() {
-  const { data: organization, isPending, refetch } = authClient.useActiveOrganization();
-  const { data: session } = authClient.useSession();
+type WorkspaceOrganization = {
+  id: string;
+  name: string;
+  members?: unknown[];
+  invitations?: unknown[];
+};
+
+type WorkspaceSession = {
+  user?: { id?: string; name?: string | null; email?: string | null };
+};
+
+export function WorkspaceMembers({
+  organization,
+  session,
+  isPending,
+  refetchOrganization,
+}: {
+  organization?: WorkspaceOrganization | null;
+  session?: WorkspaceSession | null;
+  isPending: boolean;
+  refetchOrganization?: () => Promise<unknown>;
+}) {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("member");
   const [busy, setBusy] = useState(false);
-  const organizationApi = authClient.organization as unknown as Record<string, (input: Record<string, unknown>) => Promise<unknown>>;
+  const organizationApi = authClient.organization as unknown as Record<
+    string,
+    (input: Record<string, unknown>) => Promise<unknown>
+  >;
 
   const run = async (action: string, input: Record<string, unknown>, success: string) => {
     const method = organizationApi[action];
@@ -39,7 +61,7 @@ export function WorkspaceMembers() {
     try {
       const result = await method(input);
       if ((result as { error?: unknown })?.error) throw new Error("The organization service rejected this request");
-      await refetch?.();
+      await refetchOrganization?.();
       toast.success(success);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to update workspace membership");

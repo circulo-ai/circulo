@@ -13,6 +13,7 @@ const getQuerySchema = z.object({
   starting_after: z.string().optional(),
   ending_before: z.string().optional(),
   search: z.string().optional(),
+  archived: z.enum(["true", "false"]).optional(),
 });
 
 const router = createRouter();
@@ -23,7 +24,7 @@ router.get(
   zValidator("query", getQuerySchema),
   async (c) => {
     const { user, activeOrgId } = c.var;
-    const { limit, starting_after, ending_before, search } =
+    const { limit, starting_after, ending_before, search, archived } =
       c.req.valid("query");
 
     if (starting_after && ending_before) {
@@ -45,6 +46,7 @@ router.get(
       startingAfter: starting_after,
       endingBefore: ending_before,
       search: search?.trim() || undefined,
+      archived: archived === "true",
     });
 
     const chatIds = chatsPage.chats.map((chat) => chat.id);

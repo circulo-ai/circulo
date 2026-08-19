@@ -92,16 +92,16 @@ export class RateLimiter {
         bucket: request.bucket,
       };
     } catch (error) {
-      logger.error("Rate limit check failed; allowing request", {
+      logger.error("Rate limit check failed; rejecting request", {
         error,
         key: request.key,
       });
 
       const resetAt = new Date(Date.now() + windowMs);
       return {
-        allowed: true,
+        allowed: false,
         count: 0,
-        remaining: limit,
+        remaining: 0,
         limit,
         resetAt,
         key: request.key,

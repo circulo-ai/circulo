@@ -1,5 +1,8 @@
 import type { Agent, ChatAgent } from "@/db";
-import { getLanguageModel } from "@/lib/ai/providers";
+import {
+  orchestrationFallbackModel,
+  withModelFallback,
+} from "@/lib/ai/providers";
 import type { ChatMessage } from "@/lib/types";
 import { getTextFromMessages } from "@/lib/utils";
 import type { OrchestrationInput } from "@/workflows/orchestrate/types";
@@ -45,6 +48,9 @@ export async function planAgentExecutionStep(params: {
   agents: Array<ChatAgent & { agent: Agent }>;
   triggerMessages: ChatMessage[];
   webhookPayload?: OrchestrationInput["webhookPayload"];
+  orchestrationAgent?: { model: string; instructions: string } | null;
+  orchestrationModel?: string | null;
+  orchestrationFallbackModel?: string | null;
 }): Promise<ExecutionPlan> {
   const { classification, agents, triggerMessages, webhookPayload } = params;
 
@@ -86,10 +92,17 @@ Event: ${webhookPayload.event}
 This is an automated trigger, not a direct user request.`;
   }
 
-  const { output } = await generateText({
-    model: getLanguageModel(),
-    output: Output.object({ schema: executionPlanSchema }),
-    system: `You are an expert orchestration planner for a multi-agent AI system.
+  const controllerInstructions =
+    params.orchestrationAgent?.instructions?.trim();
+  const { output } = await withModelFallback({
+    modelId: params.orchestrationAgent?.model ?? params.orchestrationModel,
+    fallbackModelId:
+      params.orchestrationFallbackModel ?? orchestrationFallbackModel,
+    run: (model) =>
+      generateText({
+        model,
+        output: Output.object({ schema: executionPlanSchema }),
+        system: `${controllerInstructions ? `${controllerInstructions}\n\n` : ""}You are an expert orchestration planner for a multi-agent AI system.
 
 Your task is to:
 1. Select the best agent(s) for the classified request
@@ -159,11 +172,12 @@ RULES:
 - Return every schema property. Use null for parallelGroup, dependsOn,
   estimatedDuration, or fallbackAgentId when it does not apply; do not omit
   those properties.`,
-    prompt: `User's request: "${getTextFromMessages(triggerMessages)}"
+        prompt: `User's request: "${getTextFromMessages(triggerMessages)}"
 
 Classification reasoning: ${classification.reasoning}
 
-Plan the optimal agent orchestration.`,
+    Plan the optimal agent orchestration.`,
+      }),
   });
 
   // Validate that selected agents exist and are enabled

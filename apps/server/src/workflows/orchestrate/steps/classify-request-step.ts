@@ -1,5 +1,8 @@
 import { type Message } from "@/db";
-import { getLanguageModel } from "@/lib/ai/providers";
+import {
+  orchestrationFallbackModel,
+  withModelFallback,
+} from "@/lib/ai/providers";
 import { type ChatMessage } from "@/lib/types";
 import { getTextFromMessages } from "@/lib/utils";
 import { type OrchestrationInput } from "@/workflows/orchestrate/types";
@@ -40,6 +43,9 @@ export async function classifyRequestStep(params: {
   messages: Message[];
   triggerType: OrchestrationInput["triggerType"];
   webhookPayload?: OrchestrationInput["webhookPayload"];
+  orchestrationAgent?: { model: string; instructions: string } | null;
+  orchestrationModel?: string | null;
+  orchestrationFallbackModel?: string | null;
 }): Promise<RequestClassification> {
   const {
     inputMessages: message,
@@ -67,10 +73,17 @@ User Message: ${getTextFromMessages(message)}`;
     author: m.authorType,
   }));
 
-  const { output } = await generateText({
-    model: getLanguageModel(),
-    output: Output.object({ schema: classificationSchema }),
-    system: `You are an intelligent request classifier for a multi-agent orchestration system.
+  const controllerInstructions =
+    params.orchestrationAgent?.instructions?.trim();
+  const { output } = await withModelFallback({
+    modelId: params.orchestrationAgent?.model ?? params.orchestrationModel,
+    fallbackModelId:
+      params.orchestrationFallbackModel ?? orchestrationFallbackModel,
+    run: (model) =>
+      generateText({
+        model,
+        output: Output.object({ schema: classificationSchema }),
+        system: `${controllerInstructions ? `${controllerInstructions}\n\n` : ""}You are an intelligent request classifier for a multi-agent orchestration system.
 
 Analyze the user's request and conversation history to determine:
 1. The primary intent (what they want to accomplish)
@@ -86,13 +99,14 @@ Context:
 - This is ${triggerType === "webhook_event" ? "a webhook-triggered automation" : "a direct user request"}
 - Consider the conversation history for context
 - Be precise in domain identification for better agent matching`,
-    prompt: `Recent conversation:
+        prompt: `Recent conversation:
 ${recentMessages.map((m) => `${m.author}: ${m.content}`).join("\n")}
 
 Current request:
 ${prompt}
 
-Classify this request thoroughly.`,
+    Classify this request thoroughly.`,
+      }),
   });
 
   return output;

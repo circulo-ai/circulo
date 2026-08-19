@@ -5,7 +5,9 @@ import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 
-export function useChatHistory() {
+export type ChatHistoryView = "all" | "archived";
+
+export function useChatHistory({ view = "all" }: { view?: ChatHistoryView } = {}) {
   const { id } = useParams();
   const { currentChatId, setCurrentChatId, setIsChatLoading } =
     useChatHistoryStore();
@@ -28,7 +30,10 @@ export function useChatHistory() {
 
   const { data, ...history } = useSWR<GetChatHistoryResponse>([
     "/api/history",
-    { search: debouncedSearch },
+    {
+      search: debouncedSearch,
+      archived: view === "archived" ? "true" : "false",
+    },
   ]);
 
   const sortedData = useMemo(() => {

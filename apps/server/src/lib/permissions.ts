@@ -1,50 +1,33 @@
 import { db } from "@/db";
 import * as schema from "@/db/schema";
-import { getSession, statement, type SessionResponse } from "@/lib/auth";
+import {
+  getSession,
+  memberRole,
+  adminRole,
+  ownerRole,
+  statement,
+  type SessionResponse,
+} from "@/lib/auth";
+import { ForbiddenError } from "@circulo-ai/types";
 import { and, eq } from "drizzle-orm";
 
 export type Resource = keyof typeof statement;
 export type Action<R extends Resource> = (typeof statement)[R][number];
 
-// Define role permissions with proper typing
-type RolePermissions = {
-  [K in Resource]: string[];
+type RoleType = "owner" | "admin" | "member" | (string & {});
+
+const organizationRoles: Record<string, any> = {
+  owner: ownerRole,
+  admin: adminRole,
+  member: memberRole,
 };
 
-const rolePermissions: Record<string, RolePermissions> = {
-  owner: {
-    // Default resources from ownerAc
-    invitation: ["create", "cancel"],
-    member: ["create", "update", "delete"],
-    organization: ["update", "delete"],
-    team: ["create", "update", "delete"],
-    ac: ["read"],
-    // Custom resources
-    chat: ["create", "update", "delete", "share"],
-  },
-  admin: {
-    // Default resources from adminAc
-    invitation: ["create", "cancel"],
-    member: ["create", "update", "delete"],
-    organization: [],
-    team: [],
-    ac: [],
-    // Custom resources
-    chat: ["create", "update", "share"],
-  },
-  member: {
-    // Default resources from memberAc
-    invitation: ["create"],
-    member: [],
-    organization: [],
-    team: [],
-    ac: [],
-    // Custom resources
-    chat: ["create", "share"],
-  },
-};
-
-type RoleType = "owner" | "admin" | "member";
+function roleAllows(role: string, resource: string, action: string): boolean {
+  const statements = organizationRoles[role]?.statements as
+    | Record<string, string[]>
+    | undefined;
+  return Boolean(statements?.[resource]?.includes(action));
+}
 
 function getSessionActiveOrganizationId(
   session?: SessionResponse,
@@ -80,6 +63,14 @@ export async function getUserRole(
   return membershipRow.role as RoleType;
 }
 
+export async function getUserRoles(
+  userId: string,
+  organizationId: string,
+): Promise<string[]> {
+  const role = await getUserRole(userId, organizationId);
+  return role ? role.split(",").map((value) => value.trim()).filter(Boolean) : [];
+}
+
 /**
  * Check if current user has permission for a specific action
  * @param resource - The resource type (e.g., "chat", "member")
@@ -93,23 +84,26 @@ export async function hasPermission<R extends Resource>(
   session?: SessionResponse,
 ): Promise<boolean> {
   const sessionData = session ?? (await getSession());
-
-  if (!sessionData?.user) return false;
-
   const orgId = organizationId || getSessionActiveOrganizationId(sessionData);
   if (!orgId) return false;
 
-  const role = await getUserRole(sessionData.user.id, orgId);
-  if (!role) return false;
+  const apiKeyPermissions = (sessionData?.session as any)?.apiKeyPermissions as
+    | Record<string, string[]>
+    | null
+    | undefined;
+  if (!sessionData?.user) {
+    return Boolean(apiKeyPermissions?.[resource]?.includes(action as string));
+  }
 
-  // Get permissions for the role and resource
-  const rolePermissionSet = rolePermissions[role];
-  if (!rolePermissionSet) return false;
+  if (
+    apiKeyPermissions &&
+    !apiKeyPermissions[resource]?.includes(action as string)
+  ) {
+    return false;
+  }
 
-  const permissions = rolePermissionSet[resource] ?? [];
-
-  // Type-safe check
-  return permissions.includes(action);
+  const roles = await getUserRoles(sessionData.user.id, orgId);
+  return roles.some((role) => roleAllows(role, resource, action));
 }
 
 /**
@@ -137,7 +131,7 @@ export async function requirePermission<R extends Resource>(
         ? await getUserRole(sessionData.user.id, orgId)
         : null;
 
-    throw new Error(
+    throw new ForbiddenError(
       `Permission denied: ${role || "guest"} cannot ${action} ${resource}`,
     );
   }
@@ -167,8 +161,7 @@ export async function isOwner(
   const orgId = organizationId || getSessionActiveOrganizationId(sessionData);
   if (!orgId) return false;
 
-  const role = await getUserRole(sessionData.user.id, orgId);
-  return role === "owner";
+  return (await getUserRoles(sessionData.user.id, orgId)).includes("owner");
 }
 
 /**
@@ -184,8 +177,8 @@ export async function isAdminOrOwner(
   const orgId = organizationId || getSessionActiveOrganizationId(sessionData);
   if (!orgId) return false;
 
-  const role = await getUserRole(sessionData.user.id, orgId);
-  return role === "owner" || role === "admin";
+  const roles = await getUserRoles(sessionData.user.id, orgId);
+  return roles.includes("owner") || roles.includes("admin");
 }
 
 /**
@@ -254,10 +247,19 @@ export async function getUserPermissions(
   const orgId = organizationId || getSessionActiveOrganizationId(sessionData);
   if (!orgId) return {};
 
-  const role = await getUserRole(sessionData.user.id, orgId);
-  if (!role) return {};
-
-  return rolePermissions[role] as Record<string, string[]>;
+  const roles = await getUserRoles(sessionData.user.id, orgId);
+  const permissions: Record<string, string[]> = {};
+  for (const role of roles) {
+    const statements = organizationRoles[role]?.statements as
+      | Record<string, string[]>
+      | undefined;
+    for (const [resource, actions] of Object.entries(statements ?? {})) {
+      permissions[resource] = Array.from(
+        new Set([...(permissions[resource] ?? []), ...actions]),
+      );
+    }
+  }
+  return permissions;
 }
 
 /**

@@ -1,5 +1,10 @@
 import { chatMember, db, user } from "@/db";
-import { chatAgentRepo, chatMemberRepo, chatRepo } from "@/db/repositories";
+import {
+  agentRepo,
+  chatAgentRepo,
+  chatMemberRepo,
+  chatRepo,
+} from "@/db/repositories";
 import { knowledgeBase } from "@/db/schema";
 import { getSession } from "@/lib/auth";
 import { createRouter } from "@/lib/create-app";
@@ -26,6 +31,9 @@ const settingsSchema = z
     knowledgeBaseIds: z.array(z.uuid()).max(50).optional(),
     visibility: z.enum(["private", "public"]).optional(),
     orchestrationEnabled: z.boolean().optional(),
+    orchestrationAgentId: z.uuid().nullable().optional(),
+    orchestrationModel: z.string().trim().min(1).max(200).optional(),
+    orchestrationFallbackModel: z.string().trim().min(1).max(200).optional(),
   })
   .refine((value) => Object.keys(value).length > 0, "No settings to update");
 
@@ -119,6 +127,9 @@ router.get(
         visibility: chat.visibility,
         type: chat.type,
         orchestrationEnabled: chat.orchestrationEnabled,
+        orchestrationAgentId: chat.orchestrationAgentId,
+        orchestrationModel: chat.orchestrationModel,
+        orchestrationFallbackModel: chat.orchestrationFallbackModel,
         creatorId: chat.creatorId,
       },
       members: members.map((member) => ({
@@ -184,6 +195,21 @@ router.patch(
       if (bases.length !== new Set(body.knowledgeBaseIds).size) {
         throw new BadRequestError(
           "Every knowledge base must belong to this workspace",
+        );
+      }
+    }
+
+    if (body.orchestrationAgentId) {
+      const orchestrationAgent = await agentRepo.findById(
+        body.orchestrationAgentId,
+      );
+      if (
+        !orchestrationAgent ||
+        orchestrationAgent.organizationId !== chat.organizationId ||
+        orchestrationAgent.isArchived
+      ) {
+        throw new BadRequestError(
+          "The orchestration agent must belong to this workspace and be active",
         );
       }
     }

@@ -98,6 +98,8 @@ type CapabilityResponse = {
 	skills: Skill[];
 	counts: { plugins: number; apps: number; mcps: number; skills: number };
 };
+type ChatOption = { id: string; title: string };
+type AgentOption = { id: string; name: string; model?: string };
 
 const skillSchema = z
 	.object({
@@ -146,6 +148,14 @@ export default function PluginsPage() {
 	const { data: organization } = authClient.useActiveOrganization();
 	const { data, error, mutate } = useSWR<CapabilityResponse>(
 		organization?.id ? "/api/capabilities" : null,
+		fetcher,
+	);
+	const { data: chatHistory } = useSWR<{ chats: ChatOption[] }>(
+		organization?.id ? "/api/history?limit=100" : null,
+		fetcher,
+	);
+	const { data: agents } = useSWR<AgentOption[]>(
+		organization?.id ? "/api/agent?limit=100" : null,
 		fetcher,
 	);
 	const [search, setSearch] = useState("");
@@ -511,23 +521,46 @@ export default function PluginsPage() {
 								</SelectContent>
 							</Select>
 						</Field>
-						{skillForm.scope !== "organization" && (
-							<Field data-invalid={Boolean(skillErrors.targetId)}>
-								<FieldLabel htmlFor="skill-target">
-									{skillForm.scope === "chat" ? "Chat ID" : "Agent ID"}
-								</FieldLabel>
-								<Input
-									aria-invalid={Boolean(skillErrors.targetId)}
-									id="skill-target"
-									onChange={(event) =>
-										setSkillForm((current) => ({
-											...current,
-											targetId: event.target.value,
-										}))
-									}
-									value={skillForm.targetId}
-								/>
-								{skillErrors.targetId && (
+							{skillForm.scope !== "organization" && (
+								<Field data-invalid={Boolean(skillErrors.targetId)}>
+									<FieldLabel>
+										{skillForm.scope === "chat" ? "Chat ID" : "Agent ID"}
+									</FieldLabel>
+									<Select
+										onValueChange={(value) =>
+											setSkillForm((current) => ({
+												...current,
+												targetId: value ?? "",
+											}))
+										}
+										value={skillForm.targetId || undefined}
+									>
+										<SelectTrigger aria-invalid={Boolean(skillErrors.targetId)}>
+											<SelectValue
+												placeholder={
+													skillForm.scope === "chat"
+														? "Choose a chat"
+														: "Choose an agent"
+												}
+											/>
+										</SelectTrigger>
+										<SelectContent>
+											<SelectGroup>
+												{skillForm.scope === "chat"
+													? (chatHistory?.chats ?? []).map((chat) => (
+															<SelectItem key={chat.id} value={chat.id}>
+																{chat.title}
+															</SelectItem>
+														))
+													: (agents ?? []).map((agent) => (
+															<SelectItem key={agent.id} value={agent.id}>
+																{agent.name}
+															</SelectItem>
+														))}
+											</SelectGroup>
+										</SelectContent>
+									</Select>
+									{skillErrors.targetId && (
 									<FieldError>{skillErrors.targetId}</FieldError>
 								)}
 							</Field>
