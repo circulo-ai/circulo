@@ -11,6 +11,9 @@ import {
   messageRepo,
 } from "@circulo-ai/db/repositories";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 async function getRequestUserId(): Promise<string | null> {
   const requestHeaders = await headers();
   const cookie = requestHeaders.get("cookie");

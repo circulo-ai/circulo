@@ -686,6 +686,7 @@ router.post(
 							name: tool.name,
 							title: tool.title ?? null,
 							description: tool.description ?? null,
+							enabled: true,
 							inputSchema: tool.inputSchema ?? {
 								type: "object",
 								additionalProperties: true,

@@ -197,6 +197,13 @@
       "when": 1787086000000,
       "tag": "0028_repair_better_auth_17",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1787140330679,
+      "tag": "0029_familiar_shaman",
+      "breakpoints": true
     }
   ]
 }

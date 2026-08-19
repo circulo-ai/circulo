@@ -190,6 +190,7 @@ function isDurableUIChunk(chunk: CustomUIMessageChunk): boolean {
   if (type === "data-workflowHeartbeat" || type === "data-usage") {
     return false;
   }
+  if (type.startsWith("text-")) return true;
   return (
     type.startsWith("data-workflowAgent") ||
     type === "data-workflowApprovalRequested" ||
@@ -299,11 +300,27 @@ export async function executeDirectResponseStep(params: {
       "You are Circulo, the default assistant. Answer the user's request directly, clearly, and accurately. No specialist agent was selected, so complete the task yourself using only the tools provided in this run.",
     ),
     tools,
-  }).generate({
+  }).stream({
     messages: modelMessages,
   });
+  const streamedMessageId = crypto.randomUUID();
+  let streamedText = "";
+  dataStream.write({ type: "text-start", id: streamedMessageId });
+  for await (const chunk of result.toUIMessageStream<ChatMessage>({
+    sendFinish: false,
+  })) {
+    if (chunk.type !== "text-delta") continue;
+    streamedText += chunk.delta;
+    dataStream.write({
+      type: "text-delta",
+      id: streamedMessageId,
+      delta: chunk.delta,
+    });
+  }
+  dataStream.write({ type: "text-end", id: streamedMessageId });
   const steps = await result.steps;
   const response = await result.response;
+  const resultText = await result.text;
   const responseMessages = steps.flatMap((step) => step.response.messages);
   const allResponseMessages = responseMessages.length
     ? responseMessages
@@ -333,7 +350,7 @@ export async function executeDirectResponseStep(params: {
     agentId: "circulo-default",
     agentName,
     task,
-    output: result.text,
+    output: streamedText || resultText,
     durationMs: endTime.getTime() - startTime.getTime(),
     model: defaultModel,
     toolCalls,
@@ -346,7 +363,7 @@ export async function executeDirectResponseStep(params: {
     agentName,
     task,
     success: true,
-    output: result.text,
+    output: streamedText || resultText,
     startTime,
     endTime,
     durationMs: endTime.getTime() - startTime.getTime(),

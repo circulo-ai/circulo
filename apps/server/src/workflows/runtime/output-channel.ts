@@ -11,9 +11,11 @@ export class WorkflowOutputChannel {
   private readonly chunks: CustomUIMessageChunk[] = [];
   private readonly listeners = new Set<Listener>();
   private closed = false;
+  private textMessageStarted = false;
 
   write(chunk: CustomUIMessageChunk): void {
     if (this.closed) return;
+    if (chunk.type === "text-start") this.textMessageStarted = true;
     this.chunks.push(chunk);
     this.notify();
   }
@@ -30,6 +32,10 @@ export class WorkflowOutputChannel {
 
   get isClosed(): boolean {
     return this.closed;
+  }
+
+  get hasTextMessage(): boolean {
+    return this.textMessageStarted;
   }
 
   createReadable(startIndex = 0): ReadableStream<CustomUIMessageChunk> {
