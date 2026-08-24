@@ -1,3 +1,9 @@
+if (process.env.NODE_ENV !== "production") {
+  throw new Error(
+    "The server bundle must be built with NODE_ENV=production so production safeguards are not compiled out.",
+  );
+}
+
 const result = await Bun.build({
   entrypoints: ["./src/index.ts"],
   outdir: "./dist",

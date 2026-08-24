@@ -1,11 +1,11 @@
-import { createAuthPlugin } from "@better-auth-ui/core"
+import { createAuthPlugin } from "@better-auth-ui/core";
 import {
   type ApiKeyPluginOptions,
-  apiKeyPlugin as coreApiKeyPlugin
-} from "@better-auth-ui/core/plugins/api-key"
+  apiKeyPlugin as coreApiKeyPlugin,
+} from "@better-auth-ui/core/plugins/api-key";
 
-import { ApiKeys } from "@/components/auth/api-key/api-keys"
-import { OrganizationApiKeys } from "@/components/auth/api-key/organization-api-keys"
+import { ApiKeys } from "@/components/auth/api-key/api-keys";
+import { OrganizationApiKeys } from "@/components/auth/api-key/organization-api-keys";
 
 export const apiKeyPlugin = createAuthPlugin(
   coreApiKeyPlugin.id,
@@ -17,16 +17,18 @@ export const apiKeyPlugin = createAuthPlugin(
         {
           id: "organization",
           label: "Organization API key",
-          organization: true
-        }
+          organization: true,
+        },
       ],
-      ...options
-    })
+      ...options,
+    });
 
     return {
       ...core,
       securityCards: [ApiKeys],
-      ...(core.organization ? { organizationCards: [OrganizationApiKeys] } : {})
-    }
-  }
-)
+      ...(core.organization
+        ? { organizationCards: [OrganizationApiKeys] }
+        : {}),
+    };
+  },
+);

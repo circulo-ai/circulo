@@ -1,6 +1,15 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import {
@@ -19,6 +28,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 
 export type WorkspaceSection =
@@ -135,8 +145,10 @@ export function WorkspaceShell({
   actions?: ReactNode;
   children: ReactNode;
 }) {
+  const router = useRouter();
+
   return (
-    <main className="flex h-svh min-h-0 flex-col overflow-hidden bg-background text-foreground">
+    <main className="flex h-dvh min-h-0 flex-col overflow-hidden bg-background text-foreground">
       <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col px-4 py-5 sm:px-6 lg:px-8">
         <header className="flex items-center justify-between gap-4 pb-5">
           <Button asChild size="sm" variant="ghost">
@@ -155,11 +167,51 @@ export function WorkspaceShell({
           </div>
         </header>
         <Separator />
-        <div className="grid min-h-0 flex-1 items-start gap-8 py-8 lg:grid-cols-[220px_minmax(0,1fr)]">
-          <aside className="lg:sticky lg:top-6">
+        <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] items-stretch gap-4 py-4 lg:grid-cols-[220px_minmax(0,1fr)] lg:grid-rows-none lg:items-start lg:gap-8 lg:py-8">
+          <aside className="min-h-0 lg:sticky lg:top-6">
+            <div className="lg:hidden">
+              <label
+                className="mb-2 block text-xs font-medium text-muted-foreground"
+                htmlFor="workspace-section-select"
+              >
+                Workspace section
+              </label>
+              <Select
+                value={activeSection}
+                onValueChange={(section) => {
+                  const item = navigation
+                    .flatMap((group) => group.items)
+                    .find((navigationItem) => navigationItem.id === section);
+
+                  if (item) {
+                    router.push(item.href);
+                  }
+                }}
+              >
+                <SelectTrigger
+                  aria-label="Workspace section"
+                  className="h-11 w-full rounded-xl bg-background"
+                  id="workspace-section-select"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {navigation.map((group) => (
+                    <SelectGroup key={group.label}>
+                      <SelectLabel>{group.label}</SelectLabel>
+                      {group.items.map((item) => (
+                        <SelectItem key={item.id} value={item.id}>
+                          {item.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <nav
               aria-label="Workspace navigation"
-              className="flex gap-1 overflow-x-auto pb-2 lg:flex-col lg:overflow-visible"
+              className="hidden gap-1 lg:flex lg:flex-col"
             >
               {navigation.map((group) => (
                 <div

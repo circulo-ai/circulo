@@ -4,7 +4,7 @@
  * This module provides standardized console logging utilities for internal application logging.
  * It is separate from the user-facing logging system in logging.ts.
  */
-import { env } from "@/lib/env";
+import { env, getEnv } from "@/lib/env";
 import chalk from "chalk";
 
 /**
@@ -36,8 +36,14 @@ export enum LogLevel {
  * - Test: ERROR (only show errors in tests)
  */
 const getMinLogLevel = (): LogLevel => {
-  if (env.LOG_LEVEL) {
-    return env.LOG_LEVEL as LogLevel;
+  const configuredLevel = getEnv("NEXT_PUBLIC_LOG_LEVEL");
+  if (
+    configuredLevel === LogLevel.DEBUG ||
+    configuredLevel === LogLevel.INFO ||
+    configuredLevel === LogLevel.WARN ||
+    configuredLevel === LogLevel.ERROR
+  ) {
+    return configuredLevel;
   }
 
   const ENV = (env.NODE_ENV || "development") as string;

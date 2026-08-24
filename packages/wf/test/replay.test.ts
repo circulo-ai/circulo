@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { WorkflowHistoryEvent } from "../src";
 import {
   ActivityWorker,
   defineActivity,
@@ -10,7 +11,6 @@ import {
   WorkflowReplayCursor,
   WorkflowReplayError,
 } from "../src";
-import type { WorkflowHistoryEvent } from "../src";
 
 function event(
   sequence: number,
@@ -77,9 +77,11 @@ describe("workflow replay cursor", () => {
       ),
     ).toBeUndefined();
     expect(cursor.remaining).toBe(1);
-    expect(cursor.takeIf<{ type: string }>("signal.received")?.payload).toEqual({
-      type: "approval",
-    });
+    expect(cursor.takeIf<{ type: string }>("signal.received")?.payload).toEqual(
+      {
+        type: "approval",
+      },
+    );
     expect(cursor.done).toBe(true);
   });
 });
@@ -97,8 +99,15 @@ describe("replay-safe workflow execution", () => {
       name: "replay-demo",
       version: 1,
       activityRegistry: registry,
-      run: async (context: { activity: <TInput, TOutput>(name: string, input: TInput) => Promise<TOutput> }, input: number) =>
-        context.activity<number, number>("double", input),
+      run: async (
+        context: {
+          activity: <TInput, TOutput>(
+            name: string,
+            input: TInput,
+          ) => Promise<TOutput>;
+        },
+        input: number,
+      ) => context.activity<number, number>("double", input),
     };
     let finalResult: unknown;
     const activityWorker = new ActivityWorker({
@@ -115,7 +124,11 @@ describe("replay-safe workflow execution", () => {
     const waiting = await runner.start(definition, 21);
     expect(waiting.status).toBe("waiting");
     await activityWorker.start();
-    await waitUntil(() => (finalResult as { status?: string } | undefined)?.status === "completed");
+    await waitUntil(
+      () =>
+        (finalResult as { status?: string } | undefined)?.status ===
+        "completed",
+    );
     await activityWorker.stop();
 
     expect(finalResult).toMatchObject({ status: "completed", output: 42 });
@@ -138,7 +151,9 @@ describe("replay-safe workflow execution", () => {
     const registry = new InMemoryActivityRegistry();
     registry.register(
       defineActivity<number, number>("double", async (input) => {
-        await new Promise((resolve) => setTimeout(resolve, input === 1 ? 15 : 1));
+        await new Promise((resolve) =>
+          setTimeout(resolve, input === 1 ? 15 : 1),
+        );
         return input * 2;
       }),
     );
@@ -258,14 +273,25 @@ describe("replay-safe workflow execution", () => {
       },
     });
     await worker.start();
-    await waitUntil(async () =>
-      (await history.read({ workflowId: started.workflowId, runId: started.runId })).at(-1)?.eventType ===
-        "workflow.completed",
+    await waitUntil(
+      async () =>
+        (
+          await history.read({
+            workflowId: started.workflowId,
+            runId: started.runId,
+          })
+        ).at(-1)?.eventType === "workflow.completed",
     );
     await worker.stop();
     expect(attempts).toBe(2);
-    expect((await history.read({ workflowId: started.workflowId, runId: started.runId }))
-      .filter((item) => item.eventType === "activity.failed")).toHaveLength(1);
+    expect(
+      (
+        await history.read({
+          workflowId: started.workflowId,
+          runId: started.runId,
+        })
+      ).filter((item) => item.eventType === "activity.failed"),
+    ).toHaveLength(1);
   });
 
   it("waits for an external event and resumes with its typed payload", async () => {
@@ -278,7 +304,10 @@ describe("replay-safe workflow execution", () => {
       version: 1,
       activityRegistry: registry,
       run: async (context: import("../src").ReplayWorkflowContext) =>
-        context.waitForEvent<{ approved: boolean }>("approval", "approval.received"),
+        context.waitForEvent<{ approved: boolean }>(
+          "approval",
+          "approval.received",
+        ),
     };
     const waiting = await runner.start(definition, undefined);
     expect(waiting.status).toBe("waiting");
@@ -390,7 +419,9 @@ describe("replay-safe workflow execution", () => {
     const result = await runner.start(definition, undefined);
     expect(result.status).toBe("completed");
     expect(result.output?.results).toEqual([10, undefined, 30]);
-    expect(result.output?.failures).toEqual([{ index: 1, message: "invalid item" }]);
+    expect(result.output?.failures).toEqual([
+      { index: 1, message: "invalid item" },
+    ]);
     expect(result.output?.completed).toBe(2);
   });
 
@@ -398,7 +429,9 @@ describe("replay-safe workflow execution", () => {
     const history = new InMemoryWorkflowHistoryStore();
     const queue = new InMemoryTaskQueue();
     const registry = new InMemoryActivityRegistry();
-    registry.register(defineActivity("identity", async (input: string) => input));
+    registry.register(
+      defineActivity("identity", async (input: string) => input),
+    );
     const runner = new ReplayWorkflowRunner(history, queue);
     const definition = {
       name: "concurrent-replay",
@@ -408,18 +441,28 @@ describe("replay-safe workflow execution", () => {
         context.activity("identity", "ok"),
     };
     const results = await Promise.all([
-      runner.start(definition, undefined, { workflowId: "shared", runId: "run" }),
-      runner.start(definition, undefined, { workflowId: "shared", runId: "run" }),
+      runner.start(definition, undefined, {
+        workflowId: "shared",
+        runId: "run",
+      }),
+      runner.start(definition, undefined, {
+        workflowId: "shared",
+        runId: "run",
+      }),
     ]);
     expect(results.every((result) => result.status === "waiting")).toBe(true);
     expect(await queue.stats()).toMatchObject({ queued: 1 });
-    expect((await history.read({ workflowId: "shared", runId: "run" })).filter(
-      (item) => item.eventType === "activity.scheduled",
-    )).toHaveLength(1);
+    expect(
+      (await history.read({ workflowId: "shared", runId: "run" })).filter(
+        (item) => item.eventType === "activity.scheduled",
+      ),
+    ).toHaveLength(1);
   });
 });
 
-async function waitUntil(predicate: () => boolean | Promise<boolean>): Promise<void> {
+async function waitUntil(
+  predicate: () => boolean | Promise<boolean>,
+): Promise<void> {
   const deadline = Date.now() + 2000;
   while (!(await predicate()) && Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, 5));

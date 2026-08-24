@@ -1,31 +1,32 @@
-"use client"
+"use client";
 
-import type { OrganizationAuthClient } from "@better-auth-ui/core/plugins/organization"
-import { useAuth, useAuthPlugin } from "@better-auth-ui/react"
-import { useListUserInvitations } from "@better-auth-ui/react/plugins/organization"
-import { Fragment } from "react"
+import type { OrganizationAuthClient } from "@better-auth-ui/core/plugins/organization";
+import { useAuth, useAuthPlugin } from "@better-auth-ui/react";
+import { useListUserInvitations } from "@better-auth-ui/react/plugins/organization";
+import type { Invitation } from "better-auth/client";
+import { Fragment } from "react";
 
-import { Card, CardContent } from "@/components/ui/card"
-import { ItemGroup, ItemSeparator } from "@/components/ui/item"
-import { organizationPlugin } from "@/lib/auth/organization-plugin"
-import { UserInvitationRow } from "./user-invitation-row"
-import { UserInvitationRowSkeleton } from "./user-invitation-row-skeleton"
-import { UserInvitationsEmpty } from "./user-invitations-empty"
+import { Card, CardContent } from "@/components/ui/card";
+import { ItemGroup, ItemSeparator } from "@/components/ui/item";
+import { organizationPlugin } from "@/lib/auth/organization-plugin";
+import { UserInvitationRow } from "./user-invitation-row";
+import { UserInvitationRowSkeleton } from "./user-invitation-row-skeleton";
+import { UserInvitationsEmpty } from "./user-invitations-empty";
 
 export type UserInvitationsProps = {
-  className?: string
-}
+  className?: string;
+};
 
 /**
  * Organization invitations for the signed-in user. Always renders the section
  * card; uses `UserInvitationsEmpty` when there are no pending invitations.
  */
 export function UserInvitations({ className }: UserInvitationsProps) {
-  const { authClient } = useAuth<OrganizationAuthClient>()
+  const { authClient } = useAuth<OrganizationAuthClient>();
   const { localization: organizationLocalization } =
-    useAuthPlugin(organizationPlugin)
+    useAuthPlugin(organizationPlugin);
 
-  const { data: invitations, isPending } = useListUserInvitations(authClient)
+  const { data: invitations, isPending } = useListUserInvitations(authClient);
 
   return (
     <div className={className}>
@@ -44,7 +45,7 @@ export function UserInvitations({ className }: UserInvitationsProps) {
               <UserInvitationsEmpty />
             ) : (
               <ItemGroup className="gap-0">
-                {invitations.map((invitation, index) => (
+                {invitations.map((invitation: Invitation, index: number) => (
                   <Fragment key={invitation.id}>
                     {index > 0 && <ItemSeparator />}
                     <UserInvitationRow invitation={invitation} />
@@ -56,5 +57,5 @@ export function UserInvitations({ className }: UserInvitationsProps) {
         </Card>
       </div>
     </div>
-  )
+  );
 }

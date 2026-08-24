@@ -204,6 +204,55 @@
       "when": 1787140330679,
       "tag": "0029_familiar_shaman",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1787332573277,
+      "tag": "0030_real_enchantress",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1787333528450,
+      "tag": "0031_stiff_groot",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1787339167726,
+      "tag": "0032_large_piledriver",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1787343893743,
+      "tag": "0033_pretty_salo",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1787347536827,
+      "tag": "0034_neat_stardust",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1787351617000,
+      "tag": "0035_chat_connected_apps",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1787358322971,
+      "tag": "0036_clumsy_zombie",
+      "breakpoints": true
     }
   ]
 }

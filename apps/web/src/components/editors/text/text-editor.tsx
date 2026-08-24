@@ -21,7 +21,7 @@ import {
   suggestionsPlugin,
   suggestionsPluginKey,
 } from "@/lib/editor/suggestions";
-import type { Suggestion } from "@circulo-ai/db/schema";
+import type { SuggestionStreamData } from "@/lib/types";
 
 type EditorProps = {
   content: string;
@@ -29,7 +29,7 @@ type EditorProps = {
   status: "streaming" | "idle";
   isCurrentVersion: boolean;
   currentVersionIndex: number;
-  suggestions: Suggestion[];
+  suggestions: SuggestionStreamData[];
 };
 
 function PureEditor({

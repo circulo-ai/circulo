@@ -23,6 +23,7 @@ export type ChatSettings = {
     orchestrationModel: string;
     orchestrationFallbackModel: string;
     knowledgeBaseIds: string[];
+    connectedAppIds: string[];
     creatorId: string;
   };
   members: Array<{
@@ -50,6 +51,15 @@ export type ChatSettings = {
       avatarUrl: string | null;
     };
   }>;
+  connectedApps: ConnectedAppOption[];
+};
+export type ConnectedAppOption = {
+  id: string;
+  name: string;
+  description: string;
+  status: "connected" | "needs_reconnect";
+  connectionId: string;
+  accountLabel: string;
 };
 export type AgentOption = {
   id: string;
@@ -69,6 +79,7 @@ export type ChatSettingsForm = {
   orchestrationModel: string;
   orchestrationFallbackModel: string;
   knowledgeBaseIds: string[];
+  connectedAppIds: string[];
 };
 
 const fetchSettings = async (url: string): Promise<ChatSettings> => {
@@ -145,6 +156,7 @@ export function useChatSettings(chatId: string) {
     orchestrationModel: "",
     orchestrationFallbackModel: "",
     knowledgeBaseIds: [],
+    connectedAppIds: [],
   });
   const [memberEmail, setMemberEmail] = useState("");
   const [agentId, setAgentId] = useState("");
@@ -162,6 +174,7 @@ export function useChatSettings(chatId: string) {
         orchestrationModel: data.chat.orchestrationModel,
         orchestrationFallbackModel: data.chat.orchestrationFallbackModel,
         knowledgeBaseIds: data.chat.knowledgeBaseIds ?? [],
+        connectedAppIds: data.chat.connectedAppIds ?? [],
       });
   }, [data]);
   const save = async () => {

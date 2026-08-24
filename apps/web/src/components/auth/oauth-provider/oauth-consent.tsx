@@ -1,74 +1,75 @@
-"use client"
+"use client";
 
 import {
   type OAuthAuthorizationRequest,
   type OAuthProviderAuthClient,
   parseOAuthAuthorizationRequest,
   resolveOAuthScopeMetadata,
-  sanitizeOAuthClientUrl
-} from "@better-auth-ui/core/plugins/oauth-provider"
-import { useAuth, useAuthPlugin, useSession } from "@better-auth-ui/react"
+  sanitizeOAuthClientUrl,
+} from "@better-auth-ui/core/plugins/oauth-provider";
+import { useAuth, useAuthPlugin, useSession } from "@better-auth-ui/react";
 import {
   useOAuthConsent,
-  usePublicOAuthClient
-} from "@better-auth-ui/react/plugins/oauth-provider"
-import { Check, ShieldCheck } from "lucide-react"
-import { useEffect, useState } from "react"
+  usePublicOAuthClient,
+} from "@better-auth-ui/react/plugins/oauth-provider";
+import { Check, ShieldCheck } from "lucide-react";
+import { useEffect, useState } from "react";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardFooter,
   CardHeader,
-  CardTitle
-} from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Spinner } from "@/components/ui/spinner"
-import { oauthProviderPlugin } from "@/lib/auth/oauth-provider-plugin"
-import { cn } from "@/lib/utils"
-import { UserAvatar } from "../user/user-avatar"
+  CardTitle,
+} from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
+import { oauthProviderPlugin } from "@/lib/auth/oauth-provider-plugin";
+import { cn } from "@/lib/utils";
+import { UserAvatar } from "../user/user-avatar";
 
 export type OAuthConsentProps = {
-  className?: string
-}
+  className?: string;
+};
 
 const interpolateClient = (template: string, clientName: string) =>
-  template.replace("{{client}}", clientName)
+  template.replace("{{client}}", clientName);
 
 export function OAuthConsent({ className }: OAuthConsentProps) {
-  const { authClient } = useAuth()
-  const { localization, scopeMetadata } = useAuthPlugin(oauthProviderPlugin)
-  const oauthClient = authClient as OAuthProviderAuthClient
-  const { data: session, isPending: isSessionPending } = useSession(oauthClient)
-  const [request, setRequest] = useState<OAuthAuthorizationRequest>()
+  const { authClient } = useAuth();
+  const { localization, scopeMetadata } = useAuthPlugin(oauthProviderPlugin);
+  const oauthClient = authClient as OAuthProviderAuthClient;
+  const { data: session, isPending: isSessionPending } =
+    useSession(oauthClient);
+  const [request, setRequest] = useState<OAuthAuthorizationRequest>();
 
   useEffect(() => {
-    setRequest(parseOAuthAuthorizationRequest(window.location.search))
-  }, [])
+    setRequest(parseOAuthAuthorizationRequest(window.location.search));
+  }, []);
 
   const publicClient = usePublicOAuthClient(oauthClient, request?.clientId, {
-    enabled: Boolean(session && request?.clientId)
-  })
-  const consent = useOAuthConsent(oauthClient)
-  const client = publicClient.data
-  const clientName = client?.client_name || localization.application
-  const logoUrl = sanitizeOAuthClientUrl(client?.logo_uri)
-  const policyUrl = sanitizeOAuthClientUrl(client?.policy_uri)
-  const termsUrl = sanitizeOAuthClientUrl(client?.tos_uri)
-  const requestResolved = request !== undefined
+    enabled: Boolean(session && request?.clientId),
+  });
+  const consent = useOAuthConsent(oauthClient);
+  const client = publicClient.data;
+  const clientName = client?.client_name || localization.application;
+  const logoUrl = sanitizeOAuthClientUrl(client?.logo_uri);
+  const policyUrl = sanitizeOAuthClientUrl(client?.policy_uri);
+  const termsUrl = sanitizeOAuthClientUrl(client?.tos_uri);
+  const requestResolved = request !== undefined;
   const invalidRequest =
     requestResolved &&
     (!request.clientId ||
       (!isSessionPending && !session) ||
       publicClient.isError ||
-      (!publicClient.isPending && session && !client))
+      (!publicClient.isPending && session && !client));
   const canRespond = Boolean(
-    request?.clientId && session && client && !consent.isPending
-  )
+    request?.clientId && session && client && !consent.isPending,
+  );
 
   if (invalidRequest) {
     return (
@@ -82,7 +83,7 @@ export function OAuthConsent({ className }: OAuthConsentProps) {
           </CardDescription>
         </CardHeader>
       </Card>
-    )
+    );
   }
 
   return (
@@ -125,7 +126,7 @@ export function OAuthConsent({ className }: OAuthConsentProps) {
           <CardDescription>
             {interpolateClient(
               localization.authorizationDescription,
-              clientName
+              clientName,
             )}
           </CardDescription>
         </div>
@@ -145,9 +146,9 @@ export function OAuthConsent({ className }: OAuthConsentProps) {
                   scope,
                   {
                     clientId: request.clientId,
-                    requestedScopes: request.scopes
-                  }
-                )
+                    requestedScopes: request.scopes,
+                  },
+                );
 
                 return (
                   <li className="flex gap-3" key={scope}>
@@ -161,7 +162,7 @@ export function OAuthConsent({ className }: OAuthConsentProps) {
                       ) : null}
                     </div>
                   </li>
-                )
+                );
               })}
             </ul>
           ) : (
@@ -248,5 +249,5 @@ export function OAuthConsent({ className }: OAuthConsentProps) {
         </Button>
       </CardFooter>
     </Card>
-  )
+  );
 }

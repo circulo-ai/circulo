@@ -1,9 +1,13 @@
 "use client";
 
-import * as React from "react";
 import { Collapsible as CollapsiblePrimitive } from "@base-ui/react/collapsible";
+import * as React from "react";
 
-function Collapsible({ asChild = false, children, ...props }: CollapsiblePrimitive.Root.Props & {
+function Collapsible({
+  asChild = false,
+  children,
+  ...props
+}: CollapsiblePrimitive.Root.Props & {
   asChild?: boolean;
 }) {
   return (
@@ -17,7 +21,11 @@ function Collapsible({ asChild = false, children, ...props }: CollapsiblePrimiti
   );
 }
 
-function CollapsibleTrigger({ asChild = false, children, ...props }: CollapsiblePrimitive.Trigger.Props & {
+function CollapsibleTrigger({
+  asChild = false,
+  children,
+  ...props
+}: CollapsiblePrimitive.Trigger.Props & {
   asChild?: boolean;
 }) {
   return (
@@ -32,7 +40,11 @@ function CollapsibleTrigger({ asChild = false, children, ...props }: Collapsible
   );
 }
 
-function CollapsibleContent({ asChild = false, children, ...props }: CollapsiblePrimitive.Panel.Props & {
+function CollapsibleContent({
+  asChild = false,
+  children,
+  ...props
+}: CollapsiblePrimitive.Panel.Props & {
   asChild?: boolean;
 }) {
   return (
@@ -46,4 +58,4 @@ function CollapsibleContent({ asChild = false, children, ...props }: Collapsible
   );
 }
 
-export { Collapsible, CollapsibleTrigger, CollapsibleContent };
+export { Collapsible, CollapsibleContent, CollapsibleTrigger };

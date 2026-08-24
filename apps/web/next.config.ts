@@ -8,6 +8,51 @@ const apiBaseUrl =
   process.env.API_BASE_URL ??
   "http://localhost:3002";
 
+const apiOrigin = (() => {
+  try {
+    return new URL(apiBaseUrl).origin;
+  } catch {
+    return "'self'";
+  }
+})();
+
+const storageOrigins = [
+  getOrigin(process.env.S3_ENDPOINT),
+  ...(process.env.NEXT_PUBLIC_STORAGE_ORIGINS?.split(",") ?? []).map((value) =>
+    getOrigin(value),
+  ),
+  process.env.AZURE_ACCOUNT_NAME?.trim()
+    ? `https://${process.env.AZURE_ACCOUNT_NAME.trim()}.blob.core.windows.net`
+    : undefined,
+].filter((origin): origin is string => Boolean(origin));
+const connectSources = [
+  "'self'",
+  apiOrigin,
+  ...storageOrigins,
+  "https://cdn.jsdelivr.net",
+];
+
+// Keep the policy explicit while preserving the product's intentional
+// capabilities: Pyodide is loaded from jsDelivr, web previews are sandboxed
+// iframes, and API traffic may use a separately hosted server origin.
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'none'",
+  // Shiki's Oniguruma highlighter loads a WebAssembly grammar engine. The
+  // narrower wasm-unsafe-eval source expression enables WebAssembly execution
+  // without granting general JavaScript eval permissions.
+  "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data: https:",
+  `connect-src ${connectSources.join(" ")}`,
+  "worker-src 'self' blob:",
+  "child-src 'self' blob:",
+  "frame-src 'self' https:",
+].join("; ");
+
 const nextConfig: NextConfig = {
   devIndicators: false,
   images: {
@@ -115,23 +160,21 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        // API routes CORS headers
-        source: "/api/:path*",
+        // Baseline browser protections for every rendered page and API
+        // response that passes through the Next.js proxy.
+        source: "/(.*)",
         headers: [
-          { key: "Access-Control-Allow-Credentials", value: "true" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
           {
-            key: "Access-Control-Allow-Origin",
-            value: env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
           },
           {
-            key: "Access-Control-Allow-Methods",
-            value: "GET,POST,OPTIONS,PUT,DELETE",
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=()",
           },
-          {
-            key: "Access-Control-Allow-Headers",
-            value:
-              "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, X-API-Key",
-          },
+          { key: "Content-Security-Policy", value: contentSecurityPolicy },
         ],
       },
       // Block access to sourcemap files (defense in depth)
@@ -162,3 +205,12 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+
+function getOrigin(value: string | undefined): string | undefined {
+  if (!value?.trim()) return undefined;
+  try {
+    return new URL(value).origin;
+  } catch {
+    return undefined;
+  }
+}

@@ -1,6 +1,6 @@
 {
   "name": "@circulo-ai/file-parsers",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "private": false,
   "type": "module",
   "sideEffects": false,

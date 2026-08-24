@@ -12,7 +12,10 @@ export class SecureWorkflowHistoryStreamGateway implements WorkflowHistoryEventS
     private readonly eventBus: WorkflowHistoryEventBus,
     private readonly tokens: WorkflowAccessTokenSigner,
     private readonly tenantResolver?:
-      ((workflowId: string, runId: string) => string | Promise<string | undefined> | undefined)
+      | ((
+          workflowId: string,
+          runId: string,
+        ) => string | Promise<string | undefined> | undefined)
       | undefined,
   ) {}
 
@@ -24,7 +27,8 @@ export class SecureWorkflowHistoryStreamGateway implements WorkflowHistoryEventS
     options: { tenantId?: string | undefined } = {},
   ): Promise<() => void> {
     const claims = await this.tokens.verify(token);
-    const tenantId = options.tenantId ?? (await this.tenantResolver?.(workflowId, runId));
+    const tenantId =
+      options.tenantId ?? (await this.tenantResolver?.(workflowId, runId));
     this.tokens.authorize(claims, workflowId, "workflow:stream", tenantId);
     return this.eventBus.subscribe(workflowId, runId, callback);
   }
@@ -35,16 +39,28 @@ export class SecureWorkflowHistoryStreamGateway implements WorkflowHistoryEventS
     options: WorkflowHistoryStreamOptions,
   ): AsyncIterable<WorkflowHistoryEvent> {
     const maxBufferedEvents = options.maxBufferedEvents ?? 1000;
-    if (maxBufferedEvents < 1) throw new RangeError("maxBufferedEvents must be positive");
+    if (maxBufferedEvents < 1)
+      throw new RangeError("maxBufferedEvents must be positive");
     return createBufferedAsyncStream<WorkflowHistoryEvent>(
       async (push) => {
-        const unsubscribe = this.eventBus.subscribe(workflowId, options.runId, (event) => {
-          push(event);
-        });
+        const unsubscribe = this.eventBus.subscribe(
+          workflowId,
+          options.runId,
+          (event) => {
+            push(event);
+          },
+        );
         try {
           const claims = await this.tokens.verify(token);
-          const tenantId = options.tenantId ?? (await this.tenantResolver?.(workflowId, options.runId));
-          this.tokens.authorize(claims, workflowId, "workflow:stream", tenantId);
+          const tenantId =
+            options.tenantId ??
+            (await this.tenantResolver?.(workflowId, options.runId));
+          this.tokens.authorize(
+            claims,
+            workflowId,
+            "workflow:stream",
+            tenantId,
+          );
           return unsubscribe;
         } catch (error) {
           unsubscribe();

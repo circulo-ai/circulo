@@ -14,11 +14,20 @@ export class InMemoryTenantPolicyStore implements TenantPolicyStore {
       this.policies.set(policy.tenantId, structuredClone(policy));
       return;
     }
-    validateOptionalLimit(policy.maxConcurrentWorkflows, "maxConcurrentWorkflows");
-    validateOptionalLimit(policy.maxConcurrentActivities, "maxConcurrentActivities");
+    validateOptionalLimit(
+      policy.maxConcurrentWorkflows,
+      "maxConcurrentWorkflows",
+    );
+    validateOptionalLimit(
+      policy.maxConcurrentActivities,
+      "maxConcurrentActivities",
+    );
     if (policy.rateLimit) {
       validateOptionalLimit(policy.rateLimit.capacity, "rateLimit.capacity");
-      validateOptionalLimit(policy.rateLimit.refillPerSecond, "rateLimit.refillPerSecond");
+      validateOptionalLimit(
+        policy.rateLimit.refillPerSecond,
+        "rateLimit.refillPerSecond",
+      );
     }
     this.policies.set(policy.tenantId, structuredClone(policy));
   }

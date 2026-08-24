@@ -21,7 +21,10 @@ export const isTest = env.NODE_ENV === "test";
 /**
  * Is billing enforcement enabled
  */
-export const isBillingEnabled = isTruthy(env.BILLING_ENABLED);
+// This module is imported by client components. Use the public billing flag
+// here instead of the server-only BILLING_ENABLED field; reading a server
+// field through @t3-oss/env-nextjs throws during production hydration.
+export const isBillingEnabled = isTruthy(env.NEXT_PUBLIC_BILLING_ENABLED);
 
 /**
  * Is this the hosted version of the application

@@ -1,44 +1,44 @@
-"use client"
+"use client";
 
-import type { OrganizationAuthClient } from "@better-auth-ui/core/plugins/organization"
-import { useAuth, useAuthPlugin } from "@better-auth-ui/react"
+import type { OrganizationAuthClient } from "@better-auth-ui/core/plugins/organization";
+import { useAuth, useAuthPlugin } from "@better-auth-ui/react";
 import {
   useAcceptInvitation,
-  useRejectInvitation
-} from "@better-auth-ui/react/plugins/organization"
-import type { Invitation } from "better-auth/client"
-import { Check, Clock, X } from "lucide-react"
+  useRejectInvitation,
+} from "@better-auth-ui/react/plugins/organization";
+import type { Invitation } from "better-auth/client";
+import { Check, Clock, X } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Item,
   ItemActions,
   ItemContent,
   ItemDescription,
   ItemMedia,
-  ItemTitle
-} from "@/components/ui/item"
-import { Spinner } from "@/components/ui/spinner"
-import { organizationPlugin } from "@/lib/auth/organization-plugin"
+  ItemTitle,
+} from "@/components/ui/item";
+import { Spinner } from "@/components/ui/spinner";
+import { organizationPlugin } from "@/lib/auth/organization-plugin";
 
 export type UserInvitationRowProps = {
-  invitation: Invitation & { organizationName?: string }
-}
+  invitation: Invitation & { organizationName?: string };
+};
 
 /**
  * Single invitation row with accept/reject actions for the current user.
  */
 export function UserInvitationRow({ invitation }: UserInvitationRowProps) {
-  const { authClient } = useAuth<OrganizationAuthClient>()
+  const { authClient } = useAuth<OrganizationAuthClient>();
   const { localization: organizationLocalization, roles } =
-    useAuthPlugin(organizationPlugin)
+    useAuthPlugin(organizationPlugin);
 
   const { mutate: acceptInvitation, isPending: isAccepting } =
-    useAcceptInvitation(authClient)
+    useAcceptInvitation(authClient);
 
   const { mutate: rejectInvitation, isPending: isRejecting } =
-    useRejectInvitation(authClient)
+    useRejectInvitation(authClient);
 
   return (
     <Item>
@@ -53,10 +53,13 @@ export function UserInvitationRow({ invitation }: UserInvitationRowProps) {
           </Badge>
         </ItemTitle>
         <ItemDescription>
-          {new Date(invitation.createdAt).toLocaleString(undefined, {
-            dateStyle: "medium",
-            timeStyle: "short"
-          })}
+          {new Date(invitation.createdAt ?? Date.now()).toLocaleString(
+            undefined,
+            {
+              dateStyle: "medium",
+              timeStyle: "short",
+            },
+          )}
         </ItemDescription>
       </ItemContent>
       <ItemActions>
@@ -83,5 +86,5 @@ export function UserInvitationRow({ invitation }: UserInvitationRowProps) {
         </Button>
       </ItemActions>
     </Item>
-  )
+  );
 }

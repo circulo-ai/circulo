@@ -1,54 +1,54 @@
-"use client"
+"use client";
 
-import type { OrganizationAuthClient } from "@better-auth-ui/core/plugins/organization"
-import { useAuth, useAuthPlugin } from "@better-auth-ui/react"
+import type { OrganizationAuthClient } from "@better-auth-ui/core/plugins/organization";
+import { useAuth, useAuthPlugin } from "@better-auth-ui/react";
 import {
   useActiveOrganization,
-  useHasPermission
-} from "@better-auth-ui/react/plugins/organization"
-import { useState } from "react"
+  useHasPermission,
+} from "@better-auth-ui/react/plugins/organization";
+import { useState } from "react";
 
-import { Button } from "@/components/ui/button"
-import { organizationPlugin } from "@/lib/auth/organization-plugin"
-import { DeleteOrganizationDialog } from "./delete-organization-dialog"
-import { DeleteOrganizationSkeleton } from "./delete-organization-skeleton"
+import { Button } from "@/components/ui/button";
+import { organizationPlugin } from "@/lib/auth/organization-plugin";
+import { DeleteOrganizationDialog } from "./delete-organization-dialog";
+import { DeleteOrganizationSkeleton } from "./delete-organization-skeleton";
 
 /**
  * Danger-zone row to delete the active organization. Hidden for members without
  * the `organization:delete` permission.
  */
 export function DeleteOrganization() {
-  const { authClient } = useAuth<OrganizationAuthClient>()
+  const { authClient } = useAuth<OrganizationAuthClient>();
   const { localization: organizationLocalization } =
-    useAuthPlugin(organizationPlugin)
+    useAuthPlugin(organizationPlugin);
 
-  const { data: activeOrganization } = useActiveOrganization(authClient)
+  const { data: activeOrganization } = useActiveOrganization(authClient);
 
   const { data: permission, isPending: permissionPending } = useHasPermission(
     authClient,
     {
-      permissions: { organization: ["delete"] }
-    }
-  )
+      permissions: { organization: ["delete"] },
+    },
+  );
 
-  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   if (permissionPending) {
-    return <DeleteOrganizationSkeleton />
+    return <DeleteOrganizationSkeleton />;
   }
 
   if (!permission?.success) {
-    return null
+    return null;
   }
 
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <p className="text-sm font-medium leading-tight">
+        <p className="text-sm leading-tight font-medium">
           {organizationLocalization.deleteOrganization}
         </p>
 
-        <p className="text-muted-foreground mt-0.5 text-xs">
+        <p className="mt-0.5 text-xs text-muted-foreground">
           {organizationLocalization.deleteOrganizationDescription}
         </p>
       </div>
@@ -71,5 +71,5 @@ export function DeleteOrganization() {
         />
       )}
     </div>
-  )
+  );
 }

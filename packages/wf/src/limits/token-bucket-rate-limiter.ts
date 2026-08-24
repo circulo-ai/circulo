@@ -13,7 +13,10 @@ export class TokenBucketRateLimiter {
     if (!Number.isFinite(options.capacity) || options.capacity <= 0) {
       throw new RangeError("Rate limit capacity must be positive");
     }
-    if (!Number.isFinite(options.refillPerSecond) || options.refillPerSecond <= 0) {
+    if (
+      !Number.isFinite(options.refillPerSecond) ||
+      options.refillPerSecond <= 0
+    ) {
       throw new RangeError("Rate limit refillPerSecond must be positive");
     }
   }

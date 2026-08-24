@@ -2,8 +2,8 @@ import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { Chat } from "@/components/chat";
-import type { ChatMessagePagination } from "@/hooks/api/chats/use-message-pagination";
 import { DataStreamHandler } from "@/components/data-stream-handler";
+import type { ChatMessagePagination } from "@/hooks/api/chats/use-message-pagination";
 import { convertToUIMessages } from "@/lib/utils";
 import {
   chatMemberRepo,

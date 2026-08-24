@@ -22,7 +22,8 @@ export class RecoveryWorker {
   private lastRunAt?: number;
 
   constructor(private readonly options: RecoveryWorkerOptions) {
-    if (!options.id.trim()) throw new Error("Recovery worker id must not be empty");
+    if (!options.id.trim())
+      throw new Error("Recovery worker id must not be empty");
     if ((options.intervalMs ?? 5_000) <= 0) {
       throw new RangeError("Recovery worker interval must be positive");
     }
@@ -59,7 +60,9 @@ export class RecoveryWorker {
       this.reclaimed += reclaimed;
       this.lastRunAt = Date.now();
     } catch (cause) {
-      await this.options.onError?.(cause instanceof Error ? cause : new Error(String(cause)));
+      await this.options.onError?.(
+        cause instanceof Error ? cause : new Error(String(cause)),
+      );
     }
   }
 }

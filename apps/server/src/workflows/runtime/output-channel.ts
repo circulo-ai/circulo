@@ -136,13 +136,13 @@ export function closeWorkflowOutputChannel(workflowId: string): void {
   const channel = channels.get(workflowId);
   if (!channel) return;
 
-	channel.close();
-	// Completed channels are replayed from the durable event store on demand.
-	// Remove the in-memory instance so long-lived server processes do not retain
-	// every completed workflow and its full chunk buffer indefinitely.
-	// Defer removal by one microtask so the request that just completed can still
-	// obtain the closed channel and return its terminal stream to the caller.
-	queueMicrotask(() => {
-		if (channels.get(workflowId) === channel) channels.delete(workflowId);
-	});
+  channel.close();
+  // Completed channels are replayed from the durable event store on demand.
+  // Remove the in-memory instance so long-lived server processes do not retain
+  // every completed workflow and its full chunk buffer indefinitely.
+  // Defer removal by one microtask so the request that just completed can still
+  // obtain the closed channel and return its terminal stream to the caller.
+  queueMicrotask(() => {
+    if (channels.get(workflowId) === channel) channels.delete(workflowId);
+  });
 }

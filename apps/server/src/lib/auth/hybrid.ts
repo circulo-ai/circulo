@@ -1,6 +1,6 @@
 import { chat, db } from "@/db";
-import { authenticateRequest } from "@/lib/auth/request";
 import { verifyInternalToken } from "@/lib/auth/internal";
+import { authenticateRequest } from "@/lib/auth/request";
 import { createLogger } from "@/lib/logs/console/logger";
 import { eq } from "drizzle-orm";
 

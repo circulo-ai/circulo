@@ -1,33 +1,33 @@
-"use client"
+"use client";
 
-import type {
-  ListDeviceSession,
-  MultiSessionAuthClient
-} from "@better-auth-ui/core/plugins/multi-session"
-import { useAuth, useAuthPlugin, useSession } from "@better-auth-ui/react"
-import {
-  useRevokeMultiSession,
-  useSetActiveSession
-} from "@better-auth-ui/react/plugins/multi-session"
-import { ArrowLeftRight, LogOut, MoreHorizontal } from "lucide-react"
-import { toast } from "sonner"
-import { UserView } from "@/components/auth/user/user-view"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { UserView } from "@/components/auth/user/user-view";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu"
-import { Item, ItemActions } from "@/components/ui/item"
-import { Spinner } from "@/components/ui/spinner"
-import { multiSessionPlugin } from "@/lib/auth/multi-session-plugin"
-import { cn } from "@/lib/utils"
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Item, ItemActions } from "@/components/ui/item";
+import { Spinner } from "@/components/ui/spinner";
+import { multiSessionPlugin } from "@/lib/auth/multi-session-plugin";
+import { cn } from "@/lib/utils";
+import type {
+  ListDeviceSession,
+  MultiSessionAuthClient,
+} from "@better-auth-ui/core/plugins/multi-session";
+import { useAuth, useAuthPlugin, useSession } from "@better-auth-ui/react";
+import {
+  useRevokeMultiSession,
+  useSetActiveSession,
+} from "@better-auth-ui/react/plugins/multi-session";
+import { ArrowLeftRight, LogOut, MoreHorizontal } from "lucide-react";
+import { toast } from "sonner";
 
 export type ManageAccountProps = {
-  deviceSession?: ListDeviceSession | null
-  isPending?: boolean
-}
+  deviceSession?: ListDeviceSession | null;
+  isPending?: boolean;
+};
 
 /**
  * Render a single account row with user info and switch/revoke controls.
@@ -41,25 +41,26 @@ export type ManageAccountProps = {
  */
 export function ManageAccount({
   deviceSession,
-  isPending
+  isPending,
 }: ManageAccountProps) {
-  const { authClient, localization } = useAuth<MultiSessionAuthClient>()
+  const { authClient, localization } = useAuth<MultiSessionAuthClient>();
   const { localization: multiSessionLocalization } =
-    useAuthPlugin(multiSessionPlugin)
-  const { data: session } = useSession(authClient)
+    useAuthPlugin(multiSessionPlugin);
+  const { data: session } = useSession(authClient);
 
   const { mutate: setActiveSession, isPending: isSwitching } =
     useSetActiveSession(authClient, {
-      onSuccess: () => window.scrollTo({ top: 0 })
-    })
+      onSuccess: () => window.scrollTo({ top: 0 }),
+    });
 
   const { mutate: revokeSession, isPending: isRevoking } =
     useRevokeMultiSession(authClient, {
-      onSuccess: () => toast.success(localization.settings.revokeSessionSuccess)
-    })
+      onSuccess: () =>
+        toast.success(localization.settings.revokeSessionSuccess),
+    });
 
-  const isActive = deviceSession?.session.userId === session?.session.userId
-  const isBusy = isSwitching || isRevoking
+  const isActive = deviceSession?.session.userId === session?.session.userId;
+  const isBusy = isSwitching || isRevoking;
 
   return (
     <Item>
@@ -85,7 +86,7 @@ export function ManageAccount({
             <DropdownMenuTrigger
               className={cn(
                 buttonVariants({ variant: "ghost", size: "icon-sm" }),
-                "shrink-0"
+                "shrink-0",
               )}
               disabled={isBusy}
             >
@@ -96,7 +97,7 @@ export function ManageAccount({
               <DropdownMenuItem
                 onClick={() =>
                   setActiveSession({
-                    sessionToken: deviceSession.session.token
+                    sessionToken: deviceSession.session.token,
                   })
                 }
               >
@@ -107,7 +108,7 @@ export function ManageAccount({
               <DropdownMenuItem
                 onClick={() =>
                   revokeSession({
-                    sessionToken: deviceSession.session.token
+                    sessionToken: deviceSession.session.token,
                   })
                 }
               >
@@ -119,5 +120,5 @@ export function ManageAccount({
         )}
       </ItemActions>
     </Item>
-  )
+  );
 }

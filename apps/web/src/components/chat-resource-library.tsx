@@ -10,7 +10,6 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Sheet,
   SheetContent,
@@ -18,6 +17,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useArtifact } from "@/hooks/api/chats/use-artifact";
 import { getFetcher } from "@/lib/swr";
@@ -216,7 +216,10 @@ export function ChatResourceLibrary({ chatId }: { chatId: string }) {
               {isLoading ? (
                 <div className="flex flex-col gap-3">
                   {[1, 2, 3, 4].map((item) => (
-                    <div className="flex items-center gap-3 rounded-2xl border p-3" key={item}>
+                    <div
+                      className="flex items-center gap-3 rounded-2xl border p-3"
+                      key={item}
+                    >
                       <Skeleton className="size-10 rounded-xl" />
                       <div className="flex min-w-0 flex-1 flex-col gap-2">
                         <Skeleton className="h-3 w-2/3 rounded" />
@@ -244,7 +247,9 @@ export function ChatResourceLibrary({ chatId }: { chatId: string }) {
                       <Paperclip />
                     </EmptyMedia>
                     <EmptyTitle>
-                      {resources.length === 0 ? "Nothing shared yet" : "No matches"}
+                      {resources.length === 0
+                        ? "Nothing shared yet"
+                        : "No matches"}
                     </EmptyTitle>
                     <EmptyDescription>
                       {resources.length === 0
@@ -299,7 +304,9 @@ function ResourceRow({
   const content = (
     <>
       <Avatar size="sm">
-        {resource.sender.image && <AvatarImage alt="" src={resource.sender.image} />}
+        {resource.sender.image && (
+          <AvatarImage alt="" src={resource.sender.image} />
+        )}
         <AvatarFallback>{initials(resource.sender.name)}</AvatarFallback>
       </Avatar>
       <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
@@ -314,7 +321,9 @@ function ResourceRow({
               ? resource.artifactKind
               : typeLabels[resource.type]}
           </span>
-          {resource.mediaType && <span className="truncate">{resource.mediaType}</span>}
+          {resource.mediaType && (
+            <span className="truncate">{resource.mediaType}</span>
+          )}
         </div>
       </div>
       {(resource.type === "artifact" || resource.url) && (
@@ -350,5 +359,9 @@ function ResourceRow({
     );
   }
 
-  return <div className="flex min-w-0 items-center gap-3 rounded-2xl border p-3">{content}</div>;
+  return (
+    <div className="flex min-w-0 items-center gap-3 rounded-2xl border p-3">
+      {content}
+    </div>
+  );
 }

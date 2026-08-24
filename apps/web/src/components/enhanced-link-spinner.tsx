@@ -1,5 +1,5 @@
-import { cn } from "@/lib/utils";
 import { Slot } from "@/lib/slot";
+import { cn } from "@/lib/utils";
 import { ComponentProps, isValidElement } from "react";
 import { Spinner } from "./ui/spinner";
 

@@ -86,14 +86,21 @@ describe("workflow lifecycle hooks", () => {
     const hooks = new WorkflowHookManager<void, void, string>();
     const calls: string[] = [];
 
-    hooks.on("workflow.started", () => {
-      calls.push("normal");
-    }, {
-      priority: 1,
-    });
-    hooks.onAny(() => {
-      calls.push("any");
-    }, { priority: -1 });
+    hooks.on(
+      "workflow.started",
+      () => {
+        calls.push("normal");
+      },
+      {
+        priority: 1,
+      },
+    );
+    hooks.onAny(
+      () => {
+        calls.push("any");
+      },
+      { priority: -1 },
+    );
     hooks.once("workflow.started", () => {
       calls.push("once");
     });

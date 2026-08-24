@@ -1,9 +1,13 @@
 import createApp from "@/lib/create-app";
 import { env } from "@/lib/env";
 import { getBaseUrl } from "@/lib/urls/utils";
-import { rateLimit } from "@/middleware/rate-limit";
-import { loadAuthContext } from "@/middleware/auth";
 import { auditRequest } from "@/middleware/audit";
+import { loadAuthContext } from "@/middleware/auth";
+import { rateLimit } from "@/middleware/rate-limit";
+import {
+  enforceCookieMutationOrigin,
+  securityHeaders,
+} from "@/middleware/security";
 import agent from "@/routes/agent";
 import artifact from "@/routes/artifact";
 import auth from "@/routes/auth";
@@ -13,11 +17,11 @@ import autumn from "@/routes/autumn";
 import billing from "@/routes/billing";
 import capabilities from "@/routes/capabilities";
 import chat from "@/routes/chat";
-import chatResources from "@/routes/chat-resources";
 import chatAgents from "@/routes/chat-agents";
 import chatInvitations from "@/routes/chat-invitations";
 import chatMembers from "@/routes/chat-members";
 import chatPin from "@/routes/chat-pin";
+import chatResources from "@/routes/chat-resources";
 import chatSettings from "@/routes/chat-settings";
 import chatStream from "@/routes/chat-stream";
 import chatVisibility from "@/routes/chat-visibility";
@@ -29,13 +33,14 @@ import knowledge from "@/routes/knowledge";
 import memories from "@/routes/memories";
 import messages from "@/routes/messages";
 import models from "@/routes/models";
-import suggestions from "@/routes/suggestions";
 import skills from "@/routes/skills";
-import test from "@/routes/test";
+import suggestions from "@/routes/suggestions";
 import userProfile from "@/routes/users/profile";
 import userSettings from "@/routes/users/settings";
 import userUnsubscribe from "@/routes/users/unsubscribe";
 import vote from "@/routes/vote";
+import webhooks from "@/routes/webhooks";
+import workspaceRoles from "@/routes/workspace-roles";
 import { HttpError } from "@circulo-ai/types";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
@@ -51,6 +56,7 @@ const OPENAPI_PATH = "/openapi.json";
 app.use("*", logger());
 app.use("*", requestId());
 app.use("*", auditRequest);
+app.use("*", securityHeaders);
 app.use(prettyJSON());
 const allowedOrigins = [
   env.NEXT_PUBLIC_APP_URL,
@@ -82,6 +88,7 @@ const corsMiddleware = cors({
   credentials: true,
 });
 app.use("*", corsMiddleware); // apply globally so preflight never 404s
+app.use("/api/*", enforceCookieMutationOrigin({ allowedOrigins }));
 
 // Rate limiting is a production boundary. Keeping it opt-in prevents an unset
 // NODE_ENV from making local development behave like a shared production API.
@@ -121,6 +128,8 @@ const routes = [
   userSettings,
   userUnsubscribe,
   vote,
+  workspaceRoles,
+  webhooks,
 ] as const;
 
 routes.forEach((route) => {
@@ -130,6 +139,9 @@ routes.forEach((route) => {
 app.route("/", health);
 
 if (IS_DEVELOPMENT) {
+  // Keep the long-lived in-memory workflow test engine out of production
+  // startup. The route is only needed for local workflow verification.
+  const { default: test } = await import("@/routes/test");
   app.route("/api", test);
 }
 

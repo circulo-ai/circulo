@@ -62,6 +62,11 @@ export const chat = pgTable(
       .$type<string[]>()
       .notNull()
       .default([]),
+    // Connected app account IDs explicitly enabled for this conversation.
+    connectedAppIds: jsonb("connected_app_ids")
+      .$type<string[]>()
+      .notNull()
+      .default([]),
 
     type: chatTypeEnum("type").notNull().default("direct"),
     visibility: chatVisibilityEnum("visibility").notNull().default("private"),

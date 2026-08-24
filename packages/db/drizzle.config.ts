@@ -1,7 +1,7 @@
+import type { Config } from "drizzle-kit";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Config } from "drizzle-kit";
 
 function loadLocalDatabaseUrl() {
   if (process.env.DATABASE_URL) {

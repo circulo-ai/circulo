@@ -3,6 +3,15 @@ import { z } from "zod";
 
 const getEnv = (variable: string) => process.env[variable];
 
+const booleanFromEnv = z.preprocess((value) => {
+  if (typeof value !== "string") return value;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "") return undefined;
+  if (["true", "1", "yes", "on"].includes(normalized)) return true;
+  if (["false", "0", "no", "off"].includes(normalized)) return false;
+  return value;
+}, z.boolean());
+
 export const env = createEnv({
   // Local builds may intentionally omit secrets, but a production process
   // must fail fast instead of starting with an incomplete security config.
@@ -12,7 +21,8 @@ export const env = createEnv({
     DATABASE_URL: z.url(),
     BETTER_AUTH_URL: z.url(),
     BETTER_AUTH_SECRET: z.string().min(32),
-    ENCRYPTION_KEY: z.string().min(32),
+    // Encryption helpers derive a 32-byte AES key from exactly 64 hex chars.
+    ENCRYPTION_KEY: z.string().regex(/^[0-9a-fA-F]{64}$/),
     INTERNAL_API_SECRET: z.string().min(32),
     AUTUMN_SECRET_KEY: z.string().optional(),
     // Local development should exercise collaboration and automation limits
@@ -58,20 +68,21 @@ export const env = createEnv({
     REDDIT_CLIENT_SECRET: z.string().optional(),
 
     // Billing toggle
-    BILLING_ENABLED: z.boolean().optional(),
+    BILLING_ENABLED: booleanFromEnv.optional(),
 
     // Storage (S3/Azure)
     S3_ENDPOINT: z.string().optional(),
     S3_REGION: z.string().optional(),
     S3_ACCESS_KEY_ID: z.string().optional(),
     S3_SECRET_ACCESS_KEY: z.string().optional(),
-    S3_FORCE_PATH_STYLE: z.boolean().optional(),
+    S3_FORCE_PATH_STYLE: booleanFromEnv.optional(),
     S3_BUCKET_NAME: z.string().optional(),
     S3_EXECUTION_FILES_BUCKET_NAME: z.string().optional(),
     S3_KB_BUCKET_NAME: z.string().optional(),
     S3_CHAT_BUCKET_NAME: z.string().optional(),
-    S3_COPILOT_BUCKET_NAME: z.string().optional(),
     S3_PROFILE_PICTURES_BUCKET_NAME: z.string().optional(),
+    CIRCULO_STORAGE_DRIVER: z.enum(["local", "s3", "azure"]).optional(),
+    CIRCULO_LOCAL_STORAGE_PATH: z.string().optional(),
     AZURE_ACCOUNT_NAME: z.string().optional(),
     AZURE_ACCOUNT_KEY: z.string().optional(),
     AZURE_CONNECTION_STRING: z.string().optional(),
@@ -79,12 +90,12 @@ export const env = createEnv({
     AZURE_STORAGE_KB_CONTAINER_NAME: z.string().optional(),
     AZURE_STORAGE_EXECUTION_FILES_CONTAINER_NAME: z.string().optional(),
     AZURE_STORAGE_CHAT_CONTAINER_NAME: z.string().optional(),
-    AZURE_STORAGE_COPILOT_CONTAINER_NAME: z.string().optional(),
     AZURE_STORAGE_PROFILE_PICTURES_CONTAINER_NAME: z.string().optional(),
 
     // Email
     RESEND_API_KEY: z.string().optional(),
     AZURE_ACS_CONNECTION_STRING: z.string().optional(),
+    EMAIL_FROM_ADDRESS: z.string().email().optional(),
 
     // Redis / caching
     REDIS_URL: z.url().optional(),
@@ -95,8 +106,18 @@ export const env = createEnv({
     OPENROUTER_HTTP_REFERER: z.url().optional(),
     OPENROUTER_APP_TITLE: z.string().optional(),
     OPENROUTER_DEFAULT_MODEL: z.string().min(1).optional(),
+    CIRCULO_EMBEDDING_MODEL: z
+      .string()
+      .min(1)
+      .optional()
+      .default("openai/text-embedding-3-small"),
+    CIRCULO_VISION_MODEL: z.string().min(1).optional(),
     CORS_ALLOWED_ORIGINS: z.string().optional(),
     TRUSTED_PROXY_HOPS: z.string().optional().default("0"),
+    // Comma-separated IPs or CIDR ranges for the reverse proxy in front of
+    // Better Auth. Forwarded client-IP headers are only trusted from these
+    // explicitly configured proxy addresses.
+    TRUSTED_PROXY_IPS: z.string().optional(),
     GOOGLE_GENERATIVE_AI_API_KEY: z.string().optional(),
     OLLAMA_URL: z.string().optional(),
 
@@ -122,7 +143,7 @@ export const env = createEnv({
   },
   client: {
     NEXT_PUBLIC_APP_URL: z.url(),
-    NEXT_PUBLIC_BILLING_ENABLED: z.boolean().optional(),
+    NEXT_PUBLIC_BILLING_ENABLED: booleanFromEnv.optional(),
     NEXT_PUBLIC_BETTER_AUTH_URL: z.string().optional(),
   },
   shared: {

@@ -148,7 +148,9 @@ export async function getSubscriptionForOrg(
     }
 
     // Extract the active subscription (plan)
-    const activeProduct = products.find((product) => product.status === "active");
+    const activeProduct = products.find(
+      (product) => product.status === "active",
+    );
 
     return {
       plan: activeProduct?.id ?? null, // e.g., "free", "pro", "team"

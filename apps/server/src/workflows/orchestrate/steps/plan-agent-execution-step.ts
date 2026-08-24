@@ -8,6 +8,7 @@ import { getTextFromMessages } from "@/lib/utils";
 import type { OrchestrationInput } from "@/workflows/orchestrate/types";
 import { generateText, Output } from "ai";
 import { z } from "zod";
+import { getExplicitlyMentionedAgentIds } from "../agent-engagement";
 import type { RequestClassification } from "./classify-request-step";
 
 const executionPlanSchema = z.object({
@@ -197,8 +198,11 @@ Classification reasoning: ${classification.reasoning}
   // prompt text. Preserve it even if the planner would otherwise choose a
   // different specialist.
   const requestText = getTextFromMessages(triggerMessages);
+  const explicitlyMentionedIds = new Set(
+    getExplicitlyMentionedAgentIds(triggerMessages, agents),
+  );
   const explicitlyMentioned = agents.filter((chatAgent) =>
-    requestText.includes(`@${chatAgent.agentId}`),
+    explicitlyMentionedIds.has(chatAgent.agentId),
   );
   const selectedIds = new Set(validatedAgents.map((agent) => agent.agentId));
   for (const chatAgent of explicitlyMentioned) {

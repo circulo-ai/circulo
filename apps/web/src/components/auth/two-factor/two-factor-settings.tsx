@@ -1,20 +1,20 @@
-"use client"
+"use client";
 
-import { useAuth, useAuthPlugin, useSession } from "@better-auth-ui/react"
-import { useState } from "react"
+import { useAuth, useAuthPlugin, useSession } from "@better-auth-ui/react";
+import { useState } from "react";
 
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
-import { twoFactorPlugin } from "@/lib/auth/two-factor-plugin"
-import { cn } from "@/lib/utils"
-import { DisableTwoFactorDialog } from "./disable-two-factor-dialog"
-import { EnableTwoFactorDialog } from "./enable-two-factor-dialog"
-import { RegenerateBackupCodesDialog } from "./regenerate-backup-codes-dialog"
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { twoFactorPlugin } from "@/lib/auth/two-factor-plugin";
+import { cn } from "@/lib/utils";
+import { DisableTwoFactorDialog } from "./disable-two-factor-dialog";
+import { EnableTwoFactorDialog } from "./enable-two-factor-dialog";
+import { RegenerateBackupCodesDialog } from "./regenerate-backup-codes-dialog";
 
 export type TwoFactorSettingsProps = {
-  className?: string
-}
+  className?: string;
+};
 
 /**
  * Security-settings card for enrolling in and managing two-factor auth.
@@ -26,21 +26,21 @@ export type TwoFactorSettingsProps = {
  * @param className - Additional CSS classes applied to the card.
  */
 export function TwoFactorSettings({ className }: TwoFactorSettingsProps) {
-  const { authClient } = useAuth()
+  const { authClient } = useAuth();
   const {
     backupCodes: backupCodesEnabled,
-    localization: twoFactorLocalization
-  } = useAuthPlugin(twoFactorPlugin)
+    localization: twoFactorLocalization,
+  } = useAuthPlugin(twoFactorPlugin);
 
-  const { data: session, isPending } = useSession(authClient)
+  const { data: session, isPending } = useSession(authClient);
   const isEnabled = Boolean(
     (session?.user as { twoFactorEnabled?: boolean } | undefined)
-      ?.twoFactorEnabled
-  )
+      ?.twoFactorEnabled,
+  );
 
-  const [enableOpen, setEnableOpen] = useState(false)
-  const [disableOpen, setDisableOpen] = useState(false)
-  const [regenerateOpen, setRegenerateOpen] = useState(false)
+  const [enableOpen, setEnableOpen] = useState(false);
+  const [disableOpen, setDisableOpen] = useState(false);
+  const [regenerateOpen, setRegenerateOpen] = useState(false);
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
@@ -76,7 +76,7 @@ export function TwoFactorSettings({ className }: TwoFactorSettingsProps) {
             </p>
           )}
 
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             {twoFactorLocalization.twoFactorDescription}
           </p>
 
@@ -103,5 +103,5 @@ export function TwoFactorSettings({ className }: TwoFactorSettingsProps) {
         onOpenChange={setRegenerateOpen}
       />
     </div>
-  )
+  );
 }

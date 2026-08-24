@@ -39,7 +39,18 @@ bun run build
 
 The server build bundles the application and the Circulo Workflow Engine directly. Production orchestration state, workflow events, optimistic versions, and execution locks are stored in PostgreSQL, and interrupted runs are reclaimed on server startup. The live HTTP output channel is instance-local, so deployments with multiple API instances should use sticky routing for an active stream or add a shared pub/sub adapter at the load-balancer boundary.
 
-Production requires valid values for `DATABASE_URL`, `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`, `ENCRYPTION_KEY`, `INTERNAL_API_SECRET`, and the AI/provider credentials used by configured agents. Database changes are applied with `bun --filter @circulo-ai/db db:migrate`.
+Production requires valid values for `DATABASE_URL`, `BETTER_AUTH_URL`,
+`BETTER_AUTH_SECRET`, `ENCRYPTION_KEY`, `INTERNAL_API_SECRET`, and the
+AI/provider credentials used by configured agents. Production storage defaults
+to S3-compatible storage and also supports Azure Blob Storage with
+`CIRCULO_STORAGE_DRIVER=azure`: configure the server containers/credentials
+and set the web app's `NEXT_PUBLIC_STORAGE_ORIGINS` to the browser-reachable
+storage origin(s) so presigned uploads satisfy CSP and CORS. `/health/ready`
+verifies the configured buckets or containers before reporting production
+readiness. If the API is
+behind a reverse proxy, set `TRUSTED_PROXY_HOPS` and the matching
+`TRUSTED_PROXY_IPS` CIDR/IP list. Database changes are applied with
+`bun --filter @circulo-ai/db db:migrate`.
 
 ## Security boundaries
 

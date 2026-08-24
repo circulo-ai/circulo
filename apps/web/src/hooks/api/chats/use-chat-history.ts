@@ -7,7 +7,9 @@ import useSWR from "swr";
 
 export type ChatHistoryView = "all" | "archived";
 
-export function useChatHistory({ view = "all" }: { view?: ChatHistoryView } = {}) {
+export function useChatHistory({
+  view = "all",
+}: { view?: ChatHistoryView } = {}) {
   const { id } = useParams();
   const { currentChatId, setCurrentChatId, setIsChatLoading } =
     useChatHistoryStore();

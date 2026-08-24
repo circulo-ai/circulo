@@ -1,10 +1,10 @@
-import { Worker } from "../worker/worker";
 import type {
   TaskDisposition,
   TaskEnvelope,
   TimerTaskPayload,
   TimerWorkerOptions,
 } from "../models";
+import { Worker } from "../worker/worker";
 import { appendHistoryEvent } from "./history-append";
 
 /** Executes durable timer tasks without keeping workflow compute occupied. */

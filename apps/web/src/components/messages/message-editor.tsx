@@ -92,10 +92,7 @@ export function MessageEditor({
                 id: message.id,
                 replacementId,
                 content,
-                parts: [
-                  ...attachmentParts,
-                  { type: "text", text: content },
-                ],
+                parts: [...attachmentParts, { type: "text", text: content }],
                 attachments: attachmentParts,
               });
 
@@ -116,10 +113,7 @@ export function MessageEditor({
               await sendMessage({
                 id: replacementId,
                 role: "user",
-                parts: [
-                  ...attachmentParts,
-                  { type: "text", text: content },
-                ],
+                parts: [...attachmentParts, { type: "text", text: content }],
               });
             } catch (error) {
               toast.error(

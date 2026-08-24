@@ -1,34 +1,34 @@
-"use client"
+"use client";
 
-import type { ListDeviceSession } from "@better-auth-ui/core/plugins/multi-session"
-import type { OAuthProviderMultiSessionAuthClient } from "@better-auth-ui/core/plugins/oauth-provider"
+import type { ListDeviceSession } from "@better-auth-ui/core/plugins/multi-session";
+import type { OAuthProviderMultiSessionAuthClient } from "@better-auth-ui/core/plugins/oauth-provider";
 import {
   type OAuthAuthorizationRequest,
   parseOAuthAuthorizationRequest,
-  sanitizeOAuthClientUrl
-} from "@better-auth-ui/core/plugins/oauth-provider"
-import { useAuth, useAuthPlugin, useSession } from "@better-auth-ui/react"
+  sanitizeOAuthClientUrl,
+} from "@better-auth-ui/core/plugins/oauth-provider";
+import { useAuth, useAuthPlugin, useSession } from "@better-auth-ui/react";
 import {
   useListDeviceSessions,
-  useSetActiveSession
-} from "@better-auth-ui/react/plugins/multi-session"
+  useSetActiveSession,
+} from "@better-auth-ui/react/plugins/multi-session";
 import {
   useOAuthContinue,
-  usePublicOAuthClient
-} from "@better-auth-ui/react/plugins/oauth-provider"
-import { ShieldCheck } from "lucide-react"
-import { useEffect, useState } from "react"
+  usePublicOAuthClient,
+} from "@better-auth-ui/react/plugins/oauth-provider";
+import { ShieldCheck } from "lucide-react";
+import { useEffect, useState } from "react";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle
-} from "@/components/ui/card"
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Item,
   ItemActions,
@@ -36,20 +36,20 @@ import {
   ItemDescription,
   ItemGroup,
   ItemMedia,
-  ItemTitle
-} from "@/components/ui/item"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Spinner } from "@/components/ui/spinner"
-import { oauthProviderPlugin } from "@/lib/auth/oauth-provider-plugin"
-import { cn } from "@/lib/utils"
-import { UserAvatar } from "../user/user-avatar"
+  ItemTitle,
+} from "@/components/ui/item";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
+import { oauthProviderPlugin } from "@/lib/auth/oauth-provider-plugin";
+import { cn } from "@/lib/utils";
+import { UserAvatar } from "../user/user-avatar";
 
 export type OAuthSelectAccountProps = {
-  className?: string
-}
+  className?: string;
+};
 
 const interpolateClient = (template: string, clientName: string) =>
-  template.replace("{{client}}", clientName)
+  template.replace("{{client}}", clientName);
 
 /**
  * Account chooser for a signed OAuth authorization request.
@@ -63,58 +63,59 @@ const interpolateClient = (template: string, clientName: string) =>
  * management belongs in security settings.
  */
 export function OAuthSelectAccount({ className }: OAuthSelectAccountProps) {
-  const { authClient } = useAuth()
-  const { localization } = useAuthPlugin(oauthProviderPlugin)
-  const oauthClient = authClient as OAuthProviderMultiSessionAuthClient
+  const { authClient } = useAuth();
+  const { localization } = useAuthPlugin(oauthProviderPlugin);
+  const oauthClient = authClient as OAuthProviderMultiSessionAuthClient;
 
-  const { data: session, isPending: isSessionPending } = useSession(oauthClient)
-  const [request, setRequest] = useState<OAuthAuthorizationRequest>()
-  const [pendingSessionId, setPendingSessionId] = useState<string>()
+  const { data: session, isPending: isSessionPending } =
+    useSession(oauthClient);
+  const [request, setRequest] = useState<OAuthAuthorizationRequest>();
+  const [pendingSessionId, setPendingSessionId] = useState<string>();
 
   useEffect(() => {
-    setRequest(parseOAuthAuthorizationRequest(window.location.search))
-  }, [])
+    setRequest(parseOAuthAuthorizationRequest(window.location.search));
+  }, []);
 
   const publicClient = usePublicOAuthClient(oauthClient, request?.clientId, {
-    enabled: Boolean(session && request?.clientId)
-  })
+    enabled: Boolean(session && request?.clientId),
+  });
   const { data: deviceSessions, isPending: isDeviceSessionsPending } =
-    useListDeviceSessions(oauthClient)
+    useListDeviceSessions(oauthClient);
 
-  const client = publicClient.data
-  const clientName = client?.client_name || localization.application
-  const logoUrl = sanitizeOAuthClientUrl(client?.logo_uri)
+  const client = publicClient.data;
+  const clientName = client?.client_name || localization.application;
+  const logoUrl = sanitizeOAuthClientUrl(client?.logo_uri);
 
-  const setActiveSession = useSetActiveSession(oauthClient)
-  const oauthContinue = useOAuthContinue(oauthClient)
+  const setActiveSession = useSetActiveSession(oauthClient);
+  const oauthContinue = useOAuthContinue(oauthClient);
 
-  const requestResolved = request !== undefined
+  const requestResolved = request !== undefined;
   const invalidRequest =
     requestResolved &&
     (!request.clientId ||
       (!isSessionPending && !session) ||
       publicClient.isError ||
-      (!publicClient.isPending && session && !client))
+      (!publicClient.isPending && session && !client));
 
   const selectAccount = async (
-    deviceSession: ListDeviceSession<OAuthProviderMultiSessionAuthClient>
+    deviceSession: ListDeviceSession<OAuthProviderMultiSessionAuthClient>,
   ) => {
-    setPendingSessionId(deviceSession.session.id)
+    setPendingSessionId(deviceSession.session.id);
 
     try {
       if (deviceSession.session.id !== session?.session.id) {
         await setActiveSession.mutateAsync({
-          sessionToken: deviceSession.session.token
-        })
+          sessionToken: deviceSession.session.token,
+        });
       }
 
-      await oauthContinue.mutateAsync({ selected: true })
+      await oauthContinue.mutateAsync({ selected: true });
     } catch {
       // The error toaster surfaces the failure; re-enable the rows so the
       // user can pick again.
-      setPendingSessionId(undefined)
+      setPendingSessionId(undefined);
     }
-  }
+  };
 
   if (invalidRequest) {
     return (
@@ -128,10 +129,10 @@ export function OAuthSelectAccount({ className }: OAuthSelectAccountProps) {
           </CardDescription>
         </CardHeader>
       </Card>
-    )
+    );
   }
 
-  const isBusy = pendingSessionId !== undefined
+  const isBusy = pendingSessionId !== undefined;
 
   return (
     <Card className={cn("w-full max-w-md", className)}>
@@ -173,7 +174,7 @@ export function OAuthSelectAccount({ className }: OAuthSelectAccountProps) {
           <CardDescription>
             {interpolateClient(
               localization.selectAccountDescription,
-              clientName
+              clientName,
             )}
           </CardDescription>
         </div>
@@ -198,15 +199,16 @@ export function OAuthSelectAccount({ className }: OAuthSelectAccountProps) {
             <p className="text-xs text-muted-foreground">
               {interpolateClient(
                 localization.noAccountsDescription,
-                clientName
+                clientName,
               )}
             </p>
           </div>
         ) : (
           <ItemGroup className="gap-2">
             {deviceSessions.map((deviceSession) => {
-              const isCurrent = deviceSession.session.id === session?.session.id
-              const isSelecting = pendingSessionId === deviceSession.session.id
+              const isCurrent =
+                deviceSession.session.id === session?.session.id;
+              const isSelecting = pendingSessionId === deviceSession.session.id;
 
               return (
                 <Item key={deviceSession.session.id} variant="outline">
@@ -243,11 +245,11 @@ export function OAuthSelectAccount({ className }: OAuthSelectAccountProps) {
                     </Button>
                   </ItemActions>
                 </Item>
-              )
+              );
             })}
           </ItemGroup>
         )}
       </CardContent>
     </Card>
-  )
+  );
 }

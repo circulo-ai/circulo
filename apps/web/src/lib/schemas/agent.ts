@@ -17,6 +17,7 @@ export const baseAgentSchema = z.object({
   model: z.enum(LLM_MODELS).default(defaultModel),
   maxTokens: z.coerce.number().int().positive().optional(),
   temperature: z.coerce.number().int().min(0).max(100).optional(),
+  toolAccessMode: z.enum(["all", "allowlist"]).default("allowlist"),
   defaultToolIds: z.array(z.string()).optional(),
   defaultKnowledgeBaseIds: z.array(z.string()).optional(),
   metadata: z.record(z.string(), z.unknown()).nullable().optional(),

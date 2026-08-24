@@ -7,20 +7,27 @@ import type {
 export class WorkflowQueryService {
   constructor(private readonly historyStore: WorkflowHistoryStore) {}
 
-  async get(workflowId: string, runId: string): Promise<WorkflowQueryView | null> {
+  async get(
+    workflowId: string,
+    runId: string,
+  ): Promise<WorkflowQueryView | null> {
     const events = await this.historyStore.read({ workflowId, runId });
-    const started = events.find((event) => event.eventType === "workflow.started");
+    const started = events.find(
+      (event) => event.eventType === "workflow.started",
+    );
     if (!started) return null;
     const terminal = events.at(-1);
     const pendingActivities = pendingActivityIds(events);
     const waitingForEvents = events
       .filter((event) => event.eventType === "event.waiting")
       .map((event) => event.payload as { waitId?: string; eventName?: string })
-      .filter((waiting) =>
-        !events.some((event) =>
-          event.eventType === "signal.received" &&
-          (event.payload as { waitId?: string }).waitId === waiting.waitId,
-        ),
+      .filter(
+        (waiting) =>
+          !events.some(
+            (event) =>
+              event.eventType === "signal.received" &&
+              (event.payload as { waitId?: string }).waitId === waiting.waitId,
+          ),
       )
       .map((waiting) => waiting.eventName)
       .filter((eventName): eventName is string => eventName !== undefined);
@@ -58,9 +65,11 @@ function isWaiting(
   eventType: WorkflowHistoryEvent["eventType"] | undefined,
   pendingActivities: readonly string[],
 ): boolean {
-  return eventType === "event.waiting" ||
+  return (
+    eventType === "event.waiting" ||
     eventType === "timer.started" ||
-    (pendingActivities.length > 0 && eventType !== "activity.started");
+    (pendingActivities.length > 0 && eventType !== "activity.started")
+  );
 }
 
 function pendingActivityIds(events: readonly WorkflowHistoryEvent[]): string[] {

@@ -11,14 +11,14 @@ import {
 import type { WorkflowEngine } from "./engine/workflow-engine";
 import type {
   Workflow,
+  WorkflowControlAction,
   WorkflowEvent,
+  WorkflowEventStreamGateway,
   WorkflowEventType,
   WorkflowHookContext,
   WorkflowHookHandler,
   WorkflowHookName,
   WorkflowHookRegistrationOptions,
-  WorkflowControlAction,
-  WorkflowEventStreamGateway,
   WorkflowQueryView,
   WorkflowRemoteClient,
   WorkflowStreamOptions,
@@ -41,9 +41,11 @@ export function useWorkflow<TContext, TInput, TOutput>(
   engine: WorkflowEngine<TContext, TInput, TOutput>,
   workflowId: string,
 ): UseWorkflowResult<TContext, TInput, TOutput> {
-  const [workflow, setWorkflow] = useState<
-    Workflow<TContext, TInput, TOutput> | null
-  >(null);
+  const [workflow, setWorkflow] = useState<Workflow<
+    TContext,
+    TInput,
+    TOutput
+  > | null>(null);
   const [lastEvent, setLastEvent] = useState<WorkflowEvent<TOutput> | null>(
     null,
   );
@@ -131,7 +133,11 @@ export function useWorkflowEvents<TContext, TInput, TOutput>(
   engine: WorkflowEngine<TContext, TInput, TOutput>,
   workflowId: string,
   options: UseWorkflowEventsOptions = {},
-): { events: WorkflowEvent<TOutput>[]; isLoading: boolean; error: Error | null } {
+): {
+  events: WorkflowEvent<TOutput>[];
+  isLoading: boolean;
+  error: Error | null;
+} {
   const maxEvents = Math.max(1, options.maxEvents ?? 100);
   const eventTypes = options.eventTypes;
   const [events, setEvents] = useState<WorkflowEvent<TOutput>[]>([]);
@@ -208,13 +214,19 @@ export function WorkflowClientProvider({
   client,
   children,
 }: WorkflowClientProviderProps): ReactNode {
-  return createElement(WorkflowClientContext.Provider, { value: client }, children);
+  return createElement(
+    WorkflowClientContext.Provider,
+    { value: client },
+    children,
+  );
 }
 
 export function useWorkflowClient(): WorkflowRemoteClient {
   const client = useContext(WorkflowClientContext);
   if (!client) {
-    throw new Error("useWorkflowClient must be used inside WorkflowClientProvider");
+    throw new Error(
+      "useWorkflowClient must be used inside WorkflowClientProvider",
+    );
   }
   return client;
 }
@@ -246,7 +258,12 @@ export function useRemoteWorkflow(
   const refresh = useCallback(async () => {
     setIsLoading(true);
     try {
-      setWorkflow(await client.queryWorkflow(workflowId, tenantId ? { tenantId } : undefined));
+      setWorkflow(
+        await client.queryWorkflow(
+          workflowId,
+          tenantId ? { tenantId } : undefined,
+        ),
+      );
       setError(null);
     } catch (cause) {
       setError(toError(cause));
@@ -259,7 +276,10 @@ export function useRemoteWorkflow(
     let active = true;
     void (async () => {
       try {
-        const value = await client.queryWorkflow(workflowId, tenantId ? { tenantId } : undefined);
+        const value = await client.queryWorkflow(
+          workflowId,
+          tenantId ? { tenantId } : undefined,
+        );
         if (active) {
           setWorkflow(value);
           setError(null);
@@ -271,13 +291,18 @@ export function useRemoteWorkflow(
       }
     })();
 
-    if (!refreshOnEvent) return () => { active = false; };
+    if (!refreshOnEvent)
+      return () => {
+        active = false;
+      };
     const controller = new AbortController();
     void (async () => {
       try {
         for await (const _event of client.streamWorkflowEvents(
           workflowId,
-          tenantId ? { tenantId, signal: controller.signal } : { signal: controller.signal },
+          tenantId
+            ? { tenantId, signal: controller.signal }
+            : { signal: controller.signal },
         )) {
           if (active) void refresh();
         }
@@ -303,7 +328,11 @@ export interface UseRemoteWorkflowEventsOptions extends WorkflowStreamOptions {
 export function useRemoteWorkflowEvents(
   workflowId: string,
   options: UseRemoteWorkflowEventsOptions = {},
-): { events: WorkflowEvent<unknown>[]; isLoading: boolean; error: Error | null } {
+): {
+  events: WorkflowEvent<unknown>[];
+  isLoading: boolean;
+  error: Error | null;
+} {
   const client = useWorkflowClient();
   const [events, setEvents] = useState<WorkflowEvent<unknown>[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -323,7 +352,10 @@ export function useRemoteWorkflowEvents(
           tenantId,
           signal: controller.signal,
         };
-        for await (const event of client.streamWorkflowEvents(workflowId, streamOptions)) {
+        for await (const event of client.streamWorkflowEvents(
+          workflowId,
+          streamOptions,
+        )) {
           if (!active) break;
           if (eventTypes && !eventTypes.includes(event.eventType)) continue;
           setIsLoading(false);
@@ -339,7 +371,14 @@ export function useRemoteWorkflowEvents(
       active = false;
       controller.abort();
     };
-  }, [client, eventTypes, maxEvents, options.maxBufferedEvents, tenantId, workflowId]);
+  }, [
+    client,
+    eventTypes,
+    maxEvents,
+    options.maxBufferedEvents,
+    tenantId,
+    workflowId,
+  ]);
 
   return { events, isLoading, error };
 }
@@ -360,9 +399,12 @@ export function useWorkflowControls(
   const invoke = useCallback(
     (action: WorkflowControlAction, reason?: string) => {
       if (!client.controlWorkflow) {
-        return Promise.reject(new Error("The workflow client does not support control operations"));
+        return Promise.reject(
+          new Error("The workflow client does not support control operations"),
+        );
       }
-      const payload = tenantId === undefined ? { reason } : { reason, tenantId };
+      const payload =
+        tenantId === undefined ? { reason } : { reason, tenantId };
       return client.controlWorkflow(workflowId, action, payload);
     },
     [client, tenantId, workflowId],
@@ -380,7 +422,10 @@ export class WorkflowGatewayClient implements WorkflowRemoteClient {
   constructor(
     private readonly gateway: WorkflowEventStreamGateway,
     private readonly token: string,
-    private readonly query?: (workflowId: string, tenantId?: string) => Promise<WorkflowQueryView>,
+    private readonly query?: (
+      workflowId: string,
+      tenantId?: string,
+    ) => Promise<WorkflowQueryView>,
   ) {}
 
   async queryWorkflow(

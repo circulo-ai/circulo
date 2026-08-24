@@ -1,40 +1,40 @@
-"use client"
+"use client";
 
-import type { OAuthProviderAuthClient } from "@better-auth-ui/core/plugins/oauth-provider"
+import type { OAuthProviderAuthClient } from "@better-auth-ui/core/plugins/oauth-provider";
 import {
   hasOAuthPrompt,
   type OAuthAuthorizationRequest,
-  parseOAuthAuthorizationRequest
-} from "@better-auth-ui/core/plugins/oauth-provider"
-import { useAuth, useAuthPlugin } from "@better-auth-ui/react"
+  parseOAuthAuthorizationRequest,
+} from "@better-auth-ui/core/plugins/oauth-provider";
+import { useAuth, useAuthPlugin } from "@better-auth-ui/react";
 import {
   useOAuthContinue,
-  usePublicOAuthClient
-} from "@better-auth-ui/react/plugins/oauth-provider"
-import { useEffect, useState } from "react"
+  usePublicOAuthClient,
+} from "@better-auth-ui/react/plugins/oauth-provider";
+import { useEffect, useState } from "react";
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardDescription,
   CardFooter,
   CardHeader,
-  CardTitle
-} from "@/components/ui/card"
-import { Spinner } from "@/components/ui/spinner"
-import { oauthProviderPlugin } from "@/lib/auth/oauth-provider-plugin"
-import { cn } from "@/lib/utils"
-import type { SocialLayout } from "../provider-buttons"
-import { SignUp } from "../sign-up"
+  CardTitle,
+} from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
+import { oauthProviderPlugin } from "@/lib/auth/oauth-provider-plugin";
+import { cn } from "@/lib/utils";
+import type { SocialLayout } from "../provider-buttons";
+import { SignUp } from "../sign-up";
 
 export type OAuthSignUpProps = {
-  className?: string
-  socialLayout?: SocialLayout
-  socialPosition?: "top" | "bottom"
-}
+  className?: string;
+  socialLayout?: SocialLayout;
+  socialPosition?: "top" | "bottom";
+};
 
 const interpolateClient = (template: string, clientName: string) =>
-  template.replace("{{client}}", clientName)
+  template.replace("{{client}}", clientName);
 
 /**
  * Sign-up view that resumes a signed OAuth authorization request.
@@ -49,27 +49,27 @@ const interpolateClient = (template: string, clientName: string) =>
 export function OAuthSignUp({
   className,
   socialLayout,
-  socialPosition
+  socialPosition,
 }: OAuthSignUpProps) {
-  const { authClient } = useAuth()
-  const { localization } = useAuthPlugin(oauthProviderPlugin)
-  const oauthClient = authClient as OAuthProviderAuthClient
+  const { authClient } = useAuth();
+  const { localization } = useAuthPlugin(oauthProviderPlugin);
+  const oauthClient = authClient as OAuthProviderAuthClient;
 
-  const [request, setRequest] = useState<OAuthAuthorizationRequest>()
-  const [isCreated, setIsCreated] = useState(false)
+  const [request, setRequest] = useState<OAuthAuthorizationRequest>();
+  const [isCreated, setIsCreated] = useState(false);
 
   useEffect(() => {
-    setRequest(parseOAuthAuthorizationRequest(window.location.search))
-  }, [])
+    setRequest(parseOAuthAuthorizationRequest(window.location.search));
+  }, []);
 
-  const isOAuthSignUp = Boolean(request && hasOAuthPrompt(request, "create"))
+  const isOAuthSignUp = Boolean(request && hasOAuthPrompt(request, "create"));
 
   const publicClient = usePublicOAuthClient(oauthClient, request?.clientId, {
-    enabled: isOAuthSignUp
-  })
-  const clientName = publicClient.data?.client_name || localization.application
+    enabled: isOAuthSignUp,
+  });
+  const clientName = publicClient.data?.client_name || localization.application;
 
-  const oauthContinue = useOAuthContinue(oauthClient)
+  const oauthContinue = useOAuthContinue(oauthClient);
 
   // The account already exists at this point, so retrying continuation is the
   // only sensible recovery — never send the user back through the form.
@@ -86,7 +86,7 @@ export function OAuthSignUp({
               oauthContinue.isError
                 ? localization.continueFailed
                 : localization.continuing,
-              clientName
+              clientName,
             )}
           </CardDescription>
         </CardHeader>
@@ -105,7 +105,7 @@ export function OAuthSignUp({
           </CardFooter>
         )}
       </Card>
-    )
+    );
   }
 
   return (
@@ -116,11 +116,11 @@ export function OAuthSignUp({
       onSignUpSuccess={
         isOAuthSignUp
           ? () => {
-              setIsCreated(true)
-              oauthContinue.mutate({ created: true })
+              setIsCreated(true);
+              oauthContinue.mutate({ created: true });
             }
           : undefined
       }
     />
-  )
+  );
 }

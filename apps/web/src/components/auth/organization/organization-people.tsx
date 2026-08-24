@@ -1,15 +1,15 @@
-"use client"
+"use client";
 
-import type { ComponentProps } from "react"
+import type { ComponentProps } from "react";
 
-import { cn } from "@/lib/utils"
-import { OrganizationInvitations } from "./organization-invitations"
-import { OrganizationMembers } from "./organization-members"
+import { cn } from "@/lib/utils";
+import { OrganizationInvitations } from "./organization-invitations";
+import { OrganizationMembers } from "./organization-members";
 
 /** Props for the `OrganizationPeople` component. */
 export type OrganizationPeopleProps = {
-  className?: string
-}
+  className?: string;
+};
 
 /**
  * Organization people UI: members table (see `OrganizationMembers`), then org
@@ -24,5 +24,5 @@ export function OrganizationPeople({
       <OrganizationMembers />
       <OrganizationInvitations />
     </div>
-  )
+  );
 }

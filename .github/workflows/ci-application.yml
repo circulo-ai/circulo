@@ -25,6 +25,20 @@ jobs:
   verify:
     name: Build and smoke-test applications
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_DB: circulo
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U user -d circulo"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
     env:
       NODE_OPTIONS: --max-old-space-size=6144
       NODE_ENV: test
@@ -33,7 +47,7 @@ jobs:
       DATABASE_URL: postgres://user:password@localhost:5432/circulo
       BETTER_AUTH_URL: http://localhost:3002
       BETTER_AUTH_SECRET: test-secret-with-at-least-32-characters
-      ENCRYPTION_KEY: test-encryption-key-with-at-least-32-chars
+      ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       INTERNAL_API_SECRET: test-internal-api-secret-with-32-chars
 
     steps:
@@ -53,11 +67,26 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Scan dependency lockfile
+        uses: google/osv-scanner-action/osv-scanner-action@baa4139e56d6312335d899e6ba045fa16d1d3d0b # v2.5.1
+        with:
+          scan-args: |-
+            --lockfile=bun.lock
+
+      - name: Check database migration graph
+        run: bun run db:check
+
+      - name: Apply database migrations
+        run: bun run db:migrate
+
+      - name: Run repository lint
+        run: bun run lint:check
+
       - name: Build production application graph
         run: bun run build
 
-      - name: Type check web
-        run: bun --filter web typecheck
+      - name: Type check repository
+        run: bun run typecheck
 
       - name: Run repository tests
         run: bun run test

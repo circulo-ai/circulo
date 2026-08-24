@@ -10,18 +10,18 @@ import {
   RedoIcon,
   UndoIcon,
 } from "@/components/icons/icons";
-import type { Suggestion } from "@circulo-ai/db/schema";
+import type { SuggestionStreamData } from "@/lib/types";
 import { toast } from "sonner";
 
 type TextArtifactMetadata = {
-  suggestions: Suggestion[];
+  suggestions: SuggestionStreamData[];
 };
 
 export const textArtifact = new Artifact<"text", TextArtifactMetadata>({
   kind: "text",
   description: "Useful for text content, like drafting essays and emails.",
   initialize: async ({ documentId, setMetadata }) => {
-    let suggestions: Suggestion[] = [];
+    let suggestions: SuggestionStreamData[] = [];
 
     try {
       const res = await fetch(

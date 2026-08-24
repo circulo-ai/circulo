@@ -65,7 +65,8 @@ import {
   Wrench01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import useSWR from "swr";
 import { z } from "zod";
@@ -114,6 +115,47 @@ const emptyForm: IntegrationForm = {
   transport: "streamable_http",
   credentialRef: "",
 };
+const starterRecipeHints: Record<
+  string,
+  {
+    name: string;
+    description: string;
+    endpoint?: string;
+    credentialRef: string;
+  }
+> = {
+  "starter:context7": {
+    name: "Context7 documentation",
+    description: "Retrieve current library documentation and code examples.",
+    endpoint: "https://mcp.context7.com/mcp",
+    credentialRef: "",
+  },
+  "starter:web-research": {
+    name: "Web research",
+    description: "Fetch pages and support source-backed research workflows.",
+    credentialRef: "MCP_CREDENTIAL_WEB_RESEARCH",
+  },
+  "starter:documents": {
+    name: "Documents and files",
+    description: "Search, read, and update files from a controlled workspace.",
+    credentialRef: "MCP_CREDENTIAL_DOCUMENTS",
+  },
+  "starter:project-management": {
+    name: "Project management",
+    description: "Keep project tasks and follow-ups synchronized.",
+    credentialRef: "MCP_CREDENTIAL_PROJECTS",
+  },
+  "starter:calendar-and-email": {
+    name: "Calendar and email",
+    description: "Coordinate schedules and draft communications.",
+    credentialRef: "MCP_CREDENTIAL_COMMUNICATIONS",
+  },
+  "starter:analytics": {
+    name: "Analytics and data",
+    description: "Inspect approved datasets and produce repeatable analysis.",
+    credentialRef: "MCP_CREDENTIAL_ANALYTICS",
+  },
+};
 const integrationSchema = z.object({
   name: z.string().trim().min(1, "Give this connection a name.").max(200),
   description: z.string().trim().max(2000),
@@ -151,6 +193,7 @@ export function WorkspaceTools({
 }: {
   organization?: { id?: string | null } | null;
 }) {
+  const searchParams = useSearchParams();
   const {
     data: integrations,
     error,
@@ -179,6 +222,23 @@ export function WorkspaceTools({
     targetId: string;
     allowedTools: string;
   }>({ type: "organization", targetId: "", allowedTools: "" });
+
+  useEffect(() => {
+    const recipeId = searchParams.get("recipe");
+    const recipe = recipeId ? starterRecipeHints[recipeId] : undefined;
+    if (!recipe) return;
+    setEditing(null);
+    setForm({
+      ...emptyForm,
+      name: recipe.name,
+      description: recipe.description,
+      endpoint: recipe.endpoint ?? "",
+      credentialRef: recipe.credentialRef,
+    });
+    setErrors({});
+    setEditorOpen(true);
+    window.history.replaceState({}, "", "/workspace?section=tools");
+  }, [searchParams]);
 
   const openCreate = () => {
     setEditing(null);
@@ -217,7 +277,11 @@ export function WorkspaceTools({
       const body = {
         ...parsed.data,
         description: parsed.data.description || null,
-        credentialRef: parsed.data.credentialRef || null,
+        ...(parsed.data.credentialRef
+          ? { credentialRef: parsed.data.credentialRef }
+          : editing
+            ? {}
+            : { credentialRef: null }),
       };
       await request(
         editing ? `/api/automation/mcp/${editing.id}` : "/api/automation/mcp",
@@ -351,13 +415,10 @@ export function WorkspaceTools({
     update: { enabled?: boolean; approvalMode?: string },
   ) => {
     try {
-      await request(
-        `/api/automation/mcp/${integrationId}/tools/${toolId}`,
-        {
-          method: "PATCH",
-          body: JSON.stringify(update),
-        },
-      );
+      await request(`/api/automation/mcp/${integrationId}/tools/${toolId}`, {
+        method: "PATCH",
+        body: JSON.stringify(update),
+      });
       await mutate();
     } catch (error) {
       toast.error(
@@ -607,7 +668,9 @@ export function WorkspaceTools({
                               <SelectContent>
                                 <SelectGroup>
                                   <SelectItem value="auto">Auto</SelectItem>
-                                  <SelectItem value="prompt">Ask first</SelectItem>
+                                  <SelectItem value="prompt">
+                                    Ask first
+                                  </SelectItem>
                                   <SelectItem value="writes">
                                     Ask for writes
                                   </SelectItem>

@@ -6,6 +6,7 @@ import {
   chatRepo,
 } from "@/db/repositories";
 import { knowledgeBase } from "@/db/schema";
+import { getConnectedAppsForUser } from "@/lib/apps/connections";
 import { getSession } from "@/lib/auth";
 import { createRouter } from "@/lib/create-app";
 import { hasPermission, isMemberOf } from "@/lib/permissions";
@@ -29,6 +30,7 @@ const settingsSchema = z
     description: z.string().trim().max(2000).nullable().optional(),
     instructions: z.string().trim().max(12000).nullable().optional(),
     knowledgeBaseIds: z.array(z.uuid()).max(50).optional(),
+    connectedAppIds: z.array(z.string().trim().min(1)).max(50).optional(),
     visibility: z.enum(["private", "public"]).optional(),
     orchestrationEnabled: z.boolean().optional(),
     orchestrationAgentId: z.uuid().nullable().optional(),
@@ -109,6 +111,7 @@ router.get(
     const agents = await chatAgentRepo.findForChat(id, {
       includeDisabled: true,
     });
+    const connectedApps = await getConnectedAppsForUser(user!.id);
 
     return c.json({
       access: {
@@ -124,6 +127,7 @@ router.get(
         description: chat.description,
         instructions: chat.instructions,
         knowledgeBaseIds: chat.knowledgeBaseIds ?? [],
+        connectedAppIds: chat.connectedAppIds ?? [],
         visibility: chat.visibility,
         type: chat.type,
         orchestrationEnabled: chat.orchestrationEnabled,
@@ -156,6 +160,7 @@ router.get(
         customTemperature: link.customTemperature,
         agent: link.agent,
       })),
+      connectedApps,
     });
   },
 );
@@ -195,6 +200,22 @@ router.patch(
       if (bases.length !== new Set(body.knowledgeBaseIds).size) {
         throw new BadRequestError(
           "Every knowledge base must belong to this workspace",
+        );
+      }
+    }
+
+    if (body.connectedAppIds) {
+      const connectedApps = await getConnectedAppsForUser(user!.id);
+      const availableConnectionIds = new Set(
+        connectedApps.map((app) => app.connectionId),
+      );
+      if (
+        body.connectedAppIds.some(
+          (connectionId) => !availableConnectionIds.has(connectionId),
+        )
+      ) {
+        throw new BadRequestError(
+          "Every connected app must belong to your active account",
         );
       }
     }

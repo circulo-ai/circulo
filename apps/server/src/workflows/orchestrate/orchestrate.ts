@@ -23,6 +23,10 @@ import {
 import type { WorkflowDefinition } from "@circulo-ai/wf";
 import { complete, defineWorkflow, waitForAndRetry } from "@circulo-ai/wf";
 import { and, asc, eq } from "drizzle-orm";
+import {
+  hasExplicitAgentDirective,
+  shouldEngageAgents,
+} from "./agent-engagement";
 import type { RequestClassification } from "./steps/classify-request-step";
 import { classifyRequestStep } from "./steps/classify-request-step";
 import { type OrchestrationInput } from "./types";
@@ -45,6 +49,8 @@ export interface OrchestrationWorkflowState {
   selfHandoffCounts?: Record<string, number>;
   finalResult?: Awaited<ReturnType<typeof aggregateResultsStep>>;
   failureReason?: string;
+  /** A human-only conversation turn completed without an agent response. */
+  silent?: boolean;
 }
 
 type OrchestrationWorkflowContext = Record<string, never>;
@@ -96,7 +102,10 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
         ) {
           return complete({
             ...state,
-            classification: createDirectClassification(state.input),
+            classification: createDirectClassification(
+              state.input,
+              state.context.agents,
+            ),
           });
         }
 
@@ -112,11 +121,31 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
               state.context.chat.orchestrationFallbackModel,
           });
 
-          return complete({ ...state, classification });
+          const explicitEngagement = shouldEngageAgents(
+            classification.shouldEngageAgents,
+            state.input.messages,
+            state.context.agents,
+          );
+          return complete({
+            ...state,
+            classification: explicitEngagement
+              ? {
+                  ...classification,
+                  shouldEngageAgents: true,
+                  reasoning: classification.shouldEngageAgents
+                    ? classification.reasoning
+                    : `${classification.reasoning} Explicit user directive requires agent participation.`,
+                }
+              : classification,
+          });
         } catch (error) {
           return complete({
             ...state,
-            failureReason: `Request classification failed: ${toErrorMessage(error)}`,
+            classification: createDirectClassification(
+              state.input,
+              state.context.agents,
+            ),
+            failureReason: undefined,
           });
         }
       },
@@ -131,9 +160,33 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
           return complete(state);
         }
 
+        const effectiveClassification = {
+          ...state.classification,
+          shouldEngageAgents: shouldEngageAgents(
+            state.classification.shouldEngageAgents,
+            state.input.messages,
+            state.context.agents,
+          ),
+        };
+
+        if (
+          !state.context.chat.orchestrationEnabled ||
+          state.context.agents.length === 0 ||
+          !effectiveClassification.shouldEngageAgents
+        ) {
+          return complete({
+            ...state,
+            plan: createDirectPlan(
+              effectiveClassification.shouldEngageAgents
+                ? "Direct assistant response mode"
+                : "No agent participation requested for this human conversation",
+            ),
+          });
+        }
+
         try {
           const plan = await planAgentExecutionStep({
-            classification: state.classification,
+            classification: effectiveClassification,
             agents: state.context.agents,
             triggerMessages: state.input.messages,
             webhookPayload: state.input.webhookPayload,
@@ -165,6 +218,20 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
           !state.classification
         ) {
           return complete({ ...state, agentResults: [] });
+        }
+
+        if (
+          state.input.triggerType === "user_message" &&
+          state.context.members.length > 1 &&
+          !state.classification.shouldEngageAgents &&
+          !hasExplicitAgentDirective(state.input.messages, state.context.agents)
+        ) {
+          return complete({
+            ...state,
+            agentResults: [],
+            silent: true,
+            workflowRunId: workflowContext.workflow.id,
+          });
         }
 
         if (
@@ -577,6 +644,13 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
           });
         }
 
+        if (state.silent) {
+          return complete({
+            ...state,
+            finalResult: createSilentResult(),
+          });
+        }
+
         const finalResult = await aggregateResultsStep({
           agentResults: state.agentResults,
           plan: state.plan,
@@ -698,17 +772,45 @@ async function executeApprovedMcpAction(params: {
 
 function createDirectClassification(
   input: OrchestrationInput,
+  agents: Parameters<typeof hasExplicitAgentDirective>[1] = [],
 ): RequestClassification {
   return {
     intent: "question",
     complexity: "simple",
     domains: [],
     requiresMultipleAgents: false,
+    shouldEngageAgents:
+      input.triggerType === "webhook_event" ||
+      hasExplicitAgentDirective(input.messages, agents),
     estimatedSteps: 1,
     urgency: "medium",
     notifyMembers: false,
     keyEntities: [],
-    reasoning: "Direct assistant response mode",
+    reasoning:
+      "Direct assistant response mode; agent participation requires an explicit directive or webhook trigger when classification is unavailable.",
+  };
+}
+
+function createDirectPlan(reason: string): ExecutionPlan {
+  return {
+    strategy: "single",
+    reasoning: reason,
+    stopOnError: true,
+    selectedAgents: [],
+    fallbackAgentId: null,
+    timeoutMinutes: 10,
+  };
+}
+
+function createSilentResult() {
+  return {
+    summary: "No agent response was requested.",
+    detailedResponse: "",
+    actionItems: [],
+    successfulAgents: [],
+    failedAgents: [],
+    overallSuccess: true,
+    recommendations: [],
   };
 }
 

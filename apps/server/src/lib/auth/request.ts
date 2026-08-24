@@ -48,10 +48,9 @@ export async function authenticateRequest(
       authMethod: "api_key",
       apiKeyId: result.key.id,
       apiKeyPermissions: permissions,
-      organizationId:
-        isOrganizationKey
-          ? result.key.referenceId
-          : typeof metadata.organizationId === "string"
+      organizationId: isOrganizationKey
+        ? result.key.referenceId
+        : typeof metadata.organizationId === "string"
           ? metadata.organizationId
           : undefined,
       session: {

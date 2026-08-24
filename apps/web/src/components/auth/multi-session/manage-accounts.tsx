@@ -1,19 +1,19 @@
-"use client"
+"use client";
 
-import type { MultiSessionAuthClient } from "@better-auth-ui/core/plugins/multi-session"
-import { useAuth, useAuthPlugin, useSession } from "@better-auth-ui/react"
-import { useListDeviceSessions } from "@better-auth-ui/react/plugins/multi-session"
-import { Fragment } from "react"
+import type { MultiSessionAuthClient } from "@better-auth-ui/core/plugins/multi-session";
+import { useAuth, useAuthPlugin, useSession } from "@better-auth-ui/react";
+import { useListDeviceSessions } from "@better-auth-ui/react/plugins/multi-session";
+import { Fragment } from "react";
 
-import { Card, CardContent } from "@/components/ui/card"
-import { ItemGroup, ItemSeparator } from "@/components/ui/item"
-import { multiSessionPlugin } from "@/lib/auth/multi-session-plugin"
-import { cn } from "@/lib/utils"
-import { ManageAccount } from "./manage-account"
+import { Card, CardContent } from "@/components/ui/card";
+import { ItemGroup, ItemSeparator } from "@/components/ui/item";
+import { multiSessionPlugin } from "@/lib/auth/multi-session-plugin";
+import { cn } from "@/lib/utils";
+import { ManageAccount } from "./manage-account";
 
 export type ManageAccountsProps = {
-  className?: string
-}
+  className?: string;
+};
 
 /**
  * Render a card that lists and manages all device sessions for the current user.
@@ -24,33 +24,33 @@ export type ManageAccountsProps = {
  * @returns A JSX element containing the accounts management card
  */
 export function ManageAccounts({ className }: ManageAccountsProps) {
-  const { authClient } = useAuth<MultiSessionAuthClient>()
+  const { authClient } = useAuth<MultiSessionAuthClient>();
   const { localization: multiSessionLocalization } =
-    useAuthPlugin(multiSessionPlugin)
-  const { data: session } = useSession(authClient)
+    useAuthPlugin(multiSessionPlugin);
+  const { data: session } = useSession(authClient);
 
-  const { data: deviceSessions, isPending } = useListDeviceSessions(authClient)
+  const { data: deviceSessions, isPending } = useListDeviceSessions(authClient);
 
   const otherSessions = deviceSessions?.filter(
-    (deviceSession) => deviceSession.session.id !== session?.session.id
-  )
+    (deviceSession) => deviceSession.session.id !== session?.session.id,
+  );
 
   const allRows = [
     {
       key: session?.session.id ?? "current",
       deviceSession: !isPending ? session : null,
-      isPending
+      isPending,
     },
     ...(otherSessions?.map((deviceSession) => ({
       key: deviceSession.session.id,
       deviceSession,
-      isPending: false
-    })) ?? [])
-  ]
+      isPending: false,
+    })) ?? []),
+  ];
 
   return (
     <div>
-      <h2 className="text-sm font-semibold mb-3">
+      <h2 className="mb-3 text-sm font-semibold">
         {multiSessionLocalization.manageAccounts}
       </h2>
 
@@ -70,5 +70,5 @@ export function ManageAccounts({ className }: ManageAccountsProps) {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

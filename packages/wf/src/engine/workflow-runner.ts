@@ -109,7 +109,11 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
   async pause(workflowId: string): Promise<void> {
     this.pauseFlags.set(workflowId, true);
     const workflow = await this.workflowStore.loadWorkflow(workflowId);
-    if (!workflow || workflow.state === "completed" || workflow.state === "failed") {
+    if (
+      !workflow ||
+      workflow.state === "completed" ||
+      workflow.state === "failed"
+    ) {
       this.pauseFlags.delete(workflowId);
       return;
     }
@@ -186,7 +190,11 @@ export class WorkflowRunner<TContext, TInput, TOutput> {
     }
 
     const workflow = await this.workflowStore.loadWorkflow(workflowId);
-    if (workflow && workflow.state !== "completed" && workflow.state !== "failed") {
+    if (
+      workflow &&
+      workflow.state !== "completed" &&
+      workflow.state !== "failed"
+    ) {
       workflow.state = "failed";
       workflow.error = {
         type: errorType,

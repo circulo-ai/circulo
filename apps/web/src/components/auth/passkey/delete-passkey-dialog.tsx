@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import type { PasskeyAuthClient } from "@better-auth-ui/core/plugins/passkey"
-import { useAuth, useAuthPlugin } from "@better-auth-ui/react"
-import { useDeletePasskey } from "@better-auth-ui/react/plugins/passkey"
-import { Fingerprint } from "lucide-react"
+import type { PasskeyAuthClient } from "@better-auth-ui/core/plugins/passkey";
+import { useAuth, useAuthPlugin } from "@better-auth-ui/react";
+import { useDeletePasskey } from "@better-auth-ui/react/plugins/passkey";
+import { Fingerprint } from "lucide-react";
 
 import {
   AlertDialog,
@@ -13,43 +13,43 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogMedia,
-  AlertDialogTitle
-} from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
-import { Field, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Spinner } from "@/components/ui/spinner"
-import { passkeyPlugin } from "@/lib/auth/passkey-plugin"
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { passkeyPlugin } from "@/lib/auth/passkey-plugin";
 
 export type ListedPasskey = {
-  id: string
-  name?: string | null
-  createdAt: Date
-}
+  id: string;
+  name?: string | null;
+  createdAt: Date;
+};
 
 export type DeletePasskeyDialogProps = {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  passkey: ListedPasskey
-}
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  passkey: ListedPasskey;
+};
 
 export function DeletePasskeyDialog({
   open,
   onOpenChange,
-  passkey
+  passkey,
 }: DeletePasskeyDialogProps) {
-  const { authClient, localization } = useAuth<PasskeyAuthClient>()
-  const { localization: passkeyLocalization } = useAuthPlugin(passkeyPlugin)
+  const { authClient, localization } = useAuth<PasskeyAuthClient>();
+  const { localization: passkeyLocalization } = useAuthPlugin(passkeyPlugin);
 
-  const passkeyName = passkey.name || passkeyLocalization.passkey
-  const previewId = `delete-passkey-preview-${passkey.id}`
+  const passkeyName = passkey.name || passkeyLocalization.passkey;
+  const previewId = `delete-passkey-preview-${passkey.id}`;
 
   const { mutate: deletePasskey, isPending: isDeleting } = useDeletePasskey(
     authClient,
     {
-      onSuccess: () => onOpenChange(false)
-    }
-  )
+      onSuccess: () => onOpenChange(false),
+    },
+  );
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -94,5 +94,5 @@ export function DeletePasskeyDialog({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-  )
+  );
 }

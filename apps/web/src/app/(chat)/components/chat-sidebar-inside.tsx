@@ -48,13 +48,15 @@ export function ChatSidebarInside() {
             className="sticky top-0 z-10 flex shrink-0 border-b border-sidebar-border/70 bg-sidebar/95 px-3 pt-1 backdrop-blur-sm"
             role="tablist"
           >
-            {([
-              ["all", "All chats"],
-              ["archived", "Archived"],
-            ] as const).map(([value, label]) => (
+            {(
+              [
+                ["all", "All chats"],
+                ["archived", "Archived"],
+              ] as const
+            ).map(([value, label]) => (
               <button
                 aria-selected={view === value}
-                className="relative min-h-9 flex-1 px-2 text-xs font-medium text-sidebar-foreground/60 transition-colors hover:text-sidebar-foreground focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/70 focus-visible:ring-inset data-[active=true]:text-sidebar-foreground after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-teal-400 after:opacity-0 after:transition-opacity data-[active=true]:after:opacity-100"
+                className="relative min-h-9 flex-1 px-2 text-xs font-medium text-sidebar-foreground/60 transition-colors after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-teal-400 after:opacity-0 after:transition-opacity hover:text-sidebar-foreground focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-teal-400/70 focus-visible:outline-none focus-visible:ring-inset data-[active=true]:text-sidebar-foreground data-[active=true]:after:opacity-100"
                 data-active={view === value}
                 key={value}
                 onClick={() => setView(value)}

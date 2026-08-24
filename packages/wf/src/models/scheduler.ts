@@ -8,7 +8,9 @@ export interface ScheduleDefinition<TInput = unknown> {
   timeZone?: "UTC" | undefined;
 }
 
-export interface ScheduleRecord<TInput = unknown> extends ScheduleDefinition<TInput> {
+export interface ScheduleRecord<
+  TInput = unknown,
+> extends ScheduleDefinition<TInput> {
   nextRunAt: number;
   lastRunAt?: number | undefined;
   version: number;
@@ -21,11 +23,23 @@ export interface ScheduleLease<TInput = unknown> {
 }
 
 export interface ScheduleStore<TInput = unknown> {
-  upsert(schedule: ScheduleDefinition<TInput>, now?: number): Promise<ScheduleRecord<TInput>>;
+  upsert(
+    schedule: ScheduleDefinition<TInput>,
+    now?: number,
+  ): Promise<ScheduleRecord<TInput>>;
   get(scheduleId: string): Promise<ScheduleRecord<TInput> | null>;
   remove(scheduleId: string): Promise<boolean>;
-  listDue(now: number, owner: string, limit: number, leaseMs: number): Promise<ScheduleLease<TInput>[]>;
-  acknowledge(lease: ScheduleLease<TInput>, nextRunAt: number, now?: number): Promise<boolean>;
+  listDue(
+    now: number,
+    owner: string,
+    limit: number,
+    leaseMs: number,
+  ): Promise<ScheduleLease<TInput>[]>;
+  acknowledge(
+    lease: ScheduleLease<TInput>,
+    nextRunAt: number,
+    now?: number,
+  ): Promise<boolean>;
   release(lease: ScheduleLease<TInput>): Promise<boolean>;
 }
 

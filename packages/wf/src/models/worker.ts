@@ -84,22 +84,36 @@ export interface TaskQueueStats {
 export interface TaskQueueAdapter {
   /** Enqueue must be idempotent by task id and reject a conflicting payload. */
   enqueue<TPayload>(task: TaskEnvelope<TPayload>): Promise<void>;
-  claim<TPayload>(options: TaskClaimOptions): Promise<ClaimedTask<TPayload> | null>;
-  heartbeat(taskId: string, leaseToken: string, leaseDurationMs: number): Promise<boolean>;
+  claim<TPayload>(
+    options: TaskClaimOptions,
+  ): Promise<ClaimedTask<TPayload> | null>;
+  heartbeat(
+    taskId: string,
+    leaseToken: string,
+    leaseDurationMs: number,
+  ): Promise<boolean>;
   acknowledge(taskId: string, leaseToken: string): Promise<boolean>;
   reschedule(
     taskId: string,
     leaseToken: string,
     options: TaskRescheduleOptions,
   ): Promise<boolean>;
-  reject(taskId: string, leaseToken: string, failure: TaskFailure): Promise<boolean>;
+  reject(
+    taskId: string,
+    leaseToken: string,
+    failure: TaskFailure,
+  ): Promise<boolean>;
   reclaimExpiredLeases(now?: number): Promise<number>;
   stats(queue?: string): Promise<TaskQueueStats>;
 }
 
 export type TaskDisposition =
   | { type: "acknowledge" }
-  | { type: "retry"; availableAt?: number | undefined; failure?: TaskFailure | undefined }
+  | {
+      type: "retry";
+      availableAt?: number | undefined;
+      failure?: TaskFailure | undefined;
+    }
   | { type: "reject"; failure: TaskFailure };
 
 export interface WorkerTaskContext {

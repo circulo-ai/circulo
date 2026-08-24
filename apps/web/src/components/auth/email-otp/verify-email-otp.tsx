@@ -1,48 +1,48 @@
-"use client"
+"use client";
 
-import { getAuthLinkURL } from "@better-auth-ui/core"
-import type { EmailOtpAuthClient } from "@better-auth-ui/core/plugins/email-otp"
-import { useAuth, useAuthPlugin } from "@better-auth-ui/react"
+import { getAuthLinkURL } from "@better-auth-ui/core";
+import type { EmailOtpAuthClient } from "@better-auth-ui/core/plugins/email-otp";
+import { useAuth, useAuthPlugin } from "@better-auth-ui/react";
 import {
   useSendVerificationOtp,
-  useVerifyEmailOtp
-} from "@better-auth-ui/react/plugins/email-otp"
-import { type SyntheticEvent, useEffect, useState } from "react"
-import { toast } from "sonner"
+  useVerifyEmailOtp,
+} from "@better-auth-ui/react/plugins/email-otp";
+import { type SyntheticEvent, useEffect, useState } from "react";
+import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle
-} from "@/components/ui/card"
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Field,
   FieldDescription,
   FieldError,
   FieldGroup,
-  FieldLabel
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Spinner } from "@/components/ui/spinner"
-import { emailOtpPlugin } from "@/lib/auth/email-otp-plugin"
+  FieldLabel,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { emailOtpPlugin } from "@/lib/auth/email-otp-plugin";
 import {
   RESEND_COOLDOWN_SECONDS,
-  useResendCooldown
-} from "@/lib/auth/use-resend-cooldown"
-import { cn } from "@/lib/utils"
-import { OpenEmailButton } from "../open-email-button"
-import { OtpField } from "../otp-field"
-import { useIsHydrated } from "../use-is-hydrated"
+  useResendCooldown,
+} from "@/lib/auth/use-resend-cooldown";
+import { cn } from "@/lib/utils";
+import { OpenEmailButton } from "../open-email-button";
+import { OtpField } from "../otp-field";
+import { useIsHydrated } from "../use-is-hydrated";
 
 /** `sessionStorage` key the sign-up and sign-in flows store the pending address under. */
-export const VERIFY_EMAIL_STORAGE_KEY = "better-auth-ui.verify-email"
+export const VERIFY_EMAIL_STORAGE_KEY = "better-auth-ui.verify-email";
 
 export type VerifyEmailOtpProps = {
-  className?: string
-}
+  className?: string;
+};
 
 /**
  * Verify an email address with a code instead of a link.
@@ -63,76 +63,76 @@ export function VerifyEmailOtp({ className }: VerifyEmailOtpProps) {
     navigate,
     redirectTo,
     viewPaths,
-    Link
-  } = useAuth()
+    Link,
+  } = useAuth();
   const { localization: emailOtpLocalization, otpLength } =
-    useAuthPlugin(emailOtpPlugin)
+    useAuthPlugin(emailOtpPlugin);
 
-  const otpClient = authClient as EmailOtpAuthClient
-  const isHydrated = useIsHydrated()
+  const otpClient = authClient as EmailOtpAuthClient;
+  const isHydrated = useIsHydrated();
 
   const [email, setEmail] = useState(
-    (isHydrated && sessionStorage.getItem(VERIFY_EMAIL_STORAGE_KEY)) || ""
-  )
-  const [code, setCode] = useState("")
-  const [fieldErrors, setFieldErrors] = useState<{ email?: string }>({})
+    (isHydrated && sessionStorage.getItem(VERIFY_EMAIL_STORAGE_KEY)) || "",
+  );
+  const [code, setCode] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string }>({});
 
-  const { cooldown, isCoolingDown, startCooldown } = useResendCooldown()
+  const { cooldown, isCoolingDown, startCooldown } = useResendCooldown();
 
   // Sign-up already sent a code to this address, so restoring it also starts
   // the cooldown — otherwise the hydrated render would offer an immediate
   // resend and walk straight into the server's rate limit.
   useEffect(() => {
-    const pendingEmail = sessionStorage.getItem(VERIFY_EMAIL_STORAGE_KEY) ?? ""
-    setEmail(pendingEmail)
+    const pendingEmail = sessionStorage.getItem(VERIFY_EMAIL_STORAGE_KEY) ?? "";
+    setEmail(pendingEmail);
 
-    if (pendingEmail) startCooldown(RESEND_COOLDOWN_SECONDS)
-  }, [startCooldown])
+    if (pendingEmail) startCooldown(RESEND_COOLDOWN_SECONDS);
+  }, [startCooldown]);
 
   const { mutate: sendVerificationOtp, isPending: isSending } =
     useSendVerificationOtp(otpClient, {
       onSuccess: (_data, { email: sentTo }) => {
-        sessionStorage.setItem(VERIFY_EMAIL_STORAGE_KEY, sentTo)
-        setEmail(sentTo)
-        startCooldown()
-        toast.success(emailOtpLocalization.codeSent)
-      }
-    })
+        sessionStorage.setItem(VERIFY_EMAIL_STORAGE_KEY, sentTo);
+        setEmail(sentTo);
+        startCooldown();
+        toast.success(emailOtpLocalization.codeSent);
+      },
+    });
 
   const { mutate: verifyEmailOtp, isPending: isVerifying } = useVerifyEmailOtp(
     otpClient,
     {
       onError: () => setCode(""),
       onSuccess: () => {
-        sessionStorage.removeItem(VERIFY_EMAIL_STORAGE_KEY)
-        toast.success(emailOtpLocalization.emailVerified)
-        navigate({ to: redirectTo })
-      }
-    }
-  )
+        sessionStorage.removeItem(VERIFY_EMAIL_STORAGE_KEY);
+        toast.success(emailOtpLocalization.emailVerified);
+        navigate({ to: redirectTo });
+      },
+    },
+  );
 
-  const isPending = isSending || isVerifying
+  const isPending = isSending || isVerifying;
 
   const verifyCode = (completedCode: string) => {
-    if (isPending || !email) return
+    if (isPending || !email) return;
 
-    verifyEmailOtp({ email, otp: completedCode })
-  }
+    verifyEmailOtp({ email, otp: completedCode });
+  };
 
   const handleSubmit = (e: SyntheticEvent<HTMLFormElement>) => {
-    e.preventDefault()
+    e.preventDefault();
 
     if (!email) {
-      const formData = new FormData(e.currentTarget)
+      const formData = new FormData(e.currentTarget);
       sendVerificationOtp({
         email: formData.get("email") as string,
-        type: "email-verification"
-      })
-      return
+        type: "email-verification",
+      });
+      return;
     }
 
-    verifyCode(code)
-  }
+    verifyCode(code);
+  };
 
   return (
     <Card className={cn("w-full max-w-sm", className)}>
@@ -180,12 +180,12 @@ export function VerifyEmailOtp({ className }: VerifyEmailOtpProps) {
                     setFieldErrors((prev) => ({ ...prev, email: undefined }))
                   }
                   onInvalid={(e) => {
-                    e.preventDefault()
+                    e.preventDefault();
 
                     setFieldErrors((prev) => ({
                       ...prev,
-                      email: (e.target as HTMLInputElement).validationMessage
-                    }))
+                      email: (e.target as HTMLInputElement).validationMessage,
+                    }));
                   }}
                   aria-invalid={!!fieldErrors.email}
                 />
@@ -222,7 +222,7 @@ export function VerifyEmailOtp({ className }: VerifyEmailOtpProps) {
                   {isCoolingDown
                     ? localization.auth.resendIn.replace(
                         "{{seconds}}",
-                        String(cooldown)
+                        String(cooldown),
                       )
                     : localization.auth.resend}
                 </Button>
@@ -231,13 +231,13 @@ export function VerifyEmailOtp({ className }: VerifyEmailOtpProps) {
           </FieldGroup>
         </form>
 
-        <div className="flex flex-col gap-3 items-center w-full mt-4">
+        <div className="mt-4 flex w-full flex-col items-center gap-3">
           <FieldDescription className="text-center">
             {localization.auth.alreadyVerifiedYourEmail}{" "}
             <Link
               href={getAuthLinkURL(
                 `${basePaths.auth}/${viewPaths.auth.signIn}`,
-                redirectTo
+                redirectTo,
               )}
               className="underline underline-offset-4"
             >
@@ -247,5 +247,5 @@ export function VerifyEmailOtp({ className }: VerifyEmailOtpProps) {
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

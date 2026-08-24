@@ -1,10 +1,10 @@
-import type {
-  HistoryEventType,
-  WorkflowHistoryEvent,
-} from "../models";
+import type { HistoryEventType, WorkflowHistoryEvent } from "../models";
 
 export class WorkflowReplayError extends Error {
-  constructor(message: string, readonly sequence?: number) {
+  constructor(
+    message: string,
+    readonly sequence?: number,
+  ) {
     super(message);
     this.name = "WorkflowReplayError";
   }

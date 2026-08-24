@@ -65,7 +65,7 @@
     "@window-splitter/react": "^1.1.4",
     "@xyflow/react": "^12.9.3",
     "ai": "7.0.66",
-    "autumn-js": "^0.1.48",
+    "autumn-js": "^1.2.53",
     "babel-plugin-react-compiler": "^1.0.0",
     "bcrypt-ts": "^7.1.0",
     "better-auth": "1.7.1",

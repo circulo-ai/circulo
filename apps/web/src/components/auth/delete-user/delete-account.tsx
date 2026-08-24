@@ -1,16 +1,5 @@
-"use client"
+"use client";
 
-import { authQueryKeys } from "@better-auth-ui/core"
-import {
-  useAuth,
-  useAuthPlugin,
-  useDeleteUser,
-  useListAccounts
-} from "@better-auth-ui/react"
-import { useQueryClient } from "@tanstack/react-query"
-import { Eye, EyeOff, TriangleAlert } from "lucide-react"
-import { type SyntheticEvent, useState } from "react"
-import { toast } from "sonner"
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -20,92 +9,104 @@ import {
   AlertDialogHeader,
   AlertDialogMedia,
   AlertDialogTitle,
-  AlertDialogTrigger
-} from "@/components/ui/alert-dialog"
-import { Button, buttonVariants } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Field, FieldError, FieldLabel } from "@/components/ui/field"
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
-  InputGroupInput
-} from "@/components/ui/input-group"
-import { Spinner } from "@/components/ui/spinner"
-import { deleteUserPlugin } from "@/lib/auth/delete-user-plugin"
-import { cn } from "@/lib/utils"
+  InputGroupInput,
+} from "@/components/ui/input-group";
+import { Spinner } from "@/components/ui/spinner";
+import { deleteUserPlugin } from "@/lib/auth/delete-user-plugin";
+import { cn } from "@/lib/utils";
+import { authQueryKeys } from "@better-auth-ui/core";
+import {
+  useAuth,
+  useAuthPlugin,
+  useDeleteUser,
+  useListAccounts,
+} from "@better-auth-ui/react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Eye, EyeOff, TriangleAlert } from "lucide-react";
+import { type SyntheticEvent, useState } from "react";
+import { toast } from "sonner";
 
 export type DeleteAccountProps = {
-  className?: string
-}
+  className?: string;
+};
 
 /**
  * Danger-zone card to delete the authenticated account, with a confirmation dialog and toasts.
  */
 export function DeleteAccount({ className }: DeleteAccountProps) {
-  const { authClient, basePaths, localization, viewPaths, navigate } = useAuth()
+  const { authClient, basePaths, localization, viewPaths, navigate } =
+    useAuth();
 
   const {
     localization: deleteUserLocalization,
-    sendDeleteAccountVerification
-  } = useAuthPlugin(deleteUserPlugin)
+    sendDeleteAccountVerification,
+  } = useAuthPlugin(deleteUserPlugin);
 
-  const { data: accounts } = useListAccounts(authClient)
+  const { data: accounts } = useListAccounts(authClient);
 
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
-  const [confirmOpen, setConfirmOpen] = useState(false)
-  const [password, setPassword] = useState("")
-  const [isPasswordVisible, setIsPasswordVisible] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [password, setPassword] = useState("");
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
   const hasCredentialAccount = accounts?.some(
-    (account) => account.providerId === "credential"
-  )
-  const needsPassword = !sendDeleteAccountVerification && hasCredentialAccount
+    (account) => account.providerId === "credential",
+  );
+  const needsPassword = !sendDeleteAccountVerification && hasCredentialAccount;
 
-  const { mutate: deleteUser, isPending } = useDeleteUser(authClient)
+  const { mutate: deleteUser, isPending } = useDeleteUser(authClient);
 
   const handleDialogOpenChange = (open: boolean) => {
-    setConfirmOpen(open)
-    setPassword("")
-    setIsPasswordVisible(false)
-  }
+    setConfirmOpen(open);
+    setPassword("");
+    setIsPasswordVisible(false);
+  };
 
   const handleSubmit = async (e: SyntheticEvent<HTMLFormElement>) => {
-    e.preventDefault()
+    e.preventDefault();
 
     const params = {
-      ...(needsPassword ? { password } : {})
-    }
+      ...(needsPassword ? { password } : {}),
+    };
 
     deleteUser(params, {
       onSuccess: () => {
-        setConfirmOpen(false)
-        setPassword("")
+        setConfirmOpen(false);
+        setPassword("");
 
         if (sendDeleteAccountVerification) {
-          toast.success(deleteUserLocalization.deleteUserVerificationSent)
+          toast.success(deleteUserLocalization.deleteUserVerificationSent);
         } else {
-          toast.success(deleteUserLocalization.deleteUserSuccess)
-          queryClient.removeQueries({ queryKey: authQueryKeys.all })
+          toast.success(deleteUserLocalization.deleteUserSuccess);
+          queryClient.removeQueries({ queryKey: authQueryKeys.all });
           navigate({
             to: `${basePaths.auth}/${viewPaths.auth.signIn}`,
-            replace: true
-          })
+            replace: true,
+          });
         }
-      }
-    })
-  }
+      },
+    });
+  };
 
   return (
     <Card className={cn("border-destructive", className)}>
       <CardContent className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-medium leading-tight">
+          <p className="text-sm leading-tight font-medium">
             {deleteUserLocalization.deleteAccount}
           </p>
 
-          <p className="text-muted-foreground text-xs mt-0.5">
+          <p className="mt-0.5 text-xs text-muted-foreground">
             {deleteUserLocalization.deleteAccountDescription}
           </p>
         </div>
@@ -113,7 +114,7 @@ export function DeleteAccount({ className }: DeleteAccountProps) {
         <AlertDialog open={confirmOpen} onOpenChange={handleDialogOpenChange}>
           <AlertDialogTrigger
             className={cn(
-              buttonVariants({ variant: "destructive", size: "sm" })
+              buttonVariants({ variant: "destructive", size: "sm" }),
             )}
             disabled={!accounts}
           >
@@ -169,7 +170,7 @@ export function DeleteAccount({ className }: DeleteAccountProps) {
                             : localization.auth.showPassword
                         }
                         onClick={() => {
-                          setIsPasswordVisible((visible) => !visible)
+                          setIsPasswordVisible((visible) => !visible);
                         }}
                       >
                         {isPasswordVisible ? <EyeOff /> : <Eye />}
@@ -201,5 +202,5 @@ export function DeleteAccount({ className }: DeleteAccountProps) {
         </AlertDialog>
       </CardContent>
     </Card>
-  )
+  );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { RequireSession } from "@/components/auth/require-session";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,8 +39,10 @@ import {
   BookOpen,
   Check,
   FileText,
+  FileUp,
   Pencil,
   Plus,
+  RefreshCw,
   Search,
   Trash2,
   X,
@@ -94,7 +97,7 @@ async function request(url: string, init?: RequestInit) {
   return response.json();
 }
 
-export default function KnowledgePage() {
+function KnowledgePageContent() {
   const {
     data: bases,
     error,
@@ -116,6 +119,8 @@ export default function KnowledgePage() {
   );
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [reindexing, setReindexing] = useState(false);
   const [deleteBaseTarget, setDeleteBaseTarget] = useState<{
     id: string;
     name: string;
@@ -223,6 +228,61 @@ export default function KnowledgePage() {
       );
     } finally {
       setSaving(false);
+    }
+  };
+  const uploadDocument = async (file: File | undefined) => {
+    if (!activeId || !file) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.set("file", file);
+      const response = await fetch(
+        `/api/knowledge-bases/${activeId}/documents/upload`,
+        { method: "POST", body: formData },
+      );
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as {
+          message?: string;
+          error?: string;
+        } | null;
+        throw new Error(payload?.message ?? payload?.error ?? "Upload failed");
+      }
+      await Promise.all([mutateDocuments(), mutate()]);
+      toast.success(`${file.name} added to the knowledge base`);
+    } catch (uploadError) {
+      toast.error(
+        uploadError instanceof Error
+          ? uploadError.message
+          : "Unable to upload document",
+      );
+    } finally {
+      setUploading(false);
+    }
+  };
+  const reindexKnowledgeBase = async () => {
+    if (!activeId) return;
+    setReindexing(true);
+    try {
+      const result = (await request(
+        `/api/knowledge-bases/${activeId}/reindex`,
+        {
+          method: "POST",
+        },
+      )) as { indexed: number; total: number };
+      toast.success(
+        result.indexed > 0
+          ? `Semantic index rebuilt for ${result.indexed} of ${result.total} documents`
+          : "Semantic index is unavailable; lexical search remains active",
+      );
+      await mutateDocuments();
+    } catch (reindexError) {
+      toast.error(
+        reindexError instanceof Error
+          ? reindexError.message
+          : "Unable to rebuild the semantic index",
+      );
+    } finally {
+      setReindexing(false);
     }
   };
   const updateDocument = async (id: string) => {
@@ -396,15 +456,26 @@ export default function KnowledgePage() {
                 </CardDescription>
               </div>
               {activeId && (
-                <div className="relative w-full sm:w-56">
-                  <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    aria-label="Search documents"
-                    className="pl-9"
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search documents"
-                    value={search}
-                  />
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                  <div className="relative w-full sm:w-56">
+                    <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      aria-label="Search documents"
+                      className="pl-9"
+                      onChange={(event) => setSearch(event.target.value)}
+                      placeholder="Search documents"
+                      value={search}
+                    />
+                  </div>
+                  <Button
+                    disabled={reindexing}
+                    onClick={() => void reindexKnowledgeBase()}
+                    size="sm"
+                    variant="outline"
+                  >
+                    <RefreshCw data-icon="inline-start" />
+                    {reindexing ? "Indexing…" : "Rebuild semantic index"}
+                  </Button>
                 </div>
               )}
             </CardHeader>
@@ -477,9 +548,16 @@ export default function KnowledgePage() {
                                   Source: {document.sourceKey}
                                 </div>
                               )}
-                              <p className="mt-1 line-clamp-4 text-sm whitespace-pre-wrap text-muted-foreground">
-                                {document.content}
-                              </p>
+                              {document.contentType.startsWith("image/") ? (
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                  Image reference. Agents with vision-capable
+                                  models can inspect this asset when relevant.
+                                </p>
+                              ) : (
+                                <p className="mt-1 line-clamp-4 text-sm whitespace-pre-wrap text-muted-foreground">
+                                  {document.content}
+                                </p>
+                              )}
                             </div>
                             <div className="flex shrink-0 gap-1">
                               <Button
@@ -602,6 +680,35 @@ export default function KnowledgePage() {
                       <Plus data-icon="inline-start" /> Add document
                     </Button>
                   </form>
+                  <div className="flex flex-col gap-2 border-t pt-5">
+                    <div>
+                      <div className="text-sm font-medium">
+                        Import a document
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Parse PDF, DOCX, TXT, Markdown, CSV, spreadsheets,
+                        presentations, HTML, JSON, or YAML into searchable text.
+                        JPG, PNG, GIF, and WEBP images are stored as visual
+                        knowledge references.
+                      </p>
+                    </div>
+                    <Input
+                      accept=".csv,.doc,.docx,.gif,.html,.htm,.jpeg,.jpg,.json,.md,.pdf,.png,.ppt,.pptx,.txt,.webp,.xls,.xlsx,.yaml,.yml"
+                      aria-label="Upload a document"
+                      disabled={uploading}
+                      onChange={(event) => {
+                        void uploadDocument(event.target.files?.[0]);
+                        event.currentTarget.value = "";
+                      }}
+                      type="file"
+                    />
+                    {uploading && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <FileUp className="size-4" /> Processing document or
+                        image…
+                      </div>
+                    )}
+                  </div>
                 </>
               ) : (
                 <Empty className="min-h-64 border border-dashed">
@@ -675,5 +782,13 @@ export default function KnowledgePage() {
         </AlertDialogContent>
       </AlertDialog>
     </>
+  );
+}
+
+export default function KnowledgePage() {
+  return (
+    <RequireSession>
+      <KnowledgePageContent />
+    </RequireSession>
   );
 }

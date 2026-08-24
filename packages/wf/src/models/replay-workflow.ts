@@ -35,9 +35,7 @@ export interface ReplayWorkflowContext {
     id: string,
     eventName: string,
   ): Promise<TPayload>;
-  saga<TOutput>(
-    run: (scope: SagaScope) => Promise<TOutput>,
-  ): Promise<TOutput>;
+  saga<TOutput>(run: (scope: SagaScope) => Promise<TOutput>): Promise<TOutput>;
 }
 
 export interface BatchOptions {

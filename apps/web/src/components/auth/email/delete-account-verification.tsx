@@ -1,4 +1,4 @@
-import type { ReactNode } from "react"
+import type { ReactNode } from "react";
 import {
   Body,
   Button,
@@ -9,19 +9,19 @@ import {
   Html,
   Img,
   Link,
-  Preview,
   pixelBasedPreset,
+  Preview,
   Section,
   Tailwind,
-  Text
-} from "react-email"
+  Text,
+} from "react-email";
 
-import { cn } from "../../../lib/utils"
+import { cn } from "../../../lib/utils";
 import {
   type EmailClassNames,
   type EmailColors,
-  EmailStyles
-} from "./email-styles"
+  EmailStyles,
+} from "./email-styles";
 
 const deleteAccountVerificationEmailLocalization = {
   ACCOUNT_DELETION_REQUESTED: "Account deletion requested",
@@ -38,44 +38,44 @@ const deleteAccountVerificationEmailLocalization = {
   EMAIL_SENT_BY: "Email sent by {appName}.",
   IF_YOU_DIDNT_REQUEST_ACCOUNT_DELETION:
     "If you didn't request account deletion, you can safely ignore this email. Your account will remain active.",
-  POWERED_BY_BETTER_AUTH: "Powered by {betterAuth}"
-}
+  POWERED_BY_BETTER_AUTH: "Powered by {betterAuth}",
+};
 
 /**
  * Localization strings for the DeleteAccountVerificationEmail component.
  */
 export type DeleteAccountVerificationEmailLocalization =
-  typeof deleteAccountVerificationEmailLocalization
+  typeof deleteAccountVerificationEmailLocalization;
 
 /**
  * Props for the DeleteAccountVerificationEmail component.
  */
 export interface DeleteAccountVerificationEmailProps {
   /** Account deletion verification URL sent by Better Auth */
-  url: string
+  url: string;
   /** Email address of the account scheduled for deletion */
-  email?: string
+  email?: string;
   /** Name of the application sending the email */
-  appName?: string
+  appName?: string;
   /** Number of hours until the verification link expires */
-  expirationHours?: number
+  expirationHours?: number;
   /** Logo URL(s) - a single string or light/dark variants. If omitted, no logo is shown. */
-  logoURL?: string | { light: string; dark: string }
+  logoURL?: string | { light: string; dark: string };
   /** Custom CSS class names for styling specific parts of the email */
-  classNames?: EmailClassNames
+  classNames?: EmailClassNames;
   /** Custom color scheme for light and dark modes */
-  colors?: EmailColors
+  colors?: EmailColors;
   /** Whether to show the "Powered by better-auth" footer */
-  poweredBy?: boolean
+  poweredBy?: boolean;
   /** Whether to enable dark mode support */
-  darkMode?: boolean
+  darkMode?: boolean;
   /** Additional React nodes to inject into the email head */
-  head?: ReactNode
+  head?: ReactNode;
   /**
    * Localization overrides for customizing email text
    * @remarks `DeleteAccountVerificationEmailLocalization`
    */
-  localization?: Partial<DeleteAccountVerificationEmailLocalization>
+  localization?: Partial<DeleteAccountVerificationEmailLocalization>;
 }
 
 /**
@@ -109,15 +109,15 @@ export const DeleteAccountVerificationEmail = ({
 }: DeleteAccountVerificationEmailProps) => {
   const localization = {
     ...DeleteAccountVerificationEmail.localization,
-    ...props.localization
-  }
+    ...props.localization,
+  };
 
   const requestText = localization.WE_RECEIVED_ACCOUNT_DELETION_REQUEST.replace(
     "{appName}",
-    appName || ""
+    appName || "",
   )
     .replace(/\s{2,}/g, " ")
-    .replace(" .", ".")
+    .replace(" .", ".");
 
   return (
     <Html>
@@ -137,13 +137,13 @@ export const DeleteAccountVerificationEmail = ({
           <Container
             className={cn(
               "mx-auto my-auto max-w-xl px-2 py-10",
-              classNames?.container
+              classNames?.container,
             )}
           >
             <Section
               className={cn(
                 "rounded-none border border-border bg-card p-8 text-card-foreground",
-                classNames?.card
+                classNames?.card,
               )}
             >
               {logoURL &&
@@ -161,7 +161,7 @@ export const DeleteAccountVerificationEmail = ({
                       alt={appName || localization.LOGO}
                       className={cn(
                         "logo-light mx-auto mb-8",
-                        classNames?.logo
+                        classNames?.logo,
                       )}
                       height={48}
                       src={logoURL.light}
@@ -170,8 +170,8 @@ export const DeleteAccountVerificationEmail = ({
                     <Img
                       alt={appName || localization.LOGO}
                       className={cn(
-                        "logo-dark hidden mx-auto mb-8",
-                        classNames?.logo
+                        "logo-dark mx-auto mb-8 hidden",
+                        classNames?.logo,
                       )}
                       height={48}
                       src={logoURL.dark}
@@ -183,7 +183,7 @@ export const DeleteAccountVerificationEmail = ({
               <Heading
                 className={cn(
                   "m-0 mb-5 text-2xl font-semibold",
-                  classNames?.title
+                  classNames?.title,
                 )}
               >
                 {localization.CONFIRM_ACCOUNT_DELETION}
@@ -197,13 +197,13 @@ export const DeleteAccountVerificationEmail = ({
                 <Section
                   className={cn(
                     "my-6 border border-border bg-muted p-4",
-                    classNames?.codeBlock
+                    classNames?.codeBlock,
                   )}
                 >
                   <Text
                     className={cn(
                       "m-0 mb-2 text-xs text-muted-foreground",
-                      classNames?.description
+                      classNames?.description,
                     )}
                   >
                     {localization.ACCOUNT}
@@ -211,7 +211,7 @@ export const DeleteAccountVerificationEmail = ({
                   <Text
                     className={cn(
                       "m-0 text-sm font-semibold",
-                      classNames?.content
+                      classNames?.content,
                     )}
                   >
                     {email}
@@ -228,8 +228,8 @@ export const DeleteAccountVerificationEmail = ({
               <Section className="my-6">
                 <Button
                   className={cn(
-                    "inline-block whitespace-nowrap rounded-none bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground no-underline",
-                    classNames?.button
+                    "inline-block rounded-none bg-primary px-6 py-2.5 text-sm font-medium whitespace-nowrap text-primary-foreground no-underline",
+                    classNames?.button,
                   )}
                   href={url}
                 >
@@ -240,7 +240,7 @@ export const DeleteAccountVerificationEmail = ({
               <Text
                 className={cn(
                   "m-0 mb-3 text-xs text-muted-foreground",
-                  classNames?.description
+                  classNames?.description,
                 )}
               >
                 {localization.OR_COPY_AND_PASTE_URL}
@@ -248,8 +248,8 @@ export const DeleteAccountVerificationEmail = ({
 
               <Link
                 className={cn(
-                  "break-all text-xs text-primary",
-                  classNames?.link
+                  "text-xs break-all text-primary",
+                  classNames?.link,
                 )}
                 href={url}
               >
@@ -259,19 +259,19 @@ export const DeleteAccountVerificationEmail = ({
               <Hr
                 className={cn(
                   "my-6 w-full border border-solid border-border",
-                  classNames?.separator
+                  classNames?.separator,
                 )}
               />
 
               <Text
                 className={cn(
                   "m-0 mb-3 text-xs text-muted-foreground",
-                  classNames?.description
+                  classNames?.description,
                 )}
               >
                 {localization.THIS_LINK_EXPIRES_IN_HOURS.replace(
                   "{expirationHours}",
-                  expirationHours.toString()
+                  expirationHours.toString(),
                 )}
                 {appName &&
                   ` ${localization.EMAIL_SENT_BY.replace("{appName}", appName)}`}
@@ -280,7 +280,7 @@ export const DeleteAccountVerificationEmail = ({
               <Text
                 className={cn(
                   "m-0 text-xs text-muted-foreground",
-                  classNames?.description
+                  classNames?.description,
                 )}
               >
                 {localization.IF_YOU_DIDNT_REQUEST_ACCOUNT_DELETION}
@@ -290,12 +290,12 @@ export const DeleteAccountVerificationEmail = ({
                 <Text
                   className={cn(
                     "m-0 mt-4 text-center text-[11px] text-muted-foreground",
-                    classNames?.poweredBy
+                    classNames?.poweredBy,
                   )}
                 >
                   {(() => {
                     const [beforeBetterAuth, afterBetterAuth] =
-                      localization.POWERED_BY_BETTER_AUTH.split("{betterAuth}")
+                      localization.POWERED_BY_BETTER_AUTH.split("{betterAuth}");
 
                     return (
                       <>
@@ -303,7 +303,7 @@ export const DeleteAccountVerificationEmail = ({
                         <Link
                           className={cn(
                             "text-primary underline",
-                            classNames?.link
+                            classNames?.link,
                           )}
                           href="https://better-auth.com"
                         >
@@ -311,7 +311,7 @@ export const DeleteAccountVerificationEmail = ({
                         </Link>
                         {afterBetterAuth}
                       </>
-                    )
+                    );
                   })()}
                 </Text>
               )}
@@ -320,18 +320,18 @@ export const DeleteAccountVerificationEmail = ({
         </Body>
       </Tailwind>
     </Html>
-  )
-}
+  );
+};
 
 DeleteAccountVerificationEmail.localization =
-  deleteAccountVerificationEmailLocalization
+  deleteAccountVerificationEmailLocalization;
 
 DeleteAccountVerificationEmail.PreviewProps = {
   url: "https://better-auth-ui.com/api/auth/delete-user/callback?token=example-token",
   email: "user@example.com",
   appName: "Better Auth",
   poweredBy: true,
-  darkMode: true
-} as DeleteAccountVerificationEmailProps
+  darkMode: true,
+} as DeleteAccountVerificationEmailProps;
 
-export default DeleteAccountVerificationEmail
+export default DeleteAccountVerificationEmail;

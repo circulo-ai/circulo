@@ -43,6 +43,7 @@ import {
   type AgentOption,
   type ChatSettings,
   type ChatSettingsForm,
+  type ConnectedAppOption,
   type KnowledgeBaseOption,
   type ModelOption,
 } from "@/hooks/use-chat-settings";
@@ -187,6 +188,7 @@ export function ChatSettingsDialog({ chatId }: { chatId: string }) {
                   data={settings.data}
                   form={settings.form}
                   knowledgeBaseData={settings.knowledgeBaseData}
+                  connectedApps={settings.data.connectedApps ?? []}
                   modelData={settings.modelData}
                   removeAgent={settings.removeAgent}
                   save={settings.save}
@@ -631,6 +633,7 @@ function CapabilitiesPanel({
   form,
   setForm,
   knowledgeBaseData,
+  connectedApps,
   modelData,
   agentData,
   agentId,
@@ -643,6 +646,7 @@ function CapabilitiesPanel({
   form: ChatSettingsForm;
   setForm: SetForm;
   knowledgeBaseData?: KnowledgeBaseOption[];
+  connectedApps: ConnectedAppOption[];
   modelData?: ModelOption[];
   agentData?: AgentOption[];
   agentId: string;
@@ -819,6 +823,65 @@ function CapabilitiesPanel({
             >
               <Save />
               Save knowledge access
+            </Button>
+          </div>
+        </CardContent>
+      </PanelCard>
+      <PanelCard>
+        <CardHeader>
+          <CardTitle>Connected apps</CardTitle>
+          <CardDescription>
+            Choose which connected accounts this conversation may use. Apps stay
+            unavailable until explicitly enabled here.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          {connectedApps.map((app) => (
+            <label
+              className="flex items-start gap-3 rounded-2xl border p-3 text-sm transition-colors has-data-[state=checked]:border-primary has-data-[state=checked]:bg-primary/5"
+              key={app.connectionId}
+            >
+              <Checkbox
+                checked={form.connectedAppIds.includes(app.connectionId)}
+                disabled={
+                  !data.access.canManageChat || app.status !== "connected"
+                }
+                onCheckedChange={(checked) =>
+                  setForm((current) => ({
+                    ...current,
+                    connectedAppIds:
+                      checked === true
+                        ? [...current.connectedAppIds, app.connectionId]
+                        : current.connectedAppIds.filter(
+                            (id) => id !== app.connectionId,
+                          ),
+                  }))
+                }
+              />
+              <span className="min-w-0">
+                <span className="block font-medium">{app.name}</span>
+                <span className="block text-xs text-muted-foreground">
+                  {app.accountLabel} ·{" "}
+                  {app.status === "connected"
+                    ? "Connected"
+                    : "Reconnect required"}
+                </span>
+              </span>
+            </label>
+          ))}
+          {!connectedApps.length && (
+            <p className="rounded-2xl border border-dashed p-4 text-sm text-muted-foreground">
+              Connect an app from Plugins before enabling it in this chat.
+            </p>
+          )}
+          <div className="sticky bottom-0 mt-2 border-t bg-card/95 pt-4 backdrop-blur">
+            <Button
+              className="w-full sm:w-auto"
+              disabled={!data.access.canManageChat}
+              onClick={() => void save()}
+            >
+              <Save />
+              Save app access
             </Button>
           </div>
         </CardContent>

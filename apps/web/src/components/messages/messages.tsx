@@ -103,7 +103,7 @@ function PureMessages({
         )}
 
         <Conversation className="mx-auto flex max-w-4xl min-w-0 flex-col gap-4 md:gap-6">
-          <ConversationContent className="flex flex-col gap-4 px-2 py-4 md:gap-6 md:px-4">
+          <ConversationContent className="flex flex-col gap-4 px-2 pt-16 pb-4 md:gap-6 md:px-4 md:pt-20">
             {messages.length === 0 && <Greeting />}
 
             {messages.map((message, index) => (

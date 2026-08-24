@@ -36,6 +36,7 @@ import { PreviewAttachment } from "./preview-attachment";
 import { SuggestedActions } from "./suggested-actions";
 import { Button } from "./ui/button";
 import type { VisibilityType } from "./visibility-selector";
+import { VoiceRecordingIndicator } from "./voice-recording-indicator";
 
 function PureMultimodalInput({
   chatId,
@@ -152,8 +153,17 @@ function PureMultimodalInput({
   }, [uploadManager.uploadTasks, setAttachments]);
 
   const handleVoiceFile = useCallback(
-    (file: File) => uploadManager.enqueueUploads([file], "chat"),
-    [uploadManager],
+    (file: File, transcript?: string) => {
+      if (transcript?.trim()) {
+        setInput(
+          (current) =>
+            `${current}${current.trim() ? " " : ""}${transcript.trim()}`,
+        );
+        return;
+      }
+      uploadManager.enqueueUploads([file], "chat");
+    },
+    [setInput, uploadManager],
   );
   const voiceRecorder = useVoiceRecorder({
     onRecordingComplete: handleVoiceFile,
@@ -302,189 +312,206 @@ function PureMultimodalInput({
           }
         }}
       >
-          {(attachments.length > 0 ||
-            uploadManager.uploadTasks.some(
-              (item) =>
-                item.status === "queued" ||
-                item.status === "preparing" ||
-                item.status === "uploading",
-            )) && (
-            <div
-              className="flex min-w-0 max-w-full flex-row items-end gap-2 overflow-x-auto overscroll-contain"
-              data-testid="attachments-preview"
-            >
-              {attachments.map((attachment) => (
-                <PreviewAttachment
-                  attachment={attachment}
-                  key={attachment.url}
-                  onRemove={() => {
-                    const match = uploadManager.uploadTasks.find(
-                      (item) => item.url === attachment.url,
-                    );
-                    if (match) {
-                      uploadManager.removeUploadTask(match.id);
-                    } else {
-                      setAttachments((current) =>
-                        current.filter((a) => a.url !== attachment.url),
-                      );
-                    }
-                    if (fileInputRef.current) {
-                      fileInputRef.current.value = "";
-                    }
-                  }}
-                />
-              ))}
-
-              {uploadManager.uploadTasks
-                .filter(
-                  (item) =>
-                    item.status === "queued" ||
-                    item.status === "preparing" ||
-                    item.status === "uploading" ||
-                    item.status === "error",
-                )
-                .map((item) => (
-                  <PreviewAttachment
-                    attachment={{
-                      url: "",
-                      name: item.file.name,
-                      contentType: item.file.type,
-                    }}
-                    error={item.error}
-                    isUploading={
-                      item.status === "queued" ||
-                      item.status === "preparing" ||
-                      item.status === "uploading"
-                    }
-                    key={item.id}
-                    onRemove={() => uploadManager.removeUploadTask(item.id)}
-                    onRetry={
-                      item.status === "error"
-                        ? () => uploadManager.retryUploadTask(item.id)
-                        : undefined
-                    }
-                  />
-                ))}
-            </div>
-          )}
-          <div className="flex w-full min-w-0 flex-1 flex-row items-end gap-1 sm:gap-2">
-            <PromptInputTextarea
-              enableMentions
-              enableCommands
-              fetchMentions={async (query) => {
-                const response = await fetch(`/api/chat/${chatId}/agent`);
-                if (!response.ok) {
-                  return [];
-                }
-
-                const json = (await response.json()) as
-                  | Omit<ChatAgent & Agent, "agentId">[]
-                  | { agents?: Omit<ChatAgent & Agent, "agentId">[] }
-                  | {
-                      data?: { agents?: Omit<ChatAgent & Agent, "agentId">[] };
-                    };
-                const agents = Array.isArray(json)
-                  ? json
-                  : (("agents" in json
-                      ? json.agents
-                      : "data" in json
-                        ? json.data?.agents
-                        : undefined) ?? []);
-
-                return agents
-                  .filter((agent) => agent.isEnabled !== false)
-                  .filter((agent) =>
-                    `${agent.name} ${agent.id}`
-                      .toLowerCase()
-                      .includes(query.toLowerCase()),
-                  )
-                  .map((e) => {
-                    return {
-                      type: "mention",
-                      name: e.name,
-                      username: e.id,
-                      icon: <AtSign />,
-                    } satisfies MentionItemType;
-                  });
-              }}
-              autoFocus
-              className="block w-full min-w-0 flex-1 grow resize-none border-0! border-none! bg-transparent px-2 py-2 text-sm leading-6 ring-0 outline-none [-ms-overflow-style:none] [scrollbar-width:none] placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none [&::-webkit-scrollbar]:hidden"
-              data-testid="multimodal-input"
-              disableAutoResize={true}
-              maxHeight={200}
-              minHeight={44}
-              onValueChange={setInput}
-              placeholder="Send a message..."
-              ref={textareaRef}
-              value={input}
-            />{" "}
-            {/*<Context {...contextProps} />*/}
-          </div>
-          <PromptInputToolbar className="min-w-0 flex-wrap border-top-0! border-t-0! px-3 pb-3 pt-0 shadow-none dark:border-0 dark:border-transparent! sm:px-3 sm:pb-3">
-            <PromptInputTools className="min-w-0 gap-0 sm:gap-0.5">
-              <AttachmentsButton fileInputRef={fileInputRef} status={status} />
-              <Button
-                aria-label={
-                  voiceRecorder.isRecording ? "Stop recording" : "Record voice"
-                }
-                className={cn(
-                  "aspect-square h-8 rounded-lg p-1 transition-colors hover:bg-accent",
-                  voiceRecorder.isRecording && "text-red-500",
-                )}
-                disabled={
-                  status === "submitted" ||
-                  status === "streaming" ||
-                  voiceRecorder.isStarting
-                }
-                onClick={(event) => {
-                  event.preventDefault();
-                  if (voiceRecorder.isRecording) {
-                    voiceRecorder.stop();
+        {(attachments.length > 0 ||
+          uploadManager.uploadTasks.some(
+            (item) =>
+              item.status === "queued" ||
+              item.status === "preparing" ||
+              item.status === "uploading",
+          )) && (
+          <div
+            className="flex max-w-full min-w-0 flex-row items-end gap-2 overflow-x-auto overscroll-contain"
+            data-testid="attachments-preview"
+          >
+            {attachments.map((attachment) => (
+              <PreviewAttachment
+                attachment={attachment}
+                key={attachment.url}
+                onRemove={() => {
+                  const match = uploadManager.uploadTasks.find(
+                    (item) => item.url === attachment.url,
+                  );
+                  if (match) {
+                    uploadManager.removeUploadTask(match.id);
                   } else {
-                    void voiceRecorder
-                      .start()
-                      .catch(() => undefined);
+                    setAttachments((current) =>
+                      current.filter((a) => a.url !== attachment.url),
+                    );
+                  }
+                  if (fileInputRef.current) {
+                    fileInputRef.current.value = "";
                   }
                 }}
-                type="button"
-                variant="ghost"
-              >
-                {voiceRecorder.isRecording ? (
-                  <Square size={14} />
-                ) : (
-                  <Mic size={14} />
-                )}
-              </Button>
-              {/*<ModelSelectorCompact*/}
-              {/*  onModelChange={onModelChange}*/}
-              {/*  selectedModelId={selectedModelId}*/}
-              {/*/>*/}
-            </PromptInputTools>
+              />
+            ))}
 
-            {status === "submitted" ? (
-              <StopButton setMessages={setMessages} stop={stop} />
-            ) : (
-              <PromptInputSubmit
-                className="size-8 rounded-full bg-teal-50 text-background transition-colors duration-200 hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground"
-                disabled={
-                  (input.trim().length === 0 && attachments.length === 0) ||
-                  isReadingAttachments ||
-                  voiceRecorder.isRecording ||
-                  uploadManager.hasUploadErrors ||
-                  uploadManager.uploadTasks.some(
-                    (item) =>
-                      item.status === "queued" ||
-                      item.status === "preparing" ||
-                      item.status === "uploading",
-                  )
-                }
-                status={status}
-                data-testid="send-button"
-              >
-                <ArrowUpIcon size={14} />
-              </PromptInputSubmit>
-            )}
-          </PromptInputToolbar>
+            {uploadManager.uploadTasks
+              .filter(
+                (item) =>
+                  item.status === "queued" ||
+                  item.status === "preparing" ||
+                  item.status === "uploading" ||
+                  item.status === "error",
+              )
+              .map((item) => (
+                <PreviewAttachment
+                  attachment={{
+                    url: "",
+                    name: item.file.name,
+                    contentType: item.file.type,
+                  }}
+                  error={item.error}
+                  isUploading={
+                    item.status === "queued" ||
+                    item.status === "preparing" ||
+                    item.status === "uploading"
+                  }
+                  key={item.id}
+                  onRemove={() => uploadManager.removeUploadTask(item.id)}
+                  onRetry={
+                    item.status === "error"
+                      ? () => uploadManager.retryUploadTask(item.id)
+                      : undefined
+                  }
+                />
+              ))}
+          </div>
+        )}
+        {voiceRecorder.isRecording ? (
+          <VoiceRecordingIndicator
+            elapsedSeconds={voiceRecorder.elapsedSeconds}
+            interimTranscript={voiceRecorder.interimTranscript}
+            onCancel={voiceRecorder.cancel}
+            onStop={voiceRecorder.stop}
+            transcript={voiceRecorder.transcript}
+          />
+        ) : (
+          <>
+            <div className="flex w-full min-w-0 flex-1 flex-row items-end gap-1 sm:gap-2">
+              <PromptInputTextarea
+                enableMentions
+                enableCommands
+                fetchMentions={async (query) => {
+                  const response = await fetch(`/api/chat/${chatId}/agent`);
+                  if (!response.ok) {
+                    return [];
+                  }
+
+                  const json = (await response.json()) as
+                    | Omit<ChatAgent & Agent, "agentId">[]
+                    | { agents?: Omit<ChatAgent & Agent, "agentId">[] }
+                    | {
+                        data?: {
+                          agents?: Omit<ChatAgent & Agent, "agentId">[];
+                        };
+                      };
+                  const agents = Array.isArray(json)
+                    ? json
+                    : (("agents" in json
+                        ? json.agents
+                        : "data" in json
+                          ? json.data?.agents
+                          : undefined) ?? []);
+
+                  return agents
+                    .filter((agent) => agent.isEnabled !== false)
+                    .filter((agent) =>
+                      `${agent.name} ${agent.id}`
+                        .toLowerCase()
+                        .includes(query.toLowerCase()),
+                    )
+                    .map((e) => {
+                      return {
+                        type: "mention",
+                        name: e.name,
+                        username: e.id,
+                        icon: <AtSign />,
+                      } satisfies MentionItemType;
+                    });
+                }}
+                autoFocus
+                className="block w-full min-w-0 flex-1 grow resize-none [scrollbar-width:none] border-0! border-none! bg-transparent px-2 py-2 text-sm leading-6 ring-0 outline-none [-ms-overflow-style:none] placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none [&::-webkit-scrollbar]:hidden"
+                data-testid="multimodal-input"
+                disableAutoResize={true}
+                maxHeight={200}
+                minHeight={44}
+                onValueChange={setInput}
+                placeholder="Send a message..."
+                ref={textareaRef}
+                value={input}
+              />{" "}
+              {/*<Context {...contextProps} />*/}
+            </div>
+            <PromptInputToolbar className="border-top-0! min-w-0 flex-wrap border-t-0! px-3 pt-0 pb-3 shadow-none sm:px-3 sm:pb-3 dark:border-0 dark:border-transparent!">
+              <PromptInputTools className="min-w-0 gap-0 sm:gap-0.5">
+                <AttachmentsButton
+                  fileInputRef={fileInputRef}
+                  status={status}
+                />
+                <Button
+                  aria-label={
+                    voiceRecorder.isRecording
+                      ? "Stop recording"
+                      : "Record voice"
+                  }
+                  className={cn(
+                    "aspect-square h-8 rounded-lg p-1 transition-colors hover:bg-accent",
+                    voiceRecorder.isRecording && "text-red-500",
+                  )}
+                  disabled={
+                    status === "submitted" ||
+                    status === "streaming" ||
+                    voiceRecorder.isStarting
+                  }
+                  onClick={(event) => {
+                    event.preventDefault();
+                    if (voiceRecorder.isRecording) {
+                      voiceRecorder.stop();
+                    } else {
+                      void voiceRecorder.start().catch(() => undefined);
+                    }
+                  }}
+                  type="button"
+                  variant="ghost"
+                >
+                  {voiceRecorder.isRecording ? (
+                    <Square size={14} />
+                  ) : (
+                    <Mic size={14} />
+                  )}
+                </Button>
+                {/*<ModelSelectorCompact*/}
+                {/*  onModelChange={onModelChange}*/}
+                {/*  selectedModelId={selectedModelId}*/}
+                {/*/>*/}
+              </PromptInputTools>
+
+              {status === "submitted" ? (
+                <StopButton setMessages={setMessages} stop={stop} />
+              ) : (
+                <PromptInputSubmit
+                  className="size-8 rounded-full bg-teal-50 text-background transition-colors duration-200 hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground"
+                  disabled={
+                    (input.trim().length === 0 && attachments.length === 0) ||
+                    isReadingAttachments ||
+                    voiceRecorder.isRecording ||
+                    uploadManager.hasUploadErrors ||
+                    uploadManager.uploadTasks.some(
+                      (item) =>
+                        item.status === "queued" ||
+                        item.status === "preparing" ||
+                        item.status === "uploading",
+                    )
+                  }
+                  status={status}
+                  data-testid="send-button"
+                >
+                  <ArrowUpIcon size={14} />
+                </PromptInputSubmit>
+              )}
+            </PromptInputToolbar>
+          </>
+        )}
       </PromptInput>
     </div>
   );

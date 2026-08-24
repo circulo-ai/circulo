@@ -68,7 +68,12 @@ export function ActiveSession({ activeSession }: ActiveSessionProps) {
   );
 
   const isCurrentSession = activeSession.token === session?.session.token;
-  const ua = Bowser.parse(activeSession.userAgent ?? "");
+  // Legacy sessions can legitimately have no user-agent (for example,
+  // sessions created by an older API client). Bowser throws for an empty
+  // string, so keep the security page render-safe for those records.
+  const ua = Bowser.parse(
+    activeSession.userAgent?.trim() || "Mozilla/5.0 (compatible; Circulo)",
+  );
   const isMobile =
     ua.platform.type === "mobile" || ua.platform.type === "tablet";
 

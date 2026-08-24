@@ -1,7 +1,7 @@
 "use client";
 
-import { navItems } from "@/consts/nav";
 import { UserButton } from "@/components/auth/user/user-button";
+import { navItems } from "@/consts/nav";
 import { useSession } from "@/lib/auth-client";
 import { Phone, User } from "lucide-react";
 import { Suspense, useId } from "react";

@@ -1,65 +1,65 @@
-"use client"
+"use client";
 
 import {
   useAuth,
   useAuthPlugin,
-  useCopyToClipboard
-} from "@better-auth-ui/react"
-import { Check, Copy, Key } from "lucide-react"
-import { toast } from "sonner"
+  useCopyToClipboard,
+} from "@better-auth-ui/react";
+import { Check, Copy, Key } from "lucide-react";
+import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogTitle
-} from "@/components/ui/dialog"
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
-  InputGroupInput
-} from "@/components/ui/input-group"
-import { Label } from "@/components/ui/label"
-import { apiKeyPlugin } from "@/lib/auth/api-key-plugin"
+  InputGroupInput,
+} from "@/components/ui/input-group";
+import { Label } from "@/components/ui/label";
+import { apiKeyPlugin } from "@/lib/auth/api-key-plugin";
 
 export type NewApiKeyDialogProps = {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  name: string | null
-  secretKey: string | null
-}
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  name: string | null;
+  secretKey: string | null;
+};
 
 export function NewApiKeyDialog({
   open,
   onOpenChange,
   name,
-  secretKey
+  secretKey,
 }: NewApiKeyDialogProps) {
-  const { localization } = useAuth()
-  const { localization: apiKeyLocalization } = useAuthPlugin(apiKeyPlugin)
+  const { localization } = useAuth();
+  const { localization: apiKeyLocalization } = useAuthPlugin(apiKeyPlugin);
 
   const { copied, copy, reset } = useCopyToClipboard({
     onError: (error) =>
-      toast.error(error instanceof Error ? error.message : String(error))
-  })
+      toast.error(error instanceof Error ? error.message : String(error)),
+  });
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
-      reset()
+      reset();
     }
 
-    onOpenChange(nextOpen)
-  }
+    onOpenChange(nextOpen);
+  };
 
   const copySecretKey = async () => {
-    if (!secretKey) return
+    if (!secretKey) return;
 
-    await copy(secretKey)
-  }
+    await copy(secretKey);
+  };
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -111,5 +111,5 @@ export function NewApiKeyDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

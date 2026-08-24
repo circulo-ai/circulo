@@ -65,8 +65,17 @@ export interface TenantConcurrencyLease {
 
 /** Atomic admission primitive for per-tenant workflow/activity concurrency limits. */
 export interface TenantConcurrencyStore {
-  acquire(tenantId: string, limit: number, leaseId: string, expiresAt?: number | undefined): Promise<boolean>;
-  renew(tenantId: string, leaseId: string, expiresAt?: number | undefined): Promise<boolean>;
+  acquire(
+    tenantId: string,
+    limit: number,
+    leaseId: string,
+    expiresAt?: number | undefined,
+  ): Promise<boolean>;
+  renew(
+    tenantId: string,
+    leaseId: string,
+    expiresAt?: number | undefined,
+  ): Promise<boolean>;
   release(tenantId: string, leaseId: string): Promise<boolean>;
   reclaimExpired(now?: number): Promise<number>;
 }

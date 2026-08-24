@@ -1,6 +1,10 @@
-import type { ArtifactKind, Suggestion } from "@/db";
+import type { ArtifactKind } from "@/db";
 import { artifactRepo, suggestionRepo } from "@/db/repositories";
-import type { ActorContext, ChatMessage } from "@/lib/types";
+import type {
+  ActorContext,
+  ChatMessage,
+  SuggestionStreamData,
+} from "@/lib/types";
 import { generateUUID } from "@/lib/utils";
 import {
   Output,
@@ -44,10 +48,7 @@ export const requestSuggestions = ({
         };
       }
 
-      const suggestions: Omit<
-        Suggestion,
-        "userId" | "createdAt" | "documentCreatedAt"
-      >[] = [];
+      const suggestions: SuggestionStreamData[] = [];
 
       const { elementStream } = streamText({
         model: myProvider.languageModel("artifact-model"),
@@ -66,8 +67,7 @@ export const requestSuggestions = ({
       });
 
       for await (const element of elementStream) {
-        // @ts-expect-error todo: fix type
-        const suggestion: Suggestion = {
+        const suggestion: SuggestionStreamData = {
           originalText: element.originalSentence,
           suggestedText: element.suggestedSentence,
           description: element.description,

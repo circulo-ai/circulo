@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  defineActivity,
-  InMemoryActivityRegistry,
-} from "../src";
+import { defineActivity, InMemoryActivityRegistry } from "../src";
 
 describe("activities", () => {
   it("defines and registers versioned activities", async () => {
@@ -22,9 +19,7 @@ describe("activities", () => {
 
     registry.register(activity);
     expect(registry.get("double", 1)).toBeUndefined();
-    expect(registry.get<{ value: number }, number>("double", 2)).toBe(
-      activity,
-    );
+    expect(registry.get<{ value: number }, number>("double", 2)).toBe(activity);
     expect(registry.list()).toHaveLength(1);
   });
 

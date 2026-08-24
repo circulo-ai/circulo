@@ -13,9 +13,9 @@ type DataStreamContextValue = {
 };
 
 const DataStreamContext = createContext<DataStreamContextValue | null>(null);
-const DataStreamActionsContext = createContext<
-  React.Dispatch<React.SetStateAction<DataUIPart<CustomUIDataTypes>[]>> | null
->(null);
+const DataStreamActionsContext = createContext<React.Dispatch<
+  React.SetStateAction<DataUIPart<CustomUIDataTypes>[]>
+> | null>(null);
 
 export function DataStreamProvider({
   children,

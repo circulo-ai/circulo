@@ -5,6 +5,7 @@ import {
   index,
   integer,
   jsonb,
+  pgEnum,
   pgTable,
   text,
   timestamp,
@@ -13,6 +14,11 @@ import {
 } from "drizzle-orm/pg-core";
 import { organization, user } from "./auth";
 import { chatAgent } from "./chat";
+
+export const agentToolAccessModeEnum = pgEnum("agent_tool_access_mode", [
+  "all",
+  "allowlist",
+]);
 
 export const agent = pgTable(
   "agents",
@@ -45,6 +51,9 @@ export const agent = pgTable(
     isArchived: boolean("is_archived").notNull().default(false),
 
     // Default attachments (IDs of tools, knowledge bases, etc.)
+    toolAccessMode: agentToolAccessModeEnum("tool_access_mode")
+      .notNull()
+      .default("allowlist"),
     defaultToolIds: jsonb("default_tool_ids").$type<string[]>().default([]),
     defaultKnowledgeBaseIds: jsonb("default_knowledge_base_ids")
       .$type<string[]>()

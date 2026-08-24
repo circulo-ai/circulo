@@ -1,9 +1,9 @@
 import { Action, Actions } from "@/components/ai-elements/actions";
 import {
-	CopyIcon,
-	PencilEditIcon,
-	ThumbDownIcon,
-	ThumbUpIcon,
+  CopyIcon,
+  PencilEditIcon,
+  ThumbDownIcon,
+  ThumbUpIcon,
 } from "@/components/icons/icons";
 import type { ChatMessage } from "@/lib/types";
 import { Vote } from "@circulo-ai/db";
@@ -14,199 +14,199 @@ import { useSWRConfig } from "swr";
 import { useCopyToClipboard } from "usehooks-ts";
 
 export function PureMessageActions({
-	chatId,
-	message,
-	vote,
-	isLoading,
-	setMode,
-	canEdit = true,
+  chatId,
+  message,
+  vote,
+  isLoading,
+  setMode,
+  canEdit = true,
 }: {
-	chatId: string;
-	message: ChatMessage;
-	vote: Vote | undefined;
-	isLoading: boolean;
-	setMode?: (mode: "view" | "edit") => void;
-	canEdit?: boolean;
+  chatId: string;
+  message: ChatMessage;
+  vote: Vote | undefined;
+  isLoading: boolean;
+  setMode?: (mode: "view" | "edit") => void;
+  canEdit?: boolean;
 }) {
-	const { mutate } = useSWRConfig();
-	const [_, copyToClipboard] = useCopyToClipboard();
+  const { mutate } = useSWRConfig();
+  const [_, copyToClipboard] = useCopyToClipboard();
 
-	if (isLoading) {
-		return null;
-	}
+  if (isLoading) {
+    return null;
+  }
 
-	const textFromParts = message.parts
-		?.filter((part) => part.type === "text")
-		.map((part) => part.text)
-		.join("\n")
-		.trim();
+  const textFromParts = message.parts
+    ?.filter((part) => part.type === "text")
+    .map((part) => part.text)
+    .join("\n")
+    .trim();
 
-	const handleCopy = async () => {
-		if (!textFromParts) {
-			toast.error("There's no text to copy!");
-			return;
-		}
+  const handleCopy = async () => {
+    if (!textFromParts) {
+      toast.error("There's no text to copy!");
+      return;
+    }
 
-		await copyToClipboard(textFromParts);
-		toast.success("Copied to clipboard!");
-	};
+    await copyToClipboard(textFromParts);
+    toast.success("Copied to clipboard!");
+  };
 
-	// User messages get edit (on hover) and copy actions
-	if (message.role === "user") {
-		return (
-			<Actions className="-mr-0.5 justify-end">
-				<div className="relative">
-					{setMode && canEdit && (
-						<Action
-							className="absolute top-0 -left-10 opacity-0 transition-opacity group-hover/message:opacity-100 focus-visible:opacity-100"
-							data-testid="message-edit-button"
-							onClick={() => setMode("edit")}
-							tooltip="Edit"
-						>
-							<PencilEditIcon />
-						</Action>
-					)}
-					<Action onClick={handleCopy} tooltip="Copy">
-						<CopyIcon />
-					</Action>
-				</div>
-			</Actions>
-		);
-	}
+  // User messages get edit (on hover) and copy actions
+  if (message.role === "user") {
+    return (
+      <Actions className="-mr-0.5 justify-end">
+        <div className="relative">
+          {setMode && canEdit && (
+            <Action
+              className="absolute top-0 -left-10 opacity-0 transition-opacity group-hover/message:opacity-100 focus-visible:opacity-100"
+              data-testid="message-edit-button"
+              onClick={() => setMode("edit")}
+              tooltip="Edit"
+            >
+              <PencilEditIcon />
+            </Action>
+          )}
+          <Action onClick={handleCopy} tooltip="Copy">
+            <CopyIcon />
+          </Action>
+        </div>
+      </Actions>
+    );
+  }
 
-	return (
-		<Actions className="-ml-0.5">
-			<Action onClick={handleCopy} tooltip="Copy">
-				<CopyIcon />
-			</Action>
+  return (
+    <Actions className="-ml-0.5">
+      <Action onClick={handleCopy} tooltip="Copy">
+        <CopyIcon />
+      </Action>
 
-			<Action
-				data-testid="message-upvote"
-				disabled={vote?.isUpvoted}
-				onClick={() => {
-					const upvote = fetch("/api/vote", {
-						method: "PATCH",
-						headers: { "Content-Type": "application/json" },
-						body: JSON.stringify({
-							chatId,
-							messageId: message.id,
-							type: "up",
-						}),
-					});
+      <Action
+        data-testid="message-upvote"
+        disabled={vote?.isUpvoted}
+        onClick={() => {
+          const upvote = fetch("/api/vote", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chatId,
+              messageId: message.id,
+              type: "up",
+            }),
+          });
 
-					toast.promise(upvote, {
-						loading: "Upvoting Response...",
-						success: () => {
-							mutate<Vote[]>(
-								`/api/vote?chatId=${chatId}`,
-								(currentVotes) => {
-									if (!currentVotes) {
-										return [];
-									}
+          toast.promise(upvote, {
+            loading: "Upvoting Response...",
+            success: () => {
+              mutate<Vote[]>(
+                `/api/vote?chatId=${chatId}`,
+                (currentVotes) => {
+                  if (!currentVotes) {
+                    return [];
+                  }
 
-									const votesWithoutCurrent = currentVotes.filter(
-										(currentVote) => currentVote.messageId !== message.id,
-									);
+                  const votesWithoutCurrent = currentVotes.filter(
+                    (currentVote) => currentVote.messageId !== message.id,
+                  );
 
-									return [
-										...votesWithoutCurrent,
-										{
-											userId: vote?.userId ?? "noop",
-											chatId,
-											messageId: message.id,
-											isUpvoted: true,
-										},
-									];
-								},
-								{ revalidate: false },
-							);
+                  return [
+                    ...votesWithoutCurrent,
+                    {
+                      userId: vote?.userId ?? "noop",
+                      chatId,
+                      messageId: message.id,
+                      isUpvoted: true,
+                    },
+                  ];
+                },
+                { revalidate: false },
+              );
 
-							return "Upvoted Response!";
-						},
-						error: "Failed to upvote response.",
-					});
-				}}
-				tooltip="Upvote Response"
-			>
-				<ThumbUpIcon />
-			</Action>
+              return "Upvoted Response!";
+            },
+            error: "Failed to upvote response.",
+          });
+        }}
+        tooltip="Upvote Response"
+      >
+        <ThumbUpIcon />
+      </Action>
 
-			<Action
-				data-testid="message-downvote"
-				disabled={vote && !vote.isUpvoted}
-				onClick={() => {
-					const downvote = fetch("/api/vote", {
-						method: "PATCH",
-						headers: { "Content-Type": "application/json" },
-						body: JSON.stringify({
-							chatId,
-							messageId: message.id,
-							type: "down",
-						}),
-					});
+      <Action
+        data-testid="message-downvote"
+        disabled={vote && !vote.isUpvoted}
+        onClick={() => {
+          const downvote = fetch("/api/vote", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chatId,
+              messageId: message.id,
+              type: "down",
+            }),
+          });
 
-					toast.promise(downvote, {
-						loading: "Downvoting Response...",
-						success: () => {
-							mutate<Vote[]>(
-								`/api/vote?chatId=${chatId}`,
-								(currentVotes) => {
-									if (!currentVotes) {
-										return [];
-									}
+          toast.promise(downvote, {
+            loading: "Downvoting Response...",
+            success: () => {
+              mutate<Vote[]>(
+                `/api/vote?chatId=${chatId}`,
+                (currentVotes) => {
+                  if (!currentVotes) {
+                    return [];
+                  }
 
-									const votesWithoutCurrent = currentVotes.filter(
-										(currentVote) => currentVote.messageId !== message.id,
-									);
+                  const votesWithoutCurrent = currentVotes.filter(
+                    (currentVote) => currentVote.messageId !== message.id,
+                  );
 
-									return [
-										...votesWithoutCurrent,
-										{
-											userId: vote?.userId ?? "noop",
-											chatId,
-											messageId: message.id,
-											isUpvoted: false,
-										},
-									];
-								},
-								{ revalidate: false },
-							);
+                  return [
+                    ...votesWithoutCurrent,
+                    {
+                      userId: vote?.userId ?? "noop",
+                      chatId,
+                      messageId: message.id,
+                      isUpvoted: false,
+                    },
+                  ];
+                },
+                { revalidate: false },
+              );
 
-							return "Downvoted Response!";
-						},
-						error: "Failed to downvote response.",
-					});
-				}}
-				tooltip="Downvote Response"
-			>
-				<ThumbDownIcon />
-			</Action>
-		</Actions>
-	);
+              return "Downvoted Response!";
+            },
+            error: "Failed to downvote response.",
+          });
+        }}
+        tooltip="Downvote Response"
+      >
+        <ThumbDownIcon />
+      </Action>
+    </Actions>
+  );
 }
 
 export const MessageActions = memo(
-	PureMessageActions,
-	(prevProps, nextProps) => {
-		if (prevProps.chatId !== nextProps.chatId) {
-			return false;
-		}
-		if (prevProps.message.id !== nextProps.message.id) {
-			return false;
-		}
-		if (!equal(prevProps.message.parts, nextProps.message.parts)) {
-			return false;
-		}
-		if (prevProps.canEdit !== nextProps.canEdit) {
-			return false;
-		}
-		if (!equal(prevProps.vote, nextProps.vote)) {
-			return false;
-		}
-		if (prevProps.isLoading !== nextProps.isLoading) {
-			return false;
-		}
+  PureMessageActions,
+  (prevProps, nextProps) => {
+    if (prevProps.chatId !== nextProps.chatId) {
+      return false;
+    }
+    if (prevProps.message.id !== nextProps.message.id) {
+      return false;
+    }
+    if (!equal(prevProps.message.parts, nextProps.message.parts)) {
+      return false;
+    }
+    if (prevProps.canEdit !== nextProps.canEdit) {
+      return false;
+    }
+    if (!equal(prevProps.vote, nextProps.vote)) {
+      return false;
+    }
+    if (prevProps.isLoading !== nextProps.isLoading) {
+      return false;
+    }
 
-		return true;
-	},
+    return true;
+  },
 );

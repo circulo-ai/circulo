@@ -43,7 +43,7 @@ describe("workflow history", () => {
     expect(first?.nextSequence).toBe(1);
     expect(stale).toBeNull();
     expect(second?.nextSequence).toBe(3);
-    expect((await history.nextSequence("workflow-1", "run-1"))).toBe(3);
+    expect(await history.nextSequence("workflow-1", "run-1")).toBe(3);
 
     const events = await history.read<{ activity?: string }>({
       workflowId: "workflow-1",
@@ -59,14 +59,29 @@ describe("workflow history", () => {
   it("reads a run by sequence instead of wall-clock timestamp", async () => {
     const history = new InMemoryWorkflowHistoryStore();
     await history.append(
-      { workflowId: "workflow-order", runId: "run-1", eventType: "workflow.started", payload: {}, timestamp: 20 },
+      {
+        workflowId: "workflow-order",
+        runId: "run-1",
+        eventType: "workflow.started",
+        payload: {},
+        timestamp: 20,
+      },
       0,
     );
     await history.append(
-      { workflowId: "workflow-order", runId: "run-1", eventType: "workflow.completed", payload: {}, timestamp: 10 },
+      {
+        workflowId: "workflow-order",
+        runId: "run-1",
+        eventType: "workflow.completed",
+        payload: {},
+        timestamp: 10,
+      },
       1,
     );
-    const events = await history.read({ workflowId: "workflow-order", runId: "run-1" });
+    const events = await history.read({
+      workflowId: "workflow-order",
+      runId: "run-1",
+    });
     expect(events.map((event) => event.eventType)).toEqual([
       "workflow.started",
       "workflow.completed",

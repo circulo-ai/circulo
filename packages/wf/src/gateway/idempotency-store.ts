@@ -7,7 +7,11 @@ import type {
 export class InMemoryIdempotencyStore implements IdempotencyStore {
   private readonly entries = new Map<
     string,
-    { reference: WorkflowRunReference; expiresAt?: number | undefined; fingerprint?: string | undefined }
+    {
+      reference: WorkflowRunReference;
+      expiresAt?: number | undefined;
+      fingerprint?: string | undefined;
+    }
   >();
 
   async claim(
@@ -22,7 +26,9 @@ export class InMemoryIdempotencyStore implements IdempotencyStore {
       return {
         claimed: false,
         reference: structuredClone(existing.reference),
-        ...(fingerprint !== undefined && existing.fingerprint !== undefined && fingerprint !== existing.fingerprint
+        ...(fingerprint !== undefined &&
+        existing.fingerprint !== undefined &&
+        fingerprint !== existing.fingerprint
           ? { conflict: true }
           : {}),
       };
@@ -35,9 +41,13 @@ export class InMemoryIdempotencyStore implements IdempotencyStore {
     return { claimed: true, reference: structuredClone(reference) };
   }
 
-  async release(key: string, reference: WorkflowRunReference): Promise<boolean> {
+  async release(
+    key: string,
+    reference: WorkflowRunReference,
+  ): Promise<boolean> {
     const existing = this.entries.get(key);
-    if (!existing || !sameReference(existing.reference, reference)) return false;
+    if (!existing || !sameReference(existing.reference, reference))
+      return false;
     this.entries.delete(key);
     return true;
   }
@@ -54,7 +64,10 @@ export class InMemoryIdempotencyStore implements IdempotencyStore {
   }
 }
 
-function sameReference(left: WorkflowRunReference, right: WorkflowRunReference): boolean {
+function sameReference(
+  left: WorkflowRunReference,
+  right: WorkflowRunReference,
+): boolean {
   return (
     left.workflowId === right.workflowId &&
     left.runId === right.runId &&
