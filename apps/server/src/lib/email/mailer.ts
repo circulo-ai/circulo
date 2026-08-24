@@ -1,3 +1,15 @@
+import {
+  buildUnsubscribeUrl as buildPolicyUnsubscribeUrl,
+  isTransactionalEmail,
+  normalizeRecipients,
+  selectEmailRecipients,
+  type EmailType as PolicyEmailType,
+  type SuppressibleEmailType,
+} from "@/lib/email/policy";
+import {
+  generateUnsubscribeToken,
+  isUnsubscribed,
+} from "@/lib/email/unsubscribe";
 import { getFromEmailAddress } from "@/lib/email/utils";
 import { env } from "@/lib/env";
 import { createLogger } from "@/lib/logs/console/logger";
@@ -11,6 +23,8 @@ export type EmailType =
   | "marketing"
   | "updates"
   | "notifications";
+
+export { normalizeRecipients, selectEmailRecipients } from "@/lib/email/policy";
 
 export interface EmailAttachment {
   filename: string;
@@ -48,6 +62,19 @@ export interface BatchSendEmailResult {
   data?: any;
 }
 
+export function buildUnsubscribeUrl(
+  email: string,
+  emailType: SuppressibleEmailType,
+  appUrl = env.NEXT_PUBLIC_APP_URL,
+): string {
+  return buildPolicyUnsubscribeUrl(
+    email,
+    emailType,
+    generateUnsubscribeToken(email, emailType),
+    appUrl,
+  );
+}
+
 interface ProcessedEmailData {
   to: string | string[];
   subject: string;
@@ -83,36 +110,40 @@ export async function sendEmail(
   options: EmailOptions,
 ): Promise<SendEmailResult> {
   try {
-    // Check if user has unsubscribed (skip for critical transactional emails)
-    if (options.emailType !== "transactional") {
-      const unsubscribeType = options.emailType as
-        | "marketing"
-        | "updates"
-        | "notifications";
-      // For arrays, check the first email address (batch emails typically go to similar recipients)
-      const primaryEmail = Array.isArray(options.to)
-        ? options.to[0]
-        : options.to;
-      logger.info("Email not sent (user unsubscribed):", {
+    const emailType = options.emailType ?? "transactional";
+    const recipients = await selectEmailRecipients(
+      options.to,
+      emailType as PolicyEmailType,
+      isUnsubscribed,
+    );
+
+    if (recipients.length === 0) {
+      logger.info("Email not sent (all recipients unsubscribed):", {
         to: options.to,
         subject: options.subject,
-        emailType: options.emailType,
+        emailType,
       });
       return {
         success: true,
-        message: "Email skipped (user unsubscribed)",
-        data: { id: "skipped-unsubscribed" },
+        message: "Email skipped (all recipients unsubscribed)",
+        data: { id: "skipped-unsubscribed", skipped: true },
       };
     }
 
-    // Process email data with unsubscribe tokens and headers
-    const processedData = await processEmailData(options);
+    const processedData = await processEmailData({
+      ...options,
+      to: recipients.length === 1 ? recipients[0]! : recipients,
+      emailType,
+    });
+
+    let providerFailed = false;
 
     // Try Resend first if configured
     if (resend) {
       try {
         return await sendWithResend(processedData);
       } catch (error) {
+        providerFailed = true;
         logger.warn(
           "Resend failed, attempting Azure Communication Services fallback:",
           error,
@@ -133,7 +164,23 @@ export async function sendEmail(
       }
     }
 
-    // No email service configured
+    // Never report a delivery success in production when no provider is
+    // configured or a configured provider failed. The mock result is only a
+    // deliberate local-development fallback for flows that do not need mail.
+    if (providerFailed || env.NODE_ENV === "production") {
+      logger.error("Email delivery unavailable", {
+        providerFailed,
+        configured: hasEmailService(),
+      });
+      return {
+        success: false,
+        message: providerFailed
+          ? "Configured email service failed"
+          : "Email service is not configured",
+      };
+    }
+
+    // No email service configured in local development
     logger.info("Email not sent (no email service configured):", {
       to: options.to,
       subject: options.subject,
@@ -169,16 +216,25 @@ async function processEmailData(
 
   const senderEmail = from || getFromEmailAddress();
 
-  // Generate unsubscribe token and add to content
-  let finalHtml = html;
-  let finalText = text;
   const headers: Record<string, string> = {};
+
+  const recipients = normalizeRecipients(to);
+  if (
+    !isTransactionalEmail(emailType) &&
+    options.includeUnsubscribe !== false &&
+    recipients.length === 1
+  ) {
+    headers["List-Unsubscribe"] = `<${buildUnsubscribeUrl(
+      recipients[0]!,
+      emailType as SuppressibleEmailType,
+    )}>`;
+  }
 
   return {
     to,
     subject,
-    html: finalHtml,
-    text: finalText,
+    html,
+    text,
     senderEmail,
     headers,
     attachments,

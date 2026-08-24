@@ -25,6 +25,11 @@ const classificationSchema = z.object({
     .array(z.string())
     .describe("Technical domains involved (e.g., 'code', 'data', 'design')"),
   requiresMultipleAgents: z.boolean(),
+  shouldEngageAgents: z
+    .boolean()
+    .describe(
+      "Whether an agent should participate in this turn. False when human members are simply talking to one another without addressing an agent.",
+    ),
   estimatedSteps: z.number(),
   urgency: z.enum(["low", "medium", "high", "critical"]),
   notifyMembers: z
@@ -93,11 +98,13 @@ Analyze the user's request and conversation history to determine:
 5. Estimated number of execution steps
 6. Urgency level
 7. Whether chat members should be notified
-8. Key entities (repositories, files, users, etc.)
+8. Whether an agent should participate in this turn
+9. Key entities (repositories, files, users, etc.)
 
 Context:
 - This is ${triggerType === "webhook_event" ? "a webhook-triggered automation" : "a direct user request"}
 - Consider the conversation history for context
+- Set shouldEngageAgents to false when the current speaker is addressing human teammates or continuing a human-to-human conversation without a direct or indirect request for an agent. Set it to true for an explicit @mention, a request addressed to an agent/assistant, an actionable request that clearly needs the system, or a webhook event.
 - Be precise in domain identification for better agent matching`,
         prompt: `Recent conversation:
 ${recentMessages.map((m) => `${m.author}: ${m.content}`).join("\n")}

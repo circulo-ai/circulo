@@ -2,7 +2,6 @@
 
 import { Auth } from "@/components/auth/auth";
 import { FieldDescription } from "@/components/ui/field";
-import { Spinner } from "@/components/ui/spinner";
 import { useSession } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 import { AlreadyLoggedInCard } from "./components/already-logged-in";
@@ -11,9 +10,7 @@ const termsUrl = process.env.NEXT_PUBLIC_TERMS_URL;
 const privacyUrl = process.env.NEXT_PUBLIC_PRIVACY_URL;
 
 export function AuthPageClient({ path }: { path: string }) {
-  const { data: session, isPending } = useSession();
-
-  if (isPending) return <Spinner className="mx-auto" />;
+  const { data: session } = useSession();
 
   return (
     <div className={cn("flex w-full flex-col gap-6")}>

@@ -36,8 +36,8 @@ export function handoffTask(params: {
           "The target user must be an active member of this chat",
         );
       }
-		if (input.toAgentId) {
-			const target = await chatAgentRepo.findAgentInChat(
+      if (input.toAgentId) {
+        const target = await chatAgentRepo.findAgentInChat(
           input.toAgentId,
           params.chatId,
         );

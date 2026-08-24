@@ -1,13 +1,13 @@
-import { ConsoleLogger } from "../utils/logger";
-import { InMemoryMetrics } from "../utils/metrics";
 import type {
   ActivityTaskPayload,
   ActivityWorkerOptions,
   TaskDisposition,
-  TaskFailure,
   TaskEnvelope,
+  TaskFailure,
   WorkerTaskContext,
 } from "../models";
+import { ConsoleLogger } from "../utils/logger";
+import { InMemoryMetrics } from "../utils/metrics";
 import { Worker } from "../worker/worker";
 import { appendHistoryEvent } from "./history-append";
 

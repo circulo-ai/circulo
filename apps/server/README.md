@@ -9,4 +9,6 @@ bun run dev:stack
 
 The web application is at `http://localhost:3000`. The API is at
 `http://localhost:3002`; use `/health` for liveness and `/health/ready` to
-verify PostgreSQL and Redis connectivity.
+verify PostgreSQL, Redis, authentication, encryption, AI, email, storage, and
+billing readiness. In production the readiness probe also verifies every
+configured S3-compatible bucket with `HeadBucket`.

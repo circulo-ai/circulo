@@ -1,4 +1,3 @@
-import { exponentialBackoff } from "../utils/backoff";
 import type {
   ClaimedTask,
   TaskDisposition,
@@ -9,6 +8,7 @@ import type {
   WorkerStatus,
   WorkerTaskContext,
 } from "../models";
+import { exponentialBackoff } from "../utils/backoff";
 
 const DEFAULT_CONCURRENCY = 1;
 const DEFAULT_LEASE_DURATION_MS = 30_000;
@@ -75,7 +75,9 @@ export class Worker<TPayload = unknown> {
     await Promise.resolve();
   }
 
-  async stop(options: { graceful?: boolean; timeoutMs?: number } = {}): Promise<void> {
+  async stop(
+    options: { graceful?: boolean; timeoutMs?: number } = {},
+  ): Promise<void> {
     if (this.stateValue === "stopped") return;
     if (this.stateValue === "created") {
       this.stateValue = "stopped";
@@ -95,7 +97,8 @@ export class Worker<TPayload = unknown> {
   }
 
   private async pollLoop(): Promise<void> {
-    const pollIntervalMs = this.options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
+    const pollIntervalMs =
+      this.options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
     while (!this.abortController.signal.aborted) {
       let claimed = false;
       for (const queue of this.options.queues) {
@@ -134,18 +137,18 @@ export class Worker<TPayload = unknown> {
           lease.token,
           this.options.leaseDurationMs ?? DEFAULT_LEASE_DURATION_MS,
         )
-          .then((healthy) => {
-            if (!healthy) {
-              leaseWasLost = true;
-              controller.abort();
-              leaseLostReject(new Error(`Lease lost for task ${task.id}`));
-            }
-          })
-          .catch((error: unknown) => {
+        .then((healthy) => {
+          if (!healthy) {
             leaseWasLost = true;
             controller.abort();
-            leaseLostReject(toError(error));
-          });
+            leaseLostReject(new Error(`Lease lost for task ${task.id}`));
+          }
+        })
+        .catch((error: unknown) => {
+          leaseWasLost = true;
+          controller.abort();
+          leaseLostReject(toError(error));
+        });
     }, this.options.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS);
 
     const context: WorkerTaskContext = {
@@ -184,8 +187,12 @@ export class Worker<TPayload = unknown> {
     disposition: TaskDisposition,
   ): Promise<void> {
     if (disposition.type === "acknowledge") {
-      const acknowledged = await this.options.queue.acknowledge(task.id, leaseToken);
-      if (!acknowledged) throw new Error(`Could not acknowledge task ${task.id}`);
+      const acknowledged = await this.options.queue.acknowledge(
+        task.id,
+        leaseToken,
+      );
+      if (!acknowledged)
+        throw new Error(`Could not acknowledge task ${task.id}`);
       this.completed += 1;
       return;
     }
@@ -222,15 +229,23 @@ export class Worker<TPayload = unknown> {
     if (failure.retryable && task.attempt < maxAttempts) {
       const delayMs = retryDelay(task.attempt, task.retryPolicy);
       const availableAt = requestedAvailableAt ?? Date.now() + delayMs;
-      const rescheduled = await this.options.queue.reschedule(task.id, leaseToken, {
-        availableAt,
-        failure,
-      });
+      const rescheduled = await this.options.queue.reschedule(
+        task.id,
+        leaseToken,
+        {
+          availableAt,
+          failure,
+        },
+      );
       if (!rescheduled) throw new Error(`Could not reschedule task ${task.id}`);
       return;
     }
 
-    const rejected = await this.options.queue.reject(task.id, leaseToken, failure);
+    const rejected = await this.options.queue.reject(
+      task.id,
+      leaseToken,
+      failure,
+    );
     if (!rejected) throw new Error(`Could not reject task ${task.id}`);
     this.failed += 1;
   }

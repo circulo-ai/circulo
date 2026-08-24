@@ -1,7 +1,7 @@
 "use client";
 
-import * as React from "react";
 import { PreviewCard as PreviewCardPrimitive } from "@base-ui/react/preview-card";
+import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -10,7 +10,12 @@ const hoverCardTiming = React.createContext<{
   closeDelay?: number;
 }>({});
 
-function HoverCard({ openDelay, closeDelay, children, ...props }: PreviewCardPrimitive.Root.Props & {
+function HoverCard({
+  openDelay,
+  closeDelay,
+  children,
+  ...props
+}: PreviewCardPrimitive.Root.Props & {
   openDelay?: number;
   closeDelay?: number;
 }) {
@@ -23,7 +28,13 @@ function HoverCard({ openDelay, closeDelay, children, ...props }: PreviewCardPri
   );
 }
 
-function HoverCardTrigger({ asChild = false, delay, closeDelay, children, ...props }: PreviewCardPrimitive.Trigger.Props & {
+function HoverCardTrigger({
+  asChild = false,
+  delay,
+  closeDelay,
+  children,
+  ...props
+}: PreviewCardPrimitive.Trigger.Props & {
   asChild?: boolean;
 }) {
   const timing = React.useContext(hoverCardTiming);
@@ -65,7 +76,7 @@ function HoverCardContent({
           data-slot="hover-card-content"
           className={cn(
             "z-50 w-72 origin-(--transform-origin) rounded-2xl bg-popover p-4 text-sm text-popover-foreground shadow-2xl ring-1 ring-foreground/5 outline-hidden duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
-            className
+            className,
           )}
           {...props}
         />
@@ -74,4 +85,4 @@ function HoverCardContent({
   );
 }
 
-export { HoverCard, HoverCardTrigger, HoverCardContent };
+export { HoverCard, HoverCardContent, HoverCardTrigger };

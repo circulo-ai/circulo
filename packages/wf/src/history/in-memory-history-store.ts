@@ -1,4 +1,3 @@
-import { generateId } from "../utils/id";
 import type {
   HistoryAppendResult,
   HistoryReadOptions,
@@ -6,10 +5,14 @@ import type {
   WorkflowHistoryEventInput,
   WorkflowHistoryStore,
 } from "../models";
+import { generateId } from "../utils/id";
 
 /** Reference history store for tests and local replay development. */
 export class InMemoryWorkflowHistoryStore implements WorkflowHistoryStore {
-  private readonly histories = new Map<string, WorkflowHistoryEvent<unknown>[]>();
+  private readonly histories = new Map<
+    string,
+    WorkflowHistoryEvent<unknown>[]
+  >();
 
   async append<TPayload>(
     event: WorkflowHistoryEventInput<TPayload>,
@@ -36,7 +39,9 @@ export class InMemoryWorkflowHistoryStore implements WorkflowHistoryStore {
         existingEvent.eventType !== first.eventType ||
         JSON.stringify(existingEvent.payload) !== JSON.stringify(first.payload)
       ) {
-        throw new Error(`History event id ${first.eventId} was reused with different content`);
+        throw new Error(
+          `History event id ${first.eventId} was reused with different content`,
+        );
       }
       return {
         appended: [structuredClone(existingEvent)],
@@ -77,8 +82,8 @@ export class InMemoryWorkflowHistoryStore implements WorkflowHistoryStore {
           options.fromSequence === undefined ||
           event.sequence >= options.fromSequence,
       )
-      .sort(
-        (left, right) => options.runId
+      .sort((left, right) =>
+        options.runId
           ? left.sequence - right.sequence
           : left.workflowId.localeCompare(right.workflowId) ||
             left.runId.localeCompare(right.runId) ||

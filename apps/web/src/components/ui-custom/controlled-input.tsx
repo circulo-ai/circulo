@@ -185,6 +185,8 @@ const FormInputAdapter = <
 
   return (
     <InputComponent
+      {...inputProps}
+      {...field}
       id={id} // TODO pass these props only if InputComponent accepts them
       aria-invalid={invalid}
       className={className}
@@ -203,8 +205,6 @@ const FormInputAdapter = <
               : e,
         )
       }
-      {...inputProps}
-      {...field}
     />
   );
 };

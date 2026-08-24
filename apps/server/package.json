@@ -4,9 +4,9 @@
   "private": true,
   "version": "0.0.2",
   "scripts": {
-    "dev": "bun --hot src/index.ts",
-    "build": "bun ./build-server.ts",
-    "start": "bun dist/index.js",
+    "dev": "cross-env NODE_ENV=development bun --watch src/index.ts",
+    "build": "cross-env NODE_ENV=production bun ./build-server.ts",
+    "start": "cross-env NODE_ENV=production bun dist/index.js",
     "typecheck": "bun ./node_modules/typescript/bin/tsc -p tsconfig.typecheck.json --noEmit",
     "test": "bun ./node_modules/vitest/vitest.mjs run --passWithNoTests",
     "db:generate": "bun --env-file=.env ../../node_modules/drizzle-kit/bin.cjs generate --config=../../packages/db/drizzle.config.ts",

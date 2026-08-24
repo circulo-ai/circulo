@@ -25,7 +25,10 @@ function boundedMetadata(metadata?: Record<string, unknown>) {
   if (!metadata) return undefined;
   const safe = Object.fromEntries(
     Object.entries(metadata)
-      .filter(([key]) => !/(authorization|cookie|token|secret|password|key)/i.test(key))
+      .filter(
+        ([key]) =>
+          !/(authorization|cookie|token|secret|password|key)/i.test(key),
+      )
       .slice(0, 32),
   );
   const serialized = JSON.stringify(safe);

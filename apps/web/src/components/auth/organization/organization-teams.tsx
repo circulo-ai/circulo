@@ -121,8 +121,10 @@ function TeamCard({
   const { authClient, localization: authLocalization } =
     useAuth<OrganizationAuthClient>();
   const { localization } = useAuthPlugin(organizationPlugin);
+  const [removed, setRemoved] = useState(false);
   const teamMembers = useListTeamMembers(authClient, {
     query: { teamId: team.id },
+    enabled: !removed,
   });
   const updateTeam = useUpdateTeam(authClient);
   const removeTeam = useRemoveTeam(authClient);
@@ -142,6 +144,8 @@ function TeamCard({
       label: member.user.name || member.user.email,
       value: member.userId,
     }));
+
+  if (removed) return null;
 
   return (
     <Card>
@@ -262,9 +266,15 @@ function TeamCard({
               disabled={removeTeam.isPending}
               onClick={(event) => {
                 event.preventDefault();
+                setRemoved(true);
                 removeTeam.mutate(
                   { teamId: team.id, organizationId },
-                  { onSuccess: () => setDeleteOpen(false) },
+                  {
+                    onSuccess: () => {
+                      setDeleteOpen(false);
+                    },
+                    onError: () => setRemoved(false),
+                  },
                 );
               }}
             >

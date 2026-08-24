@@ -1,5 +1,5 @@
-import { generateId } from "../utils/id";
 import type { TenantConcurrencyLease, TenantConcurrencyStore } from "../models";
+import { generateId } from "../utils/id";
 
 export class TenantConcurrencyGate {
   constructor(private readonly store: TenantConcurrencyStore) {}
@@ -7,16 +7,27 @@ export class TenantConcurrencyGate {
   async acquire(
     tenantId: string,
     limit: number,
-    options: { leaseId?: string | undefined; expiresAt?: number | undefined } = {},
+    options: {
+      leaseId?: string | undefined;
+      expiresAt?: number | undefined;
+    } = {},
   ): Promise<TenantConcurrencyLease | null> {
     if (!tenantId.trim()) throw new Error("Tenant id must not be empty");
-    if (!Number.isInteger(limit) || limit < 1) throw new RangeError("Tenant concurrency limit must be positive");
+    if (!Number.isInteger(limit) || limit < 1)
+      throw new RangeError("Tenant concurrency limit must be positive");
     const lease: TenantConcurrencyLease = {
       tenantId,
       leaseId: options.leaseId ?? generateId("tenant-lease"),
-      ...(options.expiresAt === undefined ? {} : { expiresAt: options.expiresAt }),
+      ...(options.expiresAt === undefined
+        ? {}
+        : { expiresAt: options.expiresAt }),
     };
-    const acquired = await this.store.acquire(tenantId, limit, lease.leaseId, lease.expiresAt);
+    const acquired = await this.store.acquire(
+      tenantId,
+      limit,
+      lease.leaseId,
+      lease.expiresAt,
+    );
     return acquired ? lease : null;
   }
 
@@ -24,8 +35,15 @@ export class TenantConcurrencyGate {
     return this.store.release(lease.tenantId, lease.leaseId);
   }
 
-  async renew(lease: TenantConcurrencyLease, expiresAt?: number): Promise<boolean> {
-    const renewed = await this.store.renew(lease.tenantId, lease.leaseId, expiresAt);
+  async renew(
+    lease: TenantConcurrencyLease,
+    expiresAt?: number,
+  ): Promise<boolean> {
+    const renewed = await this.store.renew(
+      lease.tenantId,
+      lease.leaseId,
+      expiresAt,
+    );
     if (renewed && expiresAt !== undefined) lease.expiresAt = expiresAt;
     return renewed;
   }
@@ -40,11 +58,19 @@ interface ActiveLease {
 export class InMemoryTenantConcurrencyStore implements TenantConcurrencyStore {
   private readonly leases = new Map<string, Map<string, ActiveLease>>();
 
-  async acquire(tenantId: string, limit: number, leaseId: string, expiresAt?: number): Promise<boolean> {
+  async acquire(
+    tenantId: string,
+    limit: number,
+    leaseId: string,
+    expiresAt?: number,
+  ): Promise<boolean> {
     await this.reclaimExpired();
     const leases = this.leases.get(tenantId) ?? new Map<string, ActiveLease>();
     if (leases.size >= limit) return false;
-    leases.set(leaseId, { leaseId, ...(expiresAt === undefined ? {} : { expiresAt }) });
+    leases.set(leaseId, {
+      leaseId,
+      ...(expiresAt === undefined ? {} : { expiresAt }),
+    });
     this.leases.set(tenantId, leases);
     return true;
   }
@@ -57,7 +83,11 @@ export class InMemoryTenantConcurrencyStore implements TenantConcurrencyStore {
     return released;
   }
 
-  async renew(tenantId: string, leaseId: string, expiresAt?: number): Promise<boolean> {
+  async renew(
+    tenantId: string,
+    leaseId: string,
+    expiresAt?: number,
+  ): Promise<boolean> {
     await this.reclaimExpired();
     const lease = this.leases.get(tenantId)?.get(leaseId);
     if (!lease) return false;

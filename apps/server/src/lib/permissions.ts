@@ -1,15 +1,15 @@
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 import {
+  adminRole,
   getSession,
   memberRole,
-  adminRole,
   ownerRole,
   statement,
   type SessionResponse,
 } from "@/lib/auth";
 import { ForbiddenError } from "@circulo-ai/types";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 export type Resource = keyof typeof statement;
 export type Action<R extends Resource> = (typeof statement)[R][number];
@@ -27,6 +27,32 @@ function roleAllows(role: string, resource: string, action: string): boolean {
     | Record<string, string[]>
     | undefined;
   return Boolean(statements?.[resource]?.includes(action));
+}
+
+async function customRoleAllows(
+  organizationId: string,
+  roles: string[],
+  resource: string,
+  action: string,
+) {
+  if (!roles.length) return false;
+  const matches = await db
+    .select({ id: schema.workspaceRolePermission.id })
+    .from(schema.workspaceRolePermission)
+    .innerJoin(
+      schema.workspaceRole,
+      eq(schema.workspaceRole.id, schema.workspaceRolePermission.roleId),
+    )
+    .where(
+      and(
+        eq(schema.workspaceRole.organizationId, organizationId),
+        inArray(schema.workspaceRole.key, roles),
+        eq(schema.workspaceRolePermission.resource, resource),
+        eq(schema.workspaceRolePermission.action, action),
+      ),
+    )
+    .limit(1);
+  return matches.length > 0;
 }
 
 function getSessionActiveOrganizationId(
@@ -68,7 +94,12 @@ export async function getUserRoles(
   organizationId: string,
 ): Promise<string[]> {
   const role = await getUserRole(userId, organizationId);
-  return role ? role.split(",").map((value) => value.trim()).filter(Boolean) : [];
+  return role
+    ? role
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean)
+    : [];
 }
 
 /**
@@ -103,7 +134,8 @@ export async function hasPermission<R extends Resource>(
   }
 
   const roles = await getUserRoles(sessionData.user.id, orgId);
-  return roles.some((role) => roleAllows(role, resource, action));
+  if (roles.some((role) => roleAllows(role, resource, action))) return true;
+  return customRoleAllows(orgId, roles, resource, action as string);
 }
 
 /**
@@ -259,7 +291,50 @@ export async function getUserPermissions(
       );
     }
   }
+
+  if (roles.length) {
+    const customPermissions = await db
+      .select({
+        resource: schema.workspaceRolePermission.resource,
+        action: schema.workspaceRolePermission.action,
+      })
+      .from(schema.workspaceRolePermission)
+      .innerJoin(
+        schema.workspaceRole,
+        eq(schema.workspaceRole.id, schema.workspaceRolePermission.roleId),
+      )
+      .where(
+        and(
+          eq(schema.workspaceRole.organizationId, orgId),
+          inArray(schema.workspaceRole.key, roles),
+        ),
+      );
+    for (const permission of customPermissions) {
+      permissions[permission.resource] = Array.from(
+        new Set([
+          ...(permissions[permission.resource] ?? []),
+          permission.action,
+        ]),
+      );
+    }
+  }
   return permissions;
+}
+
+/**
+ * Permission check for route code that already has an authenticated user id.
+ * This keeps custom workspace roles aligned with Better Auth's built-in roles
+ * without relying on request-global session state.
+ */
+export async function hasPermissionForUser(
+  userId: string,
+  organizationId: string,
+  resource: string,
+  action: string,
+): Promise<boolean> {
+  const roles = await getUserRoles(userId, organizationId);
+  if (roles.some((role) => roleAllows(role, resource, action))) return true;
+  return customRoleAllows(organizationId, roles, resource, action);
 }
 
 /**

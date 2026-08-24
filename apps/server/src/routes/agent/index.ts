@@ -3,7 +3,7 @@ import { agentRepo } from "@/db/repositories";
 import { agent, knowledgeBase } from "@/db/schema";
 import { enforceOrganizationFeatureLimit } from "@/lib/billing/limits";
 import { createRouter } from "@/lib/create-app";
-import { getUserRole, isMemberOf } from "@/lib/permissions";
+import { hasPermissionForUser, isMemberOf } from "@/lib/permissions";
 import { requireAuth } from "@/middleware/auth";
 import { NotFoundError } from "@circulo-ai/core";
 import {
@@ -70,8 +70,14 @@ router.post(
     if (!isOrgMember) {
       throw new ForbiddenError("You don't have access to this organization");
     }
-    const role = await getUserRole(user!.id, organizationId);
-    if (!role || !["owner", "admin"].includes(role)) {
+    if (
+      !(await hasPermissionForUser(
+        user!.id,
+        organizationId,
+        "agents",
+        "create",
+      ))
+    ) {
       throw new ForbiddenError(
         "Only workspace owners and admins can create agents",
       );
@@ -112,6 +118,7 @@ router.post(
         model: body.model,
         maxTokens: body.maxTokens,
         temperature: body.temperature,
+        toolAccessMode: body.toolAccessMode ?? "allowlist",
         defaultToolIds: body.defaultToolIds ?? [],
         defaultKnowledgeBaseIds: body.defaultKnowledgeBaseIds ?? [],
         metadata: body.metadata ?? undefined,
@@ -132,13 +139,18 @@ router.post(
   },
 );
 
-function assertCanManageAgent(
+async function assertCanManageAgent(
   agentCreatorId: string,
   userId: string,
-  role: string | null,
+  organizationId: string,
 ) {
-  const isAdmin = role === "owner" || role === "admin";
-  if (agentCreatorId !== userId && !isAdmin) {
+  const canManage = await hasPermissionForUser(
+    userId,
+    organizationId,
+    "agents",
+    "update",
+  );
+  if (agentCreatorId !== userId && !canManage) {
     throw new ForbiddenError("You don't have permission to modify this agent");
   }
 }
@@ -162,8 +174,11 @@ router.patch(
       throw new NotFoundError("Agent not found");
     }
 
-    const role = await getUserRole(user!.id, organizationId);
-    assertCanManageAgent(existingAgent.createdBy, user!.id, role);
+    await assertCanManageAgent(
+      existingAgent.createdBy,
+      user!.id,
+      organizationId,
+    );
 
     const { id, ...updates } = body;
 
@@ -203,6 +218,8 @@ router.patch(
       updateData.maxTokens = updates.maxTokens;
     if (updates.temperature !== undefined)
       updateData.temperature = updates.temperature;
+    if (updates.toolAccessMode !== undefined)
+      updateData.toolAccessMode = updates.toolAccessMode;
     if (updates.defaultToolIds !== undefined)
       updateData.defaultToolIds = updates.defaultToolIds;
     if (updates.defaultKnowledgeBaseIds !== undefined)
@@ -240,8 +257,11 @@ router.delete(
       throw new NotFoundError("Agent not found");
     }
 
-    const role = await getUserRole(user!.id, organizationId);
-    assertCanManageAgent(existingAgent.createdBy, user!.id, role);
+    await assertCanManageAgent(
+      existingAgent.createdBy,
+      user!.id,
+      organizationId,
+    );
 
     const deletedAgent = query.hard
       ? await agentRepo.delete(params.id)

@@ -40,7 +40,11 @@ export class SecureWorkflowClient implements WorkflowRemoteClient {
     workflowId: string,
     options?: { tenantId?: string | undefined },
   ): Promise<WorkflowQueryView> {
-    return this.adapter.queryWorkflow(workflowId, await resolveToken(this.accessToken), options);
+    return this.adapter.queryWorkflow(
+      workflowId,
+      await resolveToken(this.accessToken),
+      options,
+    );
   }
 
   async *streamWorkflowEvents(
@@ -57,7 +61,9 @@ export class SecureWorkflowClient implements WorkflowRemoteClient {
     payload?: { reason?: string | undefined; tenantId?: string | undefined },
   ): Promise<void> {
     if (!this.adapter.controlWorkflow) {
-      throw new Error("The configured workflow adapter does not support control operations");
+      throw new Error(
+        "The configured workflow adapter does not support control operations",
+      );
     }
     await this.adapter.controlWorkflow(
       workflowId,
@@ -120,7 +126,10 @@ export class WorkflowHttpAdapter implements WorkflowBackendAdapter {
     token: string,
     options: { tenantId?: string | undefined } = {},
   ): Promise<WorkflowQueryView> {
-    const url = this.url(`/workflows/${encodeURIComponent(workflowId)}`, options.tenantId);
+    const url = this.url(
+      `/workflows/${encodeURIComponent(workflowId)}`,
+      options.tenantId,
+    );
     const response = await this.fetcher(url, {
       headers: this.authHeaders(token),
     });
@@ -133,14 +142,18 @@ export class WorkflowHttpAdapter implements WorkflowBackendAdapter {
     token: string,
     options: WorkflowStreamOptions = {},
   ): AsyncIterable<WorkflowEvent<unknown>> {
-    const url = this.url(`/workflows/${encodeURIComponent(workflowId)}/events`, options.tenantId);
+    const url = this.url(
+      `/workflows/${encodeURIComponent(workflowId)}/events`,
+      options.tenantId,
+    );
     const request: WorkflowFetchRequest = {
       headers: { ...this.authHeaders(token), Accept: "text/event-stream" },
     };
     if (options.signal) request.signal = options.signal;
     const response = await this.fetcher(url, request);
     await assertOk(response);
-    if (!response.body) throw new Error("Workflow event stream response has no body");
+    if (!response.body)
+      throw new Error("Workflow event stream response has no body");
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -148,7 +161,9 @@ export class WorkflowHttpAdapter implements WorkflowBackendAdapter {
     try {
       while (true) {
         const chunk = await reader.read();
-        buffer += decoder.decode(chunk.value ?? new Uint8Array(), { stream: !chunk.done });
+        buffer += decoder.decode(chunk.value ?? new Uint8Array(), {
+          stream: !chunk.done,
+        });
         const frames = buffer.split(/\r?\n\r?\n/u);
         buffer = frames.pop() ?? "";
         for (const frame of frames) {
@@ -178,14 +193,26 @@ export class WorkflowHttpAdapter implements WorkflowBackendAdapter {
     workflowId: string,
     action: WorkflowControlAction,
     token: string,
-    payload: { reason?: string | undefined; tenantId?: string | undefined } = {},
+    payload: {
+      reason?: string | undefined;
+      tenantId?: string | undefined;
+    } = {},
   ): Promise<void> {
     const body = JSON.stringify(
       payload.tenantId === undefined ? { reason: payload.reason } : payload,
     );
     const response = await this.fetcher(
-      this.url(`/workflows/${encodeURIComponent(workflowId)}/actions/${action}`),
-      { method: "POST", headers: { ...this.authHeaders(token), "Content-Type": "application/json" }, body },
+      this.url(
+        `/workflows/${encodeURIComponent(workflowId)}/actions/${action}`,
+      ),
+      {
+        method: "POST",
+        headers: {
+          ...this.authHeaders(token),
+          "Content-Type": "application/json",
+        },
+        body,
+      },
     );
     await assertOk(response);
   }
@@ -200,7 +227,9 @@ export class WorkflowHttpAdapter implements WorkflowBackendAdapter {
   }
 }
 
-async function resolveToken(provider: WorkflowAccessTokenProvider): Promise<string> {
+async function resolveToken(
+  provider: WorkflowAccessTokenProvider,
+): Promise<string> {
   const token = typeof provider === "function" ? await provider() : provider;
   if (!token.trim()) throw new Error("Workflow access token is empty");
   return token;
@@ -208,8 +237,13 @@ async function resolveToken(provider: WorkflowAccessTokenProvider): Promise<stri
 
 async function assertOk(response: WorkflowFetchResponse): Promise<void> {
   if (response.ok) return;
-  throw new Error(`Workflow backend request failed (${response.status}${response.statusText ? ` ${response.statusText}` : ""})`);
+  throw new Error(
+    `Workflow backend request failed (${response.status}${response.statusText ? ` ${response.statusText}` : ""})`,
+  );
 }
 
 const defaultFetch: WorkflowFetch = (input, init) =>
-  fetch(input, init as RequestInit) as unknown as Promise<WorkflowFetchResponse>;
+  fetch(
+    input,
+    init as RequestInit,
+  ) as unknown as Promise<WorkflowFetchResponse>;

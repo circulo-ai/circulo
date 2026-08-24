@@ -5,13 +5,14 @@ import { ChatResourceLibrary } from "@/components/chat-resource-library";
 import { ChatSettingsDialog } from "@/components/chat-settings-dialog";
 import { Messages } from "@/components/messages/messages";
 import { getChatHistoryPaginationKey } from "@/components/sidebar/sidebar-history";
+import { Button } from "@/components/ui/button";
+import { useSidebar } from "@/components/ui/sidebar";
 import {
   useArtifact,
   useArtifactSelector,
 } from "@/hooks/api/chats/use-artifact";
 import { useChatVisibility } from "@/hooks/api/chats/use-chat-visibility";
 import type { ChatMessagePagination } from "@/hooks/api/chats/use-message-pagination";
-import { useMessagePagination } from "@/hooks/api/chats/use-message-pagination";
 import { ApiRequestError } from "@/lib/api/client";
 import {
   clearCachePattern,
@@ -22,17 +23,16 @@ import {
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { generateUUID } from "@/lib/utils";
-import { useChatHistoryStore } from "@/stores/use-chat-history-store";
 import { useChat } from "@ai-sdk/react";
 import type { Vote } from "@circulo-ai/db/schema";
 import { DefaultChatTransport } from "ai";
+import { TextAlignJustify } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { unstable_serialize } from "swr/infinite";
 import { useDataStreamActions } from "./data-stream-provider";
 import { MultimodalInput } from "./multimodal-input";
-import { PageSpinner } from "./page-spinner";
 import { toast } from "./toast";
 import type { VisibilityType } from "./visibility-selector";
 
@@ -67,7 +67,7 @@ export function Chat({
   isReadonly: boolean;
   initialLastContext?: AppUsage;
 }) {
-  const { isChatLoading } = useChatHistoryStore();
+  const { isMobile, setOpenMobile } = useSidebar();
 
   const { visibilityType } = useChatVisibility({
     chatId: id,
@@ -382,11 +382,21 @@ export function Chat({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const isArtifactVisible = useArtifactSelector((state) => state.isVisible);
 
-  if (isChatLoading) return <PageSpinner />;
-
   return (
     <>
       <div className="overscroll-behavior-contain relative flex h-dvh min-w-0 touch-pan-y flex-col">
+        {isMobile && (
+          <Button
+            aria-label="Open chat history"
+            className="absolute top-3 left-3 z-20 min-h-11 min-w-11"
+            onClick={() => setOpenMobile(true)}
+            size="icon"
+            title="Open chat history"
+            variant="ghost"
+          >
+            <TextAlignJustify aria-hidden="true" />
+          </Button>
+        )}
         {!isReadonly && <ChatSettingsDialog chatId={id} />}
         <ChatResourceLibrary chatId={id} />
         <Messages

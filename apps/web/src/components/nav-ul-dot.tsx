@@ -17,17 +17,24 @@ export function NavUlDot({ ulId }: NavUlDotProps) {
   );
 
   useEffect(() => {
-    if (currentIndex === undefined) return;
-    const finalCurrentIndex = currentIndex === 3 ? 4 : currentIndex;
+    if (currentIndex === undefined || currentIndex < 0) return;
 
-    const navUlItems = document.querySelectorAll(`#${ulId} li a`);
+    const navUl = document.getElementById(ulId);
+    if (!navUl) return;
+
+    const navUlItems = navUl.querySelectorAll("li a");
     navUlItems.forEach((ulItem) => ulItem.removeAttribute("data-active"));
-    navUlItems[finalCurrentIndex].setAttribute("data-active", "true");
 
-    setX((navUlItems[finalCurrentIndex] as HTMLElement).offsetLeft);
+    const activeItem = navUlItems[currentIndex] as HTMLElement | undefined;
+    if (activeItem) {
+      activeItem.setAttribute("data-active", "true");
+      setX(activeItem.offsetLeft);
+    }
 
-    setAnchorSilently(navItems[currentIndex].href);
-  }, [currentIndex]);
+    if (navItems[currentIndex]) {
+      setAnchorSilently(navItems[currentIndex].href);
+    }
+  }, [currentIndex, ulId]);
 
   useActiveByClass("main-section", ({ index }) => {
     if (currentIndex !== index) setCurrentIndex(index);

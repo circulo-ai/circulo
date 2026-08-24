@@ -1,7 +1,9 @@
 import { db, workflowRunEvent } from "@/db";
+import { normalizeAttachmentContext } from "@/lib/ai/attachment-context";
 import { readOpenRouterUsage } from "@/lib/ai/openrouter-client";
 import { defaultModel, getLanguageModel } from "@/lib/ai/providers";
 import { createDocument } from "@/lib/ai/tools/create-document";
+import { getGithubTools } from "@/lib/ai/tools/github";
 import { handoffTask } from "@/lib/ai/tools/handoff-task";
 import { rememberMemory } from "@/lib/ai/tools/remember-memory";
 import { requestHumanApproval } from "@/lib/ai/tools/request-human-approval";
@@ -28,10 +30,42 @@ import {
   type UIMessageStreamWriter,
 } from "ai";
 import { and, eq } from "drizzle-orm";
+import {
+  getAllowedMcpIntegrationIds,
+  hasAgentToolAccess,
+} from "../tool-access";
 import type { ExecutionPlan } from "./plan-agent-execution-step";
 
 const durableUIWrites = new Map<string, Promise<void>>();
 const AGENT_EXECUTION_EVENT = "agent.execution.completed";
+const MAX_SYSTEM_CONTEXT_CHARACTERS = 160_000;
+const MAX_CONVERSATION_CONTEXT_CHARACTERS = 60_000;
+const MAX_PAST_CONTEXT_CHARACTERS = 30_000;
+const MAX_MEMORY_CONTEXT_CHARACTERS = 30_000;
+const MAX_KNOWLEDGE_CONTEXT_CHARACTERS = 70_000;
+const MAX_SKILL_CONTEXT_CHARACTERS = 45_000;
+
+function limitContextLines(lines: string[], maxCharacters: number): string {
+  const selected: string[] = [];
+  let total = 0;
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index];
+    if (!line) continue;
+    const remaining = maxCharacters - total;
+    if (remaining <= 0) break;
+    selected.unshift(line.length > remaining ? line.slice(-remaining) : line);
+    total += Math.min(line.length, remaining);
+    if (line.length > remaining) break;
+  }
+  return selected.join("\n");
+}
+
+function limitContextText(value: string, maxCharacters: number): string {
+  if (value.length <= maxCharacters) return value;
+  const tailCharacters = Math.min(12_000, Math.floor(maxCharacters / 5));
+  const headCharacters = maxCharacters - tailCharacters;
+  return `${value.slice(0, headCharacters)}\n[Context truncated to protect the model context window.]\n${value.slice(-tailCharacters)}`;
+}
 
 export function toUIMessageStreamWriter(
   workflowId: string,
@@ -237,6 +271,11 @@ export async function executeDirectResponseStep(params: {
     workflowId: params.workflowId,
     dataStream,
   });
+  const connectedAppTools = await getGithubTools({
+    userId: params.actor.userId,
+    organizationId: params.context.chat.organizationId,
+    allowedConnectionIds: params.context.chat.connectedAppIds ?? [],
+  });
   const tools = {
     createDocument: createDocument({
       session: { ...params.actor, chatId: params.context.chat.id },
@@ -280,6 +319,7 @@ export async function executeDirectResponseStep(params: {
       chatId: params.context.chat.id,
       dataStream,
     }),
+    ...connectedAppTools,
     ...mcpTools,
   };
   await sendAgentStartEvent(dataStream, {
@@ -290,8 +330,13 @@ export async function executeDirectResponseStep(params: {
     status: "running",
     startedAt: startTime.toISOString(),
   });
-  const modelMessages = await convertToModelMessages(
-    withModelAccessibleFileUrls(convertToUIMessages(params.context.messages)),
+  const modelMessages = withKnowledgeImageContext(
+    await convertToModelMessages(
+      await normalizeAttachmentContext(
+        convertToUIMessages(params.context.messages),
+      ),
+    ),
+    params.context,
   );
   const result = await new ToolLoopAgent({
     model: getLanguageModel(),
@@ -379,47 +424,58 @@ function buildSharedContextPrompt(
   context: ChatContext,
   basePrompt: string,
 ): string {
-  const memories = context.memories
-    .slice(0, 100)
-    .map((item) => `[${item.scope}] ${item.key}: ${item.content}`)
-    .join("\n");
-  const knowledge = context.knowledgeDocuments
-    .slice(0, 50)
-    .map(
-      (document) =>
-        `[${document.knowledgeBaseName}] ${document.title}${document.sourceKey ? ` (source: ${document.sourceKey})` : ""}\n${document.content}`,
-    )
-    .join("\n\n");
-  const skills = context.skills
-    .slice(0, 50)
-    .map(
-      (skill) =>
-        `[${skill.name} v${skill.version}]${skill.description ? ` ${skill.description}` : ""}\n${skill.instructions}`,
-    )
-    .join("\n\n");
+  const memories = limitContextLines(
+    context.memories
+      .slice(0, 100)
+      .map((item) => `[${item.scope}] ${item.key}: ${item.content}`),
+    MAX_MEMORY_CONTEXT_CHARACTERS,
+  );
+  const knowledge = limitContextLines(
+    context.knowledgeDocuments
+      .slice(0, 50)
+      .map(
+        (document) =>
+          `[${document.knowledgeBaseName}] ${document.title}${document.sourceKey ? ` (source: ${document.sourceKey})` : ""}\n${document.content}${document.contentType.startsWith("image/") ? (document.imageDataUrl ? "\nVisual context is attached to this run." : "\nVisual context is stored but too large to inline for this run.") : ""}`,
+      ),
+    MAX_KNOWLEDGE_CONTEXT_CHARACTERS,
+  );
+  const skills = limitContextLines(
+    context.skills
+      .slice(0, 50)
+      .map(
+        (skill) =>
+          `[${skill.name} v${skill.version}]${skill.description ? ` ${skill.description}` : ""}\n${skill.instructions}`,
+      ),
+    MAX_SKILL_CONTEXT_CHARACTERS,
+  );
   const participants = context.members
     .map((member) => `${member.user.name} (${member.userId})`)
     .join(", ");
-  const conversation = context.messages
-    .slice(-20)
-    .map((message) => {
-      const author =
-        message.authorType === "agent"
-          ? (context.agents.find((item) => item.agentId === message.authorId)
-              ?.agent.name ?? "Agent")
-          : message.authorType === "user"
-            ? (context.members.find((item) => item.userId === message.authorId)
-                ?.user.name ?? "Human member")
-            : "System";
-      return `${author} [${message.role}]: ${getStoredMessageText(message)}`;
-    })
-    .filter((line) => line.trim().length > 0)
-    .join("\n");
-  const pastConversation = context.pastMessages
-    .slice(0, 30)
-    .map((message) => `${message.role}: ${getStoredMessageText(message)}`)
-    .filter((line) => line.trim().length > 0)
-    .join("\n");
+  const conversation = limitContextLines(
+    context.messages
+      .slice(-20)
+      .map((message) => {
+        const author =
+          message.authorType === "agent"
+            ? (context.agents.find((item) => item.agentId === message.authorId)
+                ?.agent.name ?? "Agent")
+            : message.authorType === "user"
+              ? (context.members.find(
+                  (item) => item.userId === message.authorId,
+                )?.user.name ?? "Human member")
+              : "System";
+        return `${author} [${message.role}]: ${getStoredMessageText(message)}`;
+      })
+      .filter((line) => line.trim().length > 0),
+    MAX_CONVERSATION_CONTEXT_CHARACTERS,
+  );
+  const pastConversation = limitContextLines(
+    context.pastMessages
+      .slice(0, 30)
+      .map((message) => `${message.role}: ${getStoredMessageText(message)}`)
+      .filter((line) => line.trim().length > 0),
+    MAX_PAST_CONTEXT_CHARACTERS,
+  );
   const sections = [basePrompt];
   sections.push(`=== CAPABILITY BOUNDARY ===
 Only claim that an action was completed when the corresponding runtime tool returned a successful result. Never invent access to an app, integration, MCP server, file, memory store, schedule, or other harness. If the required capability is not represented by a tool in this run, say that it is unavailable and do not imply that the action happened.
@@ -444,15 +500,15 @@ When the user asks you to remember something, use the memory tool when it is ava
   }
   if (knowledge) {
     sections.push(
-      `=== KNOWLEDGE BASE CONTEXT ===\nUse these workspace documents as reference material. Do not claim facts that are not supported by the conversation or these documents:\n${knowledge.slice(0, 120_000)}`,
+      `=== KNOWLEDGE BASE CONTEXT ===\nUse these workspace documents as reference material. Do not claim facts that are not supported by the conversation or these documents:\n${knowledge}`,
     );
   }
   if (skills) {
     sections.push(
-      `=== ASSIGNED SKILLS ===\nThese are explicit organization-approved instruction bundles assigned to this chat or its agents. Follow them only within their stated scope:\n${skills.slice(0, 80_000)}`,
+      `=== ASSIGNED SKILLS ===\nThese are explicit organization-approved instruction bundles assigned to this chat or its agents. Follow them only within their stated scope:\n${skills}`,
     );
   }
-  return sections.join("\n\n");
+  return limitContextText(sections.join("\n\n"), MAX_SYSTEM_CONTEXT_CHARACTERS);
 }
 
 function getStoredMessageText(
@@ -473,17 +529,38 @@ function getStoredMessageText(
   return message.content ?? "";
 }
 
-function withModelAccessibleFileUrls(messages: ChatMessage[]): ChatMessage[] {
-  return messages.map((message) => ({
-    ...message,
-    parts: message.parts?.map((part) => {
-      if (part.type !== "file") return part;
-      const filePart = part as typeof part & { downloadUrl?: unknown };
-      return typeof filePart.downloadUrl === "string"
-        ? { ...part, url: filePart.downloadUrl }
-        : part;
-    }),
-  }));
+function withKnowledgeImageContext(
+  messages: ModelMessage[],
+  context: ChatContext,
+): ModelMessage[] {
+  const imageParts: Array<{ type: "image"; image: string }> = [];
+  let totalCharacters = 0;
+  for (const document of context.knowledgeDocuments) {
+    if (!document.imageDataUrl) continue;
+    if (
+      imageParts.length >= 3 ||
+      totalCharacters + document.imageDataUrl.length > 6_000_000
+    ) {
+      break;
+    }
+    imageParts.push({ type: "image", image: document.imageDataUrl });
+    totalCharacters += document.imageDataUrl.length;
+  }
+  if (imageParts.length === 0) return messages;
+
+  return [
+    ...messages,
+    {
+      role: "user",
+      content: [
+        {
+          type: "text",
+          text: "Reference images from the assigned knowledge bases are attached below. Use them only when relevant to the user's request, and do not treat visual details as text unless you can actually inspect them.",
+        },
+        ...imageParts,
+      ],
+    },
+  ];
 }
 
 export async function executeAgentTaskStep(params: {
@@ -536,7 +613,7 @@ export async function executeAgentTaskStep(params: {
             const status = r.success ? "✓ SUCCESS" : "✗ FAILED";
             return `[Agent ${idx + 1}] ${r.agentName} (${status})
 Task: ${r.task}
-Output: ${r.output || "No output"}
+Output: ${(r.output || "No output").slice(0, 20_000)}
 ${r.error ? `Error: ${r.error}` : ""}
 ---`;
           })
@@ -549,7 +626,7 @@ ${r.error ? `Error: ${r.error}` : ""}
       webhookContext = `\n\n=== WEBHOOK EVENT TRIGGER ===
 Source: ${webhookPayload.source}
 Event: ${webhookPayload.event}
-Data: ${JSON.stringify(webhookPayload.data, null, 2)}
+Data: ${JSON.stringify(webhookPayload.data, null, 2).slice(0, 20_000)}
 ---`;
     }
 
@@ -595,7 +672,113 @@ Provide a focused response for YOUR specific task. Be concise but complete.`,
       session: actor,
       workflowId,
       dataStream,
+      allowedIntegrationIds: getAllowedMcpIntegrationIds(
+        agent.defaultToolIds,
+        agent.toolAccessMode,
+      ),
     });
+    const hasToolAccess = (...ids: string[]) =>
+      hasAgentToolAccess(agent.defaultToolIds, agent.toolAccessMode, ...ids);
+    const connectedAppTools = hasToolAccess(
+      "app:github",
+      "githubListRepositories",
+      "githubGetRepository",
+      "githubSearchRepositories",
+    )
+      ? await getGithubTools({
+          userId: actor.userId,
+          organizationId: context.chat.organizationId,
+          allowedConnectionIds: context.chat.connectedAppIds ?? [],
+          allowedToolIds:
+            agent.toolAccessMode === "all"
+              ? undefined
+              : (agent.defaultToolIds ?? []),
+        })
+      : {};
+    const builtinTools = {
+      ...(hasToolAccess("builtin:document-authoring", "createDocument")
+        ? {
+            createDocument: createDocument({
+              session: { ...actor, chatId: context.chat.id },
+              dataStream,
+            }),
+          }
+        : {}),
+      ...(hasToolAccess("builtin:document-authoring", "updateDocument")
+        ? {
+            updateDocument: updateDocument({
+              session: { ...actor, chatId: context.chat.id },
+              dataStream,
+            }),
+          }
+        : {}),
+      ...(hasToolAccess("builtin:suggestions", "requestSuggestions")
+        ? {
+            requestSuggestions: requestSuggestions({
+              session: actor,
+              dataStream,
+            }),
+          }
+        : {}),
+      ...(hasToolAccess("builtin:knowledge", "searchKnowledge")
+        ? {
+            searchKnowledge: searchKnowledge({
+              organizationId: context.chat.organizationId,
+              allowedKnowledgeBaseIds: context.knowledgeBaseIds,
+            }),
+          }
+        : {}),
+      ...(hasToolAccess("builtin:memory", "searchMemory")
+        ? {
+            searchMemory: searchMemory({
+              organizationId: context.chat.organizationId,
+              userId: actor.userId,
+              chatId: context.chat.id,
+              ...context.memoryPolicy,
+            }),
+          }
+        : {}),
+      ...(hasToolAccess("builtin:workflow-coordination", "requestHumanApproval")
+        ? {
+            requestHumanApproval: requestHumanApproval({
+              session: actor,
+              chatId: context.chat.id,
+              workflowRunId: workflowId,
+              dataStream,
+            }),
+          }
+        : {}),
+      ...(hasToolAccess("builtin:workflow-coordination", "scheduleTask")
+        ? {
+            scheduleTask: scheduleTask({
+              session: actor,
+              chatId: context.chat.id,
+              dataStream,
+            }),
+          }
+        : {}),
+      ...(hasToolAccess("builtin:workflow-coordination", "handoffTask")
+        ? {
+            handoffTask: handoffTask({
+              session: actor,
+              chatId: context.chat.id,
+              workflowRunId: workflowId,
+              fromAgentId: agent.id,
+              dataStream,
+            }),
+          }
+        : {}),
+      ...(hasToolAccess("builtin:memory", "rememberMemory") &&
+      context.memoryPolicy.canWritePersonalMemory
+        ? {
+            rememberMemory: rememberMemory({
+              session: actor,
+              chatId: context.chat.id,
+              dataStream,
+            }),
+          }
+        : {}),
+    };
 
     const agentLoop = new ToolLoopAgent({
       model: getLanguageModel(agent.model),
@@ -604,58 +787,7 @@ Provide a focused response for YOUR specific task. Be concise but complete.`,
       temperature: normalizeTemperature(
         chatAgent.customTemperature ?? agent.temperature,
       ),
-      tools: {
-        createDocument: createDocument({
-          session: { ...actor, chatId: context.chat.id },
-          dataStream,
-        }),
-        updateDocument: updateDocument({
-          session: { ...actor, chatId: context.chat.id },
-          dataStream,
-        }),
-        requestSuggestions: requestSuggestions({
-          session: actor,
-          dataStream,
-        }),
-        searchKnowledge: searchKnowledge({
-          organizationId: context.chat.organizationId,
-          allowedKnowledgeBaseIds: context.knowledgeBaseIds,
-        }),
-        searchMemory: searchMemory({
-          organizationId: context.chat.organizationId,
-          userId: actor.userId,
-          chatId: context.chat.id,
-          ...context.memoryPolicy,
-        }),
-        ...mcpTools,
-        requestHumanApproval: requestHumanApproval({
-          session: actor,
-          chatId: context.chat.id,
-          workflowRunId: workflowId,
-          dataStream,
-        }),
-        ...(context.memoryPolicy.canWritePersonalMemory
-          ? {
-              rememberMemory: rememberMemory({
-                session: actor,
-                chatId: context.chat.id,
-                dataStream,
-              }),
-            }
-          : {}),
-        scheduleTask: scheduleTask({
-          session: actor,
-          chatId: context.chat.id,
-          dataStream,
-        }),
-        handoffTask: handoffTask({
-          session: actor,
-          chatId: context.chat.id,
-          workflowRunId: workflowId,
-          fromAgentId: agent.id,
-          dataStream,
-        }),
-      },
+      tools: { ...builtinTools, ...connectedAppTools, ...mcpTools },
     });
 
     // Send agent started event
@@ -669,8 +801,13 @@ Provide a focused response for YOUR specific task. Be concise but complete.`,
       startedAt: startTime.toISOString(),
     });
 
-    const modelHistory = await convertToModelMessages(
-      withModelAccessibleFileUrls(convertToUIMessages(conversationHistory)),
+    const modelHistory = withKnowledgeImageContext(
+      await convertToModelMessages(
+        await normalizeAttachmentContext(
+          convertToUIMessages(conversationHistory),
+        ),
+      ),
+      context,
     );
 
     // Stream the agent response

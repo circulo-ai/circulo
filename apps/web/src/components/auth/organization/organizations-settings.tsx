@@ -1,14 +1,14 @@
-"use client"
+"use client";
 
-import type { ComponentProps } from "react"
+import type { ComponentProps } from "react";
 
-import { cn } from "@/lib/utils"
-import { Organizations } from "./organizations"
-import { UserInvitations } from "./user-invitations"
+import { cn } from "@/lib/utils";
+import { Organizations } from "./organizations";
+import { UserInvitations } from "./user-invitations";
 
 export type OrganizationsSettingsProps = {
-  className?: string
-}
+  className?: string;
+};
 
 /**
  * Renders the organizations settings panel.
@@ -28,5 +28,5 @@ export function OrganizationsSettings({
       <Organizations />
       <UserInvitations />
     </div>
-  )
+  );
 }

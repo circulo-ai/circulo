@@ -1,4 +1,3 @@
-import { generateId } from "../utils/id";
 import type {
   WorkflowHookContext,
   WorkflowHookErrorContext,
@@ -7,6 +6,7 @@ import type {
   WorkflowHookName,
   WorkflowHookRegistrationOptions,
 } from "../models/hooks";
+import { generateId } from "../utils/id";
 
 interface Registration<TContext, TInput, TOutput> {
   id: string;
@@ -36,7 +36,9 @@ export class WorkflowHookManager<TContext, TInput, TOutput> {
   private readonly failFast: boolean;
   private disposed = false;
 
-  constructor(options: WorkflowHookManagerOptions<TContext, TInput, TOutput> = {}) {
+  constructor(
+    options: WorkflowHookManagerOptions<TContext, TInput, TOutput> = {},
+  ) {
     this.onError = options.onError ?? (() => undefined);
     this.failFast = options.failFast ?? false;
   }
@@ -51,7 +53,9 @@ export class WorkflowHookManager<TContext, TInput, TOutput> {
     options: WorkflowHookRegistrationOptions = {},
   ): () => void {
     if (this.disposed) {
-      throw new Error("Cannot register a hook after the hook manager is disposed");
+      throw new Error(
+        "Cannot register a hook after the hook manager is disposed",
+      );
     }
     if (!Number.isFinite(options.priority ?? 0)) {
       throw new RangeError("Hook priority must be a finite number");
@@ -92,12 +96,15 @@ export class WorkflowHookManager<TContext, TInput, TOutput> {
     this.registrations.clear();
   }
 
-  async emit(context: WorkflowHookContext<TContext, TInput, TOutput>): Promise<void> {
+  async emit(
+    context: WorkflowHookContext<TContext, TInput, TOutput>,
+  ): Promise<void> {
     if (this.disposed) return;
 
     const handlers = [...this.registrations.values()]
-      .filter((registration) =>
-        registration.name === "*" || registration.name === context.name,
+      .filter(
+        (registration) =>
+          registration.name === "*" || registration.name === context.name,
       )
       .sort((left, right) => right.priority - left.priority);
 
@@ -107,8 +114,11 @@ export class WorkflowHookManager<TContext, TInput, TOutput> {
       try {
         await registration.handler(context);
       } catch (error) {
-        const errorContext: WorkflowHookErrorContext<TContext, TInput, TOutput> =
-          { ...context, registrationId: registration.id };
+        const errorContext: WorkflowHookErrorContext<
+          TContext,
+          TInput,
+          TOutput
+        > = { ...context, registrationId: registration.id };
         try {
           await this.onError(error, errorContext);
         } catch (handlerError) {
@@ -127,4 +137,3 @@ export class WorkflowHookManager<TContext, TInput, TOutput> {
 
 /** Friendly alias for applications that prefer the shorter name. */
 export { WorkflowHookManager as WorkflowHooks };
-

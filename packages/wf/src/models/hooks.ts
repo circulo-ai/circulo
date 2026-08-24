@@ -57,4 +57,3 @@ export interface WorkflowHookManagerOptions<TContext, TInput, TOutput> {
   /** Make a hook failure fail the operation that emitted the hook. */
   failFast?: boolean;
 }
-

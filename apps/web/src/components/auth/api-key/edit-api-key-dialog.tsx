@@ -1,76 +1,76 @@
-"use client"
+"use client";
 
-import type {
-  ApiKeyAuthClient,
-  ListedApiKey
-} from "@better-auth-ui/core/plugins/api-key"
-import { useAuth, useAuthPlugin } from "@better-auth-ui/react"
-import { useUpdateApiKey } from "@better-auth-ui/react/plugins/api-key"
-import { type FormEvent, useEffect, useRef, useState } from "react"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogClose,
   DialogContent,
   DialogFooter,
   DialogHeader,
-  DialogTitle
-} from "@/components/ui/dialog"
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Field,
   FieldError,
   FieldGroup,
-  FieldLabel
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Spinner } from "@/components/ui/spinner"
-import { Switch } from "@/components/ui/switch"
-import { Textarea } from "@/components/ui/textarea"
-import { apiKeyPlugin } from "@/lib/auth/api-key-plugin"
+  FieldLabel,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { apiKeyPlugin } from "@/lib/auth/api-key-plugin";
+import type {
+  ApiKeyAuthClient,
+  ListedApiKey,
+} from "@better-auth-ui/core/plugins/api-key";
+import { useAuth, useAuthPlugin } from "@better-auth-ui/react";
+import { useUpdateApiKey } from "@better-auth-ui/react/plugins/api-key";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 
 const optionalNumber = (formData: FormData, name: string) => {
-  const value = String(formData.get(name) ?? "").trim()
-  return value ? Number(value) : undefined
-}
+  const value = String(formData.get(name) ?? "").trim();
+  return value ? Number(value) : undefined;
+};
 
 export function EditApiKeyDialog({
   apiKey,
   open,
-  onOpenChange
+  onOpenChange,
 }: {
-  apiKey: ListedApiKey
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  apiKey: ListedApiKey;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const { authClient, localization } = useAuth<ApiKeyAuthClient>()
-  const { localization: labels } = useAuthPlugin(apiKeyPlugin)
-  const [enabled, setEnabled] = useState(apiKey.enabled)
+  const { authClient, localization } = useAuth<ApiKeyAuthClient>();
+  const { localization: labels } = useAuthPlugin(apiKeyPlugin);
+  const [enabled, setEnabled] = useState(apiKey.enabled);
   const [rateLimitEnabled, setRateLimitEnabled] = useState(
-    apiKey.rateLimitEnabled
-  )
-  const [formError, setFormError] = useState<string>()
-  const formRef = useRef<HTMLFormElement>(null)
+    apiKey.rateLimitEnabled,
+  );
+  const [formError, setFormError] = useState<string>();
+  const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
-    if (!open) return
+    if (!open) return;
 
-    formRef.current?.reset()
-    setEnabled(apiKey.enabled)
-    setRateLimitEnabled(apiKey.rateLimitEnabled)
-    setFormError(undefined)
-  }, [apiKey, open])
+    formRef.current?.reset();
+    setEnabled(apiKey.enabled);
+    setRateLimitEnabled(apiKey.rateLimitEnabled);
+    setFormError(undefined);
+  }, [apiKey, open]);
 
   const updateApiKey = useUpdateApiKey(authClient, {
-    onSuccess: () => onOpenChange(false)
-  })
+    onSuccess: () => onOpenChange(false),
+  });
 
   function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const formData = new FormData(event.currentTarget)
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
     try {
-      const metadata = String(formData.get("metadata") ?? "").trim()
-      const permissions = String(formData.get("permissions") ?? "").trim()
-      setFormError(undefined)
+      const metadata = String(formData.get("metadata") ?? "").trim();
+      const permissions = String(formData.get("permissions") ?? "").trim();
+      setFormError(undefined);
       updateApiKey.mutate({
         keyId: apiKey.id,
         configId: apiKey.configId,
@@ -83,10 +83,10 @@ export function EditApiKeyDialog({
         rateLimitMax: optionalNumber(formData, "rateLimitMax"),
         rateLimitTimeWindow: optionalNumber(formData, "rateLimitTimeWindow"),
         metadata: metadata ? JSON.parse(metadata) : null,
-        permissions: permissions ? JSON.parse(permissions) : null
-      })
+        permissions: permissions ? JSON.parse(permissions) : null,
+      });
     } catch {
-      setFormError("Metadata and permissions must contain valid JSON.")
+      setFormError("Metadata and permissions must contain valid JSON.");
     }
   }
 
@@ -201,17 +201,17 @@ export function EditApiKeyDialog({
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
 
 function NumericField({
   name,
   label,
-  value
+  value,
 }: {
-  name: string
-  label: string
-  value: number | null
+  name: string;
+  label: string;
+  value: number | null;
 }) {
   return (
     <Field>
@@ -224,5 +224,5 @@ function NumericField({
         defaultValue={value ?? undefined}
       />
     </Field>
-  )
+  );
 }

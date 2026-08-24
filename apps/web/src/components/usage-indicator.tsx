@@ -131,7 +131,9 @@ export function SubscriptionUsageIndicator() {
 
   return (
     <Popover>
-      <PopoverTrigger asChild nativeButton>{compact}</PopoverTrigger>
+      <PopoverTrigger asChild nativeButton>
+        {compact}
+      </PopoverTrigger>
       <PopoverContent sideOffset={8} align="end">
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">

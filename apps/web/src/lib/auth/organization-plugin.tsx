@@ -1,13 +1,13 @@
-import { createAuthPlugin } from "@better-auth-ui/core"
+import { createAuthPlugin } from "@better-auth-ui/core";
 import {
   organizationPlugin as coreOrganizationPlugin,
   type OrganizationLocalization,
-  type OrganizationPluginOptions
-} from "@better-auth-ui/core/plugins/organization"
+  type OrganizationPluginOptions,
+} from "@better-auth-ui/core/plugins/organization";
 export const organizationPlugin = createAuthPlugin(
   coreOrganizationPlugin.id,
   (options: OrganizationPluginOptions = {}) => {
-    const core = coreOrganizationPlugin(options)
+    const core = coreOrganizationPlugin(options);
 
     return {
       ...core,
@@ -16,6 +16,6 @@ export const organizationPlugin = createAuthPlugin(
       // screens. The registry create dialog is wired into the chat shell;
       // invitation/settings views are enabled only when their routes are
       // explicitly exposed by this application.
-    }
-  }
-)
+    };
+  },
+);

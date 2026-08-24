@@ -12,7 +12,9 @@ export class SecureWorkflowStreamGateway implements WorkflowEventStreamGateway {
     private readonly eventBus: WorkflowEventBus,
     private readonly tokens: WorkflowAccessTokenSigner,
     private readonly tenantResolver?:
-      | ((workflowId: string) => string | Promise<string | undefined> | undefined)
+      | ((
+          workflowId: string,
+        ) => string | Promise<string | undefined> | undefined)
       | undefined,
   ) {}
 
@@ -23,7 +25,8 @@ export class SecureWorkflowStreamGateway implements WorkflowEventStreamGateway {
     options: Pick<WorkflowStreamOptions, "tenantId"> = {},
   ): Promise<() => void> {
     const claims = await this.tokens.verify(token);
-    const tenantId = options.tenantId ?? (await this.tenantResolver?.(workflowId));
+    const tenantId =
+      options.tenantId ?? (await this.tenantResolver?.(workflowId));
     this.tokens.authorize(claims, workflowId, "workflow:stream", tenantId);
     return this.eventBus.subscribe(workflowId, callback);
   }
@@ -34,7 +37,8 @@ export class SecureWorkflowStreamGateway implements WorkflowEventStreamGateway {
     options: WorkflowStreamOptions = {},
   ): AsyncIterable<WorkflowEvent<unknown>> {
     const maxBufferedEvents = options.maxBufferedEvents ?? 1000;
-    if (maxBufferedEvents < 1) throw new RangeError("maxBufferedEvents must be positive");
+    if (maxBufferedEvents < 1)
+      throw new RangeError("maxBufferedEvents must be positive");
     return createBufferedAsyncStream<WorkflowEvent<unknown>>(
       async (push) => {
         const unsubscribe = this.eventBus.subscribe(workflowId, (event) => {
@@ -42,8 +46,14 @@ export class SecureWorkflowStreamGateway implements WorkflowEventStreamGateway {
         });
         try {
           const claims = await this.tokens.verify(token);
-          const tenantId = options.tenantId ?? (await this.tenantResolver?.(workflowId));
-          this.tokens.authorize(claims, workflowId, "workflow:stream", tenantId);
+          const tenantId =
+            options.tenantId ?? (await this.tenantResolver?.(workflowId));
+          this.tokens.authorize(
+            claims,
+            workflowId,
+            "workflow:stream",
+            tenantId,
+          );
           return unsubscribe;
         } catch (error) {
           unsubscribe();

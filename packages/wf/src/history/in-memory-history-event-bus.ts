@@ -5,7 +5,10 @@ import type {
 } from "../models";
 
 export class InMemoryWorkflowHistoryEventBus implements WorkflowHistoryEventBus {
-  private readonly subscribers = new Map<string, Set<WorkflowHistoryEventCallback>>();
+  private readonly subscribers = new Map<
+    string,
+    Set<WorkflowHistoryEventCallback>
+  >();
 
   async publish(event: WorkflowHistoryEvent): Promise<void> {
     const callbacks = this.subscribers.get(key(event.workflowId, event.runId));

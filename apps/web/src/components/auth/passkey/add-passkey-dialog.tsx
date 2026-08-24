@@ -1,11 +1,6 @@
-"use client"
+"use client";
 
-import type { PasskeyAuthClient } from "@better-auth-ui/core/plugins/passkey"
-import { useAuth, useAuthPlugin } from "@better-auth-ui/react"
-import { useAddPasskey } from "@better-auth-ui/react/plugins/passkey"
-import { Fingerprint } from "lucide-react"
-import type { SyntheticEvent } from "react"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogClose,
@@ -13,37 +8,42 @@ import {
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogTitle
-} from "@/components/ui/dialog"
-import { Field, FieldError, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Spinner } from "@/components/ui/spinner"
-import { passkeyPlugin } from "@/lib/auth/passkey-plugin"
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { passkeyPlugin } from "@/lib/auth/passkey-plugin";
+import type { PasskeyAuthClient } from "@better-auth-ui/core/plugins/passkey";
+import { useAuth, useAuthPlugin } from "@better-auth-ui/react";
+import { useAddPasskey } from "@better-auth-ui/react/plugins/passkey";
+import { Fingerprint } from "lucide-react";
+import type { SyntheticEvent } from "react";
 
 export type AddPasskeyDialogProps = {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-}
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+};
 
 export function AddPasskeyDialog({
   open,
-  onOpenChange
+  onOpenChange,
 }: AddPasskeyDialogProps) {
-  const { authClient, localization } = useAuth<PasskeyAuthClient>()
-  const { localization: passkeyLocalization } = useAuthPlugin(passkeyPlugin)
+  const { authClient, localization } = useAuth<PasskeyAuthClient>();
+  const { localization: passkeyLocalization } = useAuthPlugin(passkeyPlugin);
 
-  const { mutate: addPasskey, isPending: isAdding } = useAddPasskey(authClient)
+  const { mutate: addPasskey, isPending: isAdding } = useAddPasskey(authClient);
 
   const handleSubmit = (e: SyntheticEvent<HTMLFormElement>) => {
-    e.preventDefault()
+    e.preventDefault();
 
-    const formData = new FormData(e.target as HTMLFormElement)
-    const name = (formData.get("name") as string)?.trim()
+    const formData = new FormData(e.target as HTMLFormElement);
+    const name = (formData.get("name") as string)?.trim();
 
     addPasskey(name ? { name } : undefined, {
-      onSuccess: () => onOpenChange(false)
-    })
-  }
+      onSuccess: () => onOpenChange(false),
+    });
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -94,5 +94,5 @@ export function AddPasskeyDialog({
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

@@ -11,10 +11,7 @@ import {
 
 function createGateway() {
   const history = new InMemoryWorkflowHistoryStore();
-  const runner = new ReplayWorkflowRunner(
-    history,
-    new InMemoryTaskQueue(),
-  );
+  const runner = new ReplayWorkflowRunner(history, new InMemoryTaskQueue());
   return { history, runner };
 }
 
@@ -119,7 +116,10 @@ describe("workflow event gateway", () => {
         name: "conflicting",
         version: 1,
         activityRegistry: new InMemoryActivityRegistry(),
-        run: async (_context: import("../src").ReplayWorkflowContext, input: { value: number }) => input.value,
+        run: async (
+          _context: import("../src").ReplayWorkflowContext,
+          input: { value: number },
+        ) => input.value,
       },
       input: (event: { payload: { value: number } }) => event.payload,
     });
@@ -129,12 +129,14 @@ describe("workflow event gateway", () => {
       payload: { value: 1 },
       timestamp: Date.now(),
     });
-    await expect(gateway.dispatch({
-      eventId: "event-b",
-      eventName: "conflicting.event",
-      payload: { value: 2 },
-      timestamp: Date.now(),
-    })).rejects.toThrow("different payload");
+    await expect(
+      gateway.dispatch({
+        eventId: "event-b",
+        eventName: "conflicting.event",
+        payload: { value: 2 },
+        timestamp: Date.now(),
+      }),
+    ).rejects.toThrow("different payload");
   });
 
   it("waits for a duplicate owned by another gateway instance", async () => {
@@ -146,7 +148,10 @@ describe("workflow event gateway", () => {
       name: "distributed-trigger",
       version: 1,
       activityRegistry: new InMemoryActivityRegistry(),
-      run: async (_context: import("../src").ReplayWorkflowContext, value: string) => value,
+      run: async (
+        _context: import("../src").ReplayWorkflowContext,
+        value: string,
+      ) => value,
     };
     const firstGateway = new WorkflowEventGateway(runner, { idempotency });
     const secondGateway = new WorkflowEventGateway(runner, {
@@ -172,24 +177,35 @@ describe("workflow event gateway", () => {
       firstGateway.dispatch(event),
       secondGateway.dispatch(event),
     ]);
-    await expect(first[0]!.result).resolves.toMatchObject({ status: "completed", output: "ok" });
-    await expect(second[0]!.result).resolves.toMatchObject({ status: "completed", output: "ok" });
+    await expect(first[0]!.result).resolves.toMatchObject({
+      status: "completed",
+      output: "ok",
+    });
+    await expect(second[0]!.result).resolves.toMatchObject({
+      status: "completed",
+      output: "ok",
+    });
   });
 });
 
 describe("workflow query service", () => {
   it("reports an active run as running", async () => {
     const history = new InMemoryWorkflowHistoryStore();
-    await history.append({
-      workflowId: "running-workflow",
-      runId: "run-1",
-      eventType: "workflow.started",
-      payload: { input: null },
-    }, 0);
+    await history.append(
+      {
+        workflowId: "running-workflow",
+        runId: "run-1",
+        eventType: "workflow.started",
+        payload: { input: null },
+      },
+      0,
+    );
     const query = new WorkflowQueryService(history);
-    await expect(query.get("running-workflow", "run-1")).resolves.toMatchObject({
-      status: "running",
-    });
+    await expect(query.get("running-workflow", "run-1")).resolves.toMatchObject(
+      {
+        status: "running",
+      },
+    );
   });
 
   it("projects waiting and completed state from authoritative history", async () => {
@@ -200,7 +216,10 @@ describe("workflow query service", () => {
       version: 1,
       activityRegistry: registry,
       run: async (context: import("../src").ReplayWorkflowContext) =>
-        context.waitForEvent<{ approved: boolean }>("approval", "approval.received"),
+        context.waitForEvent<{ approved: boolean }>(
+          "approval",
+          "approval.received",
+        ),
     };
     const waiting = await runner.start(definition, undefined, {
       tenantId: "tenant-1",
@@ -228,7 +247,10 @@ describe("workflow query service", () => {
     });
     await expect(
       queries.get(waiting.workflowId, waiting.runId),
-    ).resolves.toMatchObject({ status: "completed", output: { approved: true } });
+    ).resolves.toMatchObject({
+      status: "completed",
+      output: { approved: true },
+    });
   });
 });
 

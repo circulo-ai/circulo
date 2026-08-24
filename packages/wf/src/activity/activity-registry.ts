@@ -1,10 +1,10 @@
-import type {
-  ActivityDefinition,
-  ActivityRegistry,
-} from "../models";
+import type { ActivityDefinition, ActivityRegistry } from "../models";
 
 export class InMemoryActivityRegistry implements ActivityRegistry {
-  private readonly definitions = new Map<string, ActivityDefinition<unknown, unknown>>();
+  private readonly definitions = new Map<
+    string,
+    ActivityDefinition<unknown, unknown>
+  >();
 
   register<TInput, TOutput>(
     definition: ActivityDefinition<TInput, TOutput>,
@@ -64,7 +64,9 @@ function activityKey(name: string, version: number): string {
   return `${name}:${version}`;
 }
 
-function validateRetryPolicy(policy: ActivityDefinition<unknown, unknown>["retryPolicy"]): void {
+function validateRetryPolicy(
+  policy: ActivityDefinition<unknown, unknown>["retryPolicy"],
+): void {
   if (!Number.isInteger(policy.maxAttempts) || policy.maxAttempts < 1) {
     throw new RangeError("Activity maxAttempts must be a positive integer");
   }

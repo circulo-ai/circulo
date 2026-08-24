@@ -13,6 +13,7 @@ import type { OrchestrationInput } from "@/workflows/orchestrate/types";
 import {
   InMemoryEventBus,
   WorkflowEngine,
+  type Workflow,
   type WorkflowEvent,
 } from "@circulo-ai/wf";
 import { eq } from "drizzle-orm";
@@ -101,7 +102,7 @@ export class WorkflowRunService {
   }
 
   async resume(runId: string): Promise<void> {
-    const workflow = await engine.getWorkflow(runId);
+    const workflow = await this.loadWorkflow(runId);
     if (!workflow) return;
     if (!this.subscriptions.has(runId)) {
       this.attachRun(
@@ -120,7 +121,7 @@ export class WorkflowRunService {
     startIndex?: number,
   ): Promise<ReadableStream<CustomUIMessageChunk>> {
     let channel = getWorkflowOutputChannel(runId);
-    const workflow = await engine.getWorkflow(runId);
+    const workflow = await this.loadWorkflow(runId);
     if (!workflow) throw new Error(`Workflow run ${runId} is not available`);
 
     // A completed stream can outlive the HTTP connection. Reconnects must get
@@ -143,10 +144,76 @@ export class WorkflowRunService {
     // terminal UI stream so a reload cannot remain stuck in "thinking".
     if (workflow.state === "completed" || workflow.state === "failed") {
       await this.replayTerminalResult(runId, workflow);
-      channel = getWorkflowOutputChannel(runId);
+      // replayTerminalResult closes and schedules cleanup of the channel.
+      // Keep the local closed channel reference so the caller can still
+      // return a replayable terminal stream before cleanup removes it.
+      channel = channel ?? getWorkflowOutputChannel(runId);
     }
     if (!channel) throw new Error(`Workflow run ${runId} is not available`);
     return channel.createReadable(startIndex);
+  }
+
+  /**
+   * Load a run through the engine first, then fall back to the durable row.
+   *
+   * Reconnects can arrive after a hot reload or another worker has replaced
+   * the in-memory engine instance. The Postgres row is the source of truth in
+   * that case, so a valid completed/paused run must remain readable instead
+   * of becoming a misleading 500 response.
+   */
+  private async loadWorkflow(
+    runId: string,
+  ): Promise<Workflow<
+    Record<string, never>,
+    OrchestrationInput,
+    WorkflowOutput
+  > | null> {
+    const workflow = await engine.getWorkflow(runId);
+    if (workflow) return workflow;
+
+    const row = await db.query.workflowRun.findFirst({
+      where: eq(workflowRun.id, runId),
+    });
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      version: row.version,
+      state: row.state as Workflow<
+        Record<string, never>,
+        OrchestrationInput,
+        WorkflowOutput
+      >["state"],
+      steps: createOrchestrationWorkflow().steps,
+      currentStep: row.currentStep,
+      context: (row.context ?? {}) as Record<string, never>,
+      input: row.input as unknown as OrchestrationInput,
+      ...(row.output !== null
+        ? { output: row.output as unknown as WorkflowOutput }
+        : {}),
+      ...(row.error
+        ? {
+            error: row.error as unknown as Workflow<
+              Record<string, never>,
+              OrchestrationInput,
+              WorkflowOutput
+            >["error"],
+          }
+        : {}),
+      createdAt: row.createdAt.getTime(),
+      updatedAt: row.updatedAt.getTime(),
+      ...(row.completedAt ? { completedAt: row.completedAt.getTime() } : {}),
+      ...(row.resumeAt ? { resumeAt: row.resumeAt.getTime() } : {}),
+      ...(row.maxExecutionTime
+        ? { maxExecutionTime: row.maxExecutionTime }
+        : {}),
+      ...(row.executionStartedAt
+        ? { executionStartedAt: row.executionStartedAt.getTime() }
+        : {}),
+      retryCount: row.retryCount,
+      tags: row.tags ?? {},
+      metadata: row.metadata ?? {},
+    };
   }
 
   private async replayTerminalResult(
@@ -372,6 +439,21 @@ export class WorkflowRunService {
       case "workflow.completed": {
         await this.syncRunStatus(runId, "completed");
         const state = (event.payload as { output: WorkflowOutput }).output;
+        if (state.silent) {
+          publishWorkflowChunk(runId, {
+            type: "data-workflowCompleted",
+            data: {
+              success: true,
+              executionTimeMs: Date.now() - state.startedAt,
+            },
+          });
+          publishWorkflowChunk(runId, {
+            type: "finish",
+            finishReason: "stop",
+          });
+          this.close(runId);
+          return;
+        }
         const finalResult = state.finalResult;
         const text =
           finalResult?.detailedResponse ??

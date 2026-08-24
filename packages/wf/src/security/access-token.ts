@@ -1,10 +1,10 @@
-import { generateId } from "../utils/id";
 import type {
   TokenRevocationStore,
   WorkflowAccessClaims,
   WorkflowAccessScope,
   WorkflowAccessTokenOptions,
 } from "../models";
+import { generateId } from "../utils/id";
 
 interface TokenEnvelope {
   version: 1;
@@ -26,7 +26,9 @@ export class WorkflowAccessTokenSigner {
     private readonly revocations?: TokenRevocationStore,
   ) {
     if (secret.length < 32) {
-      throw new Error("Workflow access token secret must be at least 32 characters");
+      throw new Error(
+        "Workflow access token secret must be at least 32 characters",
+      );
     }
   }
 
@@ -38,9 +40,12 @@ export class WorkflowAccessTokenSigner {
     const issuedAt = input.issuedAt ?? Date.now();
     const expiresAt =
       input.expiresAt ??
-      issuedAt + (options.expiresInMs ?? this.defaults.expiresInMs ?? 5 * 60 * 1000);
+      issuedAt +
+        (options.expiresInMs ?? this.defaults.expiresInMs ?? 5 * 60 * 1000);
     if (expiresAt <= issuedAt) {
-      throw new RangeError("Workflow access token expiration must be in the future");
+      throw new RangeError(
+        "Workflow access token expiration must be in the future",
+      );
     }
     const claims: WorkflowAccessClaims = {
       ...input,
@@ -51,7 +56,7 @@ export class WorkflowAccessTokenSigner {
     validateClaims(claims);
     const envelope: TokenEnvelope = {
       version: 1,
-      ...(options.issuer ?? this.defaults.issuer
+      ...((options.issuer ?? this.defaults.issuer)
         ? { issuer: options.issuer ?? this.defaults.issuer }
         : {}),
       claims,
@@ -63,13 +68,18 @@ export class WorkflowAccessTokenSigner {
 
   async verify(token: string): Promise<WorkflowAccessClaims> {
     const parts = token.split(".");
-    if (parts.length !== 2) throw new WorkflowAccessTokenError("Malformed access token");
+    if (parts.length !== 2)
+      throw new WorkflowAccessTokenError("Malformed access token");
     const encoded = parts[0];
     const signature = parts[1];
-    if (!encoded || !signature) throw new WorkflowAccessTokenError("Malformed access token");
+    if (!encoded || !signature)
+      throw new WorkflowAccessTokenError("Malformed access token");
     let validSignature = false;
     try {
-      validSignature = await safeEqual(signature, await sign(this.secret, encoded));
+      validSignature = await safeEqual(
+        signature,
+        await sign(this.secret, encoded),
+      );
     } catch {
       validSignature = false;
     }
@@ -114,11 +124,18 @@ export class WorkflowAccessTokenSigner {
     if (!claims.scopes.includes(scope)) {
       throw new WorkflowAccessTokenError(`Access token lacks ${scope} scope`);
     }
-    if (!claims.workflowIds.includes("*") && !claims.workflowIds.includes(workflowId)) {
-      throw new WorkflowAccessTokenError("Access token cannot access this workflow");
+    if (
+      !claims.workflowIds.includes("*") &&
+      !claims.workflowIds.includes(workflowId)
+    ) {
+      throw new WorkflowAccessTokenError(
+        "Access token cannot access this workflow",
+      );
     }
     if (claims.tenantId !== undefined && claims.tenantId !== tenantId) {
-      throw new WorkflowAccessTokenError("Access token tenant does not match workflow");
+      throw new WorkflowAccessTokenError(
+        "Access token tenant does not match workflow",
+      );
     }
   }
 }
@@ -148,9 +165,12 @@ export class InMemoryTokenRevocationStore implements TokenRevocationStore {
 }
 
 export function validateClaims(claims: WorkflowAccessClaims): void {
-  if (!claims.subject.trim()) throw new WorkflowAccessTokenError("Token subject is required");
+  if (!claims.subject.trim())
+    throw new WorkflowAccessTokenError("Token subject is required");
   if (claims.workflowIds.length === 0) {
-    throw new WorkflowAccessTokenError("Token must include at least one workflow id");
+    throw new WorkflowAccessTokenError(
+      "Token must include at least one workflow id",
+    );
   }
   if (claims.scopes.length === 0) {
     throw new WorkflowAccessTokenError("Token must include at least one scope");
@@ -167,7 +187,8 @@ function decodeJson<T>(value: string): T {
 
 async function sign(secret: string, value: string): Promise<string> {
   const cryptoApi = globalThis.crypto;
-  if (!cryptoApi?.subtle) throw new Error("Web Crypto API is required for access tokens");
+  if (!cryptoApi?.subtle)
+    throw new Error("Web Crypto API is required for access tokens");
   const key = await cryptoApi.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),
@@ -197,11 +218,16 @@ async function safeEqual(left: string, right: string): Promise<boolean> {
 function base64UrlEncode(bytes: Uint8Array): string {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
+  return btoa(binary)
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replace(/=+$/u, "");
 }
 
 function base64UrlDecode(value: string): Uint8Array {
-  const padded = value.replaceAll("-", "+").replaceAll("_", "/") + "===".slice((value.length + 3) % 4);
+  const padded =
+    value.replaceAll("-", "+").replaceAll("_", "/") +
+    "===".slice((value.length + 3) % 4);
   const binary = atob(padded);
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }

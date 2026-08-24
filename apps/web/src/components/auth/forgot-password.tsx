@@ -1,30 +1,30 @@
-"use client"
+"use client";
 
-import { getViewURL } from "@better-auth-ui/core"
+import { getViewURL } from "@better-auth-ui/core";
 import {
   useAuth,
   useFetchOptions,
-  useRequestPasswordReset
-} from "@better-auth-ui/react"
-import { type SyntheticEvent, useState } from "react"
+  useRequestPasswordReset,
+} from "@better-auth-ui/react";
+import { type SyntheticEvent, useState } from "react";
 
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Field,
   FieldDescription,
   FieldError,
   FieldGroup,
-  FieldLabel
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Spinner } from "@/components/ui/spinner"
-import { cn } from "@/lib/utils"
-import { RESET_LINK_SENT_STORAGE_KEY } from "./reset-link-sent"
+  FieldLabel,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { cn } from "@/lib/utils";
+import { RESET_LINK_SENT_STORAGE_KEY } from "./reset-link-sent";
 
 export type ForgotPasswordProps = {
-  className?: string
-}
+  className?: string;
+};
 
 /**
  * Render a card-based "Forgot Password" form that sends a password-reset email.
@@ -46,45 +46,45 @@ export function ForgotPassword({ className }: ForgotPasswordProps) {
     navigate,
     plugins,
     viewPaths,
-    Link
-  } = useAuth()
+    Link,
+  } = useAuth();
 
-  const { fetchOptions, resetFetchOptions } = useFetchOptions()
+  const { fetchOptions, resetFetchOptions } = useFetchOptions();
 
   const { mutate: requestPasswordReset, isPending } = useRequestPasswordReset(
     authClient,
     {
       onError: () => {
-        resetFetchOptions()
+        resetFetchOptions();
       },
       onSuccess: (_data, { email }) => {
-        sessionStorage.setItem(RESET_LINK_SENT_STORAGE_KEY, email)
-        navigate({ to: `${basePaths.auth}/${viewPaths.auth.resetLinkSent}` })
-      }
-    }
-  )
+        sessionStorage.setItem(RESET_LINK_SENT_STORAGE_KEY, email);
+        navigate({ to: `${basePaths.auth}/${viewPaths.auth.resetLinkSent}` });
+      },
+    },
+  );
 
   function handleSubmit(e: SyntheticEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const formData = new FormData(e.currentTarget)
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
     requestPasswordReset({
       email: formData.get("email") as string,
       redirectTo: getViewURL(
         baseURL,
         basePaths.auth,
-        viewPaths.auth.resetPassword
+        viewPaths.auth.resetPassword,
       ),
-      fetchOptions
-    })
+      fetchOptions,
+    });
   }
 
   const Captcha = plugins.find(
-    (plugin) => plugin.captchaComponent
-  )?.captchaComponent
+    (plugin) => plugin.captchaComponent,
+  )?.captchaComponent;
 
   const [fieldErrors, setFieldErrors] = useState<{
-    email?: string
-  }>({})
+    email?: string;
+  }>({});
 
   return (
     <Card className={cn("w-full max-w-sm", className)}>
@@ -111,20 +111,20 @@ export function ForgotPassword({ className }: ForgotPasswordProps) {
                 onChange={() => {
                   setFieldErrors((prev) => ({
                     ...prev,
-                    email: undefined
-                  }))
+                    email: undefined,
+                  }));
                 }}
                 onInvalid={(e) => {
-                  e.preventDefault()
-                  const el = e.target as HTMLInputElement
+                  e.preventDefault();
+                  const el = e.target as HTMLInputElement;
                   const msg = el.validity.valueMissing
                     ? localization.auth.fieldRequired
-                    : localization.auth.invalidEmail
+                    : localization.auth.invalidEmail;
 
                   setFieldErrors((prev) => ({
                     ...prev,
-                    email: msg
-                  }))
+                    email: msg,
+                  }));
                 }}
                 aria-invalid={!!fieldErrors.email}
               />
@@ -144,7 +144,7 @@ export function ForgotPassword({ className }: ForgotPasswordProps) {
           </FieldGroup>
         </form>
 
-        <div className="flex flex-col gap-3 items-center w-full mt-4">
+        <div className="mt-4 flex w-full flex-col items-center gap-3">
           <FieldDescription className="text-center">
             {localization.auth.rememberYourPassword}{" "}
             <Link
@@ -157,5 +157,5 @@ export function ForgotPassword({ className }: ForgotPasswordProps) {
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

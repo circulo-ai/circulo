@@ -1,7 +1,7 @@
-import type { EventBus, Unsubscribe } from "./pubsub";
-import type { WorkflowEvent, Workflow } from "./workflow";
 import type { WorkflowQueryView } from "./gateway";
 import type { WorkflowHistoryEvent } from "./history";
+import type { EventBus, Unsubscribe } from "./pubsub";
+import type { Workflow, WorkflowEvent } from "./workflow";
 
 export type WorkflowAccessScope =
   | "workflow:read"
@@ -90,5 +90,8 @@ export interface WorkflowRemoteClient {
   ): Promise<void>;
 }
 
-export type WorkflowRemoteSnapshot<TContext = unknown, TInput = unknown, TOutput = unknown> =
-  Workflow<TContext, TInput, TOutput> | WorkflowQueryView;
+export type WorkflowRemoteSnapshot<
+  TContext = unknown,
+  TInput = unknown,
+  TOutput = unknown,
+> = Workflow<TContext, TInput, TOutput> | WorkflowQueryView;

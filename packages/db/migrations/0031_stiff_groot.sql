@@ -1,0 +1,4 @@
+DROP INDEX "skill_assignments_unique_target_idx";--> statement-breakpoint
+CREATE UNIQUE INDEX "skill_assignments_unique_org_idx" ON "skill_assignments" USING btree ("skill_id") WHERE scope = 'organization' AND chat_id IS NULL AND agent_id IS NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "skill_assignments_unique_chat_idx" ON "skill_assignments" USING btree ("skill_id","chat_id") WHERE scope = 'chat' AND chat_id IS NOT NULL AND agent_id IS NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "skill_assignments_unique_agent_idx" ON "skill_assignments" USING btree ("skill_id","agent_id") WHERE scope = 'agent' AND chat_id IS NULL AND agent_id IS NOT NULL;

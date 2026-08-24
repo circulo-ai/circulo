@@ -44,6 +44,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { useSidebar } from "@/components/ui/sidebar";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import {
   Tooltip,
@@ -51,6 +52,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { FileInput } from "@/components/uploads/file-input";
+import { VoiceRecordingIndicator } from "@/components/voice-recording-indicator";
 import { useMergedRefs } from "@/hooks/use-merged-refs";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useUploadTaskManager } from "@/hooks/use-upload-task-manager";
@@ -88,6 +90,7 @@ import {
   Pencil,
   Plus,
   Square,
+  TextAlignJustify,
   Trash2,
   TriangleAlert,
 } from "lucide-react";
@@ -149,6 +152,7 @@ export function NewChat({ id }: NewChatProps) {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isReadingAttachments, setIsReadingAttachments] = useState(false);
   const isMobile = useIsMobile();
+  const { setOpenMobile } = useSidebar();
   const router = useRouter();
   const { mutate } = useSWRConfig();
   const { setCurrentChatId } = useChatHistoryStore();
@@ -184,7 +188,16 @@ export function NewChat({ id }: NewChatProps) {
   }, [uploadManager.uploadTasks]);
 
   const voiceRecorder = useVoiceRecorder({
-    onRecordingComplete: (file) => uploadManager.enqueueUploads([file], "chat"),
+    onRecordingComplete: (file, transcript) => {
+      if (transcript?.trim()) {
+        setInputText(
+          (current) =>
+            `${current}${current.trim() ? " " : ""}${transcript.trim()}`,
+        );
+        return;
+      }
+      uploadManager.enqueueUploads([file], "chat");
+    },
     onRecordingError: (error) => toast.error(error.message),
   });
 
@@ -206,6 +219,21 @@ export function NewChat({ id }: NewChatProps) {
         localStorage.setItem(`active-workflow-run-id:${chatId}`, workflowRunId);
         router.push(`/chat/${chatId}`, { scroll: false });
         setCurrentChatId(chatId);
+
+        // The routed chat page reconnects to the durable workflow stream. Do
+        // not let this transient new-chat consumer continue receiving the
+        // same chunks while the route transition is mounting; otherwise the
+        // first partial response can be concatenated with the replayed one.
+        try {
+          await response.body?.cancel();
+        } catch {
+          // The route transition may already have detached the response.
+        }
+        return new Response(null, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+        });
       }
       return response;
     },
@@ -327,7 +355,19 @@ export function NewChat({ id }: NewChatProps) {
       value={{ selectedAgentIds, setSelectedAgentIds }}
     >
       <div className="flex h-full overflow-hidden">
-        <article className="mx-auto flex h-full w-full max-w-3xl flex-col items-center justify-center gap-8 p-4 sm:p-8">
+        <article className="relative mx-auto flex h-full w-full max-w-3xl flex-col items-center justify-center gap-8 p-4 sm:p-8">
+          {isMobile && (
+            <Button
+              aria-label="Open chat history"
+              className="absolute top-3 left-3 z-20 min-h-11 min-w-11"
+              onClick={() => setOpenMobile(true)}
+              size="icon"
+              title="Open chat history"
+              variant="ghost"
+            >
+              <TextAlignJustify aria-hidden="true" />
+            </Button>
+          )}
           <h1 className="text-3xl">One chat to rule them all</h1>
           <input
             ref={fileInputRef}
@@ -387,109 +427,121 @@ export function NewChat({ id }: NewChatProps) {
                 ))}
             </div>
           )}
-          <CustomInputGroup className="h-14 w-full rounded-full! bg-sidebar!">
-            {/* TODO multiline + combine with CHAT SDK's main input */}
-            <CustomInputGroupInput
-              placeholder=" Your first message (optional)"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSubmit();
-                }
-              }}
+          {voiceRecorder.isRecording ? (
+            <VoiceRecordingIndicator
+              elapsedSeconds={voiceRecorder.elapsedSeconds}
+              interimTranscript={voiceRecorder.interimTranscript}
+              onCancel={voiceRecorder.cancel}
+              onStop={voiceRecorder.stop}
+              transcript={voiceRecorder.transcript}
             />
-            <InputGroupAddon align="inline-start" className="ml-0!">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <InputGroupButton
-                    aria-label="Add files"
-                    size="icon-md"
-                    variant="ghost-sidebar"
-                    className="rounded-full"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <Paperclip />
-                  </InputGroupButton>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Add files</p>
-                </TooltipContent>
-              </Tooltip>
-            </InputGroupAddon>
+          ) : (
+            <CustomInputGroup className="h-14 w-full rounded-full! bg-sidebar!">
+              {/* TODO multiline + combine with CHAT SDK's main input */}
+              <CustomInputGroupInput
+                placeholder=" Your first message (optional)"
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit();
+                  }
+                }}
+              />
+              <InputGroupAddon align="inline-start" className="ml-0!">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <InputGroupButton
+                      aria-label="Add files"
+                      size="icon-md"
+                      variant="ghost-sidebar"
+                      className="rounded-full"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Paperclip />
+                    </InputGroupButton>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Add files</p>
+                  </TooltipContent>
+                </Tooltip>
+              </InputGroupAddon>
 
-            <InputGroupAddon align="inline-end" className="mr-0!">
-              {isMobile ? (
-                <Sheet>
-                  <SheetTrigger asChild>{agentSelectionButton}</SheetTrigger>
-                  <SheetContent
-                    side="right"
-                    className="w-80 border-teal-50/15 bg-sidebar p-0"
-                  >
-                    <SheetHeader className="sr-only">
-                      <SheetTitle>Select AI Agents</SheetTitle>
-                      <SheetDescription>
-                        Choose who will help with your request
-                      </SheetDescription>
-                    </SheetHeader>
-                    {agentPanel}
-                  </SheetContent>
-                </Sheet>
-              ) : (
-                agentSelectionButton
-              )}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <InputGroupButton
-                    aria-label="Dictate"
-                    size="icon-md"
-                    variant="ghost-sidebar"
-                    className={cn(
-                      "rounded-full",
-                      voiceRecorder.isRecording && "text-red-500",
-                    )}
-                    onClick={() => {
-                      if (voiceRecorder.isRecording) {
-                        voiceRecorder.stop();
-                      } else {
-                        void voiceRecorder.start().catch(() => undefined);
-                      }
-                    }}
-                  >
-                    {voiceRecorder.isRecording ? <Square /> : <Mic />}
-                  </InputGroupButton>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>
-                    {voiceRecorder.isRecording
-                      ? "Stop recording"
-                      : "Record voice"}
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-              <InputGroupButton
-                aria-label="Submit"
-                size="icon-md"
-                variant="primary"
-                className="rounded-full"
-                onClick={handleSubmit}
-                disabled={
-                  status === "submitted" ||
-                  status === "streaming" ||
-                  voiceRecorder.isStarting ||
-                  isReadingAttachments ||
-                  voiceRecorder.isRecording ||
-                  uploadManager.hasUploadErrors ||
-                  uploadManager.uploadTasks.some((task) =>
-                    ["queued", "preparing", "uploading"].includes(task.status),
-                  )
-                }
-              >
-                <ArrowUp />
-              </InputGroupButton>
-            </InputGroupAddon>
-          </CustomInputGroup>
+              <InputGroupAddon align="inline-end" className="mr-0!">
+                {isMobile ? (
+                  <Sheet>
+                    <SheetTrigger asChild>{agentSelectionButton}</SheetTrigger>
+                    <SheetContent
+                      side="right"
+                      className="w-80 border-teal-50/15 bg-sidebar p-0"
+                    >
+                      <SheetHeader className="sr-only">
+                        <SheetTitle>Select AI Agents</SheetTitle>
+                        <SheetDescription>
+                          Choose who will help with your request
+                        </SheetDescription>
+                      </SheetHeader>
+                      {agentPanel}
+                    </SheetContent>
+                  </Sheet>
+                ) : (
+                  agentSelectionButton
+                )}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <InputGroupButton
+                      aria-label="Dictate"
+                      size="icon-md"
+                      variant="ghost-sidebar"
+                      className={cn(
+                        "rounded-full",
+                        voiceRecorder.isRecording && "text-red-500",
+                      )}
+                      onClick={() => {
+                        if (voiceRecorder.isRecording) {
+                          voiceRecorder.stop();
+                        } else {
+                          void voiceRecorder.start().catch(() => undefined);
+                        }
+                      }}
+                    >
+                      {voiceRecorder.isRecording ? <Square /> : <Mic />}
+                    </InputGroupButton>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>
+                      {voiceRecorder.isRecording
+                        ? "Stop recording"
+                        : "Record voice"}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+                <InputGroupButton
+                  aria-label="Submit"
+                  size="icon-md"
+                  variant="primary"
+                  className="rounded-full"
+                  onClick={handleSubmit}
+                  disabled={
+                    status === "submitted" ||
+                    status === "streaming" ||
+                    voiceRecorder.isStarting ||
+                    isReadingAttachments ||
+                    voiceRecorder.isRecording ||
+                    uploadManager.hasUploadErrors ||
+                    uploadManager.uploadTasks.some((task) =>
+                      ["queued", "preparing", "uploading"].includes(
+                        task.status,
+                      ),
+                    )
+                  }
+                >
+                  <ArrowUp />
+                </InputGroupButton>
+              </InputGroupAddon>
+            </CustomInputGroup>
+          )}
         </article>
 
         {/* Desktop: persistent side panel — uses same AgentSelectionContext */}
@@ -726,6 +778,85 @@ type NewAgentRequest = z.input<typeof createAgentBodySchema>;
 type EditAgentRequest = z.input<typeof updateAgentBodySchema>;
 type AgentRequest = NewAgentRequest | EditAgentRequest;
 
+function readAgentField(value: unknown): unknown {
+  if (value === null || value === undefined) return undefined;
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return value;
+  }
+
+  if (typeof value !== "object") return undefined;
+  const candidate = value as { target?: unknown; value?: unknown };
+  if (candidate.target && typeof candidate.target === "object") {
+    return readAgentField((candidate.target as { value?: unknown }).value);
+  }
+  if ("value" in candidate && candidate.value !== value) {
+    return readAgentField(candidate.value);
+  }
+  return undefined;
+}
+
+function readAgentString(value: unknown, fallback = "") {
+  const normalized = readAgentField(value);
+  return typeof normalized === "string" ? normalized : fallback;
+}
+
+function readAgentNumber(value: unknown, fallback: number) {
+  const normalized = readAgentField(value);
+  if (typeof normalized === "number" && Number.isFinite(normalized)) {
+    return normalized;
+  }
+  if (typeof normalized === "string" && normalized.trim()) {
+    const parsed = Number(normalized);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return fallback;
+}
+
+function toSerializableAgentPayload(
+  payload: AgentRequest,
+  fallback?: {
+    id?: string;
+    name?: string;
+    description?: string | null;
+    instructions?: string;
+    model?: string;
+    temperature?: number | null;
+    avatarUrl?: string | null;
+  },
+): AgentRequest {
+  const normalized: Record<string, unknown> = {
+    name: readAgentString(payload.name, fallback?.name ?? ""),
+    description: readAgentString(
+      payload.description,
+      fallback?.description ?? "",
+    ),
+    instructions: readAgentString(
+      payload.instructions,
+      fallback?.instructions ?? "",
+    ),
+    model: readAgentString(payload.model, fallback?.model ?? defaultModel),
+    temperature: readAgentNumber(
+      payload.temperature,
+      fallback?.temperature ?? 70,
+    ),
+  };
+
+  const avatarUrl = readAgentString(
+    payload.avatarUrl,
+    fallback?.avatarUrl ?? "",
+  );
+  if (avatarUrl) normalized.avatarUrl = avatarUrl;
+
+  const id = readAgentString(payload.id, fallback?.id ?? "");
+  if (id) normalized.id = id;
+
+  return normalized as AgentRequest;
+}
+
 function AgentForm() {
   const { redirect, currentRoute } = useRouteFlowViewContext();
 
@@ -775,7 +906,9 @@ function AgentForm() {
 
   const submitNewAgent = useCallback(
     async (payload: NewAgentRequest) => {
-      const result = await newAgent(payload);
+      const result = await newAgent(
+        toSerializableAgentPayload(payload) as NewAgentRequest,
+      );
       await globalMutate("/api/agent");
       return result;
     },
@@ -783,11 +916,15 @@ function AgentForm() {
   );
   const submitEditAgent = useCallback(
     async (payload: EditAgentRequest) => {
-      const result = await editAgent(payload);
+      const normalizedPayload = toSerializableAgentPayload(
+        payload,
+        currentAgent,
+      ) as EditAgentRequest;
+      const result = await editAgent(normalizedPayload);
       await globalMutate("/api/agent");
       return result;
     },
-    [editAgent],
+    [currentAgent, editAgent],
   );
 
   useEffect(() => {

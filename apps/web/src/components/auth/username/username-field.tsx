@@ -1,20 +1,20 @@
-"use client"
+"use client";
 
-import type { UsernameAuthClient } from "@better-auth-ui/core/plugins/username"
-import { useAuth, useAuthPlugin } from "@better-auth-ui/react"
-import { useIsUsernameAvailable } from "@better-auth-ui/react/plugins/username"
-import { useDebouncer } from "@tanstack/react-pacer"
-import { Check, X } from "lucide-react"
-import { useState } from "react"
-import type { AdditionalFieldProps } from "@/components/auth/additional-field"
-import { Field, FieldError, FieldLabel } from "@/components/ui/field"
+import type { AdditionalFieldProps } from "@/components/auth/additional-field";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import {
   InputGroup,
   InputGroupAddon,
-  InputGroupInput
-} from "@/components/ui/input-group"
-import { Spinner } from "@/components/ui/spinner"
-import { usernamePlugin } from "@/lib/auth/username-plugin"
+  InputGroupInput,
+} from "@/components/ui/input-group";
+import { Spinner } from "@/components/ui/spinner";
+import { usernamePlugin } from "@/lib/auth/username-plugin";
+import type { UsernameAuthClient } from "@better-auth-ui/core/plugins/username";
+import { useAuth, useAuthPlugin } from "@better-auth-ui/react";
+import { useIsUsernameAvailable } from "@better-auth-ui/react/plugins/username";
+import { useDebouncer } from "@tanstack/react-pacer";
+import { Check, X } from "lucide-react";
+import { useState } from "react";
 
 /**
  * Renderer for the `username` additional field. Owns availability checking,
@@ -25,56 +25,56 @@ import { usernamePlugin } from "@/lib/auth/username-plugin"
 export function UsernameField({
   name,
   field,
-  isPending
+  isPending,
 }: AdditionalFieldProps) {
   const { authClient, localization: authLocalization } =
-    useAuth<UsernameAuthClient>()
+    useAuth<UsernameAuthClient>();
   const {
     localization,
     minUsernameLength,
     maxUsernameLength,
     isUsernameAvailable: checkAvailability,
-    usernamePrefix
-  } = useAuthPlugin(usernamePlugin)
+    usernamePrefix,
+  } = useAuthPlugin(usernamePlugin);
 
-  const currentUsername = String(field.defaultValue ?? "")
-  const [value, setValue] = useState(currentUsername)
-  const [error, setError] = useState<string>()
+  const currentUsername = String(field.defaultValue ?? "");
+  const [value, setValue] = useState(currentUsername);
+  const [error, setError] = useState<string>();
 
   const {
     mutate: requestAvailability,
     data: availability,
     error: availabilityError,
-    reset: resetAvailability
+    reset: resetAvailability,
   } = useIsUsernameAvailable(authClient, {
-    onError: () => {}
-  })
+    onError: () => {},
+  });
 
   const debouncer = useDebouncer(
     (next: string) => {
-      const trimmed = next.trim()
+      const trimmed = next.trim();
       if (!trimmed || trimmed === currentUsername) {
-        resetAvailability()
-        return
+        resetAvailability();
+        return;
       }
 
-      requestAvailability({ username: trimmed })
+      requestAvailability({ username: trimmed });
     },
-    { wait: 500 }
-  )
+    { wait: 500 },
+  );
 
   function handleChange(next: string) {
-    setValue(next)
-    setError(undefined)
-    resetAvailability()
+    setValue(next);
+    setError(undefined);
+    resetAvailability();
 
     if (checkAvailability) {
-      debouncer.maybeExecute(next)
+      debouncer.maybeExecute(next);
     }
   }
 
   const isCheckingAvailability =
-    !!checkAvailability && !!value.trim() && value.trim() !== currentUsername
+    !!checkAvailability && !!value.trim() && value.trim() !== currentUsername;
 
   return (
     <Field data-invalid={!!error}>
@@ -100,20 +100,20 @@ export function UsernameField({
           value={value}
           onChange={(e) => handleChange(e.target.value)}
           onInvalid={(e) => {
-            e.preventDefault()
-            const el = e.target as HTMLInputElement
+            e.preventDefault();
+            const el = e.target as HTMLInputElement;
             const msg = el.validity.valueMissing
               ? authLocalization.auth.fieldRequired
               : el.validity.tooShort
                 ? authLocalization.auth.tooShort.replace(
                     "{{min}}",
-                    String(minUsernameLength)
+                    String(minUsernameLength),
                   )
                 : authLocalization.auth.tooLong.replace(
                     "{{max}}",
-                    String(maxUsernameLength)
-                  )
-            setError(msg)
+                    String(maxUsernameLength),
+                  );
+            setError(msg);
           }}
           aria-invalid={!!error}
           placeholder={field.placeholder}
@@ -143,5 +143,5 @@ export function UsernameField({
 
       <FieldError>{error}</FieldError>
     </Field>
-  )
+  );
 }

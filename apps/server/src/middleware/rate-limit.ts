@@ -1,4 +1,5 @@
 import type { AppEnv } from "@/lib/create-app";
+import { env } from "@/lib/env";
 import type { RateLimiter } from "@/services/rate-limit";
 import {
   DEFAULT_PLAN,
@@ -9,7 +10,6 @@ import {
 import { RateLimitError } from "@circulo-ai/types";
 import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
-import { env } from "@/lib/env";
 
 type KeyResolver = (
   c: Context<AppEnv>,

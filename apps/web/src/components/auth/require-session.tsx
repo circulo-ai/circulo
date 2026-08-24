@@ -13,7 +13,9 @@ export function RequireSession({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isPending && !session?.user) {
-      router.replace(`/auth/sign-in?redirectTo=${encodeURIComponent(pathname)}`);
+      router.replace(
+        `/auth/sign-in?redirectTo=${encodeURIComponent(pathname)}`,
+      );
     }
   }, [isPending, pathname, router, session?.user]);
 

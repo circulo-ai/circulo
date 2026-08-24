@@ -102,7 +102,10 @@ function FormLabel({
   );
 }
 
-function FormControl({ children, ...props }: React.ComponentProps<"div"> & {
+function FormControl({
+  children,
+  ...props
+}: React.ComponentProps<"div"> & {
   children: React.ReactElement;
 }) {
   const { error, formItemId, formDescriptionId, formMessageId } =
@@ -110,16 +113,19 @@ function FormControl({ children, ...props }: React.ComponentProps<"div"> & {
 
   const childProps = children.props as Record<string, unknown>;
 
-  return React.cloneElement(children as React.ReactElement<Record<string, unknown>>, {
-    "data-slot": "form-control",
-    id: formItemId,
-    "aria-describedby": !error
-      ? formDescriptionId
-      : `${formDescriptionId} ${formMessageId}`,
-    "aria-invalid": !!error,
-    ...props,
-    ...childProps,
-  });
+  return React.cloneElement(
+    children as React.ReactElement<Record<string, unknown>>,
+    {
+      "data-slot": "form-control",
+      id: formItemId,
+      "aria-describedby": !error
+        ? formDescriptionId
+        : `${formDescriptionId} ${formMessageId}`,
+      "aria-invalid": !!error,
+      ...props,
+      ...childProps,
+    },
+  );
 }
 
 function FormDescription({ className, ...props }: React.ComponentProps<"p">) {

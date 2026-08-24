@@ -177,8 +177,11 @@ export default function AuthLayout({
               {agents.map((agent, index) => {
                 const angleRad = (agent.angle * Math.PI) / 180;
                 const orbitRadius = 200;
-                const x = Math.cos(angleRad) * orbitRadius;
-                const y = Math.sin(angleRad) * orbitRadius;
+                // Keep the SSR and browser style strings identical. Without
+                // rounding, React's server serialization and the client
+                // floating-point value produce a hydration mismatch here.
+                const x = Number((Math.cos(angleRad) * orbitRadius).toFixed(3));
+                const y = Number((Math.sin(angleRad) * orbitRadius).toFixed(3));
                 const isActive = index === activeAgent;
 
                 return (

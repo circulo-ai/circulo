@@ -7,7 +7,10 @@ function clientIp(c: any): string | null {
   const hops = Math.max(0, Number(env.TRUSTED_PROXY_HOPS ?? "0"));
   const forwarded = c.req.header("x-forwarded-for");
   if (hops > 0 && forwarded) {
-    const values = forwarded.split(",").map((value: string) => value.trim()).filter(Boolean);
+    const values = forwarded
+      .split(",")
+      .map((value: string) => value.trim())
+      .filter(Boolean);
     return values[Math.max(0, values.length - hops - 1)] ?? null;
   }
   if (hops > 0) return c.req.header("x-real-ip") ?? null;
@@ -15,7 +18,10 @@ function clientIp(c: any): string | null {
 }
 
 function isAuditable(method: string, status: number): boolean {
-  return !["GET", "HEAD", "OPTIONS"].includes(method) || [401, 403, 429].includes(status);
+  return (
+    !["GET", "HEAD", "OPTIONS"].includes(method) ||
+    [401, 403, 429].includes(status)
+  );
 }
 
 /** Durable, intentionally thin request audit layer. It records metadata only. */
@@ -32,14 +38,27 @@ export const auditRequest = createMiddleware<AppEnv>(async (c, next) => {
 
   const status = c.res.status;
   if (isAuditable(c.req.method, status)) {
-    await writeAudit(c, status, status === 401 || status === 403 || status === 429 ? "denied" : "success");
+    await writeAudit(
+      c,
+      status,
+      status === 401 || status === 403 || status === 429 ? "denied" : "success",
+    );
   }
 });
 
-async function writeAudit(c: any, statusCode: number, outcome: "success" | "denied" | "failure") {
+async function writeAudit(
+  c: any,
+  statusCode: number,
+  outcome: "success" | "denied" | "failure",
+) {
   try {
     await recordAuditEvent({
-      actorType: c.var.authMethod === "api_key" ? "api_key" : c.var.user ? "user" : "anonymous",
+      actorType:
+        c.var.authMethod === "api_key"
+          ? "api_key"
+          : c.var.user
+            ? "user"
+            : "anonymous",
       actorId: c.var.apiKeyId ?? c.var.user?.id ?? null,
       authMethod: c.var.authMethod ?? null,
       organizationId: c.var.activeOrgId ?? null,
@@ -56,4 +75,3 @@ async function writeAudit(c: any, statusCode: number, outcome: "success" | "deni
     // Audit persistence must not turn a successful application request into a 500.
   }
 }
-

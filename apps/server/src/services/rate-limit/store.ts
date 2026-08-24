@@ -37,9 +37,7 @@ export class RedisRateLimitStore implements RateLimitStore {
       1,
       windowMs,
     );
-    const resetAt = new Date(
-      Date.now() + (ttlMs > 0 ? ttlMs : windowMs),
-    );
+    const resetAt = new Date(Date.now() + (ttlMs > 0 ? ttlMs : windowMs));
 
     return { count, resetAt };
   }

@@ -1,23 +1,24 @@
 import type {
   ActivityTaskPayload,
+  BatchOptions,
+  BatchResult,
   ReplayWorkflowContext,
   ReplayWorkflowDefinition,
   ReplayWorkflowResult,
   ReplayWorkflowRunnerOptions,
-  BatchOptions,
-  BatchResult,
   SagaScope,
-  TimerTaskPayload,
-} from "../models";
-import { WorkflowReplayCursor, WorkflowReplayError } from "../replay/replay-cursor";
-import { appendHistoryEvent } from "./history-append";
-import { generateId } from "../utils/id";
-import type {
   TaskEnvelope,
+  TimerTaskPayload,
   WorkflowError,
   WorkflowHistoryEvent,
   WorkflowHistoryStore,
 } from "../models";
+import {
+  WorkflowReplayCursor,
+  WorkflowReplayError,
+} from "../replay/replay-cursor";
+import { generateId } from "../utils/id";
+import { appendHistoryEvent } from "./history-append";
 
 class WorkflowSuspended extends Error {
   constructor(readonly reason: "activity" | "timer" | "event") {
@@ -62,7 +63,9 @@ export class ReplayWorkflowRunner {
         workflowId,
         runId,
         eventId: `${workflowId}:${runId}:workflow.started`,
-        ...(options.tenantId === undefined ? {} : { tenantId: options.tenantId }),
+        ...(options.tenantId === undefined
+          ? {}
+          : { tenantId: options.tenantId }),
         eventType: "workflow.started",
         payload: {
           input,
@@ -200,8 +203,11 @@ export class ReplayWorkflowRunner {
         }
 
         while (
-          cursor.find("activity.started", (event) =>
-            (event.payload as { activityId?: string }).activityId === activityId,
+          cursor.find(
+            "activity.started",
+            (event) =>
+              (event.payload as { activityId?: string }).activityId ===
+              activityId,
           )
         ) {
           // Consume every at-least-once attempt before resolving the activity.
@@ -219,32 +225,36 @@ export class ReplayWorkflowRunner {
           message?: string;
           retryable?: boolean;
         }> = [];
-        let failed: WorkflowHistoryEvent<{
-          activityId: string;
-          message?: string;
-          retryable?: boolean;
-        }> | undefined;
+        let failed:
+          | WorkflowHistoryEvent<{
+              activityId: string;
+              message?: string;
+              retryable?: boolean;
+            }>
+          | undefined;
         while (
           (failed = cursor.find<{
             activityId: string;
             message?: string;
             retryable?: boolean;
-          }>("activity.failed", (event) => event.payload.activityId === activityId))
+          }>(
+            "activity.failed",
+            (event) => event.payload.activityId === activityId,
+          ))
         ) {
           failures.push(failed.payload);
         }
         if (completed) return completed.payload.output;
         const terminalFailure = failures.find((failure) => !failure.retryable);
         if (terminalFailure) {
-          throw new Error(
-            terminalFailure.message ?? `Activity ${name} failed`,
-          );
+          throw new Error(terminalFailure.message ?? `Activity ${name} failed`);
         }
         throw new WorkflowSuspended("activity");
       },
       parallel: async <TOutput>(
         operations: readonly (() => Promise<TOutput>)[],
-      ): Promise<TOutput[]> => Promise.all(operations.map((operation) => operation())),
+      ): Promise<TOutput[]> =>
+        Promise.all(operations.map((operation) => operation())),
       fanOut: async <TInput, TOutput>(
         items: readonly TInput[],
         operation: (item: TInput, index: number) => Promise<TOutput>,
@@ -279,7 +289,8 @@ export class ReplayWorkflowRunner {
             }),
           );
           for (const item of settled) {
-            if ("error" in item) failures.push({ index: item.index, message: item.error });
+            if ("error" in item)
+              failures.push({ index: item.index, message: item.error });
             else results[item.index] = item.value;
           }
         }
@@ -291,7 +302,9 @@ export class ReplayWorkflowRunner {
       },
       sleep: async (id: string, durationMs: number): Promise<void> => {
         if (!Number.isFinite(durationMs) || durationMs < 0) {
-          throw new RangeError("Workflow sleep duration must be finite and non-negative");
+          throw new RangeError(
+            "Workflow sleep duration must be finite and non-negative",
+          );
         }
         waitCallIndex += 1;
         const timerId = `${workflowId}:${runId}:timer:${id}:${waitCallIndex}`;
@@ -351,7 +364,11 @@ export class ReplayWorkflowRunner {
           "event.waiting",
           (event) => event.payload.waitId === waitId,
         );
-        const received = cursor.find<{ waitId: string; eventName: string; data: TPayload }>(
+        const received = cursor.find<{
+          waitId: string;
+          eventName: string;
+          data: TPayload;
+        }>(
           "signal.received",
           (event) =>
             event.payload.waitId === waitId &&
@@ -397,25 +414,22 @@ export class ReplayWorkflowRunner {
                 | undefined;
             } = {},
           ): Promise<TActivityOutput> => {
-            const output = await context.activity<TActivityInput, TActivityOutput>(
-              name,
-              input,
-              {
-                version: activityOptions.version,
-                queue: activityOptions.queue,
-              },
-            );
+            const output = await context.activity<
+              TActivityInput,
+              TActivityOutput
+            >(name, input, {
+              version: activityOptions.version,
+              queue: activityOptions.queue,
+            });
             if (activityOptions.compensate) {
               const compensation = activityOptions.compensate;
               compensations.push(() =>
-                context.activity(
-                  compensation.name,
-                  compensation.input(output),
-                  {
+                context
+                  .activity(compensation.name, compensation.input(output), {
                     version: compensation.version,
                     queue: compensation.queue,
-                  },
-                ).then(() => undefined),
+                  })
+                  .then(() => undefined),
               );
             }
             return output;
@@ -445,7 +459,9 @@ export class ReplayWorkflowRunner {
           workflowId,
           runId,
           eventId: `${workflowId}:${runId}:workflow.completed`,
-          ...(options.tenantId === undefined ? {} : { tenantId: options.tenantId }),
+          ...(options.tenantId === undefined
+            ? {}
+            : { tenantId: options.tenantId }),
           eventType: "workflow.completed",
           payload: { output },
         },
@@ -463,7 +479,9 @@ export class ReplayWorkflowRunner {
           workflowId,
           runId,
           eventId: `${workflowId}:${runId}:workflow.failed`,
-          ...(options.tenantId === undefined ? {} : { tenantId: options.tenantId }),
+          ...(options.tenantId === undefined
+            ? {}
+            : { tenantId: options.tenantId }),
           eventType: "workflow.failed",
           payload: { error: workflowError },
         },
@@ -479,14 +497,19 @@ export class ReplayWorkflowRunner {
     waitId: string,
     eventName: string,
     data: TPayload,
-    options: Pick<ReplayWorkflowRunnerOptions, "tenantId" | "maxAppendRetries"> = {},
+    options: Pick<
+      ReplayWorkflowRunnerOptions,
+      "tenantId" | "maxAppendRetries"
+    > = {},
   ): Promise<void> {
     const history = await this.history.read({ workflowId, runId });
     const alreadyReceived = history.some(
       (event) =>
         event.eventType === "signal.received" &&
-        (event.payload as { waitId?: string; eventName?: string }).waitId === waitId &&
-        (event.payload as { waitId?: string; eventName?: string }).eventName === eventName,
+        (event.payload as { waitId?: string; eventName?: string }).waitId ===
+          waitId &&
+        (event.payload as { waitId?: string; eventName?: string }).eventName ===
+          eventName,
     );
     if (alreadyReceived) return;
     await appendHistoryEvent(
@@ -495,7 +518,9 @@ export class ReplayWorkflowRunner {
         workflowId,
         runId,
         eventId: `${waitId}:${eventName}:received`,
-        ...(options.tenantId === undefined ? {} : { tenantId: options.tenantId }),
+        ...(options.tenantId === undefined
+          ? {}
+          : { tenantId: options.tenantId }),
         eventType: "signal.received",
         payload: { waitId, eventName, data },
       },

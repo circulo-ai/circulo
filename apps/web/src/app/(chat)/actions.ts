@@ -32,17 +32,14 @@ export async function editMessage({
   parts?: unknown[];
   attachments?: unknown[];
 }) {
-  const response = await fetch(
-    `/api/messages/${encodeURIComponent(id)}/edit`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-      body: JSON.stringify({ replacementId, content, parts, attachments }),
+  const response = await fetch(`/api/messages/${encodeURIComponent(id)}/edit`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
     },
-  );
+    credentials: "include",
+    body: JSON.stringify({ replacementId, content, parts, attachments }),
+  });
   if (response.ok) return;
 
   const payload = (await response.json().catch(() => null)) as {

@@ -1,3 +1,6 @@
+import { db } from "@/db";
+import * as schema from "@/db/schema";
+import { auth } from "@/lib/auth";
 import { createRouter } from "@/lib/create-app";
 import {
   chunk,
@@ -12,6 +15,8 @@ import {
   WorkflowEngine,
   type WorkflowEvent,
 } from "@circulo-ai/wf";
+import { makeSignature } from "better-auth/crypto";
+import { and, asc, eq, isNull, or } from "drizzle-orm";
 
 const router = createRouter();
 
@@ -122,6 +127,73 @@ router.get("/test", async (c) => {
     context: result?.context,
     output: result?.output,
     events: eventLog,
+  });
+});
+
+/**
+ * Create a real Better Auth session for local browser E2E checks.
+ *
+ * This route is intentionally only mounted by app.ts when NODE_ENV is
+ * development. It never creates a user, bypasses route authorization, or
+ * exists in production; it only signs a normal session cookie for the first
+ * existing local workspace member so the authenticated product surface can
+ * be exercised without sending email or using external OAuth credentials.
+ */
+router.get("/test/session", async (c) => {
+  const member = await db
+    .select({ userId: schema.member.userId })
+    .from(schema.member)
+    .innerJoin(schema.user, eq(schema.user.id, schema.member.userId))
+    .orderBy(asc(schema.member.createdAt))
+    .limit(1);
+  const userId = member[0]?.userId;
+  if (!userId)
+    return c.json({ message: "No local workspace user exists" }, 404);
+
+  const context = await auth.$context;
+  const user = await context.internalAdapter.findUserById(userId);
+  if (!user) return c.json({ message: "Local workspace user not found" }, 404);
+
+  // Older local sessions may have been created by scripts without a user
+  // agent. Keep the security settings page resilient while preserving the
+  // real session records used by the rest of the application.
+  await db
+    .update(schema.session)
+    .set({
+      userAgent:
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    })
+    .where(
+      and(
+        eq(schema.session.userId, userId),
+        or(
+          isNull(schema.session.userAgent),
+          eq(schema.session.userAgent, ""),
+          eq(schema.session.userAgent, "Circulo Local E2E"),
+        ),
+      ),
+    );
+
+  const session = await context.internalAdapter.createSession(userId, false, {
+    userAgent:
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+  });
+  const cookieName = context.authCookies.sessionToken.name;
+  const signedToken = `${session.token}.${await makeSignature(
+    session.token,
+    context.secret,
+  )}`;
+
+  c.header(
+    "Set-Cookie",
+    `${cookieName}=${signedToken}; Max-Age=2592000; Path=/; HttpOnly; SameSite=Lax`,
+  );
+  return c.json({
+    authenticated: true,
+    user: { id: user.id, email: user.email, name: user.name },
+    organizationId:
+      (session as { activeOrganizationId?: string | null })
+        .activeOrganizationId ?? null,
   });
 });
 

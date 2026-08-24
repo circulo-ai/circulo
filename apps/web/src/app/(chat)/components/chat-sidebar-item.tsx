@@ -1,4 +1,10 @@
 import { EnhancedLink } from "@/components/enhanced-link";
+import { Ripple } from "@/components/ui-custom/ripple";
+import {
+  CustomSidebarContextMenu,
+  CustomSidebarMenuAvatar,
+  CustomSidebarMenuButton,
+} from "@/components/ui-custom/sidebar";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -9,14 +15,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Ripple } from "@/components/ui-custom/ripple";
-import {
-  CustomSidebarContextMenu,
-  CustomSidebarMenuAvatar,
-  CustomSidebarMenuButton,
-} from "@/components/ui-custom/sidebar";
 import { Badge } from "@/components/ui/badge";
-import { SidebarMenuItem } from "@/components/ui/sidebar";
+import { SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";
 import { useOptimisticSWRMutation } from "@/hooks/use-optimistic-swr-mutation";
 import { formatDate } from "@/lib/format-date";
 import { getFetcher } from "@/lib/swr";
@@ -26,8 +26,8 @@ import type { GetChatHistoryResponse } from "@/types/history";
 import { Pin } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { forwardRef, useCallback, useState } from "react";
-import { Arguments, Key, useSWRConfig } from "swr";
 import { toast } from "sonner";
+import { Arguments, Key, useSWRConfig } from "swr";
 
 const CHAT_AVATAR_GRADIENTS = [
   "from-indigo-500 via-violet-500 to-fuchsia-500",
@@ -67,6 +67,7 @@ interface ChatSidebarItemProps {
 export const ChatSidebarItem = forwardRef<HTMLLIElement, ChatSidebarItemProps>(
   function ChatSidebarItem({ item }, ref) {
     const { currentChatId, setCurrentChatId } = useChatHistoryStore();
+    const { setOpenMobile } = useSidebar();
     const router = useRouter();
     const { mutate } = useSWRConfig();
     const [isMutating, setIsMutating] = useState(false);
@@ -144,16 +145,27 @@ export const ChatSidebarItem = forwardRef<HTMLLIElement, ChatSidebarItemProps>(
           setIsMutating(false);
         }
       },
-      [currentChatId, isHistoryKey, isMutating, item.id, mutate, router, setCurrentChatId],
+      [
+        currentChatId,
+        isHistoryKey,
+        isMutating,
+        item.id,
+        mutate,
+        router,
+        setCurrentChatId,
+      ],
     );
 
     const deleteArchivedChat = useCallback(async () => {
       if (!item.isArchived || isMutating) return;
       setIsMutating(true);
       try {
-        const response = await fetch(`/api/chat?id=${encodeURIComponent(item.id)}`, {
-          method: "DELETE",
-        });
+        const response = await fetch(
+          `/api/chat?id=${encodeURIComponent(item.id)}`,
+          {
+            method: "DELETE",
+          },
+        );
         if (!response.ok) {
           throw new Error("Unable to delete archived chat");
         }
@@ -173,8 +185,7 @@ export const ChatSidebarItem = forwardRef<HTMLLIElement, ChatSidebarItemProps>(
       } finally {
         setIsMutating(false);
       }
-    },
-    [
+    }, [
       currentChatId,
       isHistoryKey,
       isMutating,
@@ -183,8 +194,7 @@ export const ChatSidebarItem = forwardRef<HTMLLIElement, ChatSidebarItemProps>(
       mutate,
       router,
       setCurrentChatId,
-    ],
-    );
+    ]);
 
     return (
       <>
@@ -194,7 +204,9 @@ export const ChatSidebarItem = forwardRef<HTMLLIElement, ChatSidebarItemProps>(
             onPinChange={handlePinChange}
             isArchived={item.isArchived}
             onArchiveChange={updateArchive}
-            onDelete={item.isArchived ? () => setDeleteDialogOpen(true) : undefined}
+            onDelete={
+              item.isArchived ? () => setDeleteDialogOpen(true) : undefined
+            }
           >
             <CustomSidebarMenuButton
               isActive={currentChatId === item.id}
@@ -205,7 +217,10 @@ export const ChatSidebarItem = forwardRef<HTMLLIElement, ChatSidebarItemProps>(
                   enableLinkStatus={false}
                   asButton={false}
                   href={`/chat/${item.id}`}
-                  onClick={() => setCurrentChatId(item.id)}
+                  onClick={() => {
+                    setCurrentChatId(item.id);
+                    setOpenMobile(false);
+                  }}
                 >
                   <CustomSidebarMenuAvatar
                     className={cn(
@@ -261,26 +276,26 @@ export const ChatSidebarItem = forwardRef<HTMLLIElement, ChatSidebarItemProps>(
             </CustomSidebarMenuButton>
           </CustomSidebarContextMenu>
         </SidebarMenuItem>
-        <AlertDialog
-          open={deleteDialogOpen}
-          onOpenChange={setDeleteDialogOpen}
-        >
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Delete archived chat?</AlertDialogTitle>
               <AlertDialogDescription>
-                This removes the archived chat from normal app views using soft-delete semantics. The record remains retained for recovery.
+                This removes the archived chat from normal app views using
+                soft-delete semantics. The record remains retained for recovery.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={isMutating}>Cancel</AlertDialogCancel>
+              <AlertDialogCancel disabled={isMutating}>
+                Cancel
+              </AlertDialogCancel>
               <AlertDialogAction
                 disabled={isMutating}
                 onClick={(event) => {
                   event.preventDefault();
                   void deleteArchivedChat();
                 }}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                className="text-destructive-foreground bg-destructive hover:bg-destructive/90"
               >
                 Delete chat
               </AlertDialogAction>

@@ -1,34 +1,34 @@
-"use client"
+"use client";
 
-import { authMutationKeys } from "@better-auth-ui/core"
-import type { MagicLinkAuthClient } from "@better-auth-ui/core/plugins/magic-link"
-import { useAuth, useAuthPlugin } from "@better-auth-ui/react"
-import { useSignInMagicLink } from "@better-auth-ui/react/plugins/magic-link"
-import { useIsMutating } from "@tanstack/react-query"
-import { type SyntheticEvent, useState } from "react"
+import { authMutationKeys } from "@better-auth-ui/core";
+import type { MagicLinkAuthClient } from "@better-auth-ui/core/plugins/magic-link";
+import { useAuth, useAuthPlugin } from "@better-auth-ui/react";
+import { useSignInMagicLink } from "@better-auth-ui/react/plugins/magic-link";
+import { useIsMutating } from "@tanstack/react-query";
+import { type SyntheticEvent, useState } from "react";
 
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Field,
   FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
-  FieldSeparator
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Spinner } from "@/components/ui/spinner"
-import { magicLinkPlugin } from "@/lib/auth/magic-link-plugin"
-import { cn } from "@/lib/utils"
-import { MAGIC_LINK_SENT_STORAGE_KEY } from "./magic-link-sent"
-import { ProviderButtons, type SocialLayout } from "./provider-buttons"
+  FieldSeparator,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { magicLinkPlugin } from "@/lib/auth/magic-link-plugin";
+import { cn } from "@/lib/utils";
+import { MAGIC_LINK_SENT_STORAGE_KEY } from "./magic-link-sent";
+import { ProviderButtons, type SocialLayout } from "./provider-buttons";
 
 export type MagicLinkProps = {
-  className?: string
-  socialLayout?: SocialLayout
-  socialPosition?: "top" | "bottom"
-}
+  className?: string;
+  socialLayout?: SocialLayout;
+  socialPosition?: "top" | "bottom";
+};
 
 /**
  * Render a card-based sign-in form that sends an email magic link and optionally shows social provider buttons.
@@ -41,7 +41,7 @@ export type MagicLinkProps = {
 export function MagicLink({
   className,
   socialLayout,
-  socialPosition = "bottom"
+  socialPosition = "bottom",
 }: MagicLinkProps) {
   const {
     authClient,
@@ -54,41 +54,41 @@ export function MagicLink({
     redirectTo,
     socialProviders,
     viewPaths,
-    Link
-  } = useAuth<MagicLinkAuthClient>()
+    Link,
+  } = useAuth<MagicLinkAuthClient>();
   const { localization: magicLinkLocalization, viewPaths: magicLinkViewPaths } =
-    useAuthPlugin(magicLinkPlugin)
+    useAuthPlugin(magicLinkPlugin);
 
-  const [email, setEmail] = useState("")
+  const [email, setEmail] = useState("");
 
   const { mutate: signInMagicLink, isPending: signInMagicLinkPending } =
     useSignInMagicLink(authClient, {
       onSuccess: (_data, variables) => {
-        sessionStorage.setItem(MAGIC_LINK_SENT_STORAGE_KEY, variables.email)
+        sessionStorage.setItem(MAGIC_LINK_SENT_STORAGE_KEY, variables.email);
         navigate({
-          to: `${basePaths.auth}/${magicLinkViewPaths.auth.magicLinkSent}`
-        })
-      }
-    })
+          to: `${basePaths.auth}/${magicLinkViewPaths.auth.magicLinkSent}`,
+        });
+      },
+    });
 
   const signInMutating = useIsMutating({
-    mutationKey: authMutationKeys.signIn.all
-  })
+    mutationKey: authMutationKeys.signIn.all,
+  });
   const signUpMutating = useIsMutating({
-    mutationKey: authMutationKeys.signUp.all
-  })
-  const isPending = signInMutating + signUpMutating > 0
+    mutationKey: authMutationKeys.signUp.all,
+  });
+  const isPending = signInMutating + signUpMutating > 0;
 
   const [fieldErrors, setFieldErrors] = useState<{
-    email?: string
-  }>({})
+    email?: string;
+  }>({});
 
   const handleSubmit = (e: SyntheticEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    signInMagicLink({ email, callbackURL: `${baseURL}${redirectTo}` })
-  }
+    e.preventDefault();
+    signInMagicLink({ email, callbackURL: `${baseURL}${redirectTo}` });
+  };
 
-  const showSeparator = socialProviders && socialProviders.length > 0
+  const showSeparator = socialProviders && socialProviders.length > 0;
 
   return (
     <Card className={cn("w-full max-w-sm", className)}>
@@ -105,7 +105,7 @@ export function MagicLink({
               )}
 
               {showSeparator && (
-                <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card m-0 text-xs flex items-center">
+                <FieldSeparator className="m-0 flex items-center text-xs *:data-[slot=field-separator-content]:bg-card">
                   {localization.auth.or}
                 </FieldSeparator>
               )}
@@ -126,23 +126,23 @@ export function MagicLink({
                   autoComplete="email"
                   value={email}
                   onChange={(e) => {
-                    setEmail(e.target.value)
+                    setEmail(e.target.value);
 
                     setFieldErrors((prev) => ({
                       ...prev,
-                      email: undefined
-                    }))
+                      email: undefined,
+                    }));
                   }}
                   placeholder={localization.auth.emailPlaceholder}
                   required
                   disabled={isPending}
                   onInvalid={(e) => {
-                    e.preventDefault()
+                    e.preventDefault();
 
                     setFieldErrors((prev) => ({
                       ...prev,
-                      email: (e.target as HTMLInputElement).validationMessage
-                    }))
+                      email: (e.target as HTMLInputElement).validationMessage,
+                    }));
                   }}
                   aria-invalid={!!fieldErrors.email}
                 />
@@ -163,7 +163,7 @@ export function MagicLink({
                       key={`${plugin.id}-${index.toString()}`}
                       view="magicLink"
                     />
-                  ))
+                  )),
                 )}
               </div>
             </FieldGroup>
@@ -172,7 +172,7 @@ export function MagicLink({
           {socialPosition === "bottom" && (
             <>
               {showSeparator && (
-                <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card text-xs flex items-center">
+                <FieldSeparator className="flex items-center text-xs *:data-[slot=field-separator-content]:bg-card">
                   {localization.auth.or}
                 </FieldSeparator>
               )}
@@ -185,7 +185,7 @@ export function MagicLink({
         </div>
 
         {emailAndPassword?.enabled && (
-          <div className="flex flex-col gap-3 items-center w-full mt-4">
+          <div className="mt-4 flex w-full flex-col items-center gap-3">
             <FieldDescription className="text-center">
               {localization.auth.needToCreateAnAccount}{" "}
               <Link
@@ -199,5 +199,5 @@ export function MagicLink({
         )}
       </CardContent>
     </Card>
-  )
+  );
 }

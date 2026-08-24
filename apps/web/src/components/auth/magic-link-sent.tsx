@@ -1,21 +1,21 @@
-"use client"
+"use client";
 
-import { useAuth, useAuthPlugin } from "@better-auth-ui/react"
-import { useEffect, useState } from "react"
+import { useAuth, useAuthPlugin } from "@better-auth-ui/react";
+import { useEffect, useState } from "react";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { FieldDescription } from "@/components/ui/field"
-import { magicLinkPlugin } from "@/lib/auth/magic-link-plugin"
-import { cn } from "@/lib/utils"
-import { OpenEmailButton } from "./open-email-button"
-import { useIsHydrated } from "./use-is-hydrated"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FieldDescription } from "@/components/ui/field";
+import { magicLinkPlugin } from "@/lib/auth/magic-link-plugin";
+import { cn } from "@/lib/utils";
+import { OpenEmailButton } from "./open-email-button";
+import { useIsHydrated } from "./use-is-hydrated";
 
 /** `sessionStorage` key the magic-link form stores the submitted email under. */
-export const MAGIC_LINK_SENT_STORAGE_KEY = "better-auth-ui.magic-link-sent"
+export const MAGIC_LINK_SENT_STORAGE_KEY = "better-auth-ui.magic-link-sent";
 
 export type MagicLinkSentProps = {
-  className?: string
-}
+  className?: string;
+};
 
 /**
  * Render a card confirming that a magic-link email was sent, with a button
@@ -30,17 +30,18 @@ export type MagicLinkSentProps = {
  */
 export function MagicLinkSent({ className }: MagicLinkSentProps) {
   const { basePaths, emailAndPassword, localization, viewPaths, Link } =
-    useAuth()
-  const { localization: magicLinkLocalization } = useAuthPlugin(magicLinkPlugin)
+    useAuth();
+  const { localization: magicLinkLocalization } =
+    useAuthPlugin(magicLinkPlugin);
 
-  const isHydrated = useIsHydrated()
+  const isHydrated = useIsHydrated();
   const [email, setEmail] = useState(
-    (isHydrated && sessionStorage.getItem(MAGIC_LINK_SENT_STORAGE_KEY)) || ""
-  )
+    (isHydrated && sessionStorage.getItem(MAGIC_LINK_SENT_STORAGE_KEY)) || "",
+  );
 
   useEffect(() => {
-    setEmail(sessionStorage.getItem(MAGIC_LINK_SENT_STORAGE_KEY) ?? "")
-  }, [])
+    setEmail(sessionStorage.getItem(MAGIC_LINK_SENT_STORAGE_KEY) ?? "");
+  }, []);
 
   return (
     <Card className={cn("w-full max-w-sm", className)}>
@@ -56,7 +57,7 @@ export function MagicLinkSent({ className }: MagicLinkSentProps) {
             {email
               ? magicLinkLocalization.magicLinkSentTo.replace(
                   "{{email}}",
-                  email
+                  email,
                 )
               : magicLinkLocalization.magicLinkSent}
           </FieldDescription>
@@ -65,7 +66,7 @@ export function MagicLinkSent({ className }: MagicLinkSentProps) {
         </div>
 
         {emailAndPassword?.enabled && (
-          <div className="flex flex-col gap-3 items-center w-full mt-4">
+          <div className="mt-4 flex w-full flex-col items-center gap-3">
             <FieldDescription className="text-center">
               {localization.auth.needToCreateAnAccount}{" "}
               <Link
@@ -79,5 +80,5 @@ export function MagicLinkSent({ className }: MagicLinkSentProps) {
         )}
       </CardContent>
     </Card>
-  )
+  );
 }

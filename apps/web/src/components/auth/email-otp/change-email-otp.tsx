@@ -1,62 +1,62 @@
-"use client"
+"use client";
 
-import type { EmailOtpAuthClient } from "@better-auth-ui/core/plugins/email-otp"
-import { useAuth, useAuthPlugin, useSession } from "@better-auth-ui/react"
+import type { EmailOtpAuthClient } from "@better-auth-ui/core/plugins/email-otp";
+import { useAuth, useAuthPlugin, useSession } from "@better-auth-ui/react";
 import {
   useChangeEmailOtp,
   useRequestEmailChangeOtp,
-  useSendVerificationOtp
-} from "@better-auth-ui/react/plugins/email-otp"
-import { type SyntheticEvent, useReducer, useState } from "react"
-import { toast } from "sonner"
+  useSendVerificationOtp,
+} from "@better-auth-ui/react/plugins/email-otp";
+import { type SyntheticEvent, useReducer, useState } from "react";
+import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardFooter } from "@/components/ui/card"
-import { Field, FieldError, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Spinner } from "@/components/ui/spinner"
-import { emailOtpPlugin } from "@/lib/auth/email-otp-plugin"
-import { cn } from "@/lib/utils"
-import { OpenEmailButton } from "../open-email-button"
-import { OtpField } from "../otp-field"
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
+import { emailOtpPlugin } from "@/lib/auth/email-otp-plugin";
+import { cn } from "@/lib/utils";
+import { OpenEmailButton } from "../open-email-button";
+import { OtpField } from "../otp-field";
 
-type ChangeEmailStep = "email" | "currentCode" | "newCode"
+type ChangeEmailStep = "email" | "currentCode" | "newCode";
 
 type ChangeEmailState = {
-  step: ChangeEmailStep
-  newEmail: string
-}
+  step: ChangeEmailStep;
+  newEmail: string;
+};
 
 type ChangeEmailAction =
   | { type: "currentEmailChallenged"; newEmail: string }
   | { type: "changeRequested"; newEmail: string }
-  | { type: "restarted" }
+  | { type: "restarted" };
 
 const initialChangeEmailState: ChangeEmailState = {
   step: "email",
-  newEmail: ""
-}
+  newEmail: "",
+};
 
 // Every step is reachable from the action alone, so the previous state never
 // takes part in the transition.
 function changeEmailReducer(
   _state: ChangeEmailState,
-  action: ChangeEmailAction
+  action: ChangeEmailAction,
 ): ChangeEmailState {
   switch (action.type) {
     case "currentEmailChallenged":
-      return { step: "currentCode", newEmail: action.newEmail }
+      return { step: "currentCode", newEmail: action.newEmail };
     case "changeRequested":
-      return { step: "newCode", newEmail: action.newEmail }
+      return { step: "newCode", newEmail: action.newEmail };
     case "restarted":
-      return initialChangeEmailState
+      return initialChangeEmailState;
   }
 }
 
 export type ChangeEmailOtpProps = {
-  className?: string
-}
+  className?: string;
+};
 
 /**
  * Change the account email with codes instead of a confirmation link.
@@ -69,102 +69,102 @@ export type ChangeEmailOtpProps = {
  * @param className - Additional CSS classes applied to the card.
  */
 export function ChangeEmailOtp({ className }: ChangeEmailOtpProps) {
-  const { authClient, localization } = useAuth()
+  const { authClient, localization } = useAuth();
   const {
     localization: emailOtpLocalization,
     otpLength,
-    verifyCurrentEmail
-  } = useAuthPlugin(emailOtpPlugin)
+    verifyCurrentEmail,
+  } = useAuthPlugin(emailOtpPlugin);
 
-  const otpClient = authClient as EmailOtpAuthClient
-  const { data: session } = useSession(otpClient)
-  const currentEmail = session?.user.email
+  const otpClient = authClient as EmailOtpAuthClient;
+  const { data: session } = useSession(otpClient);
+  const currentEmail = session?.user.email;
 
   const [state, dispatch] = useReducer(
     changeEmailReducer,
-    initialChangeEmailState
-  )
-  const [code, setCode] = useState("")
-  const [fieldErrors, setFieldErrors] = useState<{ email?: string }>({})
+    initialChangeEmailState,
+  );
+  const [code, setCode] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string }>({});
 
   const resetFlow = () => {
-    setCode("")
-    dispatch({ type: "restarted" })
-  }
+    setCode("");
+    dispatch({ type: "restarted" });
+  };
 
   // The step transition is attached per call: the code goes to the current
   // address while the pending change targets the new one, so the address to
   // remember isn't in this mutation's variables.
   const { mutate: sendVerificationOtp, isPending: isSending } =
-    useSendVerificationOtp(otpClient)
+    useSendVerificationOtp(otpClient);
 
   const { mutate: requestEmailChangeOtp, isPending: isRequesting } =
     useRequestEmailChangeOtp(otpClient, {
       onError: () => setCode(""),
       onSuccess: (_data, { newEmail }) => {
-        setCode("")
-        dispatch({ type: "changeRequested", newEmail })
-      }
-    })
+        setCode("");
+        dispatch({ type: "changeRequested", newEmail });
+      },
+    });
 
   const { mutate: changeEmailOtp, isPending: isChanging } = useChangeEmailOtp(
     otpClient,
     {
       onError: () => setCode(""),
       onSuccess: () => {
-        toast.success(localization.settings.changeEmailSuccess)
-        resetFlow()
-      }
-    }
-  )
+        toast.success(localization.settings.changeEmailSuccess);
+        resetFlow();
+      },
+    },
+  );
 
-  const isPending = isSending || isRequesting || isChanging
+  const isPending = isSending || isRequesting || isChanging;
 
   const submitCode = (completedCode: string) => {
-    if (isPending || state.step === "email") return
+    if (isPending || state.step === "email") return;
 
     if (state.step === "currentCode") {
       requestEmailChangeOtp({
         newEmail: state.newEmail,
-        otp: completedCode
-      })
-      return
+        otp: completedCode,
+      });
+      return;
     }
 
-    changeEmailOtp({ newEmail: state.newEmail, otp: completedCode })
-  }
+    changeEmailOtp({ newEmail: state.newEmail, otp: completedCode });
+  };
 
   const handleSubmit = (e: SyntheticEvent<HTMLFormElement>) => {
-    e.preventDefault()
+    e.preventDefault();
 
     if (state.step === "email") {
-      const formData = new FormData(e.currentTarget)
-      const newEmail = formData.get("email") as string
+      const formData = new FormData(e.currentTarget);
+      const newEmail = formData.get("email") as string;
 
       if (verifyCurrentEmail && currentEmail) {
         sendVerificationOtp(
           { email: currentEmail, type: "change-email" },
           {
             onSuccess: () =>
-              dispatch({ type: "currentEmailChallenged", newEmail })
-          }
-        )
-        return
+              dispatch({ type: "currentEmailChallenged", newEmail }),
+          },
+        );
+        return;
       }
 
-      requestEmailChangeOtp({ newEmail })
-      return
+      requestEmailChangeOtp({ newEmail });
+      return;
     }
 
-    submitCode(code)
-  }
+    submitCode(code);
+  };
 
   const codeTarget =
-    state.step === "currentCode" ? currentEmail : state.newEmail
+    state.step === "currentCode" ? currentEmail : state.newEmail;
 
   return (
     <div>
-      <h2 className="text-sm font-semibold mb-3">
+      <h2 className="mb-3 text-sm font-semibold">
         {localization.settings.changeEmail}
       </h2>
 
@@ -192,12 +192,12 @@ export function ChangeEmailOtp({ className }: ChangeEmailOtpProps) {
                       setFieldErrors((prev) => ({ ...prev, email: undefined }))
                     }
                     onInvalid={(e) => {
-                      e.preventDefault()
+                      e.preventDefault();
 
                       setFieldErrors((prev) => ({
                         ...prev,
-                        email: (e.target as HTMLInputElement).validationMessage
-                      }))
+                        email: (e.target as HTMLInputElement).validationMessage,
+                      }));
                     }}
                     aria-invalid={!!fieldErrors.email}
                   />
@@ -211,10 +211,10 @@ export function ChangeEmailOtp({ className }: ChangeEmailOtpProps) {
               </Field>
             ) : (
               <div className="flex flex-col gap-3">
-                <p className="text-muted-foreground text-sm">
+                <p className="text-sm text-muted-foreground">
                   {emailOtpLocalization.confirmEmailDescription.replace(
                     "{{email}}",
-                    codeTarget ?? ""
+                    codeTarget ?? "",
                   )}
                 </p>
 
@@ -272,5 +272,5 @@ export function ChangeEmailOtp({ className }: ChangeEmailOtpProps) {
         </Card>
       </form>
     </div>
-  )
+  );
 }

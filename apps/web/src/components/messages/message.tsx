@@ -4,9 +4,9 @@ import { Response } from "@/components/ai-elements/response";
 import type { ArtifactKind } from "@/components/artifacts/artifact";
 import { SparklesIcon } from "@/components/icons/icons";
 import { PreviewAttachment } from "@/components/preview-attachment";
+import { useArtifact } from "@/hooks/api/chats/use-artifact";
 import type { ChatMessage } from "@/lib/types";
 import { cn, sanitizeText } from "@/lib/utils";
-import { useArtifact } from "@/hooks/api/chats/use-artifact";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import type { Vote } from "@circulo-ai/db/schema";
 import equal from "fast-deep-equal";
@@ -42,34 +42,36 @@ const PurePreviewMessage = ({
 }) => {
   const [mode, setMode] = useState<"view" | "edit">("view");
 
-	const attachmentsFromMessage = message.parts.filter(
-		(part) => part.type === "file",
-	);
-	const completedArtifacts = message.parts.flatMap((part) => {
-		if (!part.type.startsWith("tool-") && part.type !== "dynamic-tool") {
-			return [];
-		}
-		const name = part.type.replace(/^tool-/, "");
-		if (name !== "createDocument" && name !== "updateDocument") return [];
-		const output = (part as unknown as { output?: unknown }).output;
-		if (!output || typeof output !== "object") return [];
-		const result = output as { id?: unknown; title?: unknown; kind?: unknown };
-		if (
-			typeof result.id !== "string" ||
-			typeof result.title !== "string" ||
-			!isArtifactKind(result.kind)
-		) {
-			return [];
-		}
-		const action: "Created" | "Updated" =
-			name === "updateDocument" ? "Updated" : "Created";
-		return [{
-			id: result.id,
-			title: result.title,
-			kind: result.kind,
-			action,
-		}];
-	});
+  const attachmentsFromMessage = message.parts.filter(
+    (part) => part.type === "file",
+  );
+  const completedArtifacts = message.parts.flatMap((part) => {
+    if (!part.type.startsWith("tool-") && part.type !== "dynamic-tool") {
+      return [];
+    }
+    const name = part.type.replace(/^tool-/, "");
+    if (name !== "createDocument" && name !== "updateDocument") return [];
+    const output = (part as unknown as { output?: unknown }).output;
+    if (!output || typeof output !== "object") return [];
+    const result = output as { id?: unknown; title?: unknown; kind?: unknown };
+    if (
+      typeof result.id !== "string" ||
+      typeof result.title !== "string" ||
+      !isArtifactKind(result.kind)
+    ) {
+      return [];
+    }
+    const action: "Created" | "Updated" =
+      name === "updateDocument" ? "Updated" : "Created";
+    return [
+      {
+        id: result.id,
+        title: result.title,
+        kind: result.kind,
+        action,
+      },
+    ];
+  });
 
   return (
     <motion.div
@@ -160,8 +162,7 @@ const PurePreviewMessage = ({
                           message.role === "user",
                         "bg-transparent px-0 py-0 text-left":
                           message.role === "assistant",
-					})}
-
+                      })}
                       data-testid="message-content"
                       style={
                         message.role === "user"
@@ -253,24 +254,27 @@ const PurePreviewMessage = ({
             }
 
             return null;
-					})}
+          })}
 
-					{completedArtifacts.length > 0 && (
-						<div className="flex flex-col gap-2 pt-1" data-testid="message-artifacts">
-							<div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-								<FileText className="size-3.5" />
-								Artifacts from this message
-							</div>
-							<div className="grid min-w-0 gap-2 sm:grid-cols-2">
-								{completedArtifacts.map((artifact) => (
-									<MessageArtifactCard
-										artifact={artifact}
-										key={`${artifact.id}:${artifact.action}`}
-									/>
-								))}
-							</div>
-						</div>
-					)}
+          {completedArtifacts.length > 0 && (
+            <div
+              className="flex flex-col gap-2 pt-1"
+              data-testid="message-artifacts"
+            >
+              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <FileText className="size-3.5" />
+                Artifacts from this message
+              </div>
+              <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+                {completedArtifacts.map((artifact) => (
+                  <MessageArtifactCard
+                    artifact={artifact}
+                    key={`${artifact.id}:${artifact.action}`}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
           {!isReadonly && (
             <MessageActions
@@ -290,52 +294,57 @@ const PurePreviewMessage = ({
 };
 
 function isArtifactKind(value: unknown): value is ArtifactKind {
-	return value === "text" || value === "code" || value === "image" || value === "sheet";
+  return (
+    value === "text" ||
+    value === "code" ||
+    value === "image" ||
+    value === "sheet"
+  );
 }
 
 function MessageArtifactCard({
-	artifact,
+  artifact,
 }: {
-	artifact: {
-		id: string;
-		title: string;
-		kind: ArtifactKind;
-		action: "Created" | "Updated";
-	};
+  artifact: {
+    id: string;
+    title: string;
+    kind: ArtifactKind;
+    action: "Created" | "Updated";
+  };
 }) {
-	const { setArtifact } = useArtifact();
+  const { setArtifact } = useArtifact();
 
-	return (
-		<button
-			className="group flex min-w-0 items-center gap-3 rounded-2xl border bg-background/70 p-3 text-left transition-colors hover:bg-muted"
-			onClick={() => {
-				setArtifact((currentArtifact) => ({
-					...currentArtifact,
-					documentId: artifact.id,
-					title: artifact.title,
-					kind: artifact.kind,
-					content: "",
-					status: "idle",
-					error: undefined,
-					isVisible: true,
-				}));
-			}}
-			type="button"
-		>
-			<div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-				<FileText className="size-4" />
-			</div>
-			<div className="min-w-0 flex-1">
-				<div className="truncate text-sm font-medium">{artifact.title}</div>
-				<div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-					<span>{artifact.action}</span>
-					<span aria-hidden="true">·</span>
-					<span className="truncate">{artifact.kind}</span>
-				</div>
-			</div>
-			<ArrowUpRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-		</button>
-	);
+  return (
+    <button
+      className="group flex min-w-0 items-center gap-3 rounded-2xl border bg-background/70 p-3 text-left transition-colors hover:bg-muted"
+      onClick={() => {
+        setArtifact((currentArtifact) => ({
+          ...currentArtifact,
+          documentId: artifact.id,
+          title: artifact.title,
+          kind: artifact.kind,
+          content: "",
+          status: "idle",
+          error: undefined,
+          isVisible: true,
+        }));
+      }}
+      type="button"
+    >
+      <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+        <FileText className="size-4" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium">{artifact.title}</div>
+        <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+          <span>{artifact.action}</span>
+          <span aria-hidden="true">·</span>
+          <span className="truncate">{artifact.kind}</span>
+        </div>
+      </div>
+      <ArrowUpRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+    </button>
+  );
 }
 
 export const PreviewMessage = memo(

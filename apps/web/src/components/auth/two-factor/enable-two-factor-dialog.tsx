@@ -1,20 +1,6 @@
-"use client"
+"use client";
 
-import { createQrCodeSvgData } from "@better-auth-ui/core"
-import type { TwoFactorAuthClient } from "@better-auth-ui/core/plugins/two-factor"
-import {
-  useAuth,
-  useAuthPlugin,
-  useCopyToClipboard
-} from "@better-auth-ui/react"
-import {
-  useEnableTwoFactor,
-  useVerifyTotp
-} from "@better-auth-ui/react/plugins/two-factor"
-import { Check, Copy, ShieldCheck } from "lucide-react"
-import { type SyntheticEvent, useMemo, useState } from "react"
-import { toast } from "sonner"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogClose,
@@ -22,28 +8,42 @@ import {
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogTitle
-} from "@/components/ui/dialog"
-import { Field, FieldError, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
-  InputGroupInput
-} from "@/components/ui/input-group"
-import { Spinner } from "@/components/ui/spinner"
-import { twoFactorPlugin } from "@/lib/auth/two-factor-plugin"
-import { useTwoFactorPasswordRequirement } from "@/lib/auth/use-two-factor-password"
-import { OtpField } from "../otp-field"
-import { BackupCodes } from "./backup-codes"
+  InputGroupInput,
+} from "@/components/ui/input-group";
+import { Spinner } from "@/components/ui/spinner";
+import { twoFactorPlugin } from "@/lib/auth/two-factor-plugin";
+import { useTwoFactorPasswordRequirement } from "@/lib/auth/use-two-factor-password";
+import { createQrCodeSvgData } from "@better-auth-ui/core";
+import type { TwoFactorAuthClient } from "@better-auth-ui/core/plugins/two-factor";
+import {
+  useAuth,
+  useAuthPlugin,
+  useCopyToClipboard,
+} from "@better-auth-ui/react";
+import {
+  useEnableTwoFactor,
+  useVerifyTotp,
+} from "@better-auth-ui/react/plugins/two-factor";
+import { Check, Copy, ShieldCheck } from "lucide-react";
+import { type SyntheticEvent, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { OtpField } from "../otp-field";
+import { BackupCodes } from "./backup-codes";
 
-type EnrollmentStep = "password" | "verify" | "backupCodes"
+type EnrollmentStep = "password" | "verify" | "backupCodes";
 
 export type EnableTwoFactorDialogProps = {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-}
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+};
 
 /**
  * Three-step two-factor enrollment: confirm the password, scan the QR code
@@ -57,127 +57,127 @@ export type EnableTwoFactorDialogProps = {
  */
 export function EnableTwoFactorDialog({
   open,
-  onOpenChange
+  onOpenChange,
 }: EnableTwoFactorDialogProps) {
-  const { authClient, localization } = useAuth()
+  const { authClient, localization } = useAuth();
   const { codeLength, localization: twoFactorLocalization } =
-    useAuthPlugin(twoFactorPlugin)
+    useAuthPlugin(twoFactorPlugin);
   const { isPending: isResolvingPasswordRequirement, requiresPassword } =
-    useTwoFactorPasswordRequirement()
+    useTwoFactorPasswordRequirement();
 
-  const twoFactorClient = authClient as TwoFactorAuthClient
+  const twoFactorClient = authClient as TwoFactorAuthClient;
 
-  const [step, setStep] = useState<EnrollmentStep>("password")
-  const [totpUri, setTotpUri] = useState("")
-  const [backupCodes, setBackupCodes] = useState<string[]>([])
-  const [code, setCode] = useState("")
+  const [step, setStep] = useState<EnrollmentStep>("password");
+  const [totpUri, setTotpUri] = useState("");
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
+  const [code, setCode] = useState("");
   const {
     copied: setupKeyCopied,
     copy: copySetupKeyValue,
-    reset: resetSetupKeyCopy
+    reset: resetSetupKeyCopy,
   } = useCopyToClipboard({
-    onError: () => toast.error(twoFactorLocalization.setupKeyCopyFailed)
-  })
+    onError: () => toast.error(twoFactorLocalization.setupKeyCopyFailed),
+  });
 
   const qrCode = useMemo(
     () => (totpUri ? createQrCodeSvgData(totpUri) : null),
-    [totpUri]
-  )
+    [totpUri],
+  );
 
   // Manual entry fallback for authenticator apps that can't scan. The URI is
   // an `otpauth://` URL, so the secret is just a query parameter.
   const setupKey = useMemo(() => {
-    if (!totpUri) return null
+    if (!totpUri) return null;
 
     try {
-      return new URL(totpUri).searchParams.get("secret")
+      return new URL(totpUri).searchParams.get("secret");
     } catch {
-      return null
+      return null;
     }
-  }, [totpUri])
+  }, [totpUri]);
 
   const copySetupKey = async () => {
-    if (!setupKey) return
+    if (!setupKey) return;
 
-    await copySetupKeyValue(setupKey)
-  }
+    await copySetupKeyValue(setupKey);
+  };
 
   const {
     mutate: enableTwoFactor,
     isPending: isEnabling,
-    reset: resetEnrollment
+    reset: resetEnrollment,
   } = useEnableTwoFactor(twoFactorClient, {
     onSuccess: (data) => {
-      if (data.method !== "totp") return
+      if (data.method !== "totp") return;
 
-      setTotpUri(data.totpURI)
-      setBackupCodes(data.backupCodes)
-      setStep("verify")
-    }
-  })
+      setTotpUri(data.totpURI);
+      setBackupCodes(data.backupCodes);
+      setStep("verify");
+    },
+  });
 
   const { mutate: verifyTotp, isPending: isVerifying } = useVerifyTotp(
     twoFactorClient,
     {
       onError: () => setCode(""),
       onSuccess: () => {
-        toast.success(twoFactorLocalization.twoFactorEnabled)
-        setStep("backupCodes")
-      }
-    }
-  )
+        toast.success(twoFactorLocalization.twoFactorEnabled);
+        setStep("backupCodes");
+      },
+    },
+  );
 
-  const isPending = isEnabling || isVerifying || isResolvingPasswordRequirement
+  const isPending = isEnabling || isVerifying || isResolvingPasswordRequirement;
 
   const verifyCode = (completedCode: string) => {
     if (isPending || step !== "verify" || completedCode.length !== codeLength) {
-      return
+      return;
     }
 
-    verifyTotp({ code: completedCode })
-  }
+    verifyTotp({ code: completedCode });
+  };
 
   const handleOpenChange = (nextOpen: boolean) => {
-    onOpenChange(nextOpen)
+    onOpenChange(nextOpen);
 
     if (!nextOpen) {
-      setStep("password")
-      setTotpUri("")
-      setBackupCodes([])
-      setCode("")
-      resetSetupKeyCopy()
+      setStep("password");
+      setTotpUri("");
+      setBackupCodes([]);
+      setCode("");
+      resetSetupKeyCopy();
       // Clears the resolved TOTP URI and backup codes from the mutation cache.
-      resetEnrollment()
+      resetEnrollment();
     }
-  }
+  };
 
   const handleSubmit = (e: SyntheticEvent<HTMLFormElement>) => {
-    e.preventDefault()
+    e.preventDefault();
 
     if (step === "backupCodes") {
-      handleOpenChange(false)
-      return
+      handleOpenChange(false);
+      return;
     }
 
     if (step === "verify") {
-      verifyCode(code)
-      return
+      verifyCode(code);
+      return;
     }
 
-    const formData = new FormData(e.currentTarget)
-    const password = formData.get("password") as string
+    const formData = new FormData(e.currentTarget);
+    const password = formData.get("password") as string;
 
     enableTwoFactor(
-      requiresPassword ? { method: "totp", password } : { method: "totp" }
-    )
-  }
+      requiresPassword ? { method: "totp", password } : { method: "totp" },
+    );
+  };
 
   const submitLabel =
     step === "backupCodes"
       ? twoFactorLocalization.done
       : step === "verify"
         ? twoFactorLocalization.verify
-        : twoFactorLocalization.enableTwoFactor
+        : twoFactorLocalization.enableTwoFactor;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -242,7 +242,7 @@ export function EnableTwoFactorDialog({
               {setupKey && (
                 <Field className="w-full gap-1">
                   <FieldLabel
-                    className="text-muted-foreground text-xs"
+                    className="text-xs text-muted-foreground"
                     htmlFor="two-factor-setup-key"
                   >
                     {twoFactorLocalization.setupKey}
@@ -314,5 +314,5 @@ export function EnableTwoFactorDialog({
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

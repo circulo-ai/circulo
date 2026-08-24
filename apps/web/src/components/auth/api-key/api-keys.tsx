@@ -1,59 +1,59 @@
-"use client"
+"use client";
 
-import type { ApiKeyAuthClient } from "@better-auth-ui/core/plugins/api-key"
-import { useAuth, useAuthPlugin } from "@better-auth-ui/react"
-import { useListApiKeys } from "@better-auth-ui/react/plugins/api-key"
-import { Fragment, useState } from "react"
+import type { ApiKeyAuthClient } from "@better-auth-ui/core/plugins/api-key";
+import { useAuth, useAuthPlugin } from "@better-auth-ui/react";
+import { useListApiKeys } from "@better-auth-ui/react/plugins/api-key";
+import { Fragment, useState } from "react";
 
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { ItemGroup, ItemSeparator } from "@/components/ui/item"
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { ItemGroup, ItemSeparator } from "@/components/ui/item";
 import {
   Select,
   SelectContent,
   SelectGroup,
   SelectItem,
   SelectTrigger,
-  SelectValue
-} from "@/components/ui/select"
-import { apiKeyPlugin } from "@/lib/auth/api-key-plugin"
-import { cn } from "@/lib/utils"
-import { ApiKey } from "./api-key"
-import { ApiKeySkeleton } from "./api-key-skeleton"
-import { ApiKeysEmpty } from "./api-keys-empty"
-import { CreateApiKeyDialog } from "./create-api-key-dialog"
+  SelectValue,
+} from "@/components/ui/select";
+import { apiKeyPlugin } from "@/lib/auth/api-key-plugin";
+import { cn } from "@/lib/utils";
+import { ApiKey } from "./api-key";
+import { ApiKeySkeleton } from "./api-key-skeleton";
+import { ApiKeysEmpty } from "./api-keys-empty";
+import { CreateApiKeyDialog } from "./create-api-key-dialog";
 
 export type ApiKeysProps = {
-  className?: string
+  className?: string;
   /** Scope the list and create payload to an organization. */
-  organizationId?: string
+  organizationId?: string;
   /** Force the loading skeleton and disable the list query. */
-  isPending?: boolean
+  isPending?: boolean;
   /** Hide the "Create API key" button (header + empty state). */
-  hideCreate?: boolean
+  hideCreate?: boolean;
   /** Hide the per-row delete button on listed keys. */
-  hideDelete?: boolean
-}
+  hideDelete?: boolean;
+};
 
 export function ApiKeys({
   className,
   organizationId,
   isPending: isPendingProp,
   hideCreate,
-  hideDelete
+  hideDelete,
 }: ApiKeysProps) {
-  const { authClient } = useAuth<ApiKeyAuthClient>()
+  const { authClient } = useAuth<ApiKeyAuthClient>();
   const { localization: apiKeyLocalization, pageSize } =
-    useAuthPlugin(apiKeyPlugin)
-  const [page, setPage] = useState(0)
-  const [sort, setSort] = useState("createdAt:desc")
-  const [sortBy, sortDirection] = sort.split(":") as [string, "asc" | "desc"]
+    useAuthPlugin(apiKeyPlugin);
+  const [page, setPage] = useState(0);
+  const [sort, setSort] = useState("createdAt:desc");
+  const [sortBy, sortDirection] = sort.split(":") as [string, "asc" | "desc"];
   const sortItems = [
     { label: apiKeyLocalization.newest, value: "createdAt:desc" },
     { label: apiKeyLocalization.oldest, value: "createdAt:asc" },
     { label: apiKeyLocalization.nameAscending, value: "name:asc" },
-    { label: apiKeyLocalization.nameDescending, value: "name:desc" }
-  ]
+    { label: apiKeyLocalization.nameDescending, value: "name:desc" },
+  ];
 
   const { data: listData, isPending: isListPending } = useListApiKeys(
     authClient,
@@ -64,14 +64,14 @@ export function ApiKeys({
         offset: page * pageSize,
         sortBy,
         sortDirection,
-        ...(organizationId ? { organizationId, configId: "organization" } : {})
-      }
-    }
-  )
+        ...(organizationId ? { organizationId, configId: "organization" } : {}),
+      },
+    },
+  );
 
-  const isPending = isPendingProp || isListPending
+  const isPending = isPendingProp || isListPending;
 
-  const [createOpen, setCreateOpen] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false);
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
@@ -96,8 +96,8 @@ export function ApiKeys({
         items={sortItems}
         value={sort}
         onValueChange={(value) => {
-          setSort(value ?? "createdAt:desc")
-          setPage(0)
+          setSort(value ?? "createdAt:desc");
+          setPage(0);
         }}
       >
         <SelectTrigger aria-label={apiKeyLocalization.sortBy}>
@@ -169,5 +169,5 @@ export function ApiKeys({
         />
       )}
     </div>
-  )
+  );
 }

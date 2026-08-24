@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.0
+
+### Minor Changes
+
+- Release the accumulated public-package improvements, including the upload
+  provider adapters, FTP/FTPS support, typed file routers, React upload helpers,
+  and the associated runtime and developer-experience updates.
+
 ## 2.0.0
 
 ### Major Changes

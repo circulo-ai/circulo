@@ -9,7 +9,8 @@ export function createBufferedAsyncStream<T>(
   maxBufferedValues = 1000,
   signal?: AbortSignal,
 ): AsyncIterable<T> {
-  if (maxBufferedValues < 1) throw new RangeError("maxBufferedValues must be positive");
+  if (maxBufferedValues < 1)
+    throw new RangeError("maxBufferedValues must be positive");
   const buffered: T[] = [];
   let started = false;
   let closed = false;

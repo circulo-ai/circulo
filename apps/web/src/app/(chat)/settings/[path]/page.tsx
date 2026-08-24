@@ -1,3 +1,4 @@
+import { RequireSession } from "@/components/auth/require-session";
 import { Settings } from "@/components/auth/settings/settings";
 
 export const dynamicParams = false;
@@ -17,10 +18,12 @@ export default async function SettingsPage({
   const settingsPath = path === "profile" ? "account" : path;
 
   return (
-    <main className="flex min-h-full justify-center overflow-y-auto p-4 sm:p-8">
-      <div className="w-full max-w-4xl">
-        <Settings path={settingsPath} />
-      </div>
-    </main>
+    <RequireSession>
+      <main className="flex min-h-full justify-center overflow-y-auto p-4 sm:p-8">
+        <div className="w-full max-w-4xl">
+          <Settings path={settingsPath} />
+        </div>
+      </main>
+    </RequireSession>
   );
 }

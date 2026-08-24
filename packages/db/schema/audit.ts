@@ -1,5 +1,12 @@
 import { relations } from "drizzle-orm";
-import { index, jsonb, pgTable, text, timestamp, integer } from "drizzle-orm/pg-core";
+import {
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+} from "drizzle-orm/pg-core";
 
 export const auditEvent = pgTable(
   "audit_event",
@@ -40,7 +47,9 @@ export const auditOutbox = pgTable(
     attempts: integer("attempts").default(0).notNull(),
     lastError: text("last_error"),
   },
-  (table) => [index("audit_outbox_pending_idx").on(table.dispatchedAt, table.createdAt)],
+  (table) => [
+    index("audit_outbox_pending_idx").on(table.dispatchedAt, table.createdAt),
+  ],
 );
 
 export const auditEventRelations = relations(auditEvent, ({ one }) => ({
@@ -52,4 +61,3 @@ export const auditEventRelations = relations(auditEvent, ({ one }) => ({
 
 export type AuditEvent = typeof auditEvent.$inferSelect;
 export type NewAuditEvent = typeof auditEvent.$inferInsert;
-

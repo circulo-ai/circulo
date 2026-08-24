@@ -1,10 +1,10 @@
 "use client";
 
+import { UserAvatar } from "@/components/auth/user/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { signOut, useSession } from "@/lib/auth-client";
-import { UserAvatar } from "@/components/auth/user/user-avatar";
 import { ArrowRight, LogOut } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";

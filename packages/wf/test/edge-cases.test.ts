@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  AdapterEventBus,
   chunk,
   complete,
   defineWorkflow,
@@ -8,18 +9,17 @@ import {
   InMemoryEventBus,
   InMemoryEventStore,
   InMemoryWorkflowStore,
+  JsonEventStore,
+  JsonWorkflowStore,
   MapJsonKeyValueStore,
   MapPubSubAdapter,
   MapWorkflowLockStore,
-  AdapterEventBus,
-  JsonEventStore,
-  JsonWorkflowStore,
   streamStep,
   waitFor,
   WorkflowEngine,
   WorkflowHookManager,
-  type Workflow,
   type StepResult,
+  type Workflow,
 } from "../src";
 
 interface Context {
@@ -28,7 +28,9 @@ interface Context {
 }
 
 function createEngine<TInput, TOutput>(
-  options: Partial<ConstructorParameters<typeof WorkflowEngine<Context, TInput, TOutput>>[0]> = {},
+  options: Partial<
+    ConstructorParameters<typeof WorkflowEngine<Context, TInput, TOutput>>[0]
+  > = {},
 ): WorkflowEngine<Context, TInput, TOutput> {
   return new WorkflowEngine<Context, TInput, TOutput>({
     workflowStore: new InMemoryWorkflowStore<Context, TInput, TOutput>(),
@@ -255,7 +257,9 @@ describe("engine failure and lifecycle edges", () => {
       .build();
     const id = await engine.createAndRun(workflow, undefined);
 
-    expect((await engine.getWorkflow(id))?.output).toBe("planned-dynamic-finish");
+    expect((await engine.getWorkflow(id))?.output).toBe(
+      "planned-dynamic-finish",
+    );
     expect((await engine.getWorkflow(id))?.steps).toHaveLength(3);
     await engine.shutdown();
   });
@@ -329,9 +333,9 @@ describe("health, filters, and shutdown", () => {
     expect(
       await engine.listWorkflows({ tags: { team: "platform" } }),
     ).toHaveLength(1);
-    expect(
-      await engine.listWorkflows({ state: "failed", limit: 1 }),
-    ).toEqual([expect.objectContaining({ id: failId })]);
+    expect(await engine.listWorkflows({ state: "failed", limit: 1 })).toEqual([
+      expect.objectContaining({ id: failId }),
+    ]);
     expect((await engine.getHealth()).details.failedWorkflows).toBe(1);
     expect((await engine.getWorkflow(successId))?.state).toBe("completed");
     await engine.shutdown();
@@ -382,7 +386,11 @@ describe("hook manager and in-memory stores", () => {
       workflowId: "wf",
       timestamp,
       eventType: "workflow.step.yielded" as const,
-      payload: { type: "step.yielded" as const, stepId: "step", data: timestamp },
+      payload: {
+        type: "step.yielded" as const,
+        stepId: "step",
+        data: timestamp,
+      },
     });
     await events.append(event("one", 1));
     await events.append(event("two", 2));
@@ -425,12 +433,9 @@ describe("durable adapter edge cases", () => {
       .context({ count: 0 })
       .step("run", { run: async () => complete("ok") })
       .build();
-    const runtime = new JsonWorkflowStore(
-      store,
-      locks,
-      () => workflow.steps,
-      { keyPrefix: "test:wf:" },
-    );
+    const runtime = new JsonWorkflowStore(store, locks, () => workflow.steps, {
+      keyPrefix: "test:wf:",
+    });
     const persisted: Workflow<Context, void, string> = {
       id: "workflow-1",
       version: 0,
@@ -464,13 +469,12 @@ describe("durable adapter edge cases", () => {
       eventType: "workflow.started",
       payload: { type: "started", workflowId: "workflow-1", version: 0 },
     });
-    expect((await eventStore.list("workflow-1")).map((event) => event.id)).toEqual([
-      "early",
-      "late",
-    ]);
-    expect((await eventStore.list("workflow-1", 20)).map((event) => event.id)).toEqual([
-      "late",
-    ]);
+    expect(
+      (await eventStore.list("workflow-1")).map((event) => event.id),
+    ).toEqual(["early", "late"]);
+    expect(
+      (await eventStore.list("workflow-1", 20)).map((event) => event.id),
+    ).toEqual(["late"]);
   });
 
   it("delivers pub/sub callbacks and allows unsubscribe", async () => {
@@ -490,7 +494,11 @@ describe("durable adapter edge cases", () => {
     };
     await bus.publish(event);
     unsubscribe();
-    await bus.publish({ ...event, id: "event-2", payload: { ...event.payload, output: 2 } });
+    await bus.publish({
+      ...event,
+      id: "event-2",
+      payload: { ...event.payload, output: 2 },
+    });
 
     expect(received).toEqual([1]);
   });

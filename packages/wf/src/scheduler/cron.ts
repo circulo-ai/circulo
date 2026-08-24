@@ -10,7 +10,10 @@ interface CronFields {
 }
 
 /** Calculates the next UTC occurrence for standard 5-field or 6-field cron expressions. */
-export function nextCronOccurrence(expression: string, after: number | Date): number {
+export function nextCronOccurrence(
+  expression: string,
+  after: number | Date,
+): number {
   const fields = parseCron(expression);
   const start = after instanceof Date ? after.getTime() : after;
   const hasSeconds = expression.trim().split(/\s+/u).length === 6;
@@ -24,7 +27,9 @@ export function nextCronOccurrence(expression: string, after: number | Date): nu
     if (matchesCron(fields, candidate, hasSeconds)) return candidate.getTime();
     candidate.setTime(candidate.getTime() + step);
   }
-  throw new RangeError(`Cron expression has no occurrence within the supported search window: ${expression}`);
+  throw new RangeError(
+    `Cron expression has no occurrence within the supported search window: ${expression}`,
+  );
 }
 
 function parseCron(expression: string): CronFields {
@@ -34,7 +39,7 @@ function parseCron(expression: string): CronFields {
   }
   const offset = tokens.length === 6 ? 1 : 0;
   return {
-    seconds: parseField(tokens.length === 6 ? tokens[0] ?? "0" : "0", 0, 59),
+    seconds: parseField(tokens.length === 6 ? (tokens[0] ?? "0") : "0", 0, 59),
     minutes: parseField(tokens[offset] ?? "*", 0, 59),
     hours: parseField(tokens[offset + 1] ?? "*", 0, 23),
     daysOfMonth: parseField(tokens[offset + 2] ?? "*", 1, 31),
@@ -45,14 +50,30 @@ function parseCron(expression: string): CronFields {
   };
 }
 
-function parseField(value: string, min: number, max: number, sundayAlias = false): Set<number> {
+function parseField(
+  value: string,
+  min: number,
+  max: number,
+  sundayAlias = false,
+): Set<number> {
   const result = new Set<number>();
   for (const part of value.split(",")) {
     const [rangeValue, stepValue] = part.split("/");
-    const step = stepValue === undefined ? 1 : parsePositiveInteger(stepValue, "cron step");
+    const step =
+      stepValue === undefined
+        ? 1
+        : parsePositiveInteger(stepValue, "cron step");
     const [startValue, endValue] = (rangeValue ?? "").split("-");
-    const start = startValue === "*" || startValue === "" || startValue === undefined ? min : parseInteger(startValue, min, max);
-    const end = endValue === undefined ? (startValue === "*" || startValue === "" ? max : start) : parseInteger(endValue, min, max);
+    const start =
+      startValue === "*" || startValue === "" || startValue === undefined
+        ? min
+        : parseInteger(startValue, min, max);
+    const end =
+      endValue === undefined
+        ? startValue === "*" || startValue === ""
+          ? max
+          : start
+        : parseInteger(endValue, min, max);
     if (end < start) throw new RangeError(`Invalid cron range: ${part}`);
     for (let item = start; item <= end; item += step) {
       result.add(sundayAlias && item === 7 ? 0 : item);
@@ -63,25 +84,37 @@ function parseField(value: string, min: number, max: number, sundayAlias = false
 }
 
 function parseInteger(value: string, min: number, max: number): number {
-  if (!/^\d+$/u.test(value)) throw new RangeError(`Invalid cron value: ${value}`);
+  if (!/^\d+$/u.test(value))
+    throw new RangeError(`Invalid cron value: ${value}`);
   const parsed = Number(value);
-  if (parsed < min || parsed > max) throw new RangeError(`Cron value ${value} is outside ${min}-${max}`);
+  if (parsed < min || parsed > max)
+    throw new RangeError(`Cron value ${value} is outside ${min}-${max}`);
   return parsed;
 }
 
 function parsePositiveInteger(value: string, label: string): number {
-  if (!/^\d+$/u.test(value) || Number(value) < 1) throw new RangeError(`${label} must be positive`);
+  if (!/^\d+$/u.test(value) || Number(value) < 1)
+    throw new RangeError(`${label} must be positive`);
   return Number(value);
 }
 
-function matchesCron(fields: CronFields, date: Date, hasSeconds: boolean): boolean {
+function matchesCron(
+  fields: CronFields,
+  date: Date,
+  hasSeconds: boolean,
+): boolean {
   if (hasSeconds && !fields.seconds.has(date.getUTCSeconds())) return false;
-  if (!fields.minutes.has(date.getUTCMinutes()) || !fields.hours.has(date.getUTCHours())) return false;
+  if (
+    !fields.minutes.has(date.getUTCMinutes()) ||
+    !fields.hours.has(date.getUTCHours())
+  )
+    return false;
   if (!fields.months.has(date.getUTCMonth() + 1)) return false;
   const dayOfMonthMatches = fields.daysOfMonth.has(date.getUTCDate());
   const dayOfWeekMatches = fields.daysOfWeek.has(date.getUTCDay());
-  const dayMatches = fields.dayOfMonthWildcard || fields.dayOfWeekWildcard
-    ? dayOfMonthMatches && dayOfWeekMatches
-    : dayOfMonthMatches || dayOfWeekMatches;
+  const dayMatches =
+    fields.dayOfMonthWildcard || fields.dayOfWeekWildcard
+      ? dayOfMonthMatches && dayOfWeekMatches
+      : dayOfMonthMatches || dayOfWeekMatches;
   return dayMatches;
 }

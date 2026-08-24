@@ -86,5 +86,9 @@ export type WorkflowHistoryEventCallback = (
 
 export interface WorkflowHistoryEventBus {
   publish(event: WorkflowHistoryEvent): Promise<void>;
-  subscribe(workflowId: string, runId: string, callback: WorkflowHistoryEventCallback): () => void;
+  subscribe(
+    workflowId: string,
+    runId: string,
+    callback: WorkflowHistoryEventCallback,
+  ): () => void;
 }

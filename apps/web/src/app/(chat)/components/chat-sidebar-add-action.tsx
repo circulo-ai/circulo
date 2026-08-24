@@ -1,3 +1,4 @@
+import { CreateOrganizationDialog } from "@/components/auth/organization/create-organization-dialog";
 import { EnhancedLink } from "@/components/enhanced-link";
 import {
   CustomDropdownMenuContent,
@@ -12,7 +13,7 @@ import {
 import { useSidebar } from "@/components/ui/sidebar";
 import { useChatHistoryStore } from "@/stores/use-chat-history-store";
 import { Bot, MessagesSquare, Pencil, Users } from "lucide-react";
-import { ComponentProps } from "react";
+import { ComponentProps, useState } from "react";
 
 interface ChatSidebarAddActionProps extends Omit<
   ComponentProps<typeof DropdownMenu>,
@@ -22,40 +23,51 @@ interface ChatSidebarAddActionProps extends Omit<
 export function ChatSidebarAddAction(props: ChatSidebarAddActionProps) {
   const { open } = useSidebar();
   const { setCurrentChatId } = useChatHistoryStore();
+  const [organizationDialogOpen, setOrganizationDialogOpen] = useState(false);
 
   return (
-    <DropdownMenu {...props}>
-      <DropdownMenuTrigger asChild>
-        <CustomSidebarGroupAction title="Add">
-          <Pencil /> <span className="sr-only">Add</span>
-        </CustomSidebarGroupAction>
-      </DropdownMenuTrigger>
-      <CustomDropdownMenuContent
-        side="top"
-        sideOffset={12}
-        align={open ? "end" : "center"}
-      >
-        <DropdownMenuGroup>
-          <CustomDropdownMenuItem asChild>
-            <EnhancedLink
-              onClick={() => setCurrentChatId(undefined)}
-              asButton={false}
-              href="/chat"
+    <>
+      <CreateOrganizationDialog
+        onOpenChange={setOrganizationDialogOpen}
+        open={organizationDialogOpen}
+      />
+      <DropdownMenu {...props}>
+        <DropdownMenuTrigger asChild>
+          <CustomSidebarGroupAction title="Add">
+            <Pencil /> <span className="sr-only">Add</span>
+          </CustomSidebarGroupAction>
+        </DropdownMenuTrigger>
+        <CustomDropdownMenuContent
+          side="top"
+          sideOffset={12}
+          align={open ? "end" : "center"}
+        >
+          <DropdownMenuGroup>
+            <CustomDropdownMenuItem asChild>
+              <EnhancedLink
+                onClick={() => setCurrentChatId(undefined)}
+                asButton={false}
+                href="/chat"
+              >
+                <MessagesSquare />
+                New Chat
+              </EnhancedLink>
+            </CustomDropdownMenuItem>
+            <CustomDropdownMenuItem asChild>
+              <EnhancedLink asButton={false} href="/agents">
+                <Bot />
+                New Agent
+              </EnhancedLink>
+            </CustomDropdownMenuItem>
+            <CustomDropdownMenuItem
+              onClick={() => setOrganizationDialogOpen(true)}
             >
-              <MessagesSquare />
-              New Chat
-            </EnhancedLink>
-          </CustomDropdownMenuItem>
-          <CustomDropdownMenuItem>
-            <Bot />
-            New Agent
-          </CustomDropdownMenuItem>
-          <CustomDropdownMenuItem>
-            <Users />
-            New Organization
-          </CustomDropdownMenuItem>
-        </DropdownMenuGroup>
-      </CustomDropdownMenuContent>
-    </DropdownMenu>
+              <Users />
+              New Organization
+            </CustomDropdownMenuItem>
+          </DropdownMenuGroup>
+        </CustomDropdownMenuContent>
+      </DropdownMenu>
+    </>
   );
 }

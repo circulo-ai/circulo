@@ -1,5 +1,8 @@
-import type { ErrorType, LogContext, Logger, MetricsCollector } from "../models";
 import type {
+  ErrorType,
+  LogContext,
+  Logger,
+  MetricsCollector,
   OpenTelemetryCounter,
   OpenTelemetryHistogram,
   OpenTelemetryLogSink,
@@ -19,7 +22,9 @@ export class OpenTelemetryMetricsAdapter implements MetricsCollector {
   constructor(private readonly meter: OpenTelemetryMeter) {}
 
   recordStepDuration(stepName: string, duration: number): void {
-    this.histogram("workflow.step.duration").record(duration, { step: stepName });
+    this.histogram("workflow.step.duration").record(duration, {
+      step: stepName,
+    });
   }
 
   recordStepSuccess(stepName: string): void {
@@ -27,7 +32,10 @@ export class OpenTelemetryMetricsAdapter implements MetricsCollector {
   }
 
   recordStepFailure(stepName: string, errorType: ErrorType): void {
-    this.counter("workflow.step.failure").add(1, { step: stepName, error_type: errorType });
+    this.counter("workflow.step.failure").add(1, {
+      step: stepName,
+      error_type: errorType,
+    });
   }
 
   recordStepRetry(stepName: string, attempt: number): void {
@@ -50,7 +58,11 @@ export class OpenTelemetryMetricsAdapter implements MetricsCollector {
     this.counter(metric).add(1, tags);
   }
 
-  recordGauge(metric: string, value: number, tags: Record<string, string> = {}): void {
+  recordGauge(
+    metric: string,
+    value: number,
+    tags: Record<string, string> = {},
+  ): void {
     this.histogram(`${metric}.gauge`).record(value, tags);
   }
 
@@ -91,14 +103,25 @@ export class OpenTelemetryLoggerAdapter implements Logger {
   }
 
   error(message: string, error?: Error, context?: LogContext): void {
-    this.emit("error", message, { ...context, error: error?.message, stack: error?.stack });
+    this.emit("error", message, {
+      ...context,
+      error: error?.message,
+      stack: error?.stack,
+    });
   }
 
   child(context: LogContext): Logger {
-    return new OpenTelemetryLoggerAdapter(this.sink, { ...this.context, ...context });
+    return new OpenTelemetryLoggerAdapter(this.sink, {
+      ...this.context,
+      ...context,
+    });
   }
 
-  private emit(level: "debug" | "info" | "warn" | "error", message: string, context?: LogContext): void {
+  private emit(
+    level: "debug" | "info" | "warn" | "error",
+    message: string,
+    context?: LogContext,
+  ): void {
     this.sink.emit(level, message, { ...this.context, ...context });
   }
 }
@@ -108,7 +131,9 @@ export class OpenTelemetryTracerAdapter implements WorkflowTracer {
   constructor(private readonly tracer: OpenTelemetryTracer) {}
 
   startSpan(name: string, attributes: TelemetryAttributes = {}): WorkflowSpan {
-    return new OpenTelemetrySpanAdapter(this.tracer.startSpan(name, { attributes }));
+    return new OpenTelemetrySpanAdapter(
+      this.tracer.startSpan(name, { attributes }),
+    );
   }
 }
 
@@ -128,7 +153,9 @@ class OpenTelemetrySpanAdapter implements WorkflowSpan {
       this.span.setStatus({ code: "OK" });
       return;
     }
-    this.span.setStatus(message === undefined ? { code: "ERROR" } : { code: "ERROR", message });
+    this.span.setStatus(
+      message === undefined ? { code: "ERROR" } : { code: "ERROR", message },
+    );
   }
 
   end(): void {

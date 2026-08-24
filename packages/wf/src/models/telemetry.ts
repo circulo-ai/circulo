@@ -30,21 +30,40 @@ export interface OpenTelemetryHistogram {
 }
 
 export interface OpenTelemetryMeter {
-  createCounter(name: string, options?: { description?: string }): OpenTelemetryCounter;
-  createHistogram(name: string, options?: { description?: string }): OpenTelemetryHistogram;
+  createCounter(
+    name: string,
+    options?: { description?: string },
+  ): OpenTelemetryCounter;
+  createHistogram(
+    name: string,
+    options?: { description?: string },
+  ): OpenTelemetryHistogram;
 }
 
 export interface OpenTelemetryTracer {
-  startSpan(name: string, options?: { attributes?: TelemetryAttributes }): OpenTelemetrySpan;
+  startSpan(
+    name: string,
+    options?: { attributes?: TelemetryAttributes },
+  ): OpenTelemetrySpan;
 }
 
 export interface OpenTelemetrySpan {
-  setAttribute(name: string, value: TelemetryAttribute): OpenTelemetrySpan | void;
+  setAttribute(
+    name: string,
+    value: TelemetryAttribute,
+  ): OpenTelemetrySpan | void;
   recordException(error: Error): OpenTelemetrySpan | void;
-  setStatus(status: { code: "OK" | "ERROR"; message?: string }): OpenTelemetrySpan | void;
+  setStatus(status: {
+    code: "OK" | "ERROR";
+    message?: string;
+  }): OpenTelemetrySpan | void;
   end(): void;
 }
 
 export interface OpenTelemetryLogSink {
-  emit(level: "debug" | "info" | "warn" | "error", message: string, context: LogContext): void;
+  emit(
+    level: "debug" | "info" | "warn" | "error",
+    message: string,
+    context: LogContext,
+  ): void;
 }

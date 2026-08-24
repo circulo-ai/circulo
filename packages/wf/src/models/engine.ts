@@ -1,9 +1,9 @@
+import type { WorkflowHookManager } from "../hooks/workflow-hooks";
 import type { Logger } from "./logger";
 import type { MetricsCollector } from "./metrics";
 import type { EventBus } from "./pubsub";
 import type { EventStore, WorkflowStore } from "./store";
 import type { Step } from "./workflow";
-import type { WorkflowHookManager } from "../hooks/workflow-hooks";
 
 export interface WorkflowEngineConfig<TContext, TInput, TOutput> {
   workflowStore: WorkflowStore<TContext, TInput, TOutput>;

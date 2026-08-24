@@ -1,19 +1,19 @@
-"use client"
+"use client";
 
-import { useAuthPlugin } from "@better-auth-ui/react"
-import { ShieldCheck } from "lucide-react"
+import { useAuthPlugin } from "@better-auth-ui/react";
+import { ShieldCheck } from "lucide-react";
 
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
-  EmptyTitle
-} from "@/components/ui/empty"
-import { oauthProviderPlugin } from "@/lib/auth/oauth-provider-plugin"
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { oauthProviderPlugin } from "@/lib/auth/oauth-provider-plugin";
 
 export function AuthorizedApplicationsEmpty() {
-  const { localization } = useAuthPlugin(oauthProviderPlugin)
+  const { localization } = useAuthPlugin(oauthProviderPlugin);
 
   return (
     <Empty>
@@ -27,5 +27,5 @@ export function AuthorizedApplicationsEmpty() {
         </EmptyDescription>
       </EmptyHeader>
     </Empty>
-  )
+  );
 }

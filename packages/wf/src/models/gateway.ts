@@ -1,8 +1,8 @@
+import type { TokenBucketRateLimiter } from "../limits/token-bucket-rate-limiter";
 import type {
   ReplayWorkflowDefinition,
   ReplayWorkflowResult,
 } from "./replay-workflow";
-import type { TokenBucketRateLimiter } from "../limits/token-bucket-rate-limiter";
 
 export interface WorkflowRunReference {
   workflowId: string;
@@ -40,7 +40,9 @@ export interface WorkflowTrigger<TEvent, TInput, TOutput> {
   eventName: string;
   workflow: ReplayWorkflowDefinition<TInput, TOutput>;
   input: (event: WorkflowEventEnvelope<TEvent>) => TInput;
-  filter?: ((event: WorkflowEventEnvelope<TEvent>) => boolean | Promise<boolean>) | undefined;
+  filter?:
+    | ((event: WorkflowEventEnvelope<TEvent>) => boolean | Promise<boolean>)
+    | undefined;
   idempotencyKey?:
     | ((event: WorkflowEventEnvelope<TEvent>) => string)
     | undefined;

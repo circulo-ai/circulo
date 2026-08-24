@@ -1,4 +1,3 @@
-import { generateId } from "../utils/id";
 import type {
   ClaimedTask,
   TaskClaimOptions,
@@ -8,6 +7,7 @@ import type {
   TaskQueueStats,
   TaskRescheduleOptions,
 } from "../models";
+import { generateId } from "../utils/id";
 
 /** Reference queue used by tests and local worker development. */
 export class InMemoryTaskQueue implements TaskQueueAdapter {
@@ -46,7 +46,9 @@ export class InMemoryTaskQueue implements TaskQueueAdapter {
         )
           return false;
         if (task.lease && task.lease.expiresAt > now) return false;
-        return options.tenantId === undefined || task.tenantId === options.tenantId;
+        return (
+          options.tenantId === undefined || task.tenantId === options.tenantId
+        );
       })
       .sort(
         (left, right) =>
@@ -131,8 +133,10 @@ export class InMemoryTaskQueue implements TaskQueueAdapter {
     );
     const now = Date.now();
     return {
-      queued: tasks.filter((task) => !task.lease && task.availableAt <= now).length,
-      leased: tasks.filter((task) => task.lease && task.lease.expiresAt > now).length,
+      queued: tasks.filter((task) => !task.lease && task.availableAt <= now)
+        .length,
+      leased: tasks.filter((task) => task.lease && task.lease.expiresAt > now)
+        .length,
       expiredLeases: tasks.filter(
         (task) => task.lease !== undefined && task.lease.expiresAt <= now,
       ).length,

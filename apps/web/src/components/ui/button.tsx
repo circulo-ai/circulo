@@ -12,12 +12,17 @@ const buttonVariants = cva(
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary/80",
         primary: "bg-primary text-primary-foreground hover:bg-primary/80",
-        outline: "border-border bg-input/30 hover:bg-input/50 hover:text-foreground",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        outline:
+          "border-border bg-input/30 hover:bg-input/50 hover:text-foreground",
+        secondary:
+          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-muted hover:text-foreground",
-        "ghost-sidebar": "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-        "sidebar-menu-badge": "bg-sidebar-accent text-sidebar-accent-foreground",
-        destructive: "bg-destructive/10 text-destructive hover:bg-destructive/20",
+        "ghost-sidebar":
+          "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        "sidebar-menu-badge":
+          "bg-sidebar-accent text-sidebar-accent-foreground",
+        destructive:
+          "bg-destructive/10 text-destructive hover:bg-destructive/20",
         link: "text-primary underline-offset-4 hover:underline",
         text: "text-muted-foreground hover:text-foreground",
         highlightedText: "text-primary hover:text-primary/80",
@@ -58,13 +63,34 @@ const buttonVariants = cva(
 
 type ButtonProps = ButtonPrimitive.Props & {
   variant?:
-    | "default" | "primary" | "outline" | "secondary" | "ghost"
-    | "ghost-sidebar" | "sidebar-menu-badge" | "destructive" | "link"
-    | "text" | "highlightedText" | "reversedText" | "icon";
+    | "default"
+    | "primary"
+    | "outline"
+    | "secondary"
+    | "ghost"
+    | "ghost-sidebar"
+    | "sidebar-menu-badge"
+    | "destructive"
+    | "link"
+    | "text"
+    | "highlightedText"
+    | "reversedText"
+    | "icon";
   size?:
-    | "default" | "xs" | "sm" | "lg" | "text" | "wide" | "wider"
-    | "lg-wider" | "lg-widest" | "icon" | "icon-xs" | "icon-sm"
-    | "icon-md" | "icon-lg";
+    | "default"
+    | "xs"
+    | "sm"
+    | "lg"
+    | "text"
+    | "wide"
+    | "wider"
+    | "lg-wider"
+    | "lg-widest"
+    | "icon"
+    | "icon-xs"
+    | "icon-sm"
+    | "icon-md"
+    | "icon-lg";
   rounded?: "none" | "sm" | "md" | "lg" | "full";
   asChild?: boolean;
   children?: ReactNode;

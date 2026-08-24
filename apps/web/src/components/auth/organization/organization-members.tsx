@@ -1,59 +1,59 @@
-"use client"
+"use client";
 
-import type { OrganizationAuthClient } from "@better-auth-ui/core/plugins/organization"
-import { useAuth, useAuthPlugin, useSession } from "@better-auth-ui/react"
+import type { OrganizationAuthClient } from "@better-auth-ui/core/plugins/organization";
+import { useAuth, useAuthPlugin, useSession } from "@better-auth-ui/react";
 import {
   useActiveOrganization,
   useHasPermission,
-  useListOrganizationMembers
-} from "@better-auth-ui/react/plugins/organization"
-import type { Member } from "better-auth/client"
-import { ChevronUp, Filter, Search, X } from "lucide-react"
-import { type ComponentProps, type ReactNode, useMemo, useState } from "react"
+  useListOrganizationMembers,
+} from "@better-auth-ui/react/plugins/organization";
+import type { Member } from "better-auth/client";
+import { ChevronUp, Filter, Search, X } from "lucide-react";
+import { type ComponentProps, type ReactNode, useMemo, useState } from "react";
 
-import { Badge } from "@/components/ui/badge"
-import { Button, buttonVariants } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
-  DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu"
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   InputGroup,
   InputGroupAddon,
-  InputGroupInput
-} from "@/components/ui/input-group"
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import {
   Table,
   TableBody,
   TableHead,
   TableHeader,
-  TableRow
-} from "@/components/ui/table"
-import { organizationPlugin } from "@/lib/auth/organization-plugin"
-import { cn } from "@/lib/utils"
-import { InviteMemberDialog } from "./invite-member-dialog"
-import { OrganizationMemberRow } from "./organization-member-row"
-import { OrganizationMemberRowSkeleton } from "./organization-member-row-skeleton"
+  TableRow,
+} from "@/components/ui/table";
+import { organizationPlugin } from "@/lib/auth/organization-plugin";
+import { cn } from "@/lib/utils";
+import { InviteMemberDialog } from "./invite-member-dialog";
+import { OrganizationMemberRow } from "./organization-member-row";
+import { OrganizationMemberRowSkeleton } from "./organization-member-row-skeleton";
 
-type SortDirection = "ascending" | "descending"
+type SortDirection = "ascending" | "descending";
 
 type SortDescriptor = {
-  column: string
-  direction: SortDirection
-}
+  column: string;
+  direction: SortDirection;
+};
 
 type OrganizationMember = Member & {
-  user: NonNullable<Member["user"]>
-}
+  user: NonNullable<Member["user"]>;
+};
 
 /** Props for the `OrganizationMembers` component. */
 export type OrganizationMembersProps = {
-  className?: string
-}
+  className?: string;
+};
 
 /**
  * Organization members table with title, invite control, and per-row actions.
@@ -62,89 +62,86 @@ export function OrganizationMembers({
   className,
   ...props
 }: OrganizationMembersProps & ComponentProps<"div">) {
-  const { authClient } = useAuth<OrganizationAuthClient>()
+  const { authClient } = useAuth<OrganizationAuthClient>();
   const {
     localization: organizationLocalization,
     membershipLimit,
-    roles
-  } = useAuthPlugin(organizationPlugin)
-  const roleLabels = roles as Record<string, string> | undefined
+    roles,
+  } = useAuthPlugin(organizationPlugin);
+  const roleLabels = roles as Record<string, string> | undefined;
 
-  const { data: session } = useSession(authClient)
+  const { data: session } = useSession(authClient);
   const { data: activeOrganization, isPending: activeOrganizationPending } =
-    useActiveOrganization(authClient)
+    useActiveOrganization(authClient);
   const { data: membersData, isPending: membersPending } =
-    useListOrganizationMembers(authClient)
+    useListOrganizationMembers(authClient);
 
   const { isPending: updatePermissionPending } = useHasPermission(authClient, {
-    permissions: { member: ["update"] }
-  })
+    permissions: { member: ["update"] },
+  });
   const { isPending: deletePermissionPending } = useHasPermission(authClient, {
-    permissions: { member: ["delete"] }
-  })
+    permissions: { member: ["delete"] },
+  });
 
   const isPending =
     activeOrganizationPending ||
     membersPending ||
     updatePermissionPending ||
-    deletePermissionPending
+    deletePermissionPending;
 
-  const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>()
-  const [roleFilter, setRoleFilter] = useState("all")
-  const [search, setSearch] = useState("")
+  const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>();
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [search, setSearch] = useState("");
 
   const filteredMembers = useMemo(() => {
     return membersData?.members.filter(
-      (member: {
-        role: string
-        user: { name: string; email: string }
-      }) =>
+      (member: { role: string; user: { name: string; email: string } }) =>
         (roleFilter === "all" || member.role === roleFilter) &&
         (member.user.name.toLowerCase().includes(search.toLowerCase()) ||
-          member.user.email.toLowerCase().includes(search.toLowerCase()))
-    )
-  }, [search, membersData?.members, roleFilter])
+          member.user.email.toLowerCase().includes(search.toLowerCase())),
+    );
+  }, [search, membersData?.members, roleFilter]);
 
   const sortedMembers = useMemo(() => {
-    if (!sortDescriptor) return filteredMembers
-    if (!filteredMembers) return filteredMembers
+    if (!sortDescriptor) return filteredMembers;
+    if (!filteredMembers) return filteredMembers;
 
     return [...filteredMembers].sort((a, b) => {
-      const col = sortDescriptor.column as keyof Member | "user"
+      const col = sortDescriptor.column as keyof Member | "user";
       const first =
-        col === "user" ? a.user.name || a.user.email : String(a[col])
+        col === "user" ? a.user.name || a.user.email : String(a[col]);
       const second =
-        col === "user" ? b.user.name || b.user.email : String(b[col])
+        col === "user" ? b.user.name || b.user.email : String(b[col]);
 
-      let cmp = first.localeCompare(second)
+      let cmp = first.localeCompare(second);
       if (sortDescriptor.direction === "descending") {
-        cmp *= -1
+        cmp *= -1;
       }
 
-      return cmp
-    })
-  }, [sortDescriptor, filteredMembers])
+      return cmp;
+    });
+  }, [sortDescriptor, filteredMembers]);
 
-  const [inviteOpen, setInviteOpen] = useState(false)
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   const isOwner = membersData?.members.some(
     (member: { role: string; userId: string }) =>
-      member.role === "owner" && member.userId === session?.user.id
-  )
+      member.role === "owner" && member.userId === session?.user.id,
+  );
   const atMembershipLimit =
     membershipLimit !== undefined &&
-    (membersData?.members.length ?? 0) >= membershipLimit
+    (membersData?.members.length ?? 0) >= membershipLimit;
 
   function toggleSort(column: string) {
     setSortDescriptor((current) => {
       if (current?.column !== column) {
-        return { column, direction: "ascending" }
+        return { column, direction: "ascending" };
       }
       if (current.direction === "ascending") {
-        return { column, direction: "descending" }
+        return { column, direction: "descending" };
       }
-      return undefined
-    })
+      return undefined;
+    });
   }
 
   return (
@@ -282,17 +279,17 @@ export function OrganizationMembers({
 
       <InviteMemberDialog open={inviteOpen} onOpenChange={setInviteOpen} />
     </div>
-  )
+  );
 }
 
 function SortableTableHead({
   children,
   sortDirection,
-  onClick
+  onClick,
 }: {
-  children: ReactNode
-  sortDirection?: SortDirection
-  onClick: () => void
+  children: ReactNode;
+  sortDirection?: SortDirection;
+  onClick: () => void;
 }) {
   return (
     <TableHead aria-sort={sortDirection ?? "none"}>
@@ -309,11 +306,11 @@ function SortableTableHead({
           <ChevronUp
             className={cn(
               "size-3 transition-transform duration-100 ease-out",
-              sortDirection === "descending" ? "rotate-180" : ""
+              sortDirection === "descending" ? "rotate-180" : "",
             )}
           />
         )}
       </Button>
     </TableHead>
-  )
+  );
 }

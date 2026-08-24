@@ -1,4 +1,4 @@
-import type { ReactNode } from "react"
+import type { ReactNode } from "react";
 import {
   Body,
   Button,
@@ -9,19 +9,19 @@ import {
   Html,
   Img,
   Link,
-  Preview,
   pixelBasedPreset,
+  Preview,
   Section,
   Tailwind,
-  Text
-} from "react-email"
+  Text,
+} from "react-email";
 
-import { cn } from "../../../lib/utils"
+import { cn } from "../../../lib/utils";
 import {
   type EmailClassNames,
   type EmailColors,
-  EmailStyles
-} from "./email-styles"
+  EmailStyles,
+} from "./email-styles";
 
 const organizationInvitationEmailLocalization = {
   YOU_RE_INVITED_TO_ORGANIZATION: "You're invited to {organizationName}",
@@ -38,8 +38,8 @@ const organizationInvitationEmailLocalization = {
   EMAIL_SENT_BY: "Email sent by {appName}.",
   IF_YOU_DIDNT_EXPECT_THIS_INVITATION:
     "If you didn't expect this invitation, you can safely ignore this email.",
-  POWERED_BY_BETTER_AUTH: "Powered by {betterAuth}"
-}
+  POWERED_BY_BETTER_AUTH: "Powered by {betterAuth}",
+};
 
 /**
  * Localization strings for the OrganizationInvitationEmail component.
@@ -47,7 +47,7 @@ const organizationInvitationEmailLocalization = {
  * Contains all text content used in the organization invitation email template.
  */
 export type OrganizationInvitationEmailLocalization =
-  typeof organizationInvitationEmailLocalization
+  typeof organizationInvitationEmailLocalization;
 
 /**
  * Props for the OrganizationInvitationEmail component.
@@ -59,40 +59,40 @@ export interface OrganizationInvitationEmailProps {
    * @remarks Pass `{baseUrl}/settings/organizations` — this is where pending
    * organization invitations are listed in the settings UI.
    */
-  url: string
+  url: string;
   /** Email address of the user being invited */
-  email?: string
+  email?: string;
   /** Name of the person who sent the invitation */
-  inviterName?: string
+  inviterName?: string;
   /** Email address of the person who sent the invitation */
-  inviterEmail?: string
+  inviterEmail?: string;
   /** Name of the organization the user is being invited to */
-  organizationName?: string
+  organizationName?: string;
   /** Organization logo URL(s) - a single string or light/dark variants. */
-  organizationLogoURL?: string | { light: string; dark: string }
+  organizationLogoURL?: string | { light: string; dark: string };
   /** Role being offered to the invitee (e.g. "member", "admin", "owner") */
-  role?: string
+  role?: string;
   /** Name of the application sending the email */
-  appName?: string
+  appName?: string;
   /** Number of hours until the invitation expires */
-  expirationHours?: number
+  expirationHours?: number;
   /** Logo URL(s) - a single string or light/dark variants. If omitted, no logo is shown. */
-  logoURL?: string | { light: string; dark: string }
+  logoURL?: string | { light: string; dark: string };
   /** Custom CSS class names for styling specific parts of the email */
-  classNames?: EmailClassNames
+  classNames?: EmailClassNames;
   /** Custom color scheme for light and dark modes */
-  colors?: EmailColors
+  colors?: EmailColors;
   /** Whether to show the "Powered by better-auth" footer */
-  poweredBy?: boolean
+  poweredBy?: boolean;
   /** Whether to enable dark mode support */
-  darkMode?: boolean
+  darkMode?: boolean;
   /** Additional React nodes to inject into the email head */
-  head?: ReactNode
+  head?: ReactNode;
   /**
    * Localization overrides for customizing email text
    * @remarks `OrganizationInvitationEmailLocalization`
    */
-  localization?: Partial<OrganizationInvitationEmailLocalization>
+  localization?: Partial<OrganizationInvitationEmailLocalization>;
 }
 
 /**
@@ -144,15 +144,15 @@ export const OrganizationInvitationEmail = ({
 }: OrganizationInvitationEmailProps) => {
   const localization = {
     ...OrganizationInvitationEmail.localization,
-    ...props.localization
-  }
+    ...props.localization,
+  };
 
   const previewText = organizationName
     ? localization.YOU_RE_INVITED_TO_ORGANIZATION.replace(
         "{organizationName}",
-        organizationName
+        organizationName,
       )
-    : localization.YOU_RE_INVITED
+    : localization.YOU_RE_INVITED;
 
   return (
     <Html>
@@ -172,13 +172,13 @@ export const OrganizationInvitationEmail = ({
           <Container
             className={cn(
               "mx-auto my-auto max-w-xl px-2 py-10",
-              classNames?.container
+              classNames?.container,
             )}
           >
             <Section
               className={cn(
-                "bg-card text-card-foreground rounded-none border border-border p-8",
-                classNames?.card
+                "rounded-none border border-border bg-card p-8 text-card-foreground",
+                classNames?.card,
               )}
             >
               {logoURL &&
@@ -198,8 +198,8 @@ export const OrganizationInvitationEmail = ({
                       height={48}
                       alt={appName || localization.LOGO}
                       className={cn(
-                        "mx-auto mb-8 logo-light",
-                        classNames?.logo
+                        "logo-light mx-auto mb-8",
+                        classNames?.logo,
                       )}
                     />
                     <Img
@@ -208,8 +208,8 @@ export const OrganizationInvitationEmail = ({
                       height={48}
                       alt={appName || localization.LOGO}
                       className={cn(
-                        "hidden mx-auto mb-8 logo-dark",
-                        classNames?.logo
+                        "logo-dark mx-auto mb-8 hidden",
+                        classNames?.logo,
                       )}
                     />
                   </>
@@ -218,13 +218,13 @@ export const OrganizationInvitationEmail = ({
               <Heading
                 className={cn(
                   "m-0 mb-5 text-2xl font-semibold",
-                  classNames?.title
+                  classNames?.title,
                 )}
               >
                 {organizationName
                   ? localization.YOU_RE_INVITED_TO_ORGANIZATION.replace(
                       "{organizationName}",
-                      organizationName
+                      organizationName,
                     )
                   : localization.YOU_RE_INVITED}
               </Heading>
@@ -246,8 +246,8 @@ export const OrganizationInvitationEmail = ({
                       height={56}
                       alt={organizationName || localization.ORGANIZATION_LOGO}
                       className={cn(
-                        "mb-5 rounded-md logo-light",
-                        classNames?.logo
+                        "logo-light mb-5 rounded-md",
+                        classNames?.logo,
                       )}
                     />
                     <Img
@@ -256,8 +256,8 @@ export const OrganizationInvitationEmail = ({
                       height={56}
                       alt={organizationName || localization.ORGANIZATION_LOGO}
                       className={cn(
-                        "hidden mb-5 rounded-md logo-dark",
-                        classNames?.logo
+                        "logo-dark mb-5 hidden rounded-md",
+                        classNames?.logo,
                       )}
                     />
                   </>
@@ -269,32 +269,32 @@ export const OrganizationInvitationEmail = ({
                 {(() => {
                   let text = localization.INVITED_TO_JOIN_ORGANIZATION.replace(
                     "{appName}",
-                    appName || ""
+                    appName || "",
                   )
                     .replace("{organizationName}", organizationName || "")
-                    .replace("{role}", role || "")
+                    .replace("{role}", role || "");
 
                   // If we have no inviter info, drop the parenthetical and name placeholders cleanly.
                   if (!inviterName && !inviterEmail) {
                     text = text
                       .replace("{inviterName} ({inviterEmail})", "Someone")
                       .replace("{inviterName}", "Someone")
-                      .replace("({inviterEmail})", "")
+                      .replace("({inviterEmail})", "");
                   }
 
                   const [beforeInviterName, afterInviterName] =
-                    text.split("{inviterName}")
+                    text.split("{inviterName}");
 
                   const renderInviterEmail = (segment: string) => {
                     const [beforeInviterEmail, afterInviterEmail] =
-                      segment.split("{inviterEmail}")
+                      segment.split("{inviterEmail}");
 
                     if (!inviterEmail) {
                       return segment
                         .replace("({inviterEmail})", "")
                         .replace("{inviterEmail}", "")
                         .replace(/\s{2,}/g, " ")
-                        .replace(" .", ".")
+                        .replace(" .", ".");
                     }
 
                     return (
@@ -302,22 +302,22 @@ export const OrganizationInvitationEmail = ({
                         {beforeInviterEmail}
                         <Link
                           href={`mailto:${inviterEmail}`}
-                          className="text-primary font-medium"
+                          className="font-medium text-primary"
                         >
                           {inviterEmail}
                         </Link>
                         {afterInviterEmail}
                       </>
-                    )
-                  }
+                    );
+                  };
 
                   if (!inviterName) {
                     return renderInviterEmail(
                       text
                         .replace("{inviterName}", "")
                         .replace(/\s{2,}/g, " ")
-                        .replace(" .", ".")
-                    )
+                        .replace(" .", "."),
+                    );
                   }
 
                   return (
@@ -326,7 +326,7 @@ export const OrganizationInvitationEmail = ({
                       <span className="font-medium">{inviterName}</span>
                       {renderInviterEmail(afterInviterName ?? "")}
                     </>
-                  )
+                  );
                 })()}
               </Text>
 
@@ -334,8 +334,8 @@ export const OrganizationInvitationEmail = ({
                 <Button
                   href={url}
                   className={cn(
-                    "inline-block whitespace-nowrap rounded-none text-sm font-medium py-2.5 px-6 bg-primary text-primary-foreground no-underline",
-                    classNames?.button
+                    "inline-block rounded-none bg-primary px-6 py-2.5 text-sm font-medium whitespace-nowrap text-primary-foreground no-underline",
+                    classNames?.button,
                   )}
                 >
                   {localization.ACCEPT_INVITATION}
@@ -345,7 +345,7 @@ export const OrganizationInvitationEmail = ({
               <Text
                 className={cn(
                   "m-0 mb-3 text-xs text-muted-foreground",
-                  classNames?.description
+                  classNames?.description,
                 )}
               >
                 {localization.OR_COPY_AND_PASTE_URL}
@@ -353,8 +353,8 @@ export const OrganizationInvitationEmail = ({
 
               <Link
                 className={cn(
-                  "break-all text-xs text-primary",
-                  classNames?.link
+                  "text-xs break-all text-primary",
+                  classNames?.link,
                 )}
                 href={url}
               >
@@ -364,7 +364,7 @@ export const OrganizationInvitationEmail = ({
               <Hr
                 className={cn(
                   "my-6 w-full border border-solid border-border",
-                  classNames?.separator
+                  classNames?.separator,
                 )}
               />
 
@@ -372,13 +372,13 @@ export const OrganizationInvitationEmail = ({
                 <Text
                   className={cn(
                     "m-0 mb-3 text-xs text-muted-foreground",
-                    classNames?.description
+                    classNames?.description,
                   )}
                 >
                   {expirationHours
                     ? localization.THIS_INVITATION_EXPIRES_IN_HOURS.replace(
                         "{expirationHours}",
-                        expirationHours.toString()
+                        expirationHours.toString(),
                       )
                     : null}
                   {appName && (
@@ -393,7 +393,7 @@ export const OrganizationInvitationEmail = ({
               <Text
                 className={cn(
                   "m-0 text-xs text-muted-foreground",
-                  classNames?.description
+                  classNames?.description,
                 )}
               >
                 {localization.IF_YOU_DIDNT_EXPECT_THIS_INVITATION}
@@ -403,12 +403,12 @@ export const OrganizationInvitationEmail = ({
                 <Text
                   className={cn(
                     "m-0 mt-4 text-center text-[11px] text-muted-foreground",
-                    classNames?.poweredBy
+                    classNames?.poweredBy,
                   )}
                 >
                   {(() => {
                     const [beforeBetterAuth, afterBetterAuth] =
-                      localization.POWERED_BY_BETTER_AUTH.split("{betterAuth}")
+                      localization.POWERED_BY_BETTER_AUTH.split("{betterAuth}");
 
                     return (
                       <>
@@ -417,14 +417,14 @@ export const OrganizationInvitationEmail = ({
                           href="https://better-auth.com"
                           className={cn(
                             "text-primary underline",
-                            classNames?.link
+                            classNames?.link,
                           )}
                         >
                           better-auth
                         </Link>
                         {afterBetterAuth}
                       </>
-                    )
+                    );
                   })()}
                 </Text>
               )}
@@ -433,11 +433,11 @@ export const OrganizationInvitationEmail = ({
         </Body>
       </Tailwind>
     </Html>
-  )
-}
+  );
+};
 
 OrganizationInvitationEmail.localization =
-  organizationInvitationEmailLocalization
+  organizationInvitationEmailLocalization;
 
 OrganizationInvitationEmail.PreviewProps = {
   url: "https://better-auth-ui.com/auth/accept-invitation?invitationId=example",
@@ -448,7 +448,7 @@ OrganizationInvitationEmail.PreviewProps = {
   role: "member",
   appName: "Better Auth",
   expirationHours: 48,
-  darkMode: true
-} as OrganizationInvitationEmailProps
+  darkMode: true,
+} as OrganizationInvitationEmailProps;
 
-export default OrganizationInvitationEmail
+export default OrganizationInvitationEmail;

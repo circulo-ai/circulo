@@ -1,18 +1,18 @@
-import { createAuthPlugin } from "@better-auth-ui/core"
+import { createAuthPlugin } from "@better-auth-ui/core";
 import {
   oauthProviderPlugin as coreOAuthProviderPlugin,
-  type OAuthProviderPluginOptions
-} from "@better-auth-ui/core/plugins/oauth-provider"
+  type OAuthProviderPluginOptions,
+} from "@better-auth-ui/core/plugins/oauth-provider";
 
-import { AuthorizedApplications } from "@/components/auth/oauth-provider/authorized-applications"
-import { OAuthConsent } from "@/components/auth/oauth-provider/oauth-consent"
-import { OAuthSelectAccount } from "@/components/auth/oauth-provider/oauth-select-account"
-import { OAuthSignUp } from "@/components/auth/oauth-provider/oauth-sign-up"
+import { AuthorizedApplications } from "@/components/auth/oauth-provider/authorized-applications";
+import { OAuthConsent } from "@/components/auth/oauth-provider/oauth-consent";
+import { OAuthSelectAccount } from "@/components/auth/oauth-provider/oauth-select-account";
+import { OAuthSignUp } from "@/components/auth/oauth-provider/oauth-sign-up";
 
 export const oauthProviderPlugin = createAuthPlugin(
   coreOAuthProviderPlugin.id,
   (options: OAuthProviderPluginOptions = {}) => {
-    const core = coreOAuthProviderPlugin(options)
+    const core = coreOAuthProviderPlugin(options);
 
     return {
       ...core,
@@ -22,12 +22,12 @@ export const oauthProviderPlugin = createAuthPlugin(
           // A route of its own rather than an override of the built-in
           // `signUp` view — ordinary sign-up stays untouched.
           oauthSignUp: OAuthSignUp,
-          oauthSelectAccount: OAuthSelectAccount
-        }
+          oauthSelectAccount: OAuthSelectAccount,
+        },
       },
       ...(core.showConnectedApplications
         ? { securityCards: [AuthorizedApplications] }
-        : {})
-    }
-  }
-)
+        : {}),
+    };
+  },
+);

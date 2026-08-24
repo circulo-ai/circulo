@@ -1,6 +1,6 @@
-import type { ErrorType } from "./workflow";
 import type { Logger } from "./logger";
 import type { MetricsCollector } from "./metrics";
+import type { ErrorType } from "./workflow";
 
 export interface ActivityRetryPolicy {
   maxAttempts: number;
@@ -33,7 +33,9 @@ export interface ActivityDefinition<TInput, TOutput> {
 }
 
 export interface ActivityRegistry {
-  register<TInput, TOutput>(definition: ActivityDefinition<TInput, TOutput>): void;
+  register<TInput, TOutput>(
+    definition: ActivityDefinition<TInput, TOutput>,
+  ): void;
   get<TInput, TOutput>(
     name: string,
     version?: number,

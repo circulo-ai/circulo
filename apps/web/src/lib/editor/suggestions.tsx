@@ -1,6 +1,6 @@
 import type { ArtifactKind } from "@/components/artifacts/artifact";
 import { Suggestion as PreviewSuggestion } from "@/components/suggestion";
-import type { Suggestion } from "@circulo-ai/db/schema";
+import type { SuggestionStreamData } from "@/lib/types";
 import type { Node } from "prosemirror-model";
 import { Plugin, PluginKey } from "prosemirror-state";
 import {
@@ -10,7 +10,7 @@ import {
 } from "prosemirror-view";
 import { createRoot } from "react-dom/client";
 
-export interface UISuggestion extends Suggestion {
+export interface UISuggestion extends SuggestionStreamData {
   selectionStart: number;
   selectionEnd: number;
 }
@@ -45,7 +45,7 @@ function findPositionsInDoc(doc: Node, searchText: string): Position | null {
 
 export function projectWithPositions(
   doc: Node,
-  suggestions: Suggestion[],
+  suggestions: SuggestionStreamData[],
 ): UISuggestion[] {
   return suggestions.map((suggestion) => {
     const positions = findPositionsInDoc(doc, suggestion.originalText);

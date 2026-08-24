@@ -10,8 +10,7 @@ import {
 } from "@/components/ui/card";
 import { useBrandConfig } from "@/lib/branding/branding";
 import { CheckCircle, Heart, Info, Loader2, XCircle } from "lucide-react";
-import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 interface UnsubscribeData {
   success: boolean;
@@ -28,19 +27,23 @@ interface UnsubscribeData {
 }
 
 function UnsubscribeContent() {
-  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<UnsubscribeData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [unsubscribed, setUnsubscribed] = useState(false);
+  const [email, setEmail] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const brand = useBrandConfig();
 
-  const email = searchParams.get("email");
-  const token = searchParams.get("token");
-
   useEffect(() => {
-    if (!email || !token) {
+    const searchParams = new URLSearchParams(window.location.search);
+    const nextEmail = searchParams.get("email");
+    const nextToken = searchParams.get("token");
+    setEmail(nextEmail);
+    setToken(nextToken);
+
+    if (!nextEmail || !nextToken) {
       setError("Missing email or token in URL");
       setLoading(false);
       return;
@@ -48,7 +51,7 @@ function UnsubscribeContent() {
 
     // Validate the unsubscribe link
     fetch(
-      `/api/users/me/settings/unsubscribe?email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}`,
+      `/api/users/me/settings/unsubscribe?email=${encodeURIComponent(nextEmail)}&token=${encodeURIComponent(nextToken)}`,
     )
       .then((res) => res.json())
       .then((data) => {
@@ -64,7 +67,7 @@ function UnsubscribeContent() {
       .finally(() => {
         setLoading(false);
       });
-  }, [email, token]);
+  }, []);
 
   const handleUnsubscribe = async (
     type: "all" | "marketing" | "updates" | "notifications",
@@ -427,19 +430,5 @@ function UnsubscribeContent() {
 }
 
 export default function Unsubscribe() {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-screen items-center justify-center bg-background">
-          <Card className="w-full max-w-md border shadow-sm">
-            <CardContent className="flex items-center justify-center p-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </CardContent>
-          </Card>
-        </div>
-      }
-    >
-      <UnsubscribeContent />
-    </Suspense>
-  );
+  return <UnsubscribeContent />;
 }

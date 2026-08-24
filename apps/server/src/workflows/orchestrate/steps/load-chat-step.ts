@@ -16,8 +16,17 @@ import {
 } from "@/db";
 import { chatMemberRepo, chatRepo, messageRepo } from "@/db/repositories";
 import { agent as agentTable, chatAgent } from "@/db/schema";
-import { getUserRole } from "@/lib/permissions";
-import { and, desc, eq, inArray, isNull, not, or, sql } from "drizzle-orm";
+import {
+  getKnowledgeAssetKey,
+  isKnowledgeImageDocument,
+  toKnowledgeImageDataUrl,
+} from "@/lib/knowledge/assets";
+import { createKnowledgeEmbedding } from "@/lib/knowledge/embeddings";
+import { hasPermissionForUser } from "@/lib/permissions";
+import { ensureInitialSkillCatalog } from "@/lib/skills/initial-catalog";
+import { storageManager } from "@/lib/storage/config";
+import { ensureWorkspaceRoleCatalog } from "@/lib/workspace-role-catalog";
+import { and, asc, desc, eq, inArray, isNull, not, or, sql } from "drizzle-orm";
 
 export interface ChatContext {
   chat: Chat;
@@ -35,6 +44,7 @@ export interface ChatContext {
     knowledgeBaseName: string;
     sourceKey: string | null;
     contentType: string;
+    imageDataUrl?: string;
   }>;
   memories: Array<{
     scope: string;
@@ -69,6 +79,9 @@ export async function loadChatContextStep(
   }
 
   const messages = await messageRepo.findForChat(chatId, 100); // Last 100 messages
+
+  await ensureInitialSkillCatalog(chat.organizationId, userId);
+  await ensureWorkspaceRoleCatalog(chat.organizationId, userId);
 
   // Use the correct method to get ChatAgent objects with agent relations
   const chatAgents = await db.query.chatAgent.findMany({
@@ -106,6 +119,15 @@ export async function loadChatContextStep(
         )
     : [];
   const readableKnowledgeBaseIds = activeKnowledgeBases.map((base) => base.id);
+  const queryEmbedding = queryText?.trim()
+    ? await createKnowledgeEmbedding(queryText.trim(), "").catch(() => null)
+    : null;
+  const lexicalKnowledgeMatch = queryText?.trim()
+    ? sql`to_tsvector('simple', ${knowledgeDocument.title} || ' ' || ${knowledgeDocument.content}) @@ plainto_tsquery('simple', ${queryText.trim()})`
+    : null;
+  const semanticDistance = queryEmbedding
+    ? sql<number>`${knowledgeDocument.embedding} <=> ${JSON.stringify(queryEmbedding)}::vector`
+    : null;
   const knowledgeDocuments = uniqueKnowledgeBaseIds.length
     ? await db.query.knowledgeDocument.findMany({
         where: and(
@@ -114,30 +136,52 @@ export async function loadChatContextStep(
           inArray(knowledgeDocument.knowledgeBaseId, readableKnowledgeBaseIds),
           ...(queryText?.trim()
             ? [
-                sql`to_tsvector('simple', ${knowledgeDocument.title} || ' ' || ${knowledgeDocument.content}) @@ plainto_tsquery('simple', ${queryText.trim()})`,
+                queryEmbedding
+                  ? or(
+                      sql`${knowledgeDocument.embedding} IS NOT NULL`,
+                      lexicalKnowledgeMatch!,
+                      sql`${knowledgeDocument.contentType} LIKE 'image/%'`,
+                    )
+                  : or(
+                      lexicalKnowledgeMatch!,
+                      sql`${knowledgeDocument.contentType} LIKE 'image/%'`,
+                    ),
               ]
             : []),
         ),
         with: { knowledgeBase: true },
-        orderBy: desc(
-          queryText?.trim()
-            ? sql`ts_rank(to_tsvector('simple', ${knowledgeDocument.title} || ' ' || ${knowledgeDocument.content}), plainto_tsquery('simple', ${queryText.trim()}))`
-            : knowledgeDocument.updatedAt,
-        ),
+        orderBy: queryEmbedding
+          ? [
+              asc(
+                sql`CASE WHEN ${knowledgeDocument.embedding} IS NULL THEN 1 ELSE 0 END`,
+              ),
+              asc(semanticDistance!),
+              desc(
+                sql`ts_rank(to_tsvector('simple', ${knowledgeDocument.title} || ' ' || ${knowledgeDocument.content}), plainto_tsquery('simple', ${queryText!.trim()}))`,
+              ),
+            ]
+          : desc(
+              queryText?.trim()
+                ? sql`ts_rank(to_tsvector('simple', ${knowledgeDocument.title} || ' ' || ${knowledgeDocument.content}), plainto_tsquery('simple', ${queryText.trim()}))`
+                : knowledgeDocument.updatedAt,
+            ),
         limit: queryText?.trim() ? 20 : 100,
       })
     : [];
   const agentIds = chatAgents.map((link) => link.agentId);
-  const organizationRole = await getUserRole(userId, chat.organizationId);
-  const canReadOrganizationMemory = ["owner", "admin"].includes(
-    organizationRole ?? "",
+  const canReadOrganizationMemory = await hasPermissionForUser(
+    userId,
+    chat.organizationId,
+    "memory",
+    "read",
   );
   const currentMember = members.find((member) => member.userId === userId);
   const canReadChatMemory = Boolean(
     currentMember &&
     (currentMember.role === "owner" ||
       currentMember.role === "admin" ||
-      currentMember.canManageKnowledge),
+      currentMember.canManageKnowledge ||
+      canReadOrganizationMemory),
   );
   const readableAgentIds = agentIds;
   const userMemoryPreference = await db.query.memoryPreference.findFirst({
@@ -235,6 +279,27 @@ export async function loadChatContextStep(
     console.warn(`No active agents found in chat ${chatId}`);
   }
 
+  const knowledgeDocumentsWithImages = await Promise.all(
+    knowledgeDocuments.map(async (document) => {
+      if (!isKnowledgeImageDocument(document)) return { document };
+      const assetKey = getKnowledgeAssetKey(document.metadata);
+      if (!assetKey) return { document };
+      try {
+        const buffer = await storageManager.download({
+          context: "knowledge-base",
+          key: assetKey,
+        });
+        const imageDataUrl = toKnowledgeImageDataUrl(
+          buffer,
+          document.contentType,
+        );
+        return { document, imageDataUrl: imageDataUrl ?? undefined };
+      } catch {
+        return { document };
+      }
+    }),
+  );
+
   return {
     chat,
     orchestrationAgent,
@@ -242,14 +307,17 @@ export async function loadChatContextStep(
     messages,
     pastMessages,
     members,
-    knowledgeDocuments: knowledgeDocuments.map((document) => ({
-      id: document.id,
-      title: document.title,
-      content: document.content,
-      knowledgeBaseName: document.knowledgeBase.name,
-      sourceKey: document.sourceKey,
-      contentType: document.contentType,
-    })),
+    knowledgeDocuments: knowledgeDocumentsWithImages.map(
+      ({ document, imageDataUrl }) => ({
+        id: document.id,
+        title: document.title,
+        content: document.content,
+        knowledgeBaseName: document.knowledgeBase.name,
+        sourceKey: document.sourceKey,
+        contentType: document.contentType,
+        imageDataUrl,
+      }),
+    ),
     memories: memories.map((item) => ({
       scope: item.scope,
       key: item.key,

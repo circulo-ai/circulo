@@ -1,38 +1,38 @@
-"use client"
+"use client";
 
-import type { ListedApiKey } from "@better-auth-ui/core/plugins/api-key"
-import { useAuth, useAuthPlugin } from "@better-auth-ui/react"
-import { Key, Pencil, X } from "lucide-react"
-import { useState } from "react"
+import type { ListedApiKey } from "@better-auth-ui/core/plugins/api-key";
+import { useAuth, useAuthPlugin } from "@better-auth-ui/react";
+import { Key, Pencil, X } from "lucide-react";
+import { useState } from "react";
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 import {
   Item,
   ItemActions,
   ItemContent,
   ItemDescription,
   ItemMedia,
-  ItemTitle
-} from "@/components/ui/item"
-import { apiKeyPlugin } from "@/lib/auth/api-key-plugin"
-import { DeleteApiKeyDialog } from "./delete-api-key-dialog"
-import { EditApiKeyDialog } from "./edit-api-key-dialog"
+  ItemTitle,
+} from "@/components/ui/item";
+import { apiKeyPlugin } from "@/lib/auth/api-key-plugin";
+import { DeleteApiKeyDialog } from "./delete-api-key-dialog";
+import { EditApiKeyDialog } from "./edit-api-key-dialog";
 
 export type ApiKeyProps = {
-  apiKey: ListedApiKey
+  apiKey: ListedApiKey;
   /** Hide the row's delete button (e.g., when caller lacks `apiKey:delete`). */
-  hideDelete?: boolean
+  hideDelete?: boolean;
   /** Scope the delete payload to an organization (sets `configId`). */
-  organizationId?: string
-}
+  organizationId?: string;
+};
 
 export function ApiKey({ apiKey, hideDelete, organizationId }: ApiKeyProps) {
-  const { localization } = useAuth()
-  const { localization: apiKeyLocalization } = useAuthPlugin(apiKeyPlugin)
-  const [deleteOpen, setDeleteOpen] = useState(false)
-  const [editOpen, setEditOpen] = useState(false)
+  const { localization } = useAuth();
+  const { localization: apiKeyLocalization } = useAuthPlugin(apiKeyPlugin);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
-  const preview = `${apiKey.start}${"*".repeat(16)}`
+  const preview = `${apiKey.start}${"*".repeat(16)}`;
 
   return (
     <Item>
@@ -46,16 +46,16 @@ export function ApiKey({ apiKey, hideDelete, organizationId }: ApiKeyProps) {
           {apiKeyLocalization.created}{" "}
           {new Date(apiKey.createdAt).toLocaleString(undefined, {
             dateStyle: "medium",
-            timeStyle: "short"
+            timeStyle: "short",
           })}
         </ItemDescription>
         <ItemDescription>
           {apiKey.expiresAt
             ? `${apiKeyLocalization.expires} ${new Date(
-                apiKey.expiresAt
+                apiKey.expiresAt,
               ).toLocaleString(undefined, {
                 dateStyle: "medium",
-                timeStyle: "short"
+                timeStyle: "short",
               })}`
             : apiKeyLocalization.neverExpires}
         </ItemDescription>
@@ -108,5 +108,5 @@ export function ApiKey({ apiKey, hideDelete, organizationId }: ApiKeyProps) {
         )}
       </ItemActions>
     </Item>
-  )
+  );
 }

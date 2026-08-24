@@ -1,28 +1,28 @@
-"use client"
+"use client";
 
 import {
   ThemePreviewDark,
   ThemePreviewLight,
   ThemePreviewSystem,
-  useAuthPlugin
-} from "@better-auth-ui/react"
-import { Monitor, Moon, Sun } from "lucide-react"
-import { useEffect, useState } from "react"
+  useAuthPlugin,
+} from "@better-auth-ui/react";
+import { Monitor, Moon, Sun } from "lucide-react";
+import { useEffect, useState } from "react";
 
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Field,
   FieldContent,
   FieldLabel,
-  FieldTitle
-} from "@/components/ui/field"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { themePlugin } from "@/lib/auth/theme-plugin"
-import { cn } from "@/lib/utils"
+  FieldTitle,
+} from "@/components/ui/field";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { themePlugin } from "@/lib/auth/theme-plugin";
+import { cn } from "@/lib/utils";
 
 export type AppearanceProps = {
-  className?: string
-}
+  className?: string;
+};
 
 /**
  * Renders a theme selector card with visual theme previews.
@@ -34,15 +34,16 @@ export type AppearanceProps = {
  * @returns A JSX element containing the theme selector card.
  */
 export function Appearance({ className }: AppearanceProps) {
-  const { useTheme, localization } = useAuthPlugin(themePlugin)
-  const { theme, setTheme, themes = [] } = useTheme()
+  const { useTheme, localization } = useAuthPlugin(themePlugin);
+  const { theme, setTheme, themes = [] } = useTheme();
+  const selectedTheme = theme ?? themes[0] ?? "system";
 
-  const [isMounted, setIsMounted] = useState(false)
-  useEffect(() => setIsMounted(true), [])
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => setIsMounted(true), []);
 
   return (
     <div>
-      <h2 className="text-sm font-semibold mb-3">{localization.appearance}</h2>
+      <h2 className="mb-3 text-sm font-semibold">{localization.appearance}</h2>
 
       <Card className={cn(className)}>
         <CardContent>
@@ -50,16 +51,16 @@ export function Appearance({ className }: AppearanceProps) {
             <FieldLabel>{localization.theme}</FieldLabel>
 
             <RadioGroup
-              value={isMounted ? theme : ""}
+              value={selectedTheme}
               onValueChange={setTheme}
-              className="grid gap-3 grid-cols-2 sm:grid-cols-3"
+              className="grid grid-cols-2 gap-3 sm:grid-cols-3"
               disabled={!isMounted || !theme}
             >
               {themes.includes("system") && (
                 <FieldLabel htmlFor="system">
                   <Field orientation="horizontal">
                     <FieldContent className="gap-2">
-                      <div className="flex items-center gap-2 justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <FieldTitle>
                           <Monitor className="size-4 text-muted-foreground" />
 
@@ -79,7 +80,7 @@ export function Appearance({ className }: AppearanceProps) {
                 <FieldLabel htmlFor="light">
                   <Field orientation="horizontal">
                     <FieldContent className="gap-2">
-                      <div className="flex items-center gap-2 justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <FieldTitle>
                           <Sun className="size-4 text-muted-foreground" />
 
@@ -99,7 +100,7 @@ export function Appearance({ className }: AppearanceProps) {
                 <FieldLabel htmlFor="dark">
                   <Field orientation="horizontal">
                     <FieldContent className="gap-2">
-                      <div className="flex items-center gap-2 justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <FieldTitle>
                           <Moon className="size-4 text-muted-foreground" />
 
@@ -119,5 +120,5 @@ export function Appearance({ className }: AppearanceProps) {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

@@ -5,6 +5,7 @@ import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { canCreateTeamOrg } from "@/lib/billing/autumn";
 import { sendEmail } from "@/lib/email/mailer";
+import { getFromEmailAddress } from "@/lib/email/utils";
 import { createLogger } from "@/lib/logs/console/logger";
 import { apiKey } from "@better-auth/api-key";
 import { autumn } from "autumn-js/better-auth";
@@ -32,15 +33,26 @@ import {
 } from "better-auth/plugins/organization/access";
 import { and, eq, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
+import { createHash } from "node:crypto";
 import { env } from "./env";
+import { getValidTrustedProxyIps } from "./trusted-proxies";
 
 const logger = createLogger("Auth");
 const isProduction = env.NODE_ENV === "production";
+const trustedProxyIps = getValidTrustedProxyIps(env.TRUSTED_PROXY_IPS);
 
 export const statement = {
   ...defaultStatements,
   apiKey: ["create", "read", "update", "delete"],
   chat: ["create", "share", "update", "delete"],
+  workspace: ["read", "manage"],
+  agents: ["read", "create", "update", "delete"],
+  automation: ["read", "create", "update", "delete", "manage"],
+  knowledge: ["read", "create", "update", "delete", "manage"],
+  memory: ["read", "create", "update", "delete", "manage"],
+  skills: ["read", "create", "update", "delete", "manage"],
+  mcp: ["read", "create", "update", "delete", "manage"],
+  apps: ["read", "manage"],
 } as const;
 
 const ac = createAccessControl(statement);
@@ -49,18 +61,42 @@ const ownerRole = ac.newRole({
   ...ownerAc.statements,
   apiKey: ["create", "read", "update", "delete"],
   chat: ["create", "share", "update", "delete"],
+  workspace: ["read", "manage"],
+  agents: ["read", "create", "update", "delete"],
+  automation: ["read", "create", "update", "delete", "manage"],
+  knowledge: ["read", "create", "update", "delete", "manage"],
+  memory: ["read", "create", "update", "delete", "manage"],
+  skills: ["read", "create", "update", "delete", "manage"],
+  mcp: ["read", "create", "update", "delete", "manage"],
+  apps: ["read", "manage"],
 });
 
 const adminRole = ac.newRole({
   ...organizationAdminAc.statements,
   apiKey: ["create", "read", "update", "delete"],
   chat: ["create", "share", "update"],
+  workspace: ["read", "manage"],
+  agents: ["read", "create", "update", "delete"],
+  automation: ["read", "create", "update", "delete", "manage"],
+  knowledge: ["read", "create", "update", "delete", "manage"],
+  memory: ["read", "create", "update", "delete", "manage"],
+  skills: ["read", "create", "update", "delete", "manage"],
+  mcp: ["read", "create", "update", "delete", "manage"],
+  apps: ["read", "manage"],
 });
 
 const memberRole = ac.newRole({
   ...memberAc.statements,
   apiKey: [],
   chat: ["create", "share"],
+  workspace: ["read"],
+  agents: ["read"],
+  automation: ["read"],
+  knowledge: ["read"],
+  memory: ["read"],
+  skills: ["read"],
+  mcp: ["read"],
+  apps: ["read"],
 });
 
 // Export the Better Auth AC and role definitions so application-level checks
@@ -196,6 +232,7 @@ const authOptions: BetterAuthOptions = {
         // Standard OAuth providers
         "google",
         "github",
+        "github-repo",
         "email-password",
         "confluence",
         "supabase",
@@ -288,7 +325,7 @@ const authOptions: BetterAuthOptions = {
     magicLink({
       sendMagicLink: async ({ email, token, url }, request) => {
         await sendEmail({
-          from: "onboarding@resend.dev",
+          from: getFromEmailAddress(),
           to: email,
           subject: "Sign in",
           html: await renderMagicLinkEmail(url, email, "sign-in"),
@@ -301,7 +338,7 @@ const authOptions: BetterAuthOptions = {
         const templateType =
           type === "sign-in" ? "sign-in" : "email-verification";
         await sendEmail({
-          from: "onboarding@resend.dev",
+          from: getFromEmailAddress(),
           to: email,
           subject:
             type === "sign-in"
@@ -321,7 +358,7 @@ const authOptions: BetterAuthOptions = {
       otpOptions: {
         sendOTP: async ({ user, otp }) => {
           await sendEmail({
-            from: "onboarding@resend.dev",
+            from: getFromEmailAddress(),
             to: user.email,
             subject: "Your Circulo two-factor code",
             html: await renderOTPEmail(otp, user.email, "sign-in"),
@@ -349,7 +386,9 @@ const authOptions: BetterAuthOptions = {
           prompt: "consent",
           tokenUrl: "https://github.com/login/oauth/access_token",
           userInfoUrl: "https://api.github.com/user",
-          scopes: ["user:email", "repo", "read:user", "workflow"],
+          // The connector only exposes read-only repository operations. Keep
+          // workflow access out of this integration's OAuth grant.
+          scopes: ["user:email", "repo", "read:user"],
           redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/github-repo`,
           getUserInfo: async (tokens) => {
             try {
@@ -1315,6 +1354,12 @@ const authOptions: BetterAuthOptions = {
     }),
     organization({
       ac,
+      teams: {
+        enabled: true,
+        maximumTeams: 50,
+        maximumMembersPerTeam: 50,
+        allowRemovingAllTeams: true,
+      },
       roles: {
         owner: ownerRole,
         admin: adminRole,
@@ -1336,7 +1381,7 @@ const authOptions: BetterAuthOptions = {
         );
 
         const result = await sendEmail({
-          from: "onboarding@resend.dev",
+          from: getFromEmailAddress(),
           to: email,
           subject: `You're invited to join ${invitedOrganization.name} on Circulo`,
           html,
@@ -1440,10 +1485,34 @@ const authOptions: BetterAuthOptions = {
           // 1. Auto-assign team plan, or
           // 2. Let users upgrade after creation
         },
+        afterCreateTeam: async ({ team, user }) => {
+          if (!user) return;
+
+          const membershipKey = createHash("sha256")
+            .update(JSON.stringify([team.id, user.id]))
+            .digest("base64url");
+
+          await db
+            .insert(schema.teamMember)
+            .values({
+              id: nanoid(),
+              teamId: team.id,
+              userId: user.id,
+              membershipKey,
+              createdAt: new Date(),
+            })
+            .onConflictDoNothing({ target: schema.teamMember.membershipKey });
+        },
       },
     }),
   ],
   advanced: {
+    ipAddress: {
+      ipAddressHeaders: ["cf-connecting-ip", "x-real-ip", "x-forwarded-for"],
+      ...(trustedProxyIps.length > 0
+        ? { trustedProxies: trustedProxyIps }
+        : {}),
+    },
     defaultCookieAttributes: {
       // Secure cross-site cookies are required in production, but they are
       // rejected by browsers when local development runs over plain HTTP.

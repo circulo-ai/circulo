@@ -1,5 +1,6 @@
 "use client";
 
+import { RequireSession } from "@/components/auth/require-session";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -124,7 +125,7 @@ const scopeLabel: Record<MemoryScope, string> = {
   agent: "Agent",
 };
 
-export default function MemoryPage() {
+function MemoryPageContent() {
   const {
     data: memories,
     error,
@@ -674,5 +675,13 @@ export default function MemoryPage() {
         </AlertDialogContent>
       </AlertDialog>
     </>
+  );
+}
+
+export default function MemoryPage() {
+  return (
+    <RequireSession>
+      <MemoryPageContent />
+    </RequireSession>
   );
 }

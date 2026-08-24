@@ -1,22 +1,23 @@
-"use client"
+"use client";
 
-import type { SettingsView } from "@better-auth-ui/core"
-import { useAuth, useAuthenticate } from "@better-auth-ui/react"
-import { Shield, User2 } from "lucide-react"
-import { useMemo } from "react"
+import type { SettingsView } from "@better-auth-ui/core";
+import { useAuth, useAuthenticate } from "@better-auth-ui/react";
+import { Building2, Shield, User2 } from "lucide-react";
+import { useMemo } from "react";
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { cn } from "@/lib/utils"
-import { AccountSettings } from "./account/account-settings"
-import { SecuritySettings } from "./security/security-settings"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
+import { OrganizationsSettings } from "../organization/organizations-settings";
+import { AccountSettings } from "./account/account-settings";
+import { SecuritySettings } from "./security/security-settings";
 
 export type SettingsProps = {
-  className?: string
-  path?: string
+  className?: string;
+  path?: string;
   /** @remarks `SettingsView` */
-  view?: SettingsView
-  hideNav?: boolean
-}
+  view?: SettingsView;
+  hideNav?: boolean;
+};
 
 /**
  * Renders the settings UI and activates the appropriate settings view based on `view` or `path`.
@@ -29,37 +30,39 @@ export type SettingsProps = {
  */
 export function Settings({ className, view, path, hideNav }: SettingsProps) {
   const { authClient, basePaths, localization, viewPaths, plugins, navigate } =
-    useAuth()
-  useAuthenticate(authClient)
+    useAuth();
+  useAuthenticate(authClient);
 
   if (!view && !path) {
-    throw new Error("[Better Auth UI] Either `view` or `path` must be provided")
+    throw new Error(
+      "[Better Auth UI] Either `view` or `path` must be provided",
+    );
   }
 
   const currentView = useMemo(() => {
-    if (view) return view
-    if (!path) return undefined
+    if (view) return view;
+    if (!path) return undefined;
 
     const match = [
       viewPaths.settings,
-      ...plugins.map((plugin) => plugin.viewPaths?.settings)
+      ...plugins.map((plugin) => plugin.viewPaths?.settings),
     ]
       .flatMap((source) => Object.entries(source ?? {}))
-      .find(([, segment]) => segment === path)
+      .find(([, segment]) => segment === path);
 
-    return match?.[0] as SettingsView | undefined
-  }, [view, path, viewPaths.settings, plugins])
+    return match?.[0] as SettingsView | undefined;
+  }, [view, path, viewPaths.settings, plugins]);
 
   if (!currentView) {
     const validPaths = [
       viewPaths.settings,
-      ...plugins.map((plugin) => plugin.viewPaths?.settings)
+      ...plugins.map((plugin) => plugin.viewPaths?.settings),
     ]
       .flatMap((source) => Object.values(source ?? {}))
-      .join(", ")
+      .join(", ");
     throw new Error(
-      `[Better Auth UI] Unknown settings path "${path}". Valid paths are: ${validPaths}`
-    )
+      `[Better Auth UI] Unknown settings path "${path}". Valid paths are: ${validPaths}`,
+    );
   }
 
   return (
@@ -74,7 +77,7 @@ export function Settings({ className, view, path, hideNav }: SettingsProps) {
             className="gap-1"
             onClick={() =>
               navigate({
-                to: `${basePaths.settings}/${viewPaths.settings.account}`
+                to: `${basePaths.settings}/${viewPaths.settings.account}`,
               })
             }
           >
@@ -88,13 +91,26 @@ export function Settings({ className, view, path, hideNav }: SettingsProps) {
             className="gap-1"
             onClick={() =>
               navigate({
-                to: `${basePaths.settings}/${viewPaths.settings.security}`
+                to: `${basePaths.settings}/${viewPaths.settings.security}`,
               })
             }
           >
             <Shield className="text-muted-foreground" />
 
             {localization.settings.security}
+          </TabsTrigger>
+
+          <TabsTrigger
+            value="organizations"
+            className="gap-1"
+            onClick={() =>
+              navigate({
+                to: `${basePaths.settings}/organizations`,
+              })
+            }
+          >
+            <Building2 className="text-muted-foreground" />
+            Organizations
           </TabsTrigger>
 
           {plugins.flatMap(
@@ -106,13 +122,13 @@ export function Settings({ className, view, path, hideNav }: SettingsProps) {
                   className="gap-1"
                   onClick={() =>
                     navigate({
-                      to: `${basePaths.settings}/${plugin.viewPaths?.settings?.[settingsTab.view]}`
+                      to: `${basePaths.settings}/${plugin.viewPaths?.settings?.[settingsTab.view]}`,
                     })
                   }
                 >
                   {settingsTab.label}
                 </TabsTrigger>
-              )) ?? []
+              )) ?? [],
           )}
         </TabsList>
       </div>
@@ -125,6 +141,10 @@ export function Settings({ className, view, path, hideNav }: SettingsProps) {
         <SecuritySettings />
       </TabsContent>
 
+      <TabsContent value="organizations" tabIndex={-1}>
+        <OrganizationsSettings />
+      </TabsContent>
+
       {plugins.flatMap((plugin) =>
         plugin.settingsTabs?.map((settingsTab, index) => (
           <TabsContent
@@ -134,8 +154,8 @@ export function Settings({ className, view, path, hideNav }: SettingsProps) {
           >
             <settingsTab.component />
           </TabsContent>
-        ))
+        )),
       )}
     </Tabs>
-  )
+  );
 }

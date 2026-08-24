@@ -81,7 +81,9 @@ router.post(
         await requireActiveChatMember(user.id, existingDoc.chatId);
 
         if (chatId && chatId !== existingDoc.chatId) {
-          throw new ForbiddenError("You cannot move an artifact to another chat");
+          throw new ForbiddenError(
+            "You cannot move an artifact to another chat",
+          );
         }
       } else if (chatId) {
         await requireActiveChatMember(user.id, chatId);

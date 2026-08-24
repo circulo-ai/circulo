@@ -1,47 +1,47 @@
-"use client"
+"use client";
 
-import type { OrganizationAuthClient } from "@better-auth-ui/core/plugins/organization"
-import { useAuth, useAuthPlugin, useSession } from "@better-auth-ui/react"
+import type { OrganizationAuthClient } from "@better-auth-ui/core/plugins/organization";
+import { useAuth, useAuthPlugin, useSession } from "@better-auth-ui/react";
 import {
   useActiveOrganization,
   useListOrganizations,
-  useSetActiveOrganization
-} from "@better-auth-ui/react/plugins/organization"
-import type { Organization } from "better-auth/client"
+  useSetActiveOrganization,
+} from "@better-auth-ui/react/plugins/organization";
+import type { Organization } from "better-auth/client";
 import {
   ChevronsUpDown,
   PlusCircle,
-  Settings as SettingsIcon
-} from "lucide-react"
-import { type ComponentProps, type ReactElement, useState } from "react"
+  Settings as SettingsIcon,
+} from "lucide-react";
+import { type ComponentProps, type ReactElement, useState } from "react";
 
-import { buttonVariants } from "@/components/ui/button"
+import { buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu"
-import { organizationPlugin } from "@/lib/auth/organization-plugin"
-import { cn } from "@/lib/utils"
-import { UserView } from "../user/user-view"
-import { CreateOrganizationDialog } from "./create-organization-dialog"
-import { OrganizationView } from "./organization-view"
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { organizationPlugin } from "@/lib/auth/organization-plugin";
+import { cn } from "@/lib/utils";
+import { UserView } from "../user/user-view";
+import { CreateOrganizationDialog } from "./create-organization-dialog";
+import { OrganizationView } from "./organization-view";
 
 /** Props for the `OrganizationSwitcher` component. */
 export type OrganizationSwitcherProps = {
-  className?: string
-  align?: "center" | "end" | "start"
-  side?: "top" | "right" | "bottom" | "left"
-  sideOffset?: number
-  trigger?: ReactElement<ComponentProps<typeof DropdownMenuTrigger>>
-  hideCreate?: boolean
-  hidePersonal?: boolean
-  hideSettings?: boolean
-  hideSlug?: boolean
-  setActive?: (organization: Organization | null) => void
-}
+  className?: string;
+  align?: "center" | "end" | "start";
+  side?: "top" | "right" | "bottom" | "left";
+  sideOffset?: number;
+  trigger?: ReactElement<ComponentProps<typeof DropdownMenuTrigger>>;
+  hideCreate?: boolean;
+  hidePersonal?: boolean;
+  hideSettings?: boolean;
+  hideSlug?: boolean;
+  setActive?: (organization: Organization | null) => void;
+};
 
 /**
  * Renders an organizations dropdown with a trigger button,
@@ -57,54 +57,55 @@ export function OrganizationSwitcher({
   hideSettings,
   hideSlug = true,
   setActive,
-  trigger
+  trigger,
 }: OrganizationSwitcherProps) {
   const { authClient, navigate, basePaths, localization, viewPaths, Link } =
-    useAuth<OrganizationAuthClient>()
-  const { data: session, isPending: sessionPending } = useSession(authClient)
+    useAuth<OrganizationAuthClient>();
+  const { data: session, isPending: sessionPending } = useSession(authClient);
   const {
     localization: organizationLocalization,
     viewPaths: organizationViewPaths,
     slug,
-    slugPrefix
-  } = useAuthPlugin(organizationPlugin)
+    slugPrefix,
+  } = useAuthPlugin(organizationPlugin);
 
   const { data: activeOrganization, isPending: activeOrganizationPending } =
-    useActiveOrganization(authClient)
+    useActiveOrganization(authClient);
 
   const { data: organizations, isPending: organizationsPending } =
-    useListOrganizations(authClient)
+    useListOrganizations(authClient);
 
-  const { mutate: setActiveOrganization } = useSetActiveOrganization(authClient)
+  const { mutate: setActiveOrganization } =
+    useSetActiveOrganization(authClient);
 
   const isPending =
     sessionPending ||
-    (!!session && (organizationsPending || activeOrganizationPending))
+    (!!session && (organizationsPending || activeOrganizationPending));
 
-  const [createOpen, setCreateOpen] = useState(false)
-  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const otherOrganizations =
     organizations?.filter(
-      (organization) => organization.id !== activeOrganization?.id
-    ) ?? []
+      (organization) => organization.id !== activeOrganization?.id,
+    ) ?? [];
 
   const hasOtherEntries =
-    otherOrganizations.length > 0 || (!!activeOrganization && !hidePersonal)
+    otherOrganizations.length > 0 || (!!activeOrganization && !hidePersonal);
 
   function handleSetActive(organization: Organization | null) {
-    setDropdownOpen(false)
+    setDropdownOpen(false);
 
     if (setActive) {
-      setActive(organization)
+      setActive(organization);
     } else if (slug !== undefined) {
       navigate({
         to: organization
           ? `${basePaths.organization}/${slugPrefix}${organization.slug}/${organizationViewPaths.organization.settings}`
-          : `${basePaths.settings}/${viewPaths.settings.account}`
-      })
+          : `${basePaths.settings}/${viewPaths.settings.account}`,
+      });
     } else {
-      setActiveOrganization({ organizationId: organization?.id ?? null })
+      setActiveOrganization({ organizationId: organization?.id ?? null });
     }
   }
 
@@ -116,7 +117,7 @@ export function OrganizationSwitcher({
             className={cn(
               buttonVariants({ variant: "ghost" }),
               "h-auto px-2 py-2 text-left",
-              className
+              className,
             )}
             disabled={!session || isPending}
           >
@@ -142,7 +143,7 @@ export function OrganizationSwitcher({
           align={align}
           side={side}
           sideOffset={sideOffset}
-          className="min-w-64 max-w-svw"
+          className="max-w-svw min-w-64"
         >
           {activeOrganization ? (
             <div className="flex items-center justify-between gap-4 px-2 py-2">
@@ -160,7 +161,7 @@ export function OrganizationSwitcher({
                       : `${basePaths.organization}/${organizationViewPaths.organization.settings}`
                   }
                   className={cn(
-                    buttonVariants({ variant: "outline", size: "sm" })
+                    buttonVariants({ variant: "outline", size: "sm" }),
                   )}
                 >
                   <SettingsIcon className="text-muted-foreground" />
@@ -177,7 +178,7 @@ export function OrganizationSwitcher({
                 <Link
                   href={`${basePaths.settings}/${viewPaths.settings.account}`}
                   className={cn(
-                    buttonVariants({ variant: "outline", size: "sm" })
+                    buttonVariants({ variant: "outline", size: "sm" }),
                   )}
                 >
                   <SettingsIcon className="text-muted-foreground" />
@@ -215,8 +216,8 @@ export function OrganizationSwitcher({
 
               <DropdownMenuItem
                 onClick={() => {
-                  setDropdownOpen(false)
-                  setCreateOpen(true)
+                  setDropdownOpen(false);
+                  setCreateOpen(true);
                 }}
               >
                 <PlusCircle className="text-muted-foreground" />
@@ -233,5 +234,5 @@ export function OrganizationSwitcher({
         onOpenChange={setCreateOpen}
       />
     </>
-  )
+  );
 }

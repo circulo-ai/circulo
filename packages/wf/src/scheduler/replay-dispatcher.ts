@@ -1,13 +1,15 @@
+import { ReplayWorkflowRunner } from "../durable/replay-workflow-runner";
 import type {
   ReplayWorkflowDefinition,
   ReplayWorkflowRunnerOptions,
   ScheduleDispatch,
   ScheduleRecord,
 } from "../models";
-import { ReplayWorkflowRunner } from "../durable/replay-workflow-runner";
 
 export interface ReplayScheduleDefinitionResolver {
-  (workflowName: string): ReplayWorkflowDefinition<unknown, unknown> | undefined;
+  (
+    workflowName: string,
+  ): ReplayWorkflowDefinition<unknown, unknown> | undefined;
 }
 
 export interface ReplayScheduleDispatcherOptions {
@@ -24,12 +26,16 @@ export function createReplayScheduleDispatcher(
     const schedule = dispatch.schedule as ScheduleRecord<unknown>;
     const definition = options.resolve(schedule.workflowName);
     if (!definition) {
-      throw new Error(`No replay workflow is registered for schedule ${schedule.workflowName}`);
+      throw new Error(
+        `No replay workflow is registered for schedule ${schedule.workflowName}`,
+      );
     }
     const runnerOptions: ReplayWorkflowRunnerOptions = {
       workflowId: `${schedule.scheduleId}:${dispatch.scheduledFor}`,
       runId: options.runId ?? "scheduled",
-      ...(schedule.tenantId === undefined ? {} : { tenantId: schedule.tenantId }),
+      ...(schedule.tenantId === undefined
+        ? {}
+        : { tenantId: schedule.tenantId }),
     };
     await options.runner.start(definition, schedule.input, runnerOptions);
   };

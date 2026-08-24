@@ -20,7 +20,6 @@ import {
   CustomContextMenuContent,
   CustomContextMenuItem,
 } from "./context-menu";
-import { Ripple } from "./ripple";
 import { CustomSkeleton } from "./skeleton";
 
 interface CustomSidebarProps extends ComponentProps<typeof Sidebar> {}
@@ -142,7 +141,7 @@ export const CustomSidebarGroupAction = forwardRef<
     <SidebarGroupAction
       ref={ref}
       className={cn(
-        "top-auto bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-20 mt-auto size-11 overflow-visible rounded-full bg-teal-700 p-0 shadow-md shadow-black/20 transition-[background-color,transform] hover:bg-teal-600 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-teal-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar active:scale-95 group-data-[collapsible=icon]:flex data-[state=open]:bg-teal-600",
+        "top-auto bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-20 mt-auto size-11 overflow-visible rounded-full bg-teal-700 p-0 shadow-md shadow-black/20 transition-[background-color,transform] group-data-[collapsible=icon]:flex hover:bg-teal-600 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-teal-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar active:scale-95 data-[state=open]:bg-teal-600",
         className,
       )}
       style={{
@@ -210,9 +209,7 @@ export function CustomSidebarContextMenu({
           )}
         </CustomContextMenuItem>
         {onArchiveChange && (
-          <CustomContextMenuItem
-            onClick={() => onArchiveChange(!isArchived)}
-          >
+          <CustomContextMenuItem onClick={() => onArchiveChange(!isArchived)}>
             {isArchived ? <ArchiveRestore /> : <Archive />}
             {isArchived ? "Restore to chats" : "Archive"}
           </CustomContextMenuItem>

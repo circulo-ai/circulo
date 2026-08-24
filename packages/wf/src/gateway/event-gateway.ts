@@ -1,4 +1,4 @@
-import { generateId } from "../utils/id";
+import { ReplayWorkflowRunner } from "../durable/replay-workflow-runner";
 import type {
   IdempotencyStore,
   ReplayWorkflowRunnerOptions,
@@ -11,15 +11,23 @@ import type {
   WorkflowTriggerResult,
 } from "../models";
 import { IdempotencyConflictError, RateLimitExceededError } from "../models";
-import { ReplayWorkflowRunner } from "../durable/replay-workflow-runner";
-import { InMemoryIdempotencyStore } from "./idempotency-store";
 import { WorkflowReplayError } from "../replay/replay-cursor";
+import { generateId } from "../utils/id";
+import { InMemoryIdempotencyStore } from "./idempotency-store";
 
 export class WorkflowEventGateway {
-  private readonly triggers = new Map<string, WorkflowTrigger<unknown, unknown, unknown>[]>();
-  private readonly inFlight = new Map<string, Promise<import("../models").ReplayWorkflowResult<unknown>>>();
+  private readonly triggers = new Map<
+    string,
+    WorkflowTrigger<unknown, unknown, unknown>[]
+  >();
+  private readonly inFlight = new Map<
+    string,
+    Promise<import("../models").ReplayWorkflowResult<unknown>>
+  >();
   private readonly idempotency: IdempotencyStore;
-  private readonly rateLimiter: import("../limits/token-bucket-rate-limiter").TokenBucketRateLimiter | undefined;
+  private readonly rateLimiter:
+    | import("../limits/token-bucket-rate-limiter").TokenBucketRateLimiter
+    | undefined;
   private readonly duplicateWaitTimeoutMs: number;
   private readonly duplicatePollIntervalMs: number;
 
@@ -33,7 +41,9 @@ export class WorkflowEventGateway {
     this.duplicateWaitTimeoutMs = options.duplicateWaitTimeoutMs ?? 10_000;
     this.duplicatePollIntervalMs = options.duplicatePollIntervalMs ?? 25;
     if (this.duplicateWaitTimeoutMs < 0 || this.duplicatePollIntervalMs < 1) {
-      throw new RangeError("Duplicate wait timing must be non-negative with a positive poll interval");
+      throw new RangeError(
+        "Duplicate wait timing must be non-negative with a positive poll interval",
+      );
     }
   }
 
@@ -71,7 +81,8 @@ export class WorkflowEventGateway {
         const decision = await this.rateLimiter.take({
           key: `trigger:${trigger.id}:${event.tenantId ?? "_"}`,
         });
-        if (!decision.allowed) throw new RateLimitExceededError(decision.retryAfterMs);
+        if (!decision.allowed)
+          throw new RateLimitExceededError(decision.retryAfterMs);
       }
       const key = trigger.idempotencyKey
         ? `${trigger.id}:${event.tenantId ?? "_"}:${trigger.idempotencyKey(event)}`
@@ -101,22 +112,24 @@ export class WorkflowEventGateway {
       let result: Promise<import("../models").ReplayWorkflowResult<unknown>>;
       if (claim.claimed) {
         result = this.runner.start(
-            trigger.workflow,
-            trigger.input(event),
-            runnerOptions,
-          );
+          trigger.workflow,
+          trigger.input(event),
+          runnerOptions,
+        );
         this.inFlight.set(key, result);
         void result.then(
           () => this.inFlight.delete(key),
           () => this.inFlight.delete(key),
         );
       } else {
-        result = this.inFlight.get(key) ?? this.runExisting(
-          trigger.workflow,
-          reference.workflowId,
-          reference.runId,
-          runnerOptions,
-        );
+        result =
+          this.inFlight.get(key) ??
+          this.runExisting(
+            trigger.workflow,
+            reference.workflowId,
+            reference.runId,
+            runnerOptions,
+          );
       }
       results.push({ reference, result });
     }
@@ -199,10 +212,16 @@ async function verifyWebhook(
   if (!signature || !timestamp) throw new Error("Webhook signature is missing");
   const timestampMs = Number(timestamp);
   const maxAgeMs = options.maxAgeMs ?? 5 * 60 * 1000;
-  if (!Number.isFinite(timestampMs) || Math.abs(Date.now() - timestampMs) > maxAgeMs) {
+  if (
+    !Number.isFinite(timestampMs) ||
+    Math.abs(Date.now() - timestampMs) > maxAgeMs
+  ) {
     throw new Error("Webhook timestamp is outside the allowed window");
   }
-  const expected = await hmacHex(options.secret, `${timestamp}.${request.body}`);
+  const expected = await hmacHex(
+    options.secret,
+    `${timestamp}.${request.body}`,
+  );
   const normalized = signature.startsWith("sha256=")
     ? signature.slice("sha256=".length)
     : signature;
@@ -213,7 +232,8 @@ async function verifyWebhook(
 
 async function hmacHex(secret: string, value: string): Promise<string> {
   const cryptoApi = globalThis.crypto;
-  if (!cryptoApi?.subtle) throw new Error("Web Crypto API is required for webhook verification");
+  if (!cryptoApi?.subtle)
+    throw new Error("Web Crypto API is required for webhook verification");
   const key = await cryptoApi.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),

@@ -1,16 +1,16 @@
-"use client"
+"use client";
 
-import type { OrganizationAuthClient } from "@better-auth-ui/core/plugins/organization"
-import { useAuth, useSession } from "@better-auth-ui/react"
+import type { OrganizationAuthClient } from "@better-auth-ui/core/plugins/organization";
+import { useAuth, useSession } from "@better-auth-ui/react";
 import {
   useActiveOrganization,
-  useListOrganizationMembers
-} from "@better-auth-ui/react/plugins/organization"
-import { ApiKeys } from "./api-keys"
+  useListOrganizationMembers,
+} from "@better-auth-ui/react/plugins/organization";
+import { ApiKeys } from "./api-keys";
 
 export type OrganizationApiKeysProps = {
-  className?: string
-}
+  className?: string;
+};
 
 /**
  * {@link ApiKeys} scoped to the active organization.
@@ -21,19 +21,19 @@ export type OrganizationApiKeysProps = {
  * `apiKey` statements), so we gate on role directly.
  */
 export function OrganizationApiKeys({ className }: OrganizationApiKeysProps) {
-  const { authClient } = useAuth<OrganizationAuthClient>()
-  const { data: session } = useSession(authClient)
+  const { authClient } = useAuth<OrganizationAuthClient>();
+  const { data: session } = useSession(authClient);
 
   const { data: activeOrganization, isPending: activeOrganizationPending } =
-    useActiveOrganization(authClient)
-  const { data: membersData } = useListOrganizationMembers(authClient)
+    useActiveOrganization(authClient);
+  const { data: membersData } = useListOrganizationMembers(authClient);
 
   const canManageApiKeys = membersData?.members.some(
-    (member) => member.role === "owner" && member.userId === session?.user.id
-  )
+    (member) => member.role === "owner" && member.userId === session?.user.id,
+  );
 
   if (!canManageApiKeys) {
-    return null
+    return null;
   }
 
   return (
@@ -42,5 +42,5 @@ export function OrganizationApiKeys({ className }: OrganizationApiKeysProps) {
       organizationId={activeOrganization?.id}
       isPending={activeOrganizationPending}
     />
-  )
+  );
 }

@@ -1,13 +1,13 @@
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { env, isTruthy } from "@/lib/env";
 import { cn } from "@/lib/utils";
 import { AuthClientProvider } from "@/providers/auth-client-provider";
 import { PointerProvider } from "@/providers/pointer-provider";
 import { SWRProvider } from "@/providers/swr-provider";
 import { ThemeProvider } from "@/providers/theme-provider";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { AutumnProvider } from "autumn-js/react";
 import type { Metadata } from "next";
 import { Figtree } from "next/font/google";
-import { env } from "process";
 import { ReactNode } from "react";
 import { Toaster } from "sonner";
 import "./globals.css";
@@ -26,9 +26,23 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
+  const isBillingEnabled = isTruthy(env.NEXT_PUBLIC_BILLING_ENABLED);
+
+  const content = (
+    <SWRProvider>
+      <PointerProvider>
+        <TooltipProvider>
+          <AuthClientProvider>{children}</AuthClientProvider>
+        </TooltipProvider>
+        <Toaster />
+      </PointerProvider>
+    </SWRProvider>
+  );
+
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       suppressHydrationWarning
       className={cn(
         "scroll-smooth sm:snap-y sm:snap-mandatory",
@@ -38,19 +52,20 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     >
       <body className={cn("font-sans", "antialiased")}>
         <ThemeProvider>
-          <AutumnProvider
-            betterAuthUrl={env.NEXT_PUBLIC_BETTER_AUTH_URL}
-            includeCredentials={true}
-          >
-            <SWRProvider>
-              <PointerProvider>
-                <TooltipProvider>
-                  <AuthClientProvider>{children}</AuthClientProvider>
-                </TooltipProvider>
-                <Toaster />
-              </PointerProvider>
-            </SWRProvider>
-          </AutumnProvider>
+          {isBillingEnabled ? (
+            <AutumnProvider
+              backendUrl={
+                env.NEXT_PUBLIC_BETTER_AUTH_URL || "http://localhost:3002"
+              }
+              includeCredentials={true}
+              pathPrefix="/api/auth/autumn"
+              useBetterAuth
+            >
+              {content}
+            </AutumnProvider>
+          ) : (
+            content
+          )}
         </ThemeProvider>
       </body>
     </html>

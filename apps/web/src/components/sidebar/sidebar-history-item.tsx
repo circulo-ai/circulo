@@ -57,7 +57,10 @@ const PureChatItem = ({
       <ContextMenuTrigger asChild>
         <SidebarMenuItem>
           <SidebarMenuButton asChild isActive={isActive}>
-            <Link href={`/chat/${chat.id}`} onClick={() => setOpenMobile(false)}>
+            <Link
+              href={`/chat/${chat.id}`}
+              onClick={() => setOpenMobile(false)}
+            >
               <span>{chat.title}</span>
             </Link>
           </SidebarMenuButton>
@@ -105,7 +108,9 @@ const PureChatItem = ({
                         <GlobeIcon />
                         <span>Public</span>
                       </div>
-                      {visibilityType === "public" ? <CheckCircleFillIcon /> : null}
+                      {visibilityType === "public" ? (
+                        <CheckCircleFillIcon />
+                      ) : null}
                     </DropdownMenuItem>
                   </DropdownMenuSubContent>
                 </DropdownMenuPortal>

@@ -32,7 +32,9 @@ export class EventPublishingWorkflowHistoryStore implements WorkflowHistoryStore
     return result;
   }
 
-  read<TPayload = unknown>(options: HistoryReadOptions): Promise<WorkflowHistoryEvent<TPayload>[]> {
+  read<TPayload = unknown>(
+    options: HistoryReadOptions,
+  ): Promise<WorkflowHistoryEvent<TPayload>[]> {
     return this.store.read(options);
   }
 
@@ -44,7 +46,9 @@ export class EventPublishingWorkflowHistoryStore implements WorkflowHistoryStore
     return this.store.clear(workflowId, runId);
   }
 
-  private async publish(events: readonly WorkflowHistoryEvent[]): Promise<void> {
+  private async publish(
+    events: readonly WorkflowHistoryEvent[],
+  ): Promise<void> {
     for (const event of events) await this.bus.publish(event);
   }
 }

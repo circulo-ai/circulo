@@ -13,6 +13,7 @@ export type AgentProps = {
   maxTokens?: number | null;
   temperature?: number | null;
   isArchived?: boolean;
+  toolAccessMode?: "all" | "allowlist";
   defaultToolIds?: string[];
   defaultKnowledgeBaseIds?: string[];
   metadata?: Record<string, unknown>;

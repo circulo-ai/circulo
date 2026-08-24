@@ -29,7 +29,7 @@ export function SidebarHeader({
   return (
     <div className="sticky top-0 z-10 border-b border-border/50 bg-[#1A1A1A]">
       <SearchBar onNewChat={onNewChat} onDeleteAll={onDeleteAll} />
-      <div className="flex items-center gap-2 overflow-x-auto px-2 pt-2 whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex [scrollbar-width:none] items-center gap-2 overflow-x-auto px-2 pt-2 whitespace-nowrap [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         <TabButton label="Conversations" active />
       </div>
     </div>

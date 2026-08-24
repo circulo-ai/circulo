@@ -1,7 +1,7 @@
 "use client";
 
-import { cn } from "@/lib/utils";
 import { Slot } from "@/lib/slot";
+import { cn } from "@/lib/utils";
 import { AnimatePresence, motion, Transition } from "motion/react";
 import { ComponentProps, forwardRef, ReactNode } from "react";
 

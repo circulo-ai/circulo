@@ -1,37 +1,37 @@
-"use client"
+"use client";
 
-import { useAuth, useAuthPlugin } from "@better-auth-ui/react"
-import { Fingerprint, Pencil, X } from "lucide-react"
-import { useState } from "react"
+import { useAuth, useAuthPlugin } from "@better-auth-ui/react";
+import { Fingerprint, Pencil, X } from "lucide-react";
+import { useState } from "react";
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 import {
   Item,
   ItemActions,
   ItemContent,
   ItemDescription,
   ItemMedia,
-  ItemTitle
-} from "@/components/ui/item"
-import { passkeyPlugin } from "@/lib/auth/passkey-plugin"
+  ItemTitle,
+} from "@/components/ui/item";
+import { passkeyPlugin } from "@/lib/auth/passkey-plugin";
 
 import {
   DeletePasskeyDialog,
-  type ListedPasskey
-} from "./delete-passkey-dialog"
-import { RenamePasskeyDialog } from "./rename-passkey-dialog"
+  type ListedPasskey,
+} from "./delete-passkey-dialog";
+import { RenamePasskeyDialog } from "./rename-passkey-dialog";
 
 export type PasskeyProps = {
-  passkey: ListedPasskey
-}
+  passkey: ListedPasskey;
+};
 
 export function Passkey({ passkey }: PasskeyProps) {
-  const { localization } = useAuth()
-  const { localization: passkeyLocalization } = useAuthPlugin(passkeyPlugin)
-  const [deleteOpen, setDeleteOpen] = useState(false)
-  const [renameOpen, setRenameOpen] = useState(false)
+  const { localization } = useAuth();
+  const { localization: passkeyLocalization } = useAuthPlugin(passkeyPlugin);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
 
-  const passkeyName = passkey.name || passkeyLocalization.passkey
+  const passkeyName = passkey.name || passkeyLocalization.passkey;
 
   return (
     <Item>
@@ -43,7 +43,7 @@ export function Passkey({ passkey }: PasskeyProps) {
         <ItemDescription>
           {new Date(passkey.createdAt).toLocaleString(undefined, {
             dateStyle: "medium",
-            timeStyle: "short"
+            timeStyle: "short",
           })}
         </ItemDescription>
       </ItemContent>
@@ -58,7 +58,7 @@ export function Passkey({ passkey }: PasskeyProps) {
           onClick={() => setDeleteOpen(true)}
           aria-label={passkeyLocalization.deletePasskey.replace(
             "{{name}}",
-            passkeyName
+            passkeyName,
           )}
         >
           <X />
@@ -78,5 +78,5 @@ export function Passkey({ passkey }: PasskeyProps) {
         />
       </ItemActions>
     </Item>
-  )
+  );
 }
