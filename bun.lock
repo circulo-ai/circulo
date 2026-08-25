@@ -281,7 +281,7 @@
     },
     "packages/di": {
       "name": "@circulo-ai/di",
-      "version": "3.2.1",
+      "version": "3.3.0",
       "devDependencies": {
         "@types/bun": "^1.3.14",
         "@types/node": "^20.19.25",
@@ -299,7 +299,7 @@
     },
     "packages/file-parsers": {
       "name": "@circulo-ai/file-parsers",
-      "version": "0.1.3",
+      "version": "0.2.0",
       "dependencies": {
         "cheerio": "^1.1.2",
         "csv-parse": "^6.1.0",
@@ -344,7 +344,7 @@
     },
     "packages/upload": {
       "name": "@circulo-ai/upload",
-      "version": "1.5.3",
+      "version": "1.6.0",
       "dependencies": {
         "@vercel/blob": "^2.0.0",
       },
@@ -384,7 +384,7 @@
     },
     "packages/wf": {
       "name": "@circulo-ai/wf",
-      "version": "2.0.0",
+      "version": "2.1.0",
       "devDependencies": {
         "@types/node": "^20.0.0",
         "@types/react": "19.2.2",
@@ -395,9 +395,11 @@
       },
       "peerDependencies": {
         "react": ">=18.2.0",
+        "yaml": ">=2.0.0",
       },
       "optionalPeers": [
         "react",
+        "yaml",
       ],
     },
   },
