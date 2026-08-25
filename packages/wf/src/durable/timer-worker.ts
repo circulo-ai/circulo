@@ -21,6 +21,7 @@ export class TimerWorker {
       leaseDurationMs: options.leaseDurationMs,
       pollIntervalMs: options.pollIntervalMs,
       tenantId: options.tenantId,
+      onError: options.onError,
       handler: (task) => this.execute(task),
     });
   }

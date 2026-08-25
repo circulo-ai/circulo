@@ -21,6 +21,8 @@ stream access, and OpenTelemetry-compatible adapters.
 
 - [Install](#install)
 - [Mental model](#mental-model)
+- [Production reference architecture](#production-reference-architecture)
+- [Runtime states and terminal behavior](#runtime-states-and-terminal-behavior)
 - [First workflow](#first-workflow)
 - [Workflow definitions](#workflow-definitions)
 - [Step results](#step-results)
@@ -94,6 +96,68 @@ definition -> create -> pending -> running -> step transitions
 
 Use in-memory implementations for local development and tests. Use a durable
 store, event store, and pub/sub adapter for production workers.
+
+## Production reference architecture
+
+Keep workflow definitions in a shared module, but give each process one clear
+responsibility:
+
+```text
+HTTP/API process
+  └─ validate input -> createWorkflow() -> enqueue/run workflow
+
+Workflow workers
+  └─ claim workflow tasks -> execute steps -> persist CAS update -> ack
+
+Activity workers                 Timer/recovery workers
+  └─ execute side effects          └─ fire timers and reclaim expired leases
+
+Durable stores                    Observability
+  └─ workflow state, history,      └─ events, hooks, metrics, logs, traces
+      locks, queue, idempotency
+```
+
+The smallest local setup can use the in-memory engine. A production setup
+replaces every in-memory boundary that must survive a process restart:
+
+```typescript
+const engine = new WorkflowEngine({
+  workflowStore: durableWorkflowStore,
+  eventStore: durableEventStore,
+  eventBus: durableEventBus,
+  enableAutoResume: false, // a queue or scheduler owns resumption
+  lockTTL: 30_000,
+  lockRenewInterval: 10_000,
+});
+
+// The request returns a durable identifier. The process may exit immediately.
+const workflowId = await engine.createWorkflow(orderWorkflow, input);
+await workflowQueue.enqueue({ workflowId });
+console.log({ workflowId });
+// { workflowId: "wf_1710000000000_1_abc123" }
+```
+
+Behavior: `createWorkflow()` persists `pending` state before returning;
+`run()` is the execution request, not the persistence operation. Optimistic
+compare-and-set updates and expiring locks prevent two workers from committing
+the same step. A worker crash can therefore leave work available for recovery,
+but external side effects still need idempotency keys because delivery is
+at-least-once.
+
+### Runtime states and terminal behavior
+
+| State       | Meaning                                      | Can resume? | Terminal? |
+| ----------- | -------------------------------------------- | ----------- | --------- |
+| `pending`   | Persisted, not currently executing           | Yes         | No        |
+| `running`   | A worker owns the execution lease            | Yes         | No        |
+| `paused`    | Waiting for a timer or explicit pause        | Yes         | No        |
+| `completed` | All steps finished and output was persisted  | No          | Yes       |
+| `failed`    | A non-retryable or exhausted error persisted | No          | Yes       |
+
+`pause()` and `abort()` are durable control operations. Calling a control
+operation on an already-terminal workflow is a no-op. A thrown step error is
+classified as `unknown` unless the step classifier or an explicit `error()`
+result supplies a type.
 
 ## Platform comparison
 
@@ -227,6 +291,22 @@ declare function capturePayment(totalCents: number): Promise<void>;
 declare function createOrder(reservationId: string): Promise<string>;
 ```
 
+Example output after the run resolves:
+
+```text
+workflow.started { workflowId: "wf_...", version: 1 }
+workflow.step.completed { stepId: "...", data: { reservationId: "res_..." } }
+workflow.step.completed { stepId: "...", data: { orderId: "ord_...", status: "confirmed" } }
+workflow.completed { output: { orderId: "ord_...", status: "confirmed" } }
+completed
+{ orderId: "ord_...", status: "confirmed" }
+```
+
+The exact generated IDs and timestamps are intentionally variable. Event order
+is stable: a persisted event is published before the corresponding engine
+operation resolves. `subscribe()` only receives events published after the
+subscription; call `getEvents()` when a client also needs persisted history.
+
 `createWorkflow()` persists a pending workflow. Use `run()` separately when a
 queue or scheduler owns execution. Use `createAndRun()` for the convenience
 path:
@@ -331,6 +411,21 @@ import { waitFor, waitForAndRetry, waitUntil } from "@circulo-ai/wf";
 Wait values must be finite and non-negative. The workflow becomes `paused`,
 the lock is released, and `resumeAt` is persisted.
 
+For example, `waitForAndRetry(2_000, status)` emits a waiting event and leaves
+`currentStep` unchanged. After the timer is due, the same step runs again with
+the original workflow input. `waitFor(2_000, data)` advances to the next step
+after resumption; its optional `data` becomes that next step's input. The
+durable state looks like this while waiting:
+
+```json
+{
+  "state": "paused",
+  "currentStep": 1,
+  "resumeAt": 1710000002000,
+  "retryCount": 0
+}
+```
+
 ## Context and cancellation
 
 Each step receives a typed context:
@@ -423,6 +518,13 @@ const workflow = defineWorkflow<Context, Input>()
   .step("run", { run: async (input) => complete(await process(input)) })
   .build();
 ```
+
+With `retries: 2`, the initial attempt plus two retries are allowed. A
+retryable failure produces `workflow.retrying` and the step remains
+non-terminal; after the final failed attempt, the workflow persists
+`state: "failed"` with `error.retryable: false`. A timeout aborts the step's
+signal and persists `error.type: "timeout"`. Always pass `ctx.signal` to
+network, database, and SDK calls so cancellation can actually stop work.
 
 ## Waiting and polling
 
@@ -547,6 +649,41 @@ bounded concurrency and returns partial failures. `saga()` records reverse-order
 compensation activities and keeps compensation retryable. `sleep()` persists a
 timer task, and `waitForEvent()` persists an approval/event subscription.
 
+### Activity and timer workers
+
+Replay execution suspends when it schedules an activity, timer, or external
+event. Separate workers perform those tasks and call `onWorkflowReady` so the
+runner can replay the workflow:
+
+```typescript
+const activityWorker = new ActivityWorker({
+  id: "activity-worker-1",
+  queue: durableTaskQueue,
+  registry: activities,
+  history: durableHistory,
+  concurrency: 20,
+  onWorkflowReady: (workflowId, runId) => resumeReplay(workflowId, runId),
+});
+
+const timerWorker = new TimerWorker({
+  id: "timer-worker-1",
+  queue: durableTaskQueue,
+  history: durableHistory,
+  onWorkflowReady: (workflowId, runId) => resumeReplay(workflowId, runId),
+});
+
+await Promise.all([activityWorker.start(), timerWorker.start()]);
+console.log(activityWorker.status);
+// { state: "running", activeTasks: 0, completedTasks: 0, ... }
+```
+
+`ActivityWorker` records `activity.started`, `activity.completed`, and
+`activity.failed` history events. An activity is delivered at least once, so
+use an idempotency key derived from `activityId` for payments, emails, and
+other external effects. `TimerWorker` records `timer.fired`; it does not keep a
+Node timer alive for every workflow. Both workers must share the same durable
+queue and history store as the runner.
+
 ## Workers and recovery
 
 `Worker` is a pull worker over the `TaskQueueAdapter` contract. Claims are
@@ -557,6 +694,85 @@ and `TimerWorker` provide the durable activity/timer handlers used by replay
 workflows. Queue implementations for Redis, Postgres, SQS, or another broker
 should make claim, heartbeat, acknowledgement, reschedule, and rejection
 atomic.
+
+### Worker process example
+
+```typescript
+import { InMemoryTaskQueue, RecoveryWorker, Worker } from "@circulo-ai/wf";
+
+interface EmailTask {
+  to: string;
+  template: string;
+}
+
+const queue = new InMemoryTaskQueue(); // replace with a durable adapter
+const worker = new Worker<EmailTask>({
+  id: "email-worker-1",
+  role: "activity",
+  queues: ["email"],
+  queue,
+  concurrency: 10,
+  leaseDurationMs: 30_000,
+  heartbeatIntervalMs: 10_000,
+  maxAttempts: 5,
+  onError: (error, task) => {
+    logger.error("Worker infrastructure failure", error, {
+      taskId: task?.id,
+    });
+  },
+  handler: async (task, context) => {
+    try {
+      await sendEmail(task.payload, { signal: context.signal });
+      return { type: "acknowledge" };
+    } catch (cause) {
+      return {
+        type: "retry",
+        failure: {
+          message: cause instanceof Error ? cause.message : String(cause),
+          retryable: true,
+          timestamp: Date.now(),
+        },
+      };
+    }
+  },
+});
+
+const recovery = new RecoveryWorker({
+  id: "email-recovery-1",
+  queue,
+  intervalMs: 5_000,
+});
+
+await Promise.all([worker.start(), recovery.start()]);
+console.log(worker.status);
+// { state: "running", activeTasks: 0, completedTasks: 0, ... }
+
+const shutdown = async () => {
+  await worker.stop({ graceful: true, timeoutMs: 30_000 });
+  await recovery.stop();
+};
+process.once("SIGTERM", () => void shutdown());
+process.once("SIGINT", () => void shutdown());
+
+declare const logger: import("@circulo-ai/wf").Logger;
+declare function sendEmail(
+  task: EmailTask,
+  options: { signal: AbortSignal },
+): Promise<void>;
+```
+
+The worker validates that the heartbeat interval is shorter than the lease;
+this avoids a worker losing ownership before its first heartbeat. `maxAttempts`
+is an optional worker-level ceiling over a task's value. `onError` reports
+queue, lease, handler, and acknowledgement failures without allowing an error
+reporting integration to kill the polling loop. Delivery remains at-least-once:
+acknowledge only after the side effect is complete, and make the side effect
+idempotent with the task ID or a business idempotency key.
+
+When graceful shutdown exceeds its timeout, active task signals are aborted and
+the queue's lease is left for recovery. A normal stop reports
+`{ state: "stopped", activeTasks: 0 }`; a crashed worker is recovered by the
+next `RecoveryWorker` scan.
 
 ## Triggers, webhooks, queries, and scheduling
 
@@ -580,6 +796,115 @@ to a registered definition and derives a stable workflow/run identity from the
 schedule ID and occurrence timestamp. This makes scheduler retries converge
 on the same durable run.
 
+### Typed events and duplicate delivery
+
+```typescript
+const gateway = new WorkflowEventGateway(replayRunner, {
+  idempotency: durableIdempotencyStore,
+  idempotencyTtlMs: 24 * 60 * 60 * 1000,
+});
+
+const unregister = gateway.register({
+  id: "invoice-created-starts-reconciliation",
+  eventName: "invoice.created",
+  workflow: reconciliationWorkflow,
+  filter: (event) => event.payload.totalCents > 0,
+  input: (event) => ({ invoiceId: event.payload.invoiceId }),
+  idempotencyKey: (event) => event.payload.invoiceId,
+});
+
+const [trigger] = await gateway.dispatch({
+  eventId: "evt_123",
+  eventName: "invoice.created",
+  tenantId: "tenant_acme",
+  timestamp: Date.now(),
+  payload: { invoiceId: "inv_123", totalCents: 4999 },
+});
+
+console.log(trigger?.reference);
+// { workflowId: "workflow_...", runId: "run_...", tenantId: "tenant_acme" }
+console.log(await trigger?.result);
+// { workflowId: "workflow_...", runId: "run_...", status: "completed", output: ... }
+
+// Dispatching the same event again returns the same durable reference.
+unregister();
+
+interface InvoiceCreated {
+  invoiceId: string;
+  totalCents: number;
+}
+```
+
+The gateway filters before claiming idempotency. A duplicate with the same
+fingerprint coalesces to the existing run; reusing the same idempotency key
+with a different payload throws `IdempotencyConflictError`. A distributed
+`IdempotencyStore` must make `claim()` atomic. The in-memory store is only a
+single-process reference implementation.
+
+### Signed webhook input
+
+```typescript
+const body = JSON.stringify({ invoiceId: "inv_123", totalCents: 4999 });
+const timestamp = String(Date.now());
+const signature = createHmac("sha256", process.env.WF_WEBHOOK_SECRET!)
+  .update(`${timestamp}.${body}`)
+  .digest("hex");
+
+const results = await gateway.handleWebhook<InvoiceCreated>(
+  "invoice.created",
+  {
+    body,
+    headers: {
+      "x-event-id": "evt_123",
+      "x-wf-timestamp": timestamp,
+      "x-wf-signature": `sha256=${signature}`,
+    },
+  },
+  { secret: process.env.WF_WEBHOOK_SECRET! },
+);
+```
+
+The signature covers the exact timestamp and raw request body. Verification
+rejects missing headers, invalid HMAC values, and timestamps outside the
+five-minute default replay window. `crypto.createHmac` above is Node's
+`node:crypto` API; use Web Crypto or your framework's equivalent in other
+runtimes.
+
+### Cron scheduling
+
+```typescript
+const schedules = new InMemoryScheduleStore<{ tenantId: string }>();
+await schedules.upsert({
+  scheduleId: "nightly-reconciliation",
+  cron: "0 2 * * *", // 02:00 UTC every day
+  workflowName: "reconciliation",
+  tenantId: "tenant_acme",
+  input: { tenantId: "tenant_acme" },
+});
+
+const scheduler = createScheduleWorker(schedules, {
+  workerId: "scheduler-1",
+  onDispatch: async ({ schedule, scheduledFor }) => {
+    await dispatchWorkflow(schedule.workflowName, schedule.input, scheduledFor);
+  },
+  onError: (error) => alertOnCall(error),
+});
+scheduler.start();
+```
+
+The scheduler leases due records before dispatching. Successful dispatch
+advances `nextRunAt`; a failed dispatch releases the lease so another poll can
+retry it. `ScheduleWorker` generates a stable-enough process-local worker ID
+when `workerId` is omitted, but production deployments should provide a host
+or instance identity for diagnostics.
+
+```typescript
+console.log(
+  nextCronOccurrence("0 2 * * *", Date.parse("2025-01-01T00:00:00Z")),
+);
+// 2025-01-01T02:00:00.000Z as a timestamp
+```
+
 ## Limits, tenancy, and observability
 
 Use `TokenBucketRateLimiter` with a distributed `TokenBucketStore` for atomic
@@ -598,6 +923,53 @@ React entry point. The remote hooks are `useRemoteWorkflow`,
 `useRemoteWorkflowEvents`, and `useWorkflowControls`; the existing local
 engine hooks remain available.
 
+```tsx
+// Server/client setup; the token provider should return a short-lived token.
+const client = new SecureWorkflowClient(
+  new WorkflowHttpAdapter({ baseUrl: "https://api.example.com/wf" }),
+  () => getWorkflowToken(),
+);
+
+export function WorkflowPage({ workflowId }: { workflowId: string }) {
+  return (
+    <WorkflowClientProvider client={client}>
+      <RemoteStatus workflowId={workflowId} />
+    </WorkflowClientProvider>
+  );
+}
+
+function RemoteStatus({ workflowId }: { workflowId: string }) {
+  const { workflow, isLoading, error } = useRemoteWorkflow(workflowId);
+  const { events } = useRemoteWorkflowEvents(workflowId, {
+    maxEvents: 50,
+    eventTypes: ["workflow.completed", "workflow.failed"],
+  });
+  const { pause, resume, abort } = useWorkflowControls(workflowId);
+
+  if (isLoading) return <p>Loading…</p>;
+  if (error) return <p role="alert">{error.message}</p>;
+  if (!workflow) return <p>Workflow not found.</p>;
+  return (
+    <section>
+      <strong>{workflow.status}</strong>
+      <button onClick={() => void pause()}>Pause</button>
+      <button onClick={() => void resume()}>Resume</button>
+      <button onClick={() => void abort("Cancelled by operator")}>Abort</button>
+      <p>{events.length} terminal events received</p>
+    </section>
+  );
+}
+
+declare function getWorkflowToken(): Promise<string>;
+```
+
+Behavior: the query is loaded once, then the SSE stream refreshes the current
+projection when events arrive. Event history is bounded by `maxEvents`. The
+hooks abort their stream on unmount, convert unknown thrown values to `Error`,
+and expose loading/error/empty states so components do not need to manage
+transport cleanup manually. `useWorkflowControls` rejects when the configured
+remote client does not implement control operations.
+
 Replay histories can be streamed too: wrap a durable history store with
 `EventPublishingWorkflowHistoryStore`, publish through a durable
 `WorkflowHistoryEventBus`, and expose it through
@@ -608,6 +980,73 @@ OpenTelemetry remains an optional peer integration: inject the SDK's meter,
 tracer, and log bridge into `OpenTelemetryMetricsAdapter`,
 `OpenTelemetryTracerAdapter`, and `OpenTelemetryLoggerAdapter`. No specific
 OpenTelemetry package is forced on applications.
+
+### Rate limits and tenant admission
+
+```typescript
+const limiter = new TokenBucketRateLimiter(
+  new InMemoryTokenBucketStore(), // replace with an atomic Redis/SQL adapter
+  { capacity: 100, refillPerSecond: 10, keyPrefix: "checkout:" },
+);
+
+const decision = await limiter.take({ key: "tenant_acme", cost: 1 });
+if (!decision.allowed) {
+  throw new RateLimitExceededError(decision.retryAfterMs);
+}
+
+const tenantGate = new TenantConcurrencyGate(
+  new InMemoryTenantConcurrencyStore(),
+);
+const lease = await tenantGate.acquire("tenant_acme", 25, {
+  expiresAt: Date.now() + 30_000,
+});
+if (!lease) throw new Error("Tenant concurrency limit reached");
+try {
+  await runTenantWork();
+} finally {
+  await tenantGate.release(lease);
+}
+```
+
+The first request consumes one token and reports the remaining capacity. A
+denied request is deterministic for the configured store and includes
+`retryAfterMs`. Tenant leases must be renewed by long-running work and always
+released in `finally`; distributed implementations must make acquire, renew,
+release, and expiration atomic. Use `InMemoryTenantPolicyStore` for local
+policy tests, not as a cross-process coordination service.
+
+### OpenTelemetry and hooks
+
+```typescript
+const hooks = new WorkflowHookManager({
+  onError: (error, context) =>
+    logger.error("Workflow integration failed", error as Error, {
+      hook: context.name,
+    }),
+});
+
+hooks.on("workflow.failed", ({ workflow, error }) => {
+  metrics.incrementCounter("workflow.alert", {
+    workflowId: workflow?.id ?? "unknown",
+  });
+  return alertOnCall(error);
+});
+
+const engine = new WorkflowEngine({
+  workflowStore,
+  eventStore,
+  eventBus,
+  hooks,
+  metrics: new OpenTelemetryMetricsAdapter(otelMeter),
+  logger: new OpenTelemetryLoggerAdapter(otelLogger),
+});
+```
+
+Hook handlers run in priority order and are awaited. By default, one handler
+failure is reported through `onError` and does not prevent other handlers or
+workflow execution. Set `failFast: true` only when the hook is deliberately
+part of the transaction. Metric and log adapters are structural bridges, so
+the application owns the OpenTelemetry SDK lifecycle.
 
 ## Dynamic plans and compensation
 
@@ -979,6 +1418,27 @@ projections, or hosted KV and pub/sub services. The package exports
 `MapJsonKeyValueStore`, `MapWorkflowLockStore`, and `MapPubSubAdapter` for
 local adapter tests.
 
+Restart behavior is explicit:
+
+```typescript
+// Process A
+await engine.createAndRun(checkout, input);
+// The workflow snapshot contains context/input/output/state, but not functions.
+
+// Process B
+const restored = await workflowStore.loadWorkflow(workflowId);
+console.log(restored?.state, restored?.currentStep);
+// "paused" 1
+// stepsFactory() has rebuilt the executable steps before the next run.
+await engine.run(workflowId);
+```
+
+The `stepsFactory` must return the same ordered step IDs/names for a compatible
+workflow version. Do not persist closures, secrets, database clients, or
+request objects in context, input, output, metadata, or events. If a workflow
+definition changes incompatibly, publish a new definition version and keep the
+old definition available until existing runs are drained.
+
 ### Custom workflow store
 
 Implement the full `WorkflowStore` contract when your persistence layer is not
@@ -1183,12 +1643,19 @@ The repository covers these scenarios in `test/workflow.test.ts` and
 | `Worker` / `RecoveryWorker`                                                  | Leased at-least-once task processing and expired-lease recovery.         |
 | `ActivityWorker` / `TimerWorker`                                             | Durable activity and timer task handlers.                                |
 | `WorkflowEventGateway` / `WorkflowQueryService`                              | Event/webhook triggers and current-state projections.                    |
-| `ScheduleWorker` / `nextCronOccurrence`                                      | Leased production scheduler and UTC cron calculation.                    |
+| `ScheduleWorker` / `createScheduleWorker` / `nextCronOccurrence`             | Leased production scheduler and UTC cron calculation.                    |
 | `TokenBucketRateLimiter` / `TenantConcurrencyGate`                           | Rate limits and per-tenant admission.                                    |
 | `WorkflowAccessTokenSigner` / `SecureWorkflowStreamGateway`                  | Scoped secure stream access.                                             |
 | `EventPublishingWorkflowHistoryStore` / `SecureWorkflowHistoryStreamGateway` | Secure replay-history streaming.                                         |
 | `SecureWorkflowClient` / `WorkflowHttpAdapter`                               | Bearer-token query and SSE client adapters.                              |
 | `OpenTelemetry*Adapter`                                                      | Optional structural OpenTelemetry metrics, traces, and logs.             |
+
+The optional `@circulo-ai/wf/react` entry point additionally exports
+`useWorkflow`, `useWorkflowEvents`, `useWorkflowHook`,
+`WorkflowClientProvider`, `useWorkflowClient`, `useRemoteWorkflow`,
+`useRemoteWorkflowEvents`, `useWorkflowControls`, and `WorkflowGatewayClient`.
+It has a separate React peer dependency and is not imported by the core entry
+point.
 
 Workflow states are `pending`, `running`, `paused`, `failed`, and `completed`.
 Error types are `transient`, `permanent`, `timeout`, `validation`, and
@@ -1201,6 +1668,7 @@ src/
 ├── index.ts                 # Core public exports
 ├── react.ts                 # Optional React exports
 ├── dsl/                     # Typed builder and result helpers
+├── definitions/             # Class, registry, JSON/YAML, and replay compilers
 ├── engine/                  # Scheduling and durable execution
 ├── hooks/                   # Hook registry and dispatch
 ├── models/                  # Public contracts and unions
@@ -1210,8 +1678,817 @@ src/
 
 test/
 ├── workflow.test.ts         # DSL, engine, hooks, and adapters
+├── definitions.test.ts      # Class, registry, declarative, saga, replay APIs
 └── edge-cases.test.ts       # Failure, lifecycle, store, and integration edges
 ```
+
+## Class, declarative, and saga definitions
+
+The compatibility baseline remains `defineWorkflow()`. The definitions API is
+additive and is also available from `@circulo-ai/wf/definitions`. Class
+workflows use constructor tokens, so generic types remain useful to developers
+without relying on erased runtime type information.
+
+### Class steps and dependency injection
+
+```ts
+import {
+  compileClassWorkflow,
+  InMemoryWorkflowStepRegistry,
+  WorkflowErrorHandling,
+  type IWorkflow,
+  type IWorkflowBuilder,
+  type IWorkflowStep,
+  type WorkflowStepContext,
+} from "@circulo-ai/wf/definitions";
+
+interface Data { customerId?: string }
+
+class CreateCustomer implements IWorkflowStep<Data, string> {
+  constructor(private readonly customers: CustomerService) {}
+
+  execute(context: WorkflowStepContext<Data>) {
+    return this.customers.create(String(context.input));
+  }
+}
+
+class MyWorkflow implements IWorkflow<Data> {
+  readonly id = "customer-sync";
+  readonly version = 1;
+
+  build(builder: IWorkflowBuilder<Data>) {
+    builder
+      .context({})
+      .startWith(CreateCustomer)
+      .then(PushToSalesforce)
+      .onError(WorkflowErrorHandling.Retry, {
+        delayMs: 600_000,
+        maxAttempts: 3,
+      })
+      .then(PushToERP);
+  }
+}
+
+const registry = new InMemoryWorkflowStepRegistry();
+registry.register(CreateCustomer, ({ workflowId }) =>
+  new CreateCustomer(container.customerService(workflowId)),
+  "MyApp.CreateCustomer",
+);
+registry.register(PushToSalesforce, () => new PushToSalesforce(salesforce), "MyApp.PushToSalesforce");
+registry.register(PushToERP, () => new PushToERP(erp), "MyApp.PushToERP");
+
+const definition = compileClassWorkflow(new MyWorkflow(), { registry });
+const workflowId = await engine.createAndRun(definition, "customer-42");
+```
+
+Factories are called for every execution/attempt and may resolve request-scoped
+or application-scoped dependencies. The registry is an explicit allowlist:
+`MyApp.CreateCustomer` is a key, not a module name. An unknown key throws while
+the definition is compiled or loaded, before `WorkflowEngine.createWorkflow()`
+can persist it. A factory that returns no `execute()` method is rejected.
+
+`WorkflowStepContext` provides `input`, `data`, `signal`, `logger`, `metrics`,
+`updateContext()`, and `abort()`. Returning `42` is equivalent to
+`{ type: "complete", data: 42 }`; returning `StepResult` preserves `wait`,
+`error`, and other runtime behavior. A fresh factory instance means step
+instances should not be used as durable state.
+
+`builder.build({ registry })` is also available when constructing a
+`ClassWorkflowBuilder` directly. `compileClassWorkflow()` is the convenient
+entry point for an `IWorkflow` class and produces the same
+`WorkflowDefinition` consumed by `WorkflowEngine`.
+
+### JSON and YAML
+
+JSON is built in and uses the same registry boundary:
+
+```ts
+import { loadWorkflowDefinition } from "@circulo-ai/wf/definitions";
+
+const definition = loadWorkflowDefinition(jsonDocument, {
+  format: "json",
+  registry,
+  initialContext: {},
+});
+```
+
+The supported JSON shape is:
+
+```json
+{
+  "id": "HelloWorld",
+  "version": 1,
+  "steps": [
+    { "id": "Hello", "stepType": "MyApp.HelloWorld", "nextStepId": "Bye" },
+    { "id": "Bye", "stepType": "MyApp.GoodbyeWorld" }
+  ]
+}
+```
+
+`nextStepId` is intentionally linear in this release. Loading validates
+duplicate IDs, missing targets, cycles, multiple predecessors, multiple start
+points, and unreachable steps. The compiled step order follows the validated
+chain, even when the document’s array is not ordered. Retry policies translate
+`maxAttempts: 3` to two retries and `delayMs: 1000` to a one-second retry
+backoff. `timeoutMs` maps to the existing step timeout.
+
+YAML is optional and is not imported by the core entry point. Install it in the
+application (`npm install yaml`) and inject its parser:
+
+```ts
+import { parse } from "yaml";
+import { loadWorkflowDefinition } from "@circulo-ai/wf/definitions";
+
+const definition = loadWorkflowDefinition(yamlDocument, {
+  format: "yaml",
+  parser: { parse },
+  registry,
+  initialContext: {},
+});
+```
+
+Without `parser`, YAML loading fails with an installation message instead of a
+late runtime import failure. This keeps JSON-only consumers free of YAML
+runtime loading. Never accept arbitrary `StepType` values from untrusted input
+without constructing a deliberately scoped registry.
+
+### Classic engine sagas
+
+Class workflows support reverse-order compensation as a composite engine step:
+
+```ts
+builder
+  .startWith(LogStart)
+  .saga((saga) =>
+    saga
+      .startWith(Task1).compensateWith(UndoTask1)
+      .then(Task2).compensateWith(UndoTask2)
+      .then(Task3).compensateWith(UndoTask3),
+  )
+  .onError(WorkflowErrorHandling.Retry, { delayMs: 600_000, maxAttempts: 3 })
+  .then(LogEnd);
+```
+
+Compensation is registered only after its forward step returns successfully.
+If Task3 fails, the observable order is `UndoTask2`, then `UndoTask1`; Task3
+has no completed compensation. Compensation failures are logged and reported,
+then the original forward failure remains the workflow failure. This gives
+business code a chance to alert or reconcile without masking the cause.
+
+`WorkflowErrorHandling.Fail` disables retries. `Retry` uses structured options,
+not .NET `TimeSpan`; `maxAttempts` includes the initial attempt. Existing
+function DSL workflows and their compensation behavior are unchanged.
+
+### Durable replay sagas
+
+Replay workflows use stable registry keys as versioned activity names:
+
+```ts
+import { compileClassReplayWorkflow } from "@circulo-ai/wf/definitions";
+
+const replayDefinition = compileClassReplayWorkflow(new MyWorkflow(), {
+  registry,
+  queue: "workflow-activities",
+});
+
+const result = await new ReplayWorkflowRunner(history, taskQueue).start(
+  replayDefinition,
+  "customer-42",
+);
+// First call: { status: "waiting" } after activity scheduling.
+// After workers complete activities: { status: "completed", output: ... }.
+```
+
+Class steps become activities at `definition.version`, and saga compensation
+activities are recorded through the existing `ReplayWorkflowContext.saga()`
+mechanism. `ActivityWorker` and `TimerWorker` remain the execution backend.
+Activity delivery is at-least-once: every external side effect must use a
+business idempotency key, and activity versions must remain registered while
+old workflow histories can replay. Removing a registered version produces a
+missing-activity error; changing behavior under the same name/version can
+produce a replay mismatch, so publish a new workflow/activity version instead.
+
+### Outputs, failures, and adapters
+
+For a successful class workflow, the engine emits the normal step/completed
+events and `getWorkflow(id).output` contains the final step value. A retrying
+step emits `workflow.retrying` with the configured delay, and an exhausted
+retry emits `workflow.failed` with the original classified error. A classic
+saga emits the same workflow failure event after compensation attempts.
+
+In-memory stores, registries, queues, and metrics are development/test
+adapters. Production deployments must provide durable `WorkflowStore`,
+`EventStore`, `EventBus`, history, queue, lock, and idempotency adapters with
+CAS/version checks, leases, retry-safe serialization, observability, and
+shutdown handling. The class/declarative layer only compiles definitions; it
+does not turn in-memory adapters into durable infrastructure.
+
+### Migration from `defineWorkflow()`
+
+Keep existing function workflows unchanged:
+
+```ts
+const definition = defineWorkflow<Data, string>()
+  .context({})
+  .step("create", { run: async (input) => complete(await create(input)) })
+  .build();
+```
+
+Move to classes when constructors and explicit factories improve dependency
+injection or when definitions need to be shared as JSON/YAML. First register
+the old side effects as class steps, compile with the same engine, and keep the
+workflow name/version stable only when replay semantics are compatible. Use a
+new version for changed step behavior; retain old registry keys for histories
+that still need replay.
+
+## Migrating from other workflow and job systems
+
+This section is for teams already running Inngest, Temporal, Cloudflare
+Workflows, Trigger.dev, or BullMQ. The migration goal is to move business
+behavior without changing retry counts, idempotency, ordering, timeouts, or the
+meaning of an in-flight execution.
+
+`@circulo-ai/wf` is a runtime and adapter boundary, not a hosted control plane.
+The engine persists state through `WorkflowStore`, events through `EventStore`,
+and work through queue/history adapters. In-memory implementations are for
+development and tests; production migrations need durable implementations before
+traffic is cut over.
+
+### Choose the equivalent wf model first
+
+| Existing concept | wf equivalent | Migration decision |
+| --- | --- | --- |
+| Function, task, workflow, or job | `WorkflowDefinition` or `IWorkflow` compiled with `compileClassWorkflow()` | Use one definition for the durable business transaction. |
+| Step, activity, or job processor | `IWorkflowStep.execute()` | Keep network/database side effects inside the step. |
+| Dependency container or worker registration | `WorkflowStepRegistryPort` | Register stable keys explicitly; never dynamically import user-provided `StepType` values. |
+| Retry count and backoff | `.onError(Retry, { maxAttempts, delayMs })` or serialized `retry` | `maxAttempts` includes the first attempt. Convert settings described as “retries” carefully. |
+| Durable checkpoint | `WorkflowStore` state/events, or replay activities through `ReplayWorkflowRunner` | Use replay compilation when execution must be activity/history based. |
+| Sleep, delay, cron, or approval | `waitUntil`, `waitFor`, scheduler adapters, or replay `sleep`/`waitForEvent` | Never replace a durable wait with `setTimeout`. |
+| Worker | `Worker`, `ActivityWorker`, or `TimerWorker` | Preserve leases, heartbeats, cancellation, and at-least-once handling. |
+| Rollback or failure handler | `.saga()` and `.compensateWith()` | Compensation is business logic, not an automatic database transaction. |
+| Workflow/job identifier | `id`, `version`, instance ID, and business idempotency key | Keep old IDs in metadata while systems coexist. |
+
+The first declarative JSON/YAML release accepts a validated linear chain. Class
+workflows can compose class sagas, but arbitrary branching graphs are not
+accepted by `NextStepId` documents yet.
+
+### Migration contract: attempts, state, and side effects
+
+Before changing code:
+
+1. Record whether the old number means total attempts or retries after the
+   first attempt. Trigger.dev `maxAttempts: 10` means ten total attempts; a
+   legacy setting described as “three retries” means four total attempts.
+2. Record fixed, exponential, linear, jittered, or custom delays. `delayMs` is
+   fixed; preserve richer behavior in a custom backoff or adapter.
+3. Give every external write a deterministic idempotency key. A successful
+   request followed by a lost response must be safe to repeat.
+4. Decide whether in-flight executions drain in the old system, are imported,
+   or are intentionally terminated and compensated. Do not replay old events
+   with new step meanings.
+5. Start with a shadow/canary run and compare outputs, side-effect keys,
+   failure classifications, attempts, and completion latency.
+
+The safe target shape is:
+
+```diff
+- one large callback that performs five side effects
++ five named steps with stable registry keys
++ durable input/output boundaries between steps
++ a business idempotency key for every external write
++ a retained version for old executions
+```
+
+### Common migration skeleton
+
+```ts
+import {
+  compileClassWorkflow,
+  InMemoryWorkflowStepRegistry,
+  WorkflowErrorHandling,
+  type IWorkflow,
+  type IWorkflowBuilder,
+  type IWorkflowStep,
+  type WorkflowStepContext,
+} from "@circulo-ai/wf";
+
+interface OrderInput { orderId: string; idempotencyKey: string }
+interface OrderData { orderId: string; paymentId?: string }
+
+class ReserveInventory implements IWorkflowStep<OrderData, OrderData> {
+  constructor(private readonly inventory: InventoryClient) {}
+  async execute(ctx: WorkflowStepContext<OrderData>) {
+    const input = ctx.input as OrderInput | OrderData;
+    await this.inventory.reserve(input.orderId, {
+      idempotencyKey: `reserve:${input.orderId}`,
+    });
+    return { ...ctx.data, orderId: input.orderId };
+  }
+}
+
+class CapturePayment implements IWorkflowStep<OrderData, OrderData> {
+  constructor(private readonly payments: PaymentClient) {}
+  async execute(ctx: WorkflowStepContext<OrderData>) {
+    const payment = await this.payments.capture(ctx.data.orderId, {
+      idempotencyKey: `capture:${ctx.data.orderId}`,
+    });
+    return { ...ctx.data, paymentId: payment.id };
+  }
+}
+
+class FulfillOrder implements IWorkflowStep<OrderData, OrderData> {
+  constructor(private readonly orders: OrderClient) {}
+  async execute(ctx: WorkflowStepContext<OrderData>) {
+    await this.orders.fulfill(ctx.data.orderId, {
+      idempotencyKey: `fulfill:${ctx.data.orderId}`,
+    });
+    return ctx.data;
+  }
+}
+
+class OrderWorkflow implements IWorkflow<OrderData> {
+  readonly id = "order-fulfillment";
+  readonly version = 1;
+  build(builder: IWorkflowBuilder<OrderData>) {
+    builder
+      .context({ orderId: "" })
+      .startWith(ReserveInventory)
+      .then(CapturePayment)
+      .onError(WorkflowErrorHandling.Retry, { maxAttempts: 3, delayMs: 5_000 })
+      .then(FulfillOrder);
+  }
+}
+
+const registry = new InMemoryWorkflowStepRegistry();
+registry.register(ReserveInventory, () => new ReserveInventory(inventory), "order.reserve");
+registry.register(CapturePayment, () => new CapturePayment(payments), "order.capture");
+registry.register(FulfillOrder, () => new FulfillOrder(orders), "order.fulfill");
+
+const definition = compileClassWorkflow(new OrderWorkflow(), { registry });
+const workflowId = await engine.createAndRun(definition, {
+  orderId: "order-123",
+  idempotencyKey: "checkout:order-123:v1",
+});
+```
+
+The result is a persisted reserve completion, a retriable capture step, and a
+fulfillment step. If the process stops after a provider accepts a request but
+before wf stores the result, the provider sees the same idempotency key on the
+retry.
+
+## Inngest to `@circulo-ai/wf`
+
+Inngest functions are triggered by events, schedules, or webhooks. Each
+`step.run()` is independently checkpointed and retried, so model the function
+as the workflow, each step as a class, the event payload as wf input, and the
+Inngest function ID as `id`.
+
+#### Before: Inngest
+
+```ts
+export const syncOrder = inngest.createFunction(
+  { id: "sync-order", triggers: [{ event: "shop/order.created" }] },
+  async ({ event, step }) => {
+    const order = await step.run("load-order", () =>
+      db.orders.get(event.data.orderId),
+    );
+    const customer = await step.run("load-customer", () =>
+      crm.customers.find(order.customerId),
+    );
+    await step.run("send-confirmation", () =>
+      mail.send(customer.email, order.id),
+    );
+    return { orderId: order.id };
+  },
+);
+```
+
+#### After: explicit class steps and trigger adapter
+
+```diff
+- export const syncOrder = inngest.createFunction(...);
++ class LoadOrder implements IWorkflowStep<OrderData, OrderData> {
++   constructor(private readonly db: Database) {}
++   execute(ctx: WorkflowStepContext<OrderData>) {
++     return this.db.orders.get(ctx.input.orderId);
++   }
++ }
++ class LoadCustomer implements IWorkflowStep<OrderData, OrderData> {
++   constructor(private readonly crm: CrmClient) {}
++   async execute(ctx: WorkflowStepContext<OrderData>) {
++     return { ...ctx.input, customer: await this.crm.find(ctx.input.customerId) };
++   }
++ }
++ class SendConfirmation implements IWorkflowStep<OrderData, OrderData> {
++   constructor(private readonly mail: MailClient) {}
++   async execute(ctx: WorkflowStepContext<OrderData>) {
++     await this.mail.send(ctx.input.customer.email, ctx.input.orderId, {
++       idempotencyKey: `confirmation:${ctx.input.orderId}`,
++     });
++     return ctx.input;
++   }
++ }
++ class SyncOrder implements IWorkflow<OrderData> {
++   id = "sync-order";
++   version = 1;
++   build(builder: IWorkflowBuilder<OrderData>) {
++     builder.startWith(LoadOrder).then(LoadCustomer).then(SendConfirmation);
++   }
++ }
++ // The old Inngest event becomes an HTTP/event adapter.
++ await engine.createAndRun(
++   compileClassWorkflow(new SyncOrder(), { registry }),
++   event.data,
++ );
+```
+
+Step-by-step:
+
+1. Keep the Inngest event name and payload as the external contract.
+2. Move each `step.run()` callback into one class and keep its old stable
+   name as the registry key, such as `sync-order.load-order`.
+3. Move clients from module globals into registry factories so tests, tenants,
+   credentials, and request-scoped dependencies are explicit.
+4. Convert Inngest retry settings per step and preserve the old idempotency
+   behavior. A failed step must not rerun successful predecessors.
+5. Route the event to wf only after canary comparison. During dual delivery,
+   deduplicate on the Inngest event ID/business key.
+
+Do not call `step.run()` inside a wf step. The two systems would both own retry
+and checkpoint decisions.
+
+## Temporal to `@circulo-ai/wf`
+
+Temporal separates deterministic Workflow code from Activities executed by
+workers. The closest wf mapping is the durable replay compiler: class steps
+become versioned activities, `ActivityWorker` executes them, and
+`ReplayWorkflowRunner` consumes history. `compileClassWorkflow()` is the
+classic engine path and is not a drop-in replacement for Temporal’s
+deterministic Workflow sandbox.
+
+#### Before: Temporal TypeScript
+
+```ts
+import { proxyActivities } from "@temporalio/workflow";
+import type * as activities from "../activities/order";
+
+const { reserve, capture, fulfill } = proxyActivities<typeof activities>({
+  startToCloseTimeout: "5 minutes",
+  retry: { maximumAttempts: 3 },
+});
+
+export async function orderWorkflow(orderId: string) {
+  await reserve(orderId);
+  const payment = await capture(orderId);
+  await fulfill(orderId, payment.id);
+  return { orderId, paymentId: payment.id };
+}
+```
+
+#### After: replay-safe wf activities
+
+```diff
+- const { reserve, capture, fulfill } = proxyActivities<typeof activities>({ ... });
+- export async function orderWorkflow(orderId: string) {
+-   await reserve(orderId);
+-   const payment = await capture(orderId);
+-   await fulfill(orderId, payment.id);
+- }
++ class CapturePayment implements IWorkflowStep<OrderData, OrderData> {
++   constructor(private readonly payments: PaymentClient) {}
++   execute(ctx: WorkflowStepContext<OrderData>) {
++     return this.payments.capture(ctx.input.orderId, {
++       idempotencyKey: `capture:${ctx.input.orderId}`,
++     }).then((payment) => ({ ...ctx.input, paymentId: payment.id }));
++   }
++ }
++ class OrderWorkflow implements IWorkflow<OrderData> {
++   id = "order-workflow";
++   version = 2; // Use a new version when replay semantics change.
++   build(builder: IWorkflowBuilder<OrderData>) {
++     builder
++       .startWith(ReserveInventory)
++       .then(CapturePayment)
++       .onError(WorkflowErrorHandling.Retry, { maxAttempts: 3, delayMs: 5_000 })
++       .then(FulfillOrder);
++   }
++ }
++ const replayDefinition = compileClassReplayWorkflow(new OrderWorkflow(), {
++   registry,
++   queue: "order-activities",
++ });
++ const result = await replayRunner.start(replayDefinition, { orderId });
+```
+
+Step-by-step:
+
+1. Keep the Temporal Workflow ID and business ID in wf metadata. Do not reuse a
+   Temporal run ID as a wf ID unless the store guarantees uniqueness.
+2. Move Activity implementations—not Workflow orchestration code—into
+   `IWorkflowStep` classes. Resolve clients through registry factories.
+3. Register every old Activity name as a stable wf key. The replay compiler
+   uses that key as the activity name and the wf definition version as the
+   activity version.
+4. Convert `startToCloseTimeout` to the wf/adapter activity timeout and
+   `maximumAttempts` to total wf `maxAttempts`. Verify how the old policy counts
+   the initial attempt.
+5. Translate Signals and Updates to the event gateway and `waitForEvent`/
+   approval flow. Translate Timers to replay `sleep` or a durable wait.
+6. Translate a Temporal Saga to `.saga()` and explicit compensation classes.
+   Caught Activity failures and failed wf workflows are not automatically the
+   same state; choose the desired policy explicitly.
+7. Drain or bridge in-flight Temporal executions. New wf code cannot safely
+   replay Temporal history without preserving the original payload and
+   activity-version contract.
+
+Temporal workflows are commonly deterministic and replayed by the Temporal
+service. wf replay activities still have at-least-once delivery, so external
+side effects must be idempotent even when the orchestration is replay-safe.
+
+## Cloudflare Workflows to `@circulo-ai/wf`
+
+Cloudflare Workflows uses a `WorkflowEntrypoint` with `run(event, step)`.
+`step.do()` persists results, `step.sleep()` suspends execution, and step
+configuration controls retries. In wf, `run()` is the workflow definition,
+`step.do()` is a class step, and the Cloudflare instance/event API becomes a
+thin trigger adapter.
+
+#### Before: Cloudflare Workflows
+
+```ts
+export class OrderWorkflow extends WorkflowEntrypoint<Env, OrderEvent> {
+  async run(event: WorkflowEvent<OrderEvent>, step: WorkflowStep) {
+    const order = await step.do("load order", () =>
+      this.env.DB.orders.get(event.payload.orderId),
+    );
+    await step.do("charge payment", {
+      retries: { limit: 3, delay: "5 seconds", backoff: "exponential" },
+    }, () => charge(order));
+    await step.sleep("wait for fulfillment", "1 hour");
+    return step.do("fulfill", () => fulfill(order));
+  }
+}
+```
+
+#### After: wf class definition
+
+```diff
+- export class OrderWorkflow extends WorkflowEntrypoint<Env, OrderEvent> { ... }
++ class LoadOrder implements IWorkflowStep<OrderData, OrderData> {
++   constructor(private readonly db: Database) {}
++   execute(ctx: WorkflowStepContext<OrderData>) {
++     return this.db.orders.get(ctx.input.orderId);
++   }
++ }
++ class ChargePayment implements IWorkflowStep<OrderData, OrderData> {
++   constructor(private readonly payments: PaymentClient) {}
++   async execute(ctx: WorkflowStepContext<OrderData>) {
++     await this.payments.charge(ctx.input.orderId, {
++       idempotencyKey: `charge:${ctx.input.orderId}`,
++     });
++     return ctx.input;
++   }
++ }
++ class OrderWorkflow implements IWorkflow<OrderData> {
++   id = "order-workflow";
++   version = 1;
++   build(builder: IWorkflowBuilder<OrderData>) {
++     builder
++       .startWith(LoadOrder)
++       .then(ChargePayment)
++       .onError(WorkflowErrorHandling.Retry, { maxAttempts: 3, delayMs: 5_000 })
++       .then(FulfillOrder);
++   }
++ }
++ const definition = compileClassWorkflow(new OrderWorkflow(), { registry });
++ // Replace the old sleep with waitUntil, waitForEvent, or replay sleep.
+```
+
+Step-by-step:
+
+1. Keep the Cloudflare Workflow instance ID and event payload; store the old
+   ID in wf tags/metadata while both systems coexist.
+2. Split every `step.do()` callback into a registered class and return
+   serializable data for later steps.
+3. Map `retries.limit` to total `maxAttempts` and fixed delays to `delayMs`.
+   Preserve linear/exponential or dynamic delays in a custom backoff/adapter.
+4. Replace `step.sleep()` with `waitUntil` for a timestamp, `waitForEvent` for
+   an approval/webhook, or replay `sleep` for a replay definition.
+5. Map Cloudflare rollback handlers to saga compensation classes. Register a
+   rollback only after the forward step succeeds and make it repeat-safe.
+6. Keep the Cloudflare HTTP/event API as a thin trigger adapter; it should
+   create/resume a wf instance, not run durable business work in the request.
+
+Cloudflare can provide durable state without an application-owned workflow
+store. With wf, migration is incomplete until the production store has CAS,
+leases, recovery, serialization, and idempotency behavior equivalent to the
+old Workflow instance guarantees.
+
+## Trigger.dev to `@circulo-ai/wf`
+
+Trigger.dev models a task with an ID, payload, `run` function, retry settings,
+and optional middleware/queues. A task run is closest to a wf workflow
+instance. Split the task body into wf class steps when successful work should
+not be repeated or when steps need independent retry and compensation rules.
+
+#### Before: Trigger.dev
+
+```ts
+export const syncCustomer = task({
+  id: "sync-customer",
+  retry: {
+    maxAttempts: 10,
+    factor: 1.8,
+    minTimeoutInMs: 500,
+    maxTimeoutInMs: 30_000,
+    randomize: false,
+  },
+  run: async (payload: { customerId: string }) => {
+    const customer = await crm.get(payload.customerId);
+    await billing.sync(customer);
+    await email.sendWelcome(customer.email);
+    return { customerId: customer.id };
+  },
+});
+
+await syncCustomer.trigger({ customerId: "cus-123" });
+```
+
+#### After: workflow with independently checkpointed side effects
+
+```diff
+- export const syncCustomer = task({ id: "sync-customer", retry: { maxAttempts: 10 }, ... });
+- await syncCustomer.trigger({ customerId: "cus-123" });
++ class LoadCustomer implements IWorkflowStep<CustomerData, CustomerData> {
++   constructor(private readonly crm: CrmClient) {}
++   execute(ctx: WorkflowStepContext<CustomerData>) {
++     return this.crm.get(ctx.input.customerId);
++   }
++ }
++ class SyncBilling implements IWorkflowStep<CustomerData, CustomerData> {
++   constructor(private readonly billing: BillingClient) {}
++   async execute(ctx: WorkflowStepContext<CustomerData>) {
++     await this.billing.sync(ctx.input, {
++       idempotencyKey: `billing-sync:${ctx.input.customerId}`,
++     });
++     return ctx.input;
++   }
++ }
++ class SendWelcome implements IWorkflowStep<CustomerData, CustomerData> {
++   constructor(private readonly email: EmailClient) {}
++   async execute(ctx: WorkflowStepContext<CustomerData>) {
++     await this.email.sendWelcome(ctx.input.email, {
++       idempotencyKey: `welcome:${ctx.input.customerId}`,
++     });
++     return ctx.input;
++   }
++ }
++ class CustomerWorkflow implements IWorkflow<CustomerData> {
++   id = "sync-customer";
++   version = 1;
++   build(builder: IWorkflowBuilder<CustomerData>) {
++     builder
++       .startWith(LoadCustomer)
++       .then(SyncBilling)
++       .then(SendWelcome)
++       .onError(WorkflowErrorHandling.Retry, { maxAttempts: 10, delayMs: 500 });
++   }
++ }
++ await engine.createAndRun(
++   compileClassWorkflow(new CustomerWorkflow(), { registry }),
++   { customerId: "cus-123" },
++ );
+```
+
+Step-by-step:
+
+1. Keep the Trigger.dev task ID as the wf ID and preserve the trigger payload.
+   Keep task run IDs in metadata for support tooling.
+2. Keep one task as one step when it is atomic; split it when a failure should
+   not repeat successful work, when operations need different retries, or when
+   compensation is required.
+3. Translate Trigger.dev `maxAttempts` directly to total wf attempts. Its
+   factor/min/max/jitter policy is richer than the first class builder API;
+   preserve it in a custom backoff or production adapter instead of silently
+   changing exponential retry to fixed retry.
+4. Move middleware into the trigger adapter or a step factory. Validate
+   authentication and tenant context before persistence.
+5. Map Trigger.dev queues/concurrency to queue and worker adapters, not a
+   process-local semaphore.
+6. Drain old runs. If both systems receive the trigger, deduplicate on the same
+   business idempotency key.
+
+Trigger.dev task retries rerun the task attempt. Splitting the task lets wf
+resume at the failed step, but it does not remove the need for idempotent
+side effects after a worker crash.
+
+## BullMQ to `@circulo-ai/wf`
+
+BullMQ is primarily a Redis-backed queue and job/worker system. `attempts` and
+`backoff` retry a processor, and `FlowProducer` creates parent/child job
+dependencies. It does not provide the same workflow-definition and replay
+contract as wf. Migrate when you need durable workflow state, step events,
+waits, or saga compensation; keep BullMQ as transport only if you implement a
+`TaskQueueAdapter` around it.
+
+#### Before: BullMQ flow
+
+```ts
+const flow = new FlowProducer({ connection });
+await flow.add({
+  name: "fulfill-order",
+  queueName: "orders",
+  data: { orderId },
+  children: [
+    { name: "reserve", queueName: "inventory", data: { orderId } },
+    { name: "charge", queueName: "payments", data: { orderId } },
+  ],
+});
+
+new Worker("payments", async (job) =>
+  payments.capture(job.data.orderId), { connection });
+```
+
+#### After: workflow state plus explicit step factories
+
+```diff
+- await flow.add({ name: "fulfill-order", queueName: "orders", children: [...] });
+- new Worker("payments", async (job) => payments.capture(job.data.orderId), ...);
++ class Charge implements IWorkflowStep<OrderData, OrderData> {
++   constructor(private readonly payments: PaymentClient) {}
++   async execute(ctx: WorkflowStepContext<OrderData>) {
++     await this.payments.capture(ctx.input.orderId, {
++       idempotencyKey: `charge:${ctx.input.orderId}`,
++     });
++     return ctx.input;
++   }
++ }
++ class FulfillOrder implements IWorkflow<OrderData> {
++   id = "fulfill-order";
++   version = 1;
++   build(builder: IWorkflowBuilder<OrderData>) {
++     builder
++       .startWith(Reserve)
++       .then(Charge)
++       .onError(WorkflowErrorHandling.Retry, {
++         maxAttempts: 3, // BullMQ attempts: 3 means three total attempts.
++         delayMs: 1_000,
++       });
++   }
++ }
++ await engine.createAndRun(
++   compileClassWorkflow(new FulfillOrder(), { registry }),
++   { orderId },
++ );
+```
+
+Step-by-step:
+
+1. Classify each BullMQ job as a workflow, step, timer, or external trigger.
+2. A single atomic processor can become one class step. A parent flow can
+   become a linear wf chain only when its order is unambiguous. A tree or
+   parallel flow needs a replay/function design; the first declarative
+   `NextStepId` format intentionally rejects branching.
+3. Translate `attempts` directly to total `maxAttempts`; translate fixed or
+   exponential backoff deliberately and preserve jitter when supported.
+4. Move Redis job data into workflow input and step output. Keep payloads
+   serializable and bounded; put large data in object storage and pass a key.
+5. If BullMQ remains transport, implement durable enqueue/claim/ack/lease/
+   retry/shutdown behavior in a `TaskQueueAdapter`. A BullMQ `Worker` alone is
+   not a `WorkflowStore` and cannot reconstruct wf state or history.
+6. Map stalled jobs and restarts to wf lease recovery. Treat delivery as
+   at-least-once and keep the old BullMQ job ID in metadata during draining.
+7. For already completed children whose parent is waiting, finish the old flow
+   or perform a one-time import. Do not create a wf instance per child replay.
+
+BullMQ parent/child dependencies control readiness; they do not compensate
+completed business effects. If fulfillment fails after payment succeeds, add
+explicit `RefundPayment` and `ReleaseInventory` compensation classes.
+
+## Post-migration verification checklist
+
+Run old and new implementations against the same fixtures and compare:
+
+- trigger-to-workflow ID and idempotency-key mapping;
+- step ordering and whether successful predecessors run again after failure;
+- total attempts, delay schedule, timeout, and non-retryable errors;
+- persisted output and exact failure/compensation order;
+- behavior after a crash immediately after every external side effect;
+- pause, resume, cancellation, worker restart, lease expiry, and duplicates;
+- metrics, logs, trace correlation, and manual retry tooling;
+- in-flight records and the rollback/drain plan.
+
+The migration is complete only when disabling the old system cannot lose a
+trigger, duplicate a side effect, or orphan an in-flight business operation.
+Keep old registry/activity/job names and compatible versions until the last old
+execution is terminal.
+
+Official references: [Inngest Functions and Steps](https://www.inngest.com/docs/learn/inngest-functions),
+[Inngest error handling](https://www.inngest.com/docs/guides/error-handling),
+[Temporal TypeScript](https://docs.temporal.io/develop/typescript),
+[Cloudflare Workflows](https://developers.cloudflare.com/workflows/get-started/guide/),
+[Trigger.dev tasks](https://trigger.dev/docs/tasks/overview), and
+[BullMQ workers, retries, and flows](https://docs.bullmq.io/guide/workers/).
 
 ## License
 

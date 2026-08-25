@@ -49,7 +49,8 @@ export interface ScheduleDispatch<TInput = unknown> {
 }
 
 export interface ScheduleWorkerOptions {
-  workerId: string;
+  /** Stable owner identity. A value is generated when omitted. */
+  workerId?: string | undefined;
   pollIntervalMs?: number | undefined;
   leaseMs?: number | undefined;
   batchSize?: number | undefined;

@@ -27,6 +27,7 @@ export class ActivityWorker {
       leaseDurationMs: options.leaseDurationMs,
       pollIntervalMs: options.pollIntervalMs,
       tenantId: options.tenantId,
+      onError: options.onError,
       handler: async (task, context) =>
         this.execute(task, context, logger, metrics),
     });

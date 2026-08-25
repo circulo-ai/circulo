@@ -140,6 +140,7 @@ export function useWorkflowEvents<TContext, TInput, TOutput>(
 } {
   const maxEvents = Math.max(1, options.maxEvents ?? 100);
   const eventTypes = options.eventTypes;
+  const eventTypesKey = eventTypes?.join("\u0000");
   const [events, setEvents] = useState<WorkflowEvent<TOutput>[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -147,8 +148,11 @@ export function useWorkflowEvents<TContext, TInput, TOutput>(
   useEffect(() => {
     let active = true;
     let receivedEvent = false;
+    const selectedEventTypes =
+      eventTypes === undefined ? undefined : new Set(eventTypes);
     const matches = (event: WorkflowEvent<TOutput>): boolean =>
-      eventTypes === undefined || eventTypes.includes(event.eventType);
+      selectedEventTypes === undefined ||
+      selectedEventTypes.has(event.eventType);
 
     const load = async (): Promise<void> => {
       try {
@@ -177,7 +181,7 @@ export function useWorkflowEvents<TContext, TInput, TOutput>(
       active = false;
       unsubscribe();
     };
-  }, [engine, workflowId, eventTypes, maxEvents]);
+  }, [engine, workflowId, eventTypesKey, maxEvents]);
 
   return { events, isLoading, error };
 }
@@ -339,12 +343,17 @@ export function useRemoteWorkflowEvents(
   const [error, setError] = useState<Error | null>(null);
   const maxEvents = Math.max(1, options.maxEvents ?? 100);
   const eventTypes = options.eventTypes;
+  const eventTypesKey = eventTypes?.join("\u0000");
   const tenantId = options.tenantId;
 
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
+    const selectedEventTypes =
+      eventTypes === undefined ? undefined : new Set(eventTypes);
     setIsLoading(true);
+    setEvents([]);
+    setError(null);
     void (async () => {
       try {
         const streamOptions: WorkflowStreamOptions = {
@@ -357,7 +366,11 @@ export function useRemoteWorkflowEvents(
           streamOptions,
         )) {
           if (!active) break;
-          if (eventTypes && !eventTypes.includes(event.eventType)) continue;
+          if (
+            selectedEventTypes !== undefined &&
+            !selectedEventTypes.has(event.eventType)
+          )
+            continue;
           setIsLoading(false);
           setEvents((current) => [...current, event].slice(-maxEvents));
         }
@@ -373,7 +386,7 @@ export function useRemoteWorkflowEvents(
     };
   }, [
     client,
-    eventTypes,
+    eventTypesKey,
     maxEvents,
     options.maxBufferedEvents,
     tenantId,

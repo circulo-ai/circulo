@@ -104,6 +104,7 @@ export interface ActivityWorkerOptions {
   leaseDurationMs?: number | undefined;
   pollIntervalMs?: number | undefined;
   tenantId?: string | undefined;
+  onError?: ((error: Error) => void | Promise<void>) | undefined;
 }
 
 export interface TimerWorkerOptions {
@@ -117,6 +118,7 @@ export interface TimerWorkerOptions {
   leaseDurationMs?: number | undefined;
   pollIntervalMs?: number | undefined;
   tenantId?: string | undefined;
+  onError?: ((error: Error) => void | Promise<void>) | undefined;
 }
 
 export interface TimerTaskPayload {

@@ -6,6 +6,7 @@ import {
   ReplayWorkflowRunner,
   ScheduleWorker,
   createReplayScheduleDispatcher,
+  createScheduleWorker,
   nextCronOccurrence,
 } from "../src";
 
@@ -114,5 +115,38 @@ describe("durable scheduler", () => {
       runId: "scheduled",
     });
     expect(events.at(-1)?.eventType).toBe("workflow.completed");
+  });
+
+  it("generates a worker id and reports dispatch failures", async () => {
+    const store = new InMemoryScheduleStore();
+    await store.upsert(
+      {
+        scheduleId: "failing-schedule",
+        cron: "* * * * *",
+        workflowName: "failing-workflow",
+        input: undefined,
+      },
+      Date.now() - 61_000,
+    );
+    const errors: string[] = [];
+    const abort = new AbortController();
+    const worker = createScheduleWorker(store, {
+      pollIntervalMs: 1,
+      signal: abort.signal,
+      onDispatch: async () => {
+        throw new Error("dispatch unavailable");
+      },
+      onError: async (error) => {
+        errors.push(error.message);
+        abort.abort();
+      },
+    });
+
+    worker.start();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await worker.stop();
+
+    expect(errors).toEqual(["dispatch unavailable"]);
+    expect(worker.getStatus().state).toBe("stopped");
   });
 });

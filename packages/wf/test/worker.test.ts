@@ -132,6 +132,48 @@ describe("Worker", () => {
     expect((await queue.stats()).queued).toBe(1);
   });
 
+  it("applies the worker attempt cap and reports queue failures", async () => {
+    const queue = new InMemoryTaskQueue();
+    await queue.enqueue(task("task-worker-cap", { maxAttempts: 3 }));
+    const errors: string[] = [];
+    const claim = queue.claim.bind(queue);
+    let claimFailures = 1;
+    queue.claim = async (options) => {
+      if (claimFailures > 0) {
+        claimFailures -= 1;
+        throw new Error("queue temporarily unavailable");
+      }
+      return claim(options);
+    };
+
+    const worker = new Worker({
+      id: "capped-worker",
+      role: "activity",
+      queues: ["activity"],
+      queue,
+      maxAttempts: 1,
+      pollIntervalMs: 1,
+      onError: (error) => {
+        errors.push(error.message);
+      },
+      handler: async () => ({
+        type: "retry" as const,
+        failure: {
+          message: "not retryable for this worker",
+          retryable: true,
+          timestamp: Date.now(),
+        },
+      }),
+    });
+
+    await worker.start();
+    await waitUntil(() => worker.status.failedTasks === 1);
+    await worker.stop();
+
+    expect(errors).toEqual(["queue temporarily unavailable"]);
+    expect((await queue.stats()).queued).toBe(0);
+  });
+
   it("runs lease recovery as an independent lifecycle component", async () => {
     const queue = new InMemoryTaskQueue();
     await queue.enqueue(task("task-4", { createdAt: 1, availableAt: 1 }));
