@@ -141,6 +141,10 @@ export interface WorkerOptions<TPayload = unknown> {
   pollIntervalMs?: number | undefined;
   tenantId?: string | undefined;
   maxAttempts?: number | undefined;
+  /** Receives polling, handler, lease, and acknowledgement failures. */
+  onError?:
+    | ((error: Error, task?: TaskEnvelope<TPayload>) => void | Promise<void>)
+    | undefined;
 }
 
 export type WorkerState = "created" | "running" | "stopping" | "stopped";

@@ -18,6 +18,9 @@ export {
 export { WorkflowBuilder, defineWorkflow } from "./dsl/workflow-builder";
 export type { StepConfig } from "./dsl/workflow-builder";
 
+// Class, registry, declarative, and replay workflow definitions
+export * from "./definitions";
+
 // Models
 export * from "./models";
 

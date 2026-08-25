@@ -10,7 +10,8 @@ import { nextCronOccurrence } from "./cron";
 
 /** Crash-safe cron scheduler using leases and explicit dispatch acknowledgement. */
 export class ScheduleWorker<TInput = unknown> {
-  private readonly options: ScheduleWorkerOptions & {
+  private readonly options: Omit<ScheduleWorkerOptions, "workerId"> & {
+    workerId: string;
     pollIntervalMs: number;
     leaseMs: number;
     batchSize: number;
@@ -26,19 +27,23 @@ export class ScheduleWorker<TInput = unknown> {
     private readonly store: ScheduleStore<TInput>,
     options: ScheduleWorkerOptions,
   ) {
-    if (!options.workerId.trim())
-      throw new Error("Schedule workerId is required");
+    const workerId = options.workerId?.trim() || generateId("scheduler");
     this.options = {
       ...options,
+      workerId,
       pollIntervalMs: options.pollIntervalMs ?? 1000,
       leaseMs: options.leaseMs ?? 30_000,
       batchSize: options.batchSize ?? 100,
       concurrency: options.concurrency ?? 10,
     };
     if (
+      !Number.isFinite(this.options.pollIntervalMs) ||
       this.options.pollIntervalMs < 1 ||
+      !Number.isFinite(this.options.leaseMs) ||
       this.options.leaseMs < 1 ||
+      !Number.isInteger(this.options.batchSize) ||
       this.options.batchSize < 1 ||
+      !Number.isInteger(this.options.concurrency) ||
       this.options.concurrency < 1
     ) {
       throw new RangeError("Schedule worker limits must be positive");
@@ -81,9 +86,7 @@ export class ScheduleWorker<TInput = unknown> {
         await this.dispatchLeases(leases);
         if (leases.length === 0) await wait(this.options.pollIntervalMs);
       } catch (cause) {
-        await this.options.onError?.(
-          cause instanceof Error ? cause : new Error(String(cause)),
-        );
+        await this.reportError(cause);
         await wait(this.options.pollIntervalMs);
       }
     }
@@ -109,8 +112,9 @@ export class ScheduleWorker<TInput = unknown> {
               lease.schedule.nextRunAt,
             );
             await this.store.acknowledge(lease, nextRunAt);
-          } catch {
+          } catch (cause) {
             await this.store.release(lease);
+            await this.reportError(cause);
           } finally {
             this.activeDispatches -= 1;
           }
@@ -118,6 +122,16 @@ export class ScheduleWorker<TInput = unknown> {
       },
     );
     await Promise.all(workers);
+  }
+
+  private async reportError(cause: unknown): Promise<void> {
+    try {
+      await this.options.onError?.(
+        cause instanceof Error ? cause : new Error(String(cause)),
+      );
+    } catch {
+      // Error reporting must never terminate the scheduler loop.
+    }
   }
 }
 
@@ -127,7 +141,7 @@ export function createScheduleWorker<TInput>(
 ): ScheduleWorker<TInput> {
   return new ScheduleWorker(store, {
     ...options,
-    workerId: options.workerId || generateId("scheduler"),
+    workerId: options.workerId,
   });
 }
 

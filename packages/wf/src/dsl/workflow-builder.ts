@@ -95,6 +95,10 @@ export class WorkflowBuilder<TContext, TInput = never, TCurrent = never> {
     [TInput] extends [never] ? TStepInput : TInput,
     TStepOutput
   > {
+    if (!name.trim()) {
+      throw new Error("Step name must not be empty");
+    }
+    validateStepConfig(config);
     const step: Step<
       TContext,
       StepInput<TInput, TCurrent, TStepInput>,
@@ -194,6 +198,23 @@ export class WorkflowBuilder<TContext, TInput = never, TCurrent = never> {
         ? { idempotencyKey: this.idempotencyKeyValue }
         : {}),
     };
+  }
+}
+
+function validateStepConfig<TContext, TInput, TOutput>(
+  config: StepConfig<TContext, TInput, TOutput>,
+): void {
+  if (
+    config.retries !== undefined &&
+    (!Number.isInteger(config.retries) || config.retries < 0)
+  ) {
+    throw new RangeError("Step retries must be a non-negative integer");
+  }
+  if (
+    config.timeout !== undefined &&
+    (!Number.isFinite(config.timeout) || config.timeout <= 0)
+  ) {
+    throw new RangeError("Step timeout must be a positive number");
   }
 }
 

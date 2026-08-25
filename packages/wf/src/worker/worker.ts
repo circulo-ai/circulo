@@ -34,14 +34,35 @@ export class Worker<TPayload = unknown> {
     if (options.queues.length === 0) {
       throw new Error("Worker must listen to at least one queue");
     }
-    if (
-      !Number.isInteger(options.concurrency ?? DEFAULT_CONCURRENCY) ||
-      (options.concurrency ?? DEFAULT_CONCURRENCY) < 1
-    ) {
+    const concurrency = options.concurrency ?? DEFAULT_CONCURRENCY;
+    const leaseDurationMs =
+      options.leaseDurationMs ?? DEFAULT_LEASE_DURATION_MS;
+    const heartbeatIntervalMs =
+      options.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS;
+    const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
+    if (!Number.isInteger(concurrency) || concurrency < 1) {
       throw new RangeError("Worker concurrency must be a positive integer");
     }
-    if ((options.leaseDurationMs ?? DEFAULT_LEASE_DURATION_MS) <= 0) {
+    if (!Number.isFinite(leaseDurationMs) || leaseDurationMs <= 0) {
       throw new RangeError("Worker lease duration must be positive");
+    }
+    if (
+      !Number.isFinite(heartbeatIntervalMs) ||
+      heartbeatIntervalMs <= 0 ||
+      heartbeatIntervalMs >= leaseDurationMs
+    ) {
+      throw new RangeError(
+        "Worker heartbeat interval must be positive and shorter than the lease duration",
+      );
+    }
+    if (!Number.isFinite(pollIntervalMs) || pollIntervalMs <= 0) {
+      throw new RangeError("Worker poll interval must be positive");
+    }
+    if (
+      options.maxAttempts !== undefined &&
+      (!Number.isInteger(options.maxAttempts) || options.maxAttempts < 1)
+    ) {
+      throw new RangeError("Worker maxAttempts must be a positive integer");
     }
   }
 
@@ -91,7 +112,10 @@ export class Worker<TPayload = unknown> {
     }
     if (options.graceful !== false) {
       const timeoutMs = options.timeoutMs ?? 30_000;
-      await waitForPromises(this.pollers, timeoutMs);
+      const completed = await waitForPromises(this.pollers, timeoutMs);
+      if (!completed) {
+        for (const controller of this.taskControllers) controller.abort();
+      }
     }
     this.stateValue = "stopped";
   }
@@ -100,22 +124,27 @@ export class Worker<TPayload = unknown> {
     const pollIntervalMs =
       this.options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
     while (!this.abortController.signal.aborted) {
-      let claimed = false;
-      for (const queue of this.options.queues) {
-        const task = await this.options.queue.claim<TPayload>({
-          queue,
-          workerId: this.options.id,
-          tenantId: this.options.tenantId,
-          leaseDurationMs:
-            this.options.leaseDurationMs ?? DEFAULT_LEASE_DURATION_MS,
-        });
-        if (task) {
-          claimed = true;
-          await this.process(task);
-          break;
+      try {
+        let claimed = false;
+        for (const queue of this.options.queues) {
+          const task = await this.options.queue.claim<TPayload>({
+            queue,
+            workerId: this.options.id,
+            tenantId: this.options.tenantId,
+            leaseDurationMs:
+              this.options.leaseDurationMs ?? DEFAULT_LEASE_DURATION_MS,
+          });
+          if (task) {
+            claimed = true;
+            await this.process(task);
+            break;
+          }
         }
+        if (!claimed) await delay(pollIntervalMs);
+      } catch (error) {
+        await this.reportError(error);
+        await delay(pollIntervalMs);
       }
-      if (!claimed) await delay(pollIntervalMs);
     }
   }
 
@@ -171,8 +200,20 @@ export class Worker<TPayload = unknown> {
       ]);
       await this.commitDisposition(task, lease.token, disposition);
     } catch (error) {
-      if (!leaseWasLost) {
-        await this.handleFailure(task, lease.token, toFailure(error));
+      if (leaseWasLost) {
+        await this.reportError(error, task);
+      } else {
+        try {
+          await this.handleFailure(
+            task,
+            lease.token,
+            this.maxAttempts(task),
+            toFailure(error),
+          );
+        } catch (commitError) {
+          await this.reportError(commitError, task);
+        }
+        await this.reportError(error, task);
       }
     } finally {
       clearInterval(heartbeatInterval);
@@ -210,6 +251,7 @@ export class Worker<TPayload = unknown> {
     await this.handleFailure(
       task,
       leaseToken,
+      this.maxAttempts(task),
       disposition.failure ?? {
         message: "Task requested a retry",
         retryable: true,
@@ -222,10 +264,10 @@ export class Worker<TPayload = unknown> {
   private async handleFailure(
     task: TaskEnvelope<TPayload>,
     leaseToken: string,
+    maxAttempts: number,
     failure: TaskFailure,
     requestedAvailableAt?: number,
   ): Promise<void> {
-    const maxAttempts = task.maxAttempts;
     if (failure.retryable && task.attempt < maxAttempts) {
       const delayMs = retryDelay(task.attempt, task.retryPolicy);
       const availableAt = requestedAvailableAt ?? Date.now() + delayMs;
@@ -249,6 +291,24 @@ export class Worker<TPayload = unknown> {
     if (!rejected) throw new Error(`Could not reject task ${task.id}`);
     this.failed += 1;
   }
+
+  private async reportError(
+    error: unknown,
+    task?: TaskEnvelope<TPayload>,
+  ): Promise<void> {
+    try {
+      await this.options.onError?.(toError(error), task);
+    } catch {
+      // Error reporting must never terminate polling or task cleanup.
+    }
+  }
+
+  private maxAttempts(task: TaskEnvelope<TPayload>): number {
+    return Math.min(
+      this.options.maxAttempts ?? task.maxAttempts,
+      task.maxAttempts,
+    );
+  }
 }
 
 function retryDelay(
@@ -270,11 +330,11 @@ function retryDelay(
 async function waitForPromises(
   promises: ReadonlySet<Promise<void>>,
   timeoutMs: number,
-): Promise<void> {
-  if (promises.size === 0) return;
-  await Promise.race([
-    Promise.allSettled([...promises]).then(() => undefined),
-    delay(timeoutMs),
+): Promise<boolean> {
+  if (promises.size === 0) return true;
+  return Promise.race([
+    Promise.allSettled([...promises]).then(() => true),
+    delay(timeoutMs).then(() => false),
   ]);
 }
 

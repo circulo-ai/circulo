@@ -78,6 +78,16 @@ describe("workflow DSL", () => {
 
     expect(primitiveContextWorkflow.initialContext).toBe(0);
     expect(() => waitFor(-1)).toThrow(RangeError);
+    expect(() =>
+      defineWorkflow<Context>()
+        .context({ attempts: 0 })
+        .step("", { run: async () => complete(1) }),
+    ).toThrow("Step name must not be empty");
+    expect(() =>
+      defineWorkflow<Context>()
+        .context({ attempts: 0 })
+        .step("invalid", { retries: -1, run: async () => complete(1) }),
+    ).toThrow(RangeError);
   });
 });
 
