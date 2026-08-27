@@ -67,11 +67,11 @@ jobs:
           bun --filter @circulo-ai/file-parsers typecheck
           bun --filter @circulo-ai/upload typecheck
           bun --filter @circulo-ai/wf typecheck
-          bun --filter @circulo-ai/wf-cli typecheck
           bun --filter @circulo-ai/di build
           bun --filter @circulo-ai/file-parsers build
           bun --filter @circulo-ai/upload build
           bun --filter @circulo-ai/wf build
+          bun --filter @circulo-ai/wf-cli typecheck
           bun --filter @circulo-ai/wf-cli build
 
       - name: Test public packages
