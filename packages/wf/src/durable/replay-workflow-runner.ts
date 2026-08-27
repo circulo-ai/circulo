@@ -56,7 +56,25 @@ export class ReplayWorkflowRunner {
     options: ReplayWorkflowRunnerOptions = {},
   ): Promise<ReplayWorkflowResult<TOutput>> {
     const existing = await this.history.nextSequence(workflowId, runId);
-    if (existing > 0) return this.run(definition, workflowId, runId, options);
+    if (existing > 0) {
+      const history = await this.history.read({ workflowId, runId });
+      const started = history.find(
+        (event) => event.eventType === "workflow.started",
+      );
+      const recordedInput = (
+        started?.payload as { input?: unknown } | undefined
+      )?.input;
+      if (
+        started &&
+        stableSerialize(recordedInput) !== stableSerialize(input)
+      ) {
+        throw new WorkflowReplayError(
+          `Workflow ${workflowId}/${runId} was started with different input`,
+          started.sequence,
+        );
+      }
+      return this.run(definition, workflowId, runId, options);
+    }
     await appendHistoryEvent(
       this.history,
       {
@@ -200,6 +218,14 @@ export class ReplayWorkflowRunner {
           };
           await this.queue.enqueue(task);
           throw new WorkflowSuspended("activity");
+        }
+
+        const recordedInput = scheduled.payload.input;
+        if (stableSerialize(recordedInput) !== stableSerialize(input)) {
+          throw new WorkflowReplayError(
+            `Activity ${name}:${version} input diverged from history at activity ${activityId}`,
+            scheduled.sequence,
+          );
         }
 
         while (
@@ -442,8 +468,22 @@ export class ReplayWorkflowRunner {
         try {
           return await run(scope);
         } catch (error) {
+          const compensationErrors: unknown[] = [];
           for (let index = compensations.length - 1; index >= 0; index -= 1) {
-            await compensations[index]!();
+            try {
+              await compensations[index]!();
+            } catch (compensationError) {
+              if (compensationError instanceof WorkflowSuspended) {
+                throw compensationError;
+              }
+              compensationErrors.push(compensationError);
+            }
+          }
+          if (compensationErrors.length > 0) {
+            throw new AggregateError(
+              [error, ...compensationErrors],
+              `Workflow failed: ${toError(error).message}. One or more Saga compensations also failed.`,
+            );
           }
           throw error;
         }
@@ -538,4 +578,22 @@ function toWorkflowError(error: unknown): WorkflowError {
     stack: normalized.stack,
     timestamp: Date.now(),
   };
+}
+
+function stableSerialize(value: unknown): string {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value) ?? String(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(stableSerialize).join(",")}]`;
+  }
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableSerialize(record[key])}`)
+    .join(",")}}`;
+}
+
+function toError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
 }

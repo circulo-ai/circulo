@@ -38,6 +38,8 @@ export interface WorkflowError {
 
 export interface Workflow<TContext, TInput, TOutput> {
   id: string;
+  /** Version of the executable workflow definition used by this run. */
+  definitionVersion?: number | undefined;
   version: number;
   state: WorkflowState;
   steps: Step<TContext, unknown, unknown>[];

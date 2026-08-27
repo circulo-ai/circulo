@@ -2,8 +2,8 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import {
   InMemoryEventBus,
   InMemoryEventStore,
-  InMemoryWorkflowStore,
   InMemoryWorkflowStepRegistry,
+  InMemoryWorkflowStore,
   WorkflowEngine,
   WorkflowErrorHandling,
   compileClassReplayWorkflow,
@@ -98,6 +98,7 @@ describe("class and declarative workflow definitions", () => {
     const wf = engine<unknown, unknown>();
     const id = await wf.createAndRun(definition, 2);
     expect((await wf.getWorkflow(id))?.output).toBe(6);
+    expect((await wf.getWorkflow(id))?.definitionVersion).toBe(2);
     await wf.shutdown();
 
     expect(steps.create(AddOne)).not.toBe(steps.create(AddOne));
@@ -124,14 +125,20 @@ describe("class and declarative workflow definitions", () => {
     expect(definition.steps.map((step) => step.id)).toEqual(["hello", "bye"]);
     expect(definition.steps[0]?.retries).toBe(2);
     expect(() =>
-      loadWorkflowDefinition('{"id":"x","version":1,"steps":[{"id":"a","stepType":"Nope"}]}', {
-        registry: registry(),
-      }),
+      loadWorkflowDefinition(
+        '{"id":"x","version":1,"steps":[{"id":"a","stepType":"Nope"}]}',
+        {
+          registry: registry(),
+        },
+      ),
     ).toThrow("Unknown workflow step type");
     expect(() =>
-      loadWorkflowDefinition('{"id":"x","version":1,"steps":[{"id":"a","stepType":"AddOne","nextStepId":"missing"}]}', {
-        registry: registry(),
-      }),
+      loadWorkflowDefinition(
+        '{"id":"x","version":1,"steps":[{"id":"a","stepType":"AddOne","nextStepId":"missing"}]}',
+        {
+          registry: registry(),
+        },
+      ),
     ).toThrow("missing nextStepId");
     expect(() =>
       loadWorkflowDefinition(
