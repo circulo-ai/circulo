@@ -1,0 +1,63 @@
+{
+  "name": "@circulo-ai/wf-cli",
+  "version": "0.0.0",
+  "description": "Type-safe developer toolkit for validating, inspecting, and operating Circulo WF projects",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/circulo-ai/circulo.git"
+  },
+  "bugs": {
+    "url": "https://github.com/circulo-ai/circulo/issues"
+  },
+  "homepage": "https://github.com/circulo-ai/circulo#readme",
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "bin": {
+    "wf": "./dist/cli.mjs"
+  },
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "dev": "bun ./node_modules/tsdown/dist/run.mjs --watch",
+    "build": "bun ./node_modules/tsdown/dist/run.mjs",
+    "typecheck": "bun ./node_modules/typescript/bin/tsc --noEmit",
+    "lint": "eslint src",
+    "test": "bun ./node_modules/vitest/vitest.mjs run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "release": "bun run build && npm publish --access public"
+  },
+  "dependencies": {
+    "@circulo-ai/wf": "^2.3.0",
+    "jiti": "^2.7.0",
+    "picocolors": "^1.1.1",
+    "yaml": "^2.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.25",
+    "tsdown": "^0.17.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  }
+}
