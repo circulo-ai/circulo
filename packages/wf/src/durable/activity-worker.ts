@@ -62,6 +62,25 @@ export class ActivityWorker {
       };
     }
     const payload = task.payload;
+
+    // A worker can lose its lease after recording the result but before the
+    // queue acknowledges the task. A redelivery must not execute the external
+    // side effect a second time; the durable completion event is authoritative.
+    const priorHistory = await this.options.history.read({
+      workflowId: task.workflowId,
+      runId: task.runId,
+    });
+    const alreadyCompleted = priorHistory.some(
+      (event) =>
+        event.eventType === "activity.completed" &&
+        (event.payload as { activityId?: string }).activityId ===
+          payload.activityId,
+    );
+    if (alreadyCompleted) {
+      await this.options.onWorkflowReady?.(task.workflowId, task.runId);
+      return { type: "acknowledge" };
+    }
+
     const definition = this.options.registry.get(
       payload.activityName,
       payload.activityVersion,

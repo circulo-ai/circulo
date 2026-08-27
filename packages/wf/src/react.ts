@@ -82,6 +82,8 @@ export function useWorkflow<TContext, TInput, TOutput>(
       }
     };
 
+    setWorkflow(null);
+    setLastEvent(null);
     setIsLoading(true);
     void load();
     const unsubscribe = engine.subscribe(workflowId, (event) => {
@@ -157,8 +159,12 @@ export function useWorkflowEvents<TContext, TInput, TOutput>(
     const load = async (): Promise<void> => {
       try {
         const loaded = (await engine.getEvents(workflowId)).filter(matches);
-        if (active && !receivedEvent) {
-          setEvents(loaded.slice(-maxEvents));
+        if (active) {
+          setEvents((current) =>
+            receivedEvent
+              ? mergeWorkflowEvents(current, loaded, maxEvents)
+              : loaded.slice(-maxEvents),
+          );
           setError(null);
         }
       } catch (cause) {
@@ -168,13 +174,15 @@ export function useWorkflowEvents<TContext, TInput, TOutput>(
       }
     };
 
+    setEvents([]);
+    setError(null);
     setIsLoading(true);
     void load();
     const unsubscribe = engine.subscribe(workflowId, (event) => {
       if (!active || !matches(event)) return;
       receivedEvent = true;
       setIsLoading(false);
-      setEvents((current) => [...current, event].slice(-maxEvents));
+      setEvents((current) => mergeWorkflowEvents(current, [event], maxEvents));
     });
 
     return () => {
@@ -256,23 +264,33 @@ export function useRemoteWorkflow(
   const [workflow, setWorkflow] = useState<WorkflowQueryView | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const refreshInFlight = useRef<Promise<void> | null>(null);
   const tenantId = options.tenantId;
   const refreshOnEvent = options.refreshOnEvent ?? true;
 
   const refresh = useCallback(async () => {
+    if (refreshInFlight.current) return refreshInFlight.current;
     setIsLoading(true);
+    const request = (async () => {
+      try {
+        setWorkflow(
+          await client.queryWorkflow(
+            workflowId,
+            tenantId ? { tenantId } : undefined,
+          ),
+        );
+        setError(null);
+      } catch (cause) {
+        setError(toError(cause));
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+    refreshInFlight.current = request;
     try {
-      setWorkflow(
-        await client.queryWorkflow(
-          workflowId,
-          tenantId ? { tenantId } : undefined,
-        ),
-      );
-      setError(null);
-    } catch (cause) {
-      setError(toError(cause));
+      await request;
     } finally {
-      setIsLoading(false);
+      if (refreshInFlight.current === request) refreshInFlight.current = null;
     }
   }, [client, tenantId, workflowId]);
 
@@ -372,7 +390,9 @@ export function useRemoteWorkflowEvents(
           )
             continue;
           setIsLoading(false);
-          setEvents((current) => [...current, event].slice(-maxEvents));
+          setEvents((current) =>
+            mergeWorkflowEvents(current, [event], maxEvents),
+          );
         }
       } catch (cause) {
         if (active && !controller.signal.aborted) setError(toError(cause));
@@ -459,4 +479,19 @@ export class WorkflowGatewayClient implements WorkflowRemoteClient {
 
 function toError(cause: unknown): Error {
   return cause instanceof Error ? cause : new Error(String(cause));
+}
+
+function mergeWorkflowEvents<TOutput>(
+  current: readonly WorkflowEvent<TOutput>[],
+  incoming: readonly WorkflowEvent<TOutput>[],
+  maxEvents: number,
+): WorkflowEvent<TOutput>[] {
+  const byId = new Map(current.map((event) => [event.id, event] as const));
+  for (const event of incoming) byId.set(event.id, event);
+  return [...byId.values()]
+    .sort(
+      (left, right) =>
+        left.timestamp - right.timestamp || left.id.localeCompare(right.id),
+    )
+    .slice(-maxEvents);
 }

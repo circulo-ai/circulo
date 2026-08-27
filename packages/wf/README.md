@@ -649,6 +649,14 @@ bounded concurrency and returns partial failures. `saga()` records reverse-order
 compensation activities and keeps compensation retryable. `sleep()` persists a
 timer task, and `waitForEvent()` persists an approval/event subscription.
 
+Replay validates the input supplied to an already-scheduled activity against
+the input recorded in history. A changed input fails with
+`WorkflowReplayError` instead of silently accepting a stale activity result.
+`ReplayWorkflowRunner.start()` also rejects reuse of an existing workflow/run
+identity with different input. Keep the workflow definition name and version
+stable for compatible deployments and increment the definition version when
+replay semantics or activity contracts change.
+
 ### Activity and timer workers
 
 Replay execution suspends when it schedules an activity, timer, or external
@@ -683,6 +691,12 @@ use an idempotency key derived from `activityId` for payments, emails, and
 other external effects. `TimerWorker` records `timer.fired`; it does not keep a
 Node timer alive for every workflow. Both workers must share the same durable
 queue and history store as the runner.
+
+If a worker records `activity.completed` and crashes before acknowledging the
+queue task, a later redelivery observes the durable completion and acknowledges
+the task without executing the side effect again. This closes the common
+result-before-acknowledgement window; application-level idempotency is still
+required for a crash that occurs before the completion event is persisted.
 
 ## Workers and recovery
 
@@ -1313,6 +1327,11 @@ export function WorkflowStatus({ engine, workflowId }: Props) {
 `useWorkflowEvents()` loads persisted history and subscribes to new events.
 `maxEvents` prevents unbounded browser memory use.
 
+The hooks deduplicate events by event ID, merge history with events that arrive
+during the initial load, reset state when the workflow or filter changes, and
+coalesce concurrent remote refreshes. This makes reconnects and fast event
+bursts safe for timelines and status panels.
+
 ```tsx
 import { useWorkflowEvents } from "@circulo-ai/wf/react";
 
@@ -1362,6 +1381,12 @@ export function WorkflowNotifications({ engine }: { engine: Engine }) {
 
 The in-memory stores are for local development and tests. Production workers
 should use durable `WorkflowStore`, `EventStore`, and `EventBus` implementations.
+
+For classic engine workflows, `Workflow.version` is the optimistic persistence
+revision. `Workflow.definitionVersion` identifies the executable definition
+version used to create the run. Keep both values separate in durable schemas:
+the revision changes on every successful update, while the definition version
+changes only when deploying a new compatible workflow definition.
 
 ### JSON key/value adapter
 
@@ -1702,7 +1727,9 @@ import {
   type WorkflowStepContext,
 } from "@circulo-ai/wf/definitions";
 
-interface Data { customerId?: string }
+interface Data {
+  customerId?: string;
+}
 
 class CreateCustomer implements IWorkflowStep<Data, string> {
   constructor(private readonly customers: CustomerService) {}
@@ -1730,11 +1757,16 @@ class MyWorkflow implements IWorkflow<Data> {
 }
 
 const registry = new InMemoryWorkflowStepRegistry();
-registry.register(CreateCustomer, ({ workflowId }) =>
-  new CreateCustomer(container.customerService(workflowId)),
+registry.register(
+  CreateCustomer,
+  ({ workflowId }) => new CreateCustomer(container.customerService(workflowId)),
   "MyApp.CreateCustomer",
 );
-registry.register(PushToSalesforce, () => new PushToSalesforce(salesforce), "MyApp.PushToSalesforce");
+registry.register(
+  PushToSalesforce,
+  () => new PushToSalesforce(salesforce),
+  "MyApp.PushToSalesforce",
+);
 registry.register(PushToERP, () => new PushToERP(erp), "MyApp.PushToERP");
 
 const definition = compileClassWorkflow(new MyWorkflow(), { registry });
@@ -1821,9 +1853,12 @@ builder
   .startWith(LogStart)
   .saga((saga) =>
     saga
-      .startWith(Task1).compensateWith(UndoTask1)
-      .then(Task2).compensateWith(UndoTask2)
-      .then(Task3).compensateWith(UndoTask3),
+      .startWith(Task1)
+      .compensateWith(UndoTask1)
+      .then(Task2)
+      .compensateWith(UndoTask2)
+      .then(Task3)
+      .compensateWith(UndoTask3),
   )
   .onError(WorkflowErrorHandling.Retry, { delayMs: 600_000, maxAttempts: 3 })
   .then(LogEnd);
@@ -1916,17 +1951,17 @@ traffic is cut over.
 
 ### Choose the equivalent wf model first
 
-| Existing concept | wf equivalent | Migration decision |
-| --- | --- | --- |
-| Function, task, workflow, or job | `WorkflowDefinition` or `IWorkflow` compiled with `compileClassWorkflow()` | Use one definition for the durable business transaction. |
-| Step, activity, or job processor | `IWorkflowStep.execute()` | Keep network/database side effects inside the step. |
-| Dependency container or worker registration | `WorkflowStepRegistryPort` | Register stable keys explicitly; never dynamically import user-provided `StepType` values. |
-| Retry count and backoff | `.onError(Retry, { maxAttempts, delayMs })` or serialized `retry` | `maxAttempts` includes the first attempt. Convert settings described as “retries” carefully. |
-| Durable checkpoint | `WorkflowStore` state/events, or replay activities through `ReplayWorkflowRunner` | Use replay compilation when execution must be activity/history based. |
-| Sleep, delay, cron, or approval | `waitUntil`, `waitFor`, scheduler adapters, or replay `sleep`/`waitForEvent` | Never replace a durable wait with `setTimeout`. |
-| Worker | `Worker`, `ActivityWorker`, or `TimerWorker` | Preserve leases, heartbeats, cancellation, and at-least-once handling. |
-| Rollback or failure handler | `.saga()` and `.compensateWith()` | Compensation is business logic, not an automatic database transaction. |
-| Workflow/job identifier | `id`, `version`, instance ID, and business idempotency key | Keep old IDs in metadata while systems coexist. |
+| Existing concept                            | wf equivalent                                                                     | Migration decision                                                                           |
+| ------------------------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Function, task, workflow, or job            | `WorkflowDefinition` or `IWorkflow` compiled with `compileClassWorkflow()`        | Use one definition for the durable business transaction.                                     |
+| Step, activity, or job processor            | `IWorkflowStep.execute()`                                                         | Keep network/database side effects inside the step.                                          |
+| Dependency container or worker registration | `WorkflowStepRegistryPort`                                                        | Register stable keys explicitly; never dynamically import user-provided `StepType` values.   |
+| Retry count and backoff                     | `.onError(Retry, { maxAttempts, delayMs })` or serialized `retry`                 | `maxAttempts` includes the first attempt. Convert settings described as “retries” carefully. |
+| Durable checkpoint                          | `WorkflowStore` state/events, or replay activities through `ReplayWorkflowRunner` | Use replay compilation when execution must be activity/history based.                        |
+| Sleep, delay, cron, or approval             | `waitUntil`, `waitFor`, scheduler adapters, or replay `sleep`/`waitForEvent`      | Never replace a durable wait with `setTimeout`.                                              |
+| Worker                                      | `Worker`, `ActivityWorker`, or `TimerWorker`                                      | Preserve leases, heartbeats, cancellation, and at-least-once handling.                       |
+| Rollback or failure handler                 | `.saga()` and `.compensateWith()`                                                 | Compensation is business logic, not an automatic database transaction.                       |
+| Workflow/job identifier                     | `id`, `version`, instance ID, and business idempotency key                        | Keep old IDs in metadata while systems coexist.                                              |
 
 The first declarative JSON/YAML release accepts a validated linear chain. Class
 workflows can compose class sagas, but arbitrary branching graphs are not
@@ -1972,8 +2007,14 @@ import {
   type WorkflowStepContext,
 } from "@circulo-ai/wf";
 
-interface OrderInput { orderId: string; idempotencyKey: string }
-interface OrderData { orderId: string; paymentId?: string }
+interface OrderInput {
+  orderId: string;
+  idempotencyKey: string;
+}
+interface OrderData {
+  orderId: string;
+  paymentId?: string;
+}
 
 class ReserveInventory implements IWorkflowStep<OrderData, OrderData> {
   constructor(private readonly inventory: InventoryClient) {}
@@ -2020,9 +2061,21 @@ class OrderWorkflow implements IWorkflow<OrderData> {
 }
 
 const registry = new InMemoryWorkflowStepRegistry();
-registry.register(ReserveInventory, () => new ReserveInventory(inventory), "order.reserve");
-registry.register(CapturePayment, () => new CapturePayment(payments), "order.capture");
-registry.register(FulfillOrder, () => new FulfillOrder(orders), "order.fulfill");
+registry.register(
+  ReserveInventory,
+  () => new ReserveInventory(inventory),
+  "order.reserve",
+);
+registry.register(
+  CapturePayment,
+  () => new CapturePayment(payments),
+  "order.capture",
+);
+registry.register(
+  FulfillOrder,
+  () => new FulfillOrder(orders),
+  "order.fulfill",
+);
 
 const definition = compileClassWorkflow(new OrderWorkflow(), { registry });
 const workflowId = await engine.createAndRun(definition, {
@@ -2221,9 +2274,13 @@ export class OrderWorkflow extends WorkflowEntrypoint<Env, OrderEvent> {
     const order = await step.do("load order", () =>
       this.env.DB.orders.get(event.payload.orderId),
     );
-    await step.do("charge payment", {
-      retries: { limit: 3, delay: "5 seconds", backoff: "exponential" },
-    }, () => charge(order));
+    await step.do(
+      "charge payment",
+      {
+        retries: { limit: 3, delay: "5 seconds", backoff: "exponential" },
+      },
+      () => charge(order),
+    );
     await step.sleep("wait for fulfillment", "1 hour");
     return step.do("fulfill", () => fulfill(order));
   }
@@ -2405,8 +2462,9 @@ await flow.add({
   ],
 });
 
-new Worker("payments", async (job) =>
-  payments.capture(job.data.orderId), { connection });
+new Worker("payments", async (job) => payments.capture(job.data.orderId), {
+  connection,
+});
 ```
 
 #### After: workflow state plus explicit step factories

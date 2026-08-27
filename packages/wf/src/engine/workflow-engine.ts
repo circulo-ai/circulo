@@ -160,6 +160,7 @@ export class WorkflowEngine<TContext, TInput, TOutput> {
 
     const workflow: Workflow<TContext, TInput, TOutput> = {
       id: generateId("wf"),
+      definitionVersion: definition.version,
       version: 0,
       state: "pending",
       steps: definition.steps,

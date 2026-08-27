@@ -294,6 +294,115 @@ describe("replay-safe workflow execution", () => {
     ).toHaveLength(1);
   });
 
+  it("rejects replay when an activity input diverges from history", async () => {
+    const queue = new InMemoryTaskQueue();
+    const history = new InMemoryWorkflowHistoryStore();
+    const registry = new InMemoryActivityRegistry();
+    registry.register(
+      defineActivity<number, number>("identity", async (input) => input),
+    );
+    const runner = new ReplayWorkflowRunner(history, queue);
+    const definition = {
+      name: "input-divergence",
+      version: 1,
+      activityRegistry: registry,
+      run: async (
+        context: import("../src").ReplayWorkflowContext,
+        input: number,
+      ) => context.activity("identity", input),
+    };
+
+    const started = await runner.start(definition, 1);
+    await expect(
+      runner.start(definition, 2, {
+        workflowId: started.workflowId,
+        runId: started.runId,
+      }),
+    ).rejects.toThrow("different input");
+    const changedDefinition = {
+      ...definition,
+      run: async (
+        context: import("../src").ReplayWorkflowContext,
+        input: number,
+      ) => context.activity("identity", input + 1),
+    };
+    const replayed = await runner.run(
+      changedDefinition,
+      started.workflowId,
+      started.runId,
+    );
+
+    expect(replayed.status).toBe("failed");
+    expect(replayed.error?.message).toContain("input diverged from history");
+  });
+
+  it("does not execute an activity again after a result was durably recorded", async () => {
+    const queue = new InMemoryTaskQueue();
+    const history = new InMemoryWorkflowHistoryStore();
+    const registry = new InMemoryActivityRegistry();
+    let executions = 0;
+    registry.register(
+      defineActivity<string, string>("already-completed", async (input) => {
+        executions += 1;
+        return input;
+      }),
+    );
+    const workflowId = "duplicate-delivery";
+    const runId = "run-1";
+    await history.append(
+      {
+        workflowId,
+        runId,
+        eventId: "started",
+        eventType: "workflow.started",
+        payload: {},
+      },
+      0,
+    );
+    await history.append(
+      {
+        workflowId,
+        runId,
+        eventId: "activity-completed",
+        eventType: "activity.completed",
+        payload: { activityId: "activity-1", output: "ok" },
+      },
+      1,
+    );
+    await queue.enqueue({
+      id: "activity-1",
+      kind: "activity",
+      queue: "activity:already-completed",
+      workflowId,
+      runId,
+      payload: {
+        activityId: "activity-1",
+        activityName: "already-completed",
+        activityVersion: 1,
+        input: "ok",
+      },
+      attempt: 0,
+      maxAttempts: 1,
+      priority: 0,
+      createdAt: Date.now(),
+      availableAt: Date.now(),
+    });
+    const worker = new ActivityWorker({
+      id: "duplicate-worker",
+      queue,
+      registry,
+      history,
+      pollIntervalMs: 1,
+    });
+
+    await worker.start();
+    await waitUntil(() => worker.status.completedTasks === 1);
+    await worker.stop();
+
+    expect(executions).toBe(0);
+    expect((await queue.stats()).queued).toBe(0);
+  });
+
   it("waits for an external event and resumes with its typed payload", async () => {
     const queue = new InMemoryTaskQueue();
     const history = new InMemoryWorkflowHistoryStore();
@@ -392,6 +501,82 @@ describe("replay-safe workflow execution", () => {
     await expect(
       runner.run(definition, start.workflowId, start.runId),
     ).resolves.toMatchObject({ status: "failed" });
+  });
+
+  it("preserves the original failure when a durable compensation also fails", async () => {
+    const queue = new InMemoryTaskQueue();
+    const history = new InMemoryWorkflowHistoryStore();
+    const registry = new InMemoryActivityRegistry();
+    registry.register(
+      defineActivity<void, string>("reserve", async () => "reserved"),
+    );
+    registry.register(
+      defineActivity<void, never>(
+        "forward-failure",
+        async () => {
+          throw new Error("original failure");
+        },
+        { retryPolicy: { maxAttempts: 1 } },
+      ),
+    );
+    registry.register(
+      defineActivity<string, void>(
+        "compensation-failure",
+        async () => {
+          throw new Error("compensation failure");
+        },
+        { retryPolicy: { maxAttempts: 1 } },
+      ),
+    );
+    const runner = new ReplayWorkflowRunner(history, queue);
+    const definition = {
+      name: "saga-compensation-failure",
+      version: 1,
+      activityRegistry: registry,
+      run: async (context: import("../src").ReplayWorkflowContext) =>
+        context.saga(async (saga) => {
+          await saga.activity("reserve", undefined, {
+            compensate: {
+              name: "compensation-failure",
+              input: (output) => output,
+            },
+          });
+          await saga.activity("forward-failure", undefined);
+          return "unreachable";
+        }),
+    };
+    const started = await runner.start(definition, undefined);
+    const worker = new ActivityWorker({
+      id: "saga-failure-worker",
+      queue,
+      registry,
+      history,
+      pollIntervalMs: 1,
+      onWorkflowReady: (workflowId, runId) =>
+        runner.run(definition, workflowId, runId).then(() => undefined),
+    });
+
+    await worker.start();
+    await waitUntil(async () => {
+      const events = await history.read({
+        workflowId: started.workflowId,
+        runId: started.runId,
+      });
+      return events.at(-1)?.eventType === "workflow.failed";
+    });
+    await worker.stop();
+
+    const events = await history.read({
+      workflowId: started.workflowId,
+      runId: started.runId,
+    });
+    const terminal = events.at(-1);
+    expect(
+      (terminal?.payload as { error: { message: string } }).error.message,
+    ).toContain("original failure");
+    expect(
+      events.filter((event) => event.eventType === "activity.failed"),
+    ).toHaveLength(2);
   });
 
   it("supports bounded batch processing with partial failures", async () => {
