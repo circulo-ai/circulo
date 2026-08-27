@@ -59,6 +59,11 @@
       "types": "./dist/definitions.d.mts",
       "import": "./dist/definitions.mjs",
       "default": "./dist/definitions.mjs"
+    },
+    "./config": {
+      "types": "./dist/config.d.mts",
+      "import": "./dist/config.mjs",
+      "default": "./dist/config.mjs"
     }
   },
   "peerDependencies": {

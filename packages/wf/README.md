@@ -21,6 +21,7 @@ stream access, and OpenTelemetry-compatible adapters.
 
 - [Install](#install)
 - [Mental model](#mental-model)
+- [Shared application and CLI configuration](#shared-application-and-cli-configuration)
 - [Production reference architecture](#production-reference-architecture)
 - [Runtime states and terminal behavior](#runtime-states-and-terminal-behavior)
 - [First workflow](#first-workflow)
@@ -70,6 +71,314 @@ import { WorkflowEngine, defineWorkflow, complete } from "@circulo-ai/wf";
 // Optional React integration.
 import { useWorkflow } from "@circulo-ai/wf/react";
 ```
+
+## Shared application and CLI configuration
+
+Use `defineWfConfig()` as the composition root when the application and a
+future `wf` CLI need to use the same workflow definitions, registry, and
+infrastructure choices. It is available from the core entry point and the
+dedicated `@circulo-ai/wf/config` entry point:
+
+```typescript
+import { defineWfConfig } from "@circulo-ai/wf/config";
+```
+
+The configuration layer is deliberately framework- and connector-agnostic. It
+does not open a Redis connection, read `process.env`, or create a global
+singleton while the module is imported. A profile factory creates one runtime
+when the application or tool starts, and an explicit disposer closes resources
+when that process stops.
+
+The same object can expose a workflow catalog and the allowlisted step registry
+to application code and tooling. These values are references only; they are not
+compiled or instantiated by `defineWfConfig()`:
+
+```typescript
+import { defineWfConfig, InMemoryWorkflowStepRegistry } from "@circulo-ai/wf";
+
+const registry = new InMemoryWorkflowStepRegistry();
+// Register application-owned step factories here.
+const workflows = {
+  orders: () => import("./src/workflows/orders.js"),
+};
+
+declare function createApplicationRuntime(): unknown;
+
+export const wf = defineWfConfig({
+  registry,
+  workflows,
+  createRuntime: () => createApplicationRuntime(),
+});
+```
+
+An application can use `wf.workflows` and `wf.registry` to compile or select a
+workflow, while a CLI can use them for validation and graph generation. The
+runtime factory remains responsible for infrastructure and lifecycle.
+
+### One runtime without profiles
+
+For a small application, define one lazy runtime factory:
+
+```typescript
+import {
+  defineWfConfig,
+  InMemoryEventBus,
+  InMemoryEventStore,
+  InMemoryWorkflowStore,
+  WorkflowEngine,
+} from "@circulo-ai/wf";
+
+type AppRuntime = {
+  engine: WorkflowEngine<Record<string, never>, unknown, unknown>;
+};
+
+declare const workflowDefinition: import("@circulo-ai/wf").WorkflowDefinition<
+  Record<string, never>,
+  unknown,
+  unknown
+>;
+declare const input: unknown;
+
+export const wf = defineWfConfig<
+  Readonly<Record<string, string | undefined>>,
+  AppRuntime
+>({
+  createRuntime: () => {
+    const engine = new WorkflowEngine({
+      workflowStore: new InMemoryWorkflowStore(),
+      eventStore: new InMemoryEventStore(),
+      eventBus: new InMemoryEventBus(),
+      enableAutoResume: false,
+    });
+
+    return { engine };
+  },
+});
+
+const handle = await wf.createRuntime();
+await handle.runtime.engine.createWorkflow(workflowDefinition, input);
+await handle.close();
+```
+
+`createRuntime()` is lazy, so importing `wf.config.ts` does not create a
+connection or start a worker. `handle.close()` is safe to call more than once;
+the configured disposer runs at most once.
+
+### Development, test, staging, and production profiles
+
+Named profiles allow the same configuration module to be used by the server,
+workers, tests, and development tooling:
+
+```typescript
+import {
+  defineWfConfig,
+  InMemoryEventBus,
+  InMemoryEventStore,
+  InMemoryWorkflowStore,
+  WorkflowEngine,
+} from "@circulo-ai/wf";
+
+interface Environment {
+  DATABASE_URL?: string;
+  REDIS_URL?: string;
+}
+
+interface ApplicationRuntime {
+  engine: WorkflowEngine<Record<string, never>, unknown, unknown>;
+  closeConnections?: () => Promise<void>;
+}
+
+declare function createProductionAdapters(env: Environment): Promise<{
+  workflowStore: import("@circulo-ai/wf").WorkflowStore<
+    Record<string, never>,
+    unknown,
+    unknown
+  >;
+  eventStore: import("@circulo-ai/wf").EventStore<unknown>;
+  eventBus: import("@circulo-ai/wf").EventBus<unknown>;
+  close: () => Promise<void>;
+}>;
+
+export const wf = defineWfConfig<Environment, ApplicationRuntime>({
+  defaultProfile: "development",
+  profiles: {
+    development: {
+      create: () => ({
+        engine: new WorkflowEngine({
+          workflowStore: new InMemoryWorkflowStore(),
+          eventStore: new InMemoryEventStore(),
+          eventBus: new InMemoryEventBus(),
+          enableAutoResume: false,
+        }),
+      }),
+      dispose: ({ engine }) => engine.shutdown(),
+    },
+
+    production: {
+      create: async ({ env }) => {
+        if (!env.DATABASE_URL || !env.REDIS_URL) {
+          throw new Error("DATABASE_URL and REDIS_URL are required");
+        }
+
+        // These factories belong to the application or connector package.
+        // @circulo-ai/wf supplies the contracts; it does not assume a vendor.
+        const adapters = await createProductionAdapters(env);
+        return {
+          engine: new WorkflowEngine({
+            workflowStore: adapters.workflowStore,
+            eventStore: adapters.eventStore,
+            eventBus: adapters.eventBus,
+            enableAutoResume: false,
+          }),
+          closeConnections: adapters.close,
+        };
+      },
+      dispose: async ({ engine, closeConnections }) => {
+        await engine.shutdown();
+        await closeConnections?.();
+      },
+    },
+  },
+});
+```
+
+The production adapter factory is application-owned. It can compose different
+ports independently, for example PostgreSQL for workflow state and events,
+Redis for pub/sub and task queues, and a separate lock or idempotency store:
+
+```text
+WorkflowStore       PostgreSQL
+EventStore          PostgreSQL
+EventBus            Redis
+WorkflowHistory     PostgreSQL
+TaskQueue           Redis
+Locks               Redis or PostgreSQL
+Idempotency         Redis or PostgreSQL
+```
+
+The runtime constructor receives these dependencies once. Individual workflow
+definitions and request handlers do not need to receive connector instances.
+The current engine contracts are described in `WorkflowEngineConfig`; the
+configuration API only coordinates their construction and lifecycle.
+
+### Application usage
+
+Create one runtime during application startup and keep its handle until
+shutdown:
+
+```typescript
+import { wf } from "./wf.config.js";
+
+const handle = await wf.createRuntime({
+  profile: process.env.WF_PROFILE ?? "production",
+  env: process.env,
+});
+
+const { engine } = handle.runtime;
+const workflowId = await engine.createWorkflow(workflowDefinition, input);
+console.log({ workflowId });
+
+process.once("SIGTERM", () => {
+  void handle.close();
+});
+```
+
+Expected behavior:
+
+```text
+module import       no connections opened
+createRuntime()     adapter factories run once for this runtime
+worker.start()      workers begin, when the runtime includes workers
+handle.close()      engine and external clients shut down
+```
+
+Do not call `createRuntime()` for every HTTP request. That would create a new
+pool or client set for every request and can exhaust database or Redis
+connections. Create it once at the process composition boundary and inject the
+resulting runtime into request handlers.
+
+### Reusing the configuration from the CLI
+
+The planned CLI can load the same `wf.config.ts` and select a profile:
+
+```bash
+wf --profile development status workflow_123
+wf --profile staging events workflow_123 --follow
+wf --profile production run OrdersWorkflow --input ./input.json
+```
+
+The CLI supplies its environment and receives the runtime handle from the
+configuration. No Redis URL, PostgreSQL pool, or memory store needs to be
+passed as a command-line argument. Commands that need a capability should
+fail clearly when that capability is not included in the selected runtime.
+
+For example:
+
+```text
+WF-2001 No workflow query capability configured for profile "production".
+Configure a WorkflowStore or a remote workflow client for this command.
+```
+
+The same configuration contract can also return a remote client instead of a
+direct engine for production operations. Direct mode is useful for local
+tools, migrations, and trusted administrative jobs; remote mode is safer when
+the server already owns authorization, tenant isolation, connection pools, and
+workflow control.
+
+### Memory and file adapter boundaries
+
+An in-memory adapter belongs to one JavaScript process. A server and a separate
+CLI process cannot share the same `InMemoryWorkflowStore`, event bus, or queue;
+each process would create a different instance. Memory profiles are therefore
+appropriate for local development, unit tests, and same-process tools.
+
+File adapters can be shared only when their implementation provides atomic
+writes, process-safe locks, recovery, and corruption handling. PostgreSQL and
+Redis are appropriate cross-process boundaries when the application-owned
+adapters satisfy the atomic compare-and-set, lease, enqueue, and idempotency
+contracts documented by this package.
+
+### Configuration errors and cancellation
+
+Configuration errors are raised before a runtime is returned:
+
+```typescript
+import { WfConfigError } from "@circulo-ai/wf";
+
+try {
+  const handle = await wf.createRuntime({ profile: "missing" });
+  // The application owns this handle until shutdown.
+  await handle.close();
+} catch (error) {
+  if (error instanceof WfConfigError) {
+    console.error(error.code, error.message);
+  }
+}
+```
+
+Available error codes are:
+
+| Code                   | Meaning                                                   |
+| ---------------------- | --------------------------------------------------------- |
+| `WF_CONFIG_INVALID`    | The configuration has no valid factory or profile setup.  |
+| `WF_PROFILE_NOT_FOUND` | The requested profile is not defined.                     |
+| `WF_RUNTIME_ABORTED`   | Creation was cancelled before a usable runtime was ready. |
+
+Pass an `AbortSignal` when startup has a deadline or can be cancelled:
+
+```typescript
+const controller = new AbortController();
+const handle = await wf.createRuntime({ signal: controller.signal });
+```
+
+If cancellation arrives after a factory has created resources but before the
+runtime is returned, the configured disposer is called before the cancellation
+error is reported. If cleanup also fails, an `AggregateError` preserves both
+the creation/cancellation error and the cleanup error.
+
+`defineWfConfig()` does not create a hidden global singleton. This is
+intentional: tests can create isolated runtimes, workers can own separate
+profiles, and applications can control startup and shutdown explicitly.
 
 ## Mental model
 

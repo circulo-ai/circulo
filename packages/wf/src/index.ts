@@ -2,6 +2,9 @@
 export { WorkflowEngine } from "./engine/workflow-engine";
 export { WorkflowRunner } from "./engine/workflow-runner";
 
+// Application and CLI composition root
+export * from "./config";
+
 // DSL
 export {
   chunk,
