@@ -24,7 +24,7 @@
     "LICENSE"
   ],
   "bin": {
-    "wf": "./dist/cli.mjs"
+    "wf": "dist/cli.mjs"
   },
   "main": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
