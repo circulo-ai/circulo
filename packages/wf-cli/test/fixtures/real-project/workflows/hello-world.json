@@ -1,0 +1,15 @@
+{
+  "id": "HelloWorld",
+  "version": 1,
+  "steps": [
+    {
+      "id": "Hello",
+      "stepType": "demo.Hello",
+      "nextStepId": "Goodbye"
+    },
+    {
+      "id": "Goodbye",
+      "stepType": "demo.Goodbye"
+    }
+  ]
+}
