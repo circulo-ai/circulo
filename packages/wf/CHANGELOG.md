@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.0
+
+### Minor Changes
+
+- 2a0ad6a: Add `defineWfConfig()` and the `@circulo-ai/wf/config` entry point for lazy, profile-aware application and tooling runtime composition with explicit lifecycle management.
+
 ## 2.2.1
 
 ### Patch Changes

@@ -7,6 +7,7 @@ export default defineConfig({
     index: "src/index.ts",
     react: "src/react.ts",
     definitions: "src/definitions.ts",
+    config: "src/config.ts",
   },
   outDir: "dist",
   clean: true,

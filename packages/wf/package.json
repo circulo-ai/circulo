@@ -1,6 +1,6 @@
 {
   "name": "@circulo-ai/wf",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "description": "Production-quality, framework-agnostic TypeScript workflow orchestration runtime with event-sourced execution and strongly-typed DSL",
   "type": "module",
   "private": false,
@@ -59,6 +59,11 @@
       "types": "./dist/definitions.d.mts",
       "import": "./dist/definitions.mjs",
       "default": "./dist/definitions.mjs"
+    },
+    "./config": {
+      "types": "./dist/config.d.mts",
+      "import": "./dist/config.mjs",
+      "default": "./dist/config.mjs"
     }
   },
   "peerDependencies": {
