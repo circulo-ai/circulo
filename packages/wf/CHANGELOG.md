@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.2.1
+
+### Patch Changes
+
+- 35b8e2b: Harden durable replay by validating activity inputs against recorded history, preventing duplicate activity side effects after a recorded completion is redelivered, and preserving the original workflow failure when Saga compensations also fail.
+
 ## 2.2.0
 
 ### Minor Changes
