@@ -13,9 +13,11 @@ export interface CliArguments {
 }
 
 export function parseCliArguments(argv: readonly string[]): CliArguments {
+  if (argv[0] === "-h" || argv[0] === "--help") return { command: "help", positional: [], options: {} };
   const [command = "help", ...rest] = argv;
   const positional: string[] = [];
   const options: Record<string, string | boolean> = {};
+  const supportedOptions = new Set(["config", "profile", "json", "force", "format"]);
   for (let index = 0; index < rest.length; index += 1) {
     const argument = rest[index];
     if (!argument) continue;
@@ -26,6 +28,7 @@ export function parseCliArguments(argv: readonly string[]): CliArguments {
     const [rawKey, inlineValue] = argument.slice(2).split("=", 2);
     const key = rawKey ?? "";
     if (!key) throw new Error("Option names must not be empty.");
+    if (!supportedOptions.has(key)) throw new Error(`Unknown option "--${key}".`);
     if (inlineValue !== undefined) {
       options[key] = inlineValue;
       continue;

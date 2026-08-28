@@ -43,11 +43,12 @@
     "build": "bun ./node_modules/tsdown/dist/run.mjs",
     "typecheck": "bun ./node_modules/typescript/bin/tsc --noEmit",
     "lint": "eslint src",
-    "pretest": "bun --filter @circulo-ai/wf build",
+    "pretest": "bun --filter @circulo-ai/wf build && bun run build",
     "test": "bun ./node_modules/vitest/vitest.mjs run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "release": "bun run build && npm publish --access public"
+    "release": "bun run build && npm publish --access public",
+    "prepublishOnly": "bun run build"
   },
   "dependencies": {
     "@circulo-ai/wf": "^2.3.0",

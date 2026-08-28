@@ -18,6 +18,11 @@ describe("CLI argument parsing", () => {
         options: { config: "config.ts", json: true },
       });
   });
+
+  it("supports help aliases and rejects misspelled options", () => {
+    expect(parseCliArguments(["--help"]).command).toBe("help");
+    expect(() => parseCliArguments(["help", "--jsn"])).toThrow('Unknown option "--jsn"');
+  });
 });
 
 describe("wf init", () => {

@@ -74,6 +74,22 @@ jobs:
           bun --filter @circulo-ai/wf-cli typecheck
           bun --filter @circulo-ai/wf-cli build
 
+      - name: Verify CLI package artifact
+        run: |
+          set -euo pipefail
+          test -x packages/wf-cli/dist/cli.mjs
+          node packages/wf-cli/dist/cli.mjs --help
+          cd packages/wf-cli
+          npm pack --dry-run --json > "$RUNNER_TEMP/wf-cli-pack.json"
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const packages = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/wf-cli-pack.json", "utf8"));
+            const files = new Set(packages[0].files.map((file) => file.path));
+            for (const required of ["package.json", "README.md", "dist/cli.mjs", "dist/index.mjs", "dist/index.d.mts"]) {
+              if (!files.has(required)) throw new Error(`Missing ${required} from wf-cli package artifact`);
+            }
+          '
+
       - name: Test public packages
         run: |
           set -euo pipefail

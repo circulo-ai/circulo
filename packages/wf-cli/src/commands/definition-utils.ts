@@ -14,7 +14,12 @@ export async function loadAndValidateDefinitionAsync(
 ): Promise<ValidatedWorkflowDocument> {
   const inputPath = requiredPositional(args, "workflow definition path");
   const absolutePath = resolve(context.cwd, inputPath);
-  const source = readFileSync(absolutePath, "utf8");
+  let source: string;
+  try {
+    source = readFileSync(absolutePath, "utf8");
+  } catch (error) {
+    throw new Error(`Unable to read workflow definition ${absolutePath}: ${errorMessage(error)}`);
+  }
   const format = definitionFormat(absolutePath);
   const { loadWfProject } = await import("../config/load-config");
   const project = await loadWfProject(context.cwd, optionString(args, "config"));
@@ -89,4 +94,8 @@ function orderStepIds(document: SerializedWorkflowDefinition): readonly string[]
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "unknown file system error";
 }
