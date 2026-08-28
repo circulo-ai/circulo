@@ -125,6 +125,25 @@ try {
 
 The CLI does not construct that runtime during validation. This makes `wf validate` safe to use in CI and pre-commit hooks even when production credentials are unavailable.
 
+When loading an existing TypeScript application config, the CLI automatically
+resolves the nearest `tsconfig.json` path aliases. It accepts either a default
+export or a named `wf` export, so an application composition root such as
+`apps/server/src/workflows/runtime/wf-config.ts` can be inspected directly:
+
+```bash
+bun --env-file=apps/server/.env wf doctor \
+  --config apps/server/src/workflows/runtime/wf-config.ts \
+  --profile development
+```
+
+`doctor` and `registry list` inspect the config without invoking its
+`createRuntime()` callback. The application module itself must still be safe
+to import: avoid opening network connections or creating pools at module scope
+when you want completely side-effect-free CLI diagnostics. A runtime config
+that has no step registry reports zero registry entries; register declarative
+step factories explicitly when you want `validate`, `inspect`, and `graph` to
+resolve class-based `StepType` values.
+
 ## Validate a workflow
 
 ```bash
