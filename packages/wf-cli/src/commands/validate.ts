@@ -1,7 +1,7 @@
-import pc from "picocolors";
 import { loadAndValidateDefinitionAsync, isJsonOutput } from "./definition-utils";
 import type { CliArguments } from "./command-runner";
 import type { CliCommandContext, CliCommandResult } from "../types";
+import { renderOutput } from "../output/printer";
 
 export async function executeValidateCommand(
   args: CliArguments,
@@ -17,16 +17,22 @@ export async function executeValidateCommand(
     registryEntries: validated.registry.list().length,
     profile: validated.profile,
   };
-  if (isJsonOutput(args)) return { exitCode: 0, output: JSON.stringify(result, null, 2) };
+  if (isJsonOutput(args)) return { exitCode: 0, output: renderOutput({ type: "json", value: result }) };
   return {
     exitCode: 0,
-    output: [
-      `${pc.green("✓")} Parsed ${validated.format.toUpperCase()}`,
-      `${pc.green("✓")} Workflow: ${validated.document.id} v${validated.document.version}`,
-      `${pc.green("✓")} Steps: ${validated.document.steps.length}`,
-      `${pc.green("✓")} Linear chain: ${validated.orderedStepIds.join(" → ")}`,
-      `${pc.green("✓")} Registry entries: ${validated.registry.list().length}`,
-      "Workflow is valid.",
-    ].join("\n"),
+    output: `${renderOutput({
+      type: "table",
+      columns: [
+        { key: "check", header: "Check", width: 24 },
+        { key: "result", header: "Result" },
+      ],
+      rows: [
+        { check: "Document", result: `${validated.format.toUpperCase()} parsed` },
+        { check: "Workflow", result: `${validated.document.id} v${validated.document.version}` },
+        { check: "Steps", result: validated.document.steps.length },
+        { check: "Linear chain", result: validated.orderedStepIds.join(" → ") },
+        { check: "Registry entries", result: validated.registry.list().length },
+      ],
+    })}\nWorkflow is valid.`,
   };
 }

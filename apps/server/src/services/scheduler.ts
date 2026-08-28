@@ -148,8 +148,10 @@ async function expirePendingApprovals(): Promise<void> {
   );
 }
 
-export function startScheduler() {
-  if (schedulerState[SCHEDULER_KEY]) return;
+export function startScheduler(): () => void {
+  if (schedulerState[SCHEDULER_KEY]) {
+    return () => stopScheduler();
+  }
   void tick().catch((error) =>
     console.error("[Scheduler] initial tick failed", error),
   );
@@ -158,4 +160,12 @@ export function startScheduler() {
       console.error("[Scheduler] tick failed", error),
     );
   }, 15_000);
+  return () => stopScheduler();
+}
+
+export function stopScheduler(): void {
+  const interval = schedulerState[SCHEDULER_KEY];
+  if (!interval) return;
+  clearInterval(interval);
+  schedulerState[SCHEDULER_KEY] = undefined;
 }

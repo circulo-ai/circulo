@@ -17,6 +17,34 @@ npm install @circulo-ai/wf @circulo-ai/wf-cli
 
 The package installs the YAML parser for the CLI, so `.yaml` and `.yml` files work without an extra CLI dependency. The runtime package remains free to use its optional YAML peer dependency independently.
 
+## Output formatting
+
+Human-readable commands use a shared typed print layer backed by [`cli-table3`](https://www.npmjs.com/package/cli-table3). This keeps command output consistent: records are rendered as Unicode tables, structured values are pretty-printed JSON, and graph text is emitted without decoration so it can be copied directly into another tool.
+
+Use `--json` whenever another program will consume the result. JSON output is two-space indented, contains no ANSI color codes, and is stable enough for CI logs and scripts. Human output is intended for people and may include headings and tables.
+
+```bash
+npx wf validate workflows/orders.json
+npx wf validate workflows/orders.json --json
+```
+
+Table cells support strings, numbers, booleans, `bigint`, `null`, and `undefined`. `null` is shown as `null` and an absent value is shown as `—`. Long cell values wrap at word boundaries when possible. Empty collections say `No results.` instead of producing a confusing blank table.
+
+The same printer is available to typed integrations:
+
+```ts
+import { formatJson, formatTable, renderOutput } from "@circulo-ai/wf-cli";
+
+const json = formatJson({ healthy: true, attempts: 2 });
+const table = formatTable(
+  [{ key: "name", header: "Name" }, { key: "status", header: "Status" }],
+  [{ name: "orders", status: "ready" }],
+);
+const output = renderOutput({ type: "json", value: { json, table } });
+```
+
+`renderOutput()` accepts a typed `text`, `lines`, `json`, or `table` value. Keeping formatting at this boundary lets editor integrations and CI wrappers reuse the exact same behavior without writing to process streams.
+
 ## Start a project
 
 Run this in an empty application directory:
@@ -106,11 +134,19 @@ npx wf validate workflows/orders.json
 Example output:
 
 ```text
-✓ Parsed JSON
-✓ Workflow: OrderFulfillment v1
-✓ Steps: 2
-✓ Linear chain: reserve → charge
-✓ Registry entries: 2
+┌──────────────────┬─────────────────────┐
+│ Check            │ Result              │
+├──────────────────┼─────────────────────┤
+│ Document         │ JSON parsed         │
+├──────────────────┼─────────────────────┤
+│ Workflow         │ OrderFulfillment v1 │
+├──────────────────┼─────────────────────┤
+│ Steps            │ 2                   │
+├──────────────────┼─────────────────────┤
+│ Linear chain     │ reserve → charge    │
+├──────────────────┼─────────────────────┤
+│ Registry entries │ 2                   │
+└──────────────────┴─────────────────────┘
 Workflow is valid.
 ```
 
@@ -215,8 +251,13 @@ npx wf registry list
 
 ```text
 Config: /app/wf.config.ts
-- orders.ReserveInventory
-- orders.ChargePayment
+┌─────────────────────────┐
+│ Allowlisted step type   │
+├─────────────────────────┤
+│ orders.ReserveInventory │
+├─────────────────────────┤
+│ orders.ChargePayment    │
+└─────────────────────────┘
 ```
 
 JSON output is stable and suitable for tooling:
@@ -235,11 +276,19 @@ npx wf doctor
 
 ```text
 WF project is ready.
-Config: /app/wf.config.ts
-Profile: development
-Profiles: development, test
-Registry entries: 2
-Runtime construction: not invoked by doctor
+┌──────────────────────┬───────────────────────┐
+│ Property             │ Value                 │
+├──────────────────────┼───────────────────────┤
+│ Config               │ /app/wf.config.ts     │
+├──────────────────────┼───────────────────────┤
+│ Profile              │ development           │
+├──────────────────────┼───────────────────────┤
+│ Profiles             │ development, test     │
+├──────────────────────┼───────────────────────┤
+│ Registry entries     │ 2                     │
+├──────────────────────┼───────────────────────┤
+│ Runtime construction │ not invoked by doctor │
+└──────────────────────┴───────────────────────┘
 ```
 
 `doctor` checks that the config exports `defineWfConfig()`, that the selected profile exists, and that the registry is callable. It deliberately does not perform a health check against external infrastructure. Add infrastructure probes to your application’s own deployment health endpoint, where timeouts, credentials, and redaction policy are controlled by you.

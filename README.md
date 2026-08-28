@@ -39,6 +39,22 @@ bun run build
 
 The server build bundles the application and the Circulo Workflow Engine directly. Production orchestration state, workflow events, optimistic versions, and execution locks are stored in PostgreSQL, and interrupted runs are reclaimed on server startup. The live HTTP output channel is instance-local, so deployments with multiple API instances should use sticky routing for an active stream or add a shared pub/sub adapter at the load-balancer boundary.
 
+The server composes the current `@circulo-ai/wf` 2.3 runtime through
+`apps/server/src/workflows/runtime/wf-config.ts`. Runtime creation is lazy and
+profile-aware (`development`, `test`, and `production`). Production uses the
+durable PostgreSQL stores and `AdapterEventBus` over Redis; each API instance
+has a dedicated Redis subscriber, while PostgreSQL remains the authoritative
+workflow/event log. The runtime exposes engine health through
+`/health/ready` and is closed, together with the scheduler, database pool, and
+shared Redis client, on `SIGTERM`/`SIGINT`.
+
+For a multi-instance deployment, configure `REDIS_URL` on every API instance
+and run the database migrations before accepting traffic. The event transport
+is deliberately not used as the source of truth: if a subscriber is restarted,
+the chat workflow service replays persisted events from PostgreSQL. External
+side effects in workflow steps must still use their own business idempotency
+keys because `wf` provides at-least-once durable execution semantics.
+
 Production requires valid values for `DATABASE_URL`, `BETTER_AUTH_URL`,
 `BETTER_AUTH_SECRET`, `ENCRYPTION_KEY`, `INTERNAL_API_SECRET`, and the
 AI/provider credentials used by configured agents. Production storage defaults

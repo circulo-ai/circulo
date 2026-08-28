@@ -1,6 +1,7 @@
 import { loadAndValidateDefinitionAsync, isJsonOutput, optionString } from "./definition-utils";
 import type { CliArguments } from "./command-runner";
 import type { CliCommandContext, CliCommandResult } from "../types";
+import { renderOutput } from "../output/printer";
 
 export async function executeGraphCommand(
   args: CliArguments,
@@ -11,7 +12,7 @@ export async function executeGraphCommand(
   if (format === "json") {
     return {
       exitCode: 0,
-      output: JSON.stringify({ workflow: validated.document.id, steps: validated.orderedStepIds }, null, 2),
+      output: renderOutput({ type: "json", value: { workflow: validated.document.id, steps: validated.orderedStepIds } }),
     };
   }
   if (format !== "mermaid") throw new Error(`Unsupported graph format "${format}". Use mermaid or json.`);
@@ -21,7 +22,7 @@ export async function executeGraphCommand(
     lines.push(`  ${mermaidId(stepId)}[${stepId}]`);
     if (next) lines.push(`  ${mermaidId(stepId)} --> ${mermaidId(next)}`);
   }
-  return { exitCode: 0, output: lines.join("\n") };
+  return { exitCode: 0, output: renderOutput({ type: "text", value: lines.join("\n") }) };
 }
 
 function mermaidId(value: string): string {
