@@ -1752,6 +1752,201 @@ projections, or hosted KV and pub/sub services. The package exports
 `MapJsonKeyValueStore`, `MapWorkflowLockStore`, and `MapPubSubAdapter` for
 local adapter tests.
 
+### First-party Redis adapters
+
+The package also includes reusable Redis implementations. They do not import a
+Redis library at runtime; instead, they accept the small `RedisCommandClient`
+and `RedisPubSubClient` surfaces exported by `@circulo-ai/wf`. This keeps
+`ioredis`, `redis`, and test doubles interchangeable and keeps the core bundle
+free of a mandatory infrastructure dependency.
+
+Install the client you prefer in the application:
+
+```bash
+bun add ioredis
+```
+
+For an ioredis-compatible client, the complete engine composition is:
+
+```typescript
+import Redis from "ioredis";
+import {
+  createRedisWorkflowAdapters,
+  WorkflowEngine,
+} from "@circulo-ai/wf";
+
+const redis = new Redis(process.env.REDIS_URL);
+const adapters = createRedisWorkflowAdapters({
+  client: redis,
+  stepsFactory: () => checkoutWorkflow.steps,
+  workflowKeyPrefix: "acme:wf:workflow:",
+  eventKeyPrefix: "acme:wf:event:",
+  lockKeyPrefix: "acme:wf:lock:",
+  eventTopicPrefix: "acme:wf:topic:",
+  idempotencyKeyPrefix: "acme:wf:idempotency:",
+});
+
+const engine = new WorkflowEngine({
+  workflowStore: adapters.workflowStore,
+  eventStore: adapters.eventStore,
+  eventBus: adapters.eventBus,
+});
+
+await engine.createAndRun(checkoutWorkflow, input);
+await engine.shutdown();
+await adapters.close();
+await redis.quit();
+```
+
+The factory returns `workflowStore`, `eventStore`, `eventBus`,
+`idempotencyStore`, and the lower-level `keyValueStore`, `lockStore`, and
+`pubSub` when you need to compose a custom engine. Redis workflow snapshots
+are JSON values under the configured workflow prefix; events are append-only
+JSON values under the event prefix. Workflow updates use an atomic Lua
+compare-and-set on the persisted `version`, and locks use NX/PX ownership
+checks. A stale worker receives `false` from its update and must reload the
+workflow.
+
+`RedisJsonKeyValueStore.list()` uses Redis `SCAN`, not `KEYS`, so listing does
+not block a production Redis server. Pub/sub is a notification channel, not a
+durable event log: keep `eventStore` as the source of truth and make consumers
+safe to run more than once. `RedisPubSubAdapter.close()` closes only its
+dedicated subscriber connection; the application still owns the primary Redis
+client lifecycle.
+
+Individual components are available when the factory is too opinionated:
+
+```typescript
+import {
+  AdapterEventBus,
+  JsonEventStore,
+  JsonWorkflowStore,
+  RedisIdempotencyStore,
+  RedisJsonKeyValueStore,
+  RedisPubSubAdapter,
+  RedisWorkflowLockStore,
+} from "@circulo-ai/wf/adapters";
+
+const values = new RedisJsonKeyValueStore(redis);
+const locks = new RedisWorkflowLockStore(redis, "acme:wf:lock:");
+const workflowStore = new JsonWorkflowStore(
+  values,
+  locks,
+  () => checkoutWorkflow.steps,
+);
+const eventStore = new JsonEventStore(values, "acme:wf:event:");
+const eventBus = new AdapterEventBus(
+  new RedisPubSubAdapter(redis),
+  "acme:wf:topic:",
+);
+const idempotency = new RedisIdempotencyStore(
+  redis,
+  "acme:wf:idempotency:",
+);
+```
+
+For local development, use the same composition shape without infrastructure:
+
+```typescript
+import { createInMemoryWorkflowAdapters } from "@circulo-ai/wf";
+
+const adapters = createInMemoryWorkflowAdapters<CheckoutState, CheckoutInput, CheckoutOutput>();
+const engine = new WorkflowEngine(adapters);
+```
+
+If your application has a different durable backend, keep the backend-owned
+client and use `createJsonWorkflowAdapters()` with its implementation of
+`JsonKeyValueStore`, `WorkflowLockStore`, and `PubSubAdapter`. This is the
+supported adapter pattern for SQLite, DynamoDB, S3-backed projections, NATS,
+Kafka, or hosted storage services: the workflow package supplies composition
+and correctness contracts while the application supplies the vendor client.
+The `JsonWorkflowStore` and `JsonEventStore` still enforce the same snapshot,
+append-only, CAS, and ordering behavior.
+
+Redis adapter construction fails fast for invalid lock TTLs, invalid scan
+counts, and non-JSON values. `releaseLock()` and idempotency release only
+delete records owned by the supplied holder/reference. These checks prevent a
+late worker from deleting a newer worker's lease.
+
+### First-party PostgreSQL adapters
+
+PostgreSQL adapters use a driver-neutral `PostgresQueryClient`, so applications
+can pass `pg`, `postgres.js`, or a transaction-aware wrapper. For
+`postgres.js`, the package includes a typed bridge:
+
+```typescript
+import postgres from "postgres";
+import {
+  createPostgresJsQueryClient,
+  createPostgresWorkflowAdapters,
+} from "@circulo-ai/wf/adapters";
+
+const sql = postgres(process.env.DATABASE_URL, { prepare: false });
+const adapters = createPostgresWorkflowAdapters({
+  client: createPostgresJsQueryClient(sql),
+  // LISTEN/NOTIFY is intentionally an explicit port because postgres.js,
+  // pg, and serverless clients expose different listener lifecycles.
+  notifications: postgresNotifications,
+  stepsFactory: () => checkoutWorkflow.steps,
+  workflowKeyPrefix: "acme:wf:workflow:",
+  eventKeyPrefix: "acme:wf:event:",
+});
+
+await adapters.initialize(); // run once during deployment/startup
+const engine = new WorkflowEngine({
+  workflowStore: adapters.workflowStore,
+  eventStore: adapters.eventStore,
+  eventBus: adapters.eventBus,
+});
+```
+
+`PostgresJsonKeyValueStore` creates the `wf_json_values` table and
+`PostgresWorkflowLockStore` creates `wf_workflow_locks`. The factory also
+creates `wf_idempotency`. Pass `jsonValuesTable`, `locksTable`, or
+`idempotencyTable` to use migration-owned names. Table names are validated as
+SQL identifiers; values and keys are always parameters, never interpolated.
+Run `initialize()` from a release/migration step rather than from a request
+handler in a multi-worker deployment.
+
+The PostgreSQL composition gives you atomic version checks, row-backed leases,
+JSON workflow/event persistence, and idempotency claims. The notification
+port has this deliberately small contract:
+
+```typescript
+import type { PostgresNotificationTransport } from "@circulo-ai/wf/adapters";
+
+const postgresNotifications: PostgresNotificationTransport = {
+  publish: async (channel, payload) => {
+    await listenClient.notify(channel, payload);
+  },
+  subscribe: (channel, callback) =>
+    listenClient.subscribe(channel, callback),
+  close: async () => listenClient.close(),
+};
+```
+
+The `listenClient` in this example is application-owned because its
+connection-pinning and shutdown behavior depend on the chosen PostgreSQL
+driver. If you already use Redis for notifications, compose PostgreSQL's
+`workflowStore` and `eventStore` with `RedisPubSubAdapter` instead; adapters
+are independent and do not require one backend for every concern.
+
+### Choosing and replacing adapters
+
+| Concern | Development | Redis deployment | PostgreSQL deployment | Custom replacement |
+| --- | --- | --- | --- | --- |
+| Workflow state | `InMemoryWorkflowStore` | `createRedisWorkflowAdapters().workflowStore` | `createPostgresWorkflowAdapters().workflowStore` | Implement `WorkflowStore` or use `JsonWorkflowStore` |
+| Workflow events | `InMemoryEventStore` | Redis JSON event store | PostgreSQL JSON event store | Implement `EventStore` |
+| Live notifications | `InMemoryEventBus` | `RedisPubSubAdapter` | `PostgresNotificationAdapter` | Implement `EventBus` or `PubSubAdapter` |
+| Idempotency | `InMemoryIdempotencyStore` | `RedisIdempotencyStore` | `PostgresIdempotencyStore` | Implement `IdempotencyStore` |
+| History, queues, schedules, limits | Existing in-memory adapters | Keep the explicit port or provide a backend-specific implementation | Keep the explicit port or provide a backend-specific implementation | Implement the corresponding model contract |
+
+The package intentionally does not pretend that a generic JSON store is a
+durable replay history, task queue, scheduler, or rate limiter. Those ports
+have different atomicity and leasing requirements. Use a backend adapter that
+implements the exact contract, or keep your application-owned implementation;
+the engine never requires a particular vendor.
+
 Restart behavior is explicit:
 
 ```typescript
@@ -1972,7 +2167,10 @@ The repository covers these scenarios in `test/workflow.test.ts` and
 | `WorkflowHookManager` / `WorkflowHooks`                                      | Lifecycle registration and dispatch.                                     |
 | `InMemory*`                                                                  | Local stores, bus, metrics, and testing implementations.                 |
 | `JsonWorkflowStore` / `JsonEventStore`                                       | JSON-backed durable adapters.                                            |
+| `createJsonWorkflowAdapters` / `createInMemoryWorkflowAdapters`              | Backend-neutral and local composition helpers.                           |
 | `AdapterEventBus`                                                            | Pub/sub transport bridge.                                                |
+| `createRedisWorkflowAdapters` / `createPostgresWorkflowAdapters`              | Ready-to-compose durable backend adapters.                               |
+| `Redis*` / `Postgres*` adapters                                               | JSON storage, locks, idempotency, and notification transports.           |
 | `ReplayWorkflowRunner` / `WorkflowReplayCursor`                              | Replay-safe durable workflow execution and history validation.           |
 | `Worker` / `RecoveryWorker`                                                  | Leased at-least-once task processing and expired-lease recovery.         |
 | `ActivityWorker` / `TimerWorker`                                             | Durable activity and timer task handlers.                                |
@@ -2006,7 +2204,7 @@ src/
 ├── engine/                  # Scheduling and durable execution
 ├── hooks/                   # Hook registry and dispatch
 ├── models/                  # Public contracts and unions
-├── adapters/                # JSON stores and pub/sub bridges
+├── adapters/                # JSON, Redis, PostgreSQL, and pub/sub bridges
 ├── store/                   # In-memory implementations
 └── utils/                   # IDs, backoff, logging, and metrics
 
