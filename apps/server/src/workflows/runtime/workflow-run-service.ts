@@ -330,6 +330,7 @@ export class WorkflowRunService {
             workflowId: runId,
             chatId: input.chatId,
             messages: input.messages,
+            startedAt: new Date(event.timestamp).toISOString(),
           },
         });
         return;
@@ -859,6 +860,7 @@ export class WorkflowRunService {
             workflowId: runId,
             chatId: input.chatId,
             messages: input.messages,
+            startedAt: new Date(event.timestamp).toISOString(),
           },
         });
         handled.add(event.id);

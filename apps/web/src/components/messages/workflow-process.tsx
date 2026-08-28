@@ -59,6 +59,7 @@ export function WorkflowProcess({
   // memoizing this projection can otherwise leave the activity card stuck on
   // its first event until the terminal message arrives.
   const process = buildProcess(parts);
+  const [now, setNow] = useState(() => Date.now());
   const [actionStatuses, setActionStatuses] = useState<Record<string, string>>(
     {},
   );
@@ -68,7 +69,13 @@ export function WorkflowProcess({
       setProcessOpen(true);
     }
   }, [process?.status]);
+  useEffect(() => {
+    if (process?.status !== "running") return;
+    const timer = setInterval(() => setNow(Date.now()), 1_000);
+    return () => clearInterval(timer);
+  }, [process?.status]);
   if (!process) return null;
+  const liveElapsedMs = getElapsedMs(process, now);
   const visibleProcess = {
     ...process,
     approvals: process.approvals.map((approval) => ({
@@ -184,8 +191,7 @@ export function WorkflowProcess({
           </span>
           <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
             <span>{visibleProcess.activity.length} steps</span>
-            {visibleProcess.executionTimeMs !== undefined &&
-              formatDuration(visibleProcess.executionTimeMs)}
+            {liveElapsedMs !== undefined && formatDuration(liveElapsedMs)}
             <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180" />
           </span>
         </button>
@@ -579,6 +585,7 @@ function ProcessRow({ done, label }: { done?: boolean; label: string }) {
 
 type BuiltProcess = {
   status: WorkflowTrace["status"];
+  startedAt?: string;
   executionTimeMs?: number;
   classification?: Record<string, unknown>;
   plan?: Record<string, unknown>;
@@ -634,6 +641,7 @@ function buildProcess(parts: ChatMessage["parts"]): BuiltProcess | null {
   if (trace) {
     return {
       status: trace.status,
+      startedAt: trace.startedAt,
       executionTimeMs: trace.executionTimeMs,
       classification: trace.classification,
       plan: trace.plan,
@@ -652,6 +660,7 @@ function buildProcess(parts: ChatMessage["parts"]): BuiltProcess | null {
   const agents: WorkflowAgentTrace[] = [];
   const activeAgentIndexes = new Map<string, number>();
   let status: WorkflowTrace["status"] = "running";
+  let startedAt: string | undefined;
   let executionTimeMs: number | undefined;
   let classification: Record<string, unknown> | undefined;
   let plan: Record<string, unknown> | undefined;
@@ -662,6 +671,10 @@ function buildProcess(parts: ChatMessage["parts"]): BuiltProcess | null {
   const workflowSteps = new Map<string, ActivityEntry>();
 
   for (const event of events) {
+    if (event.type === "data-workflowStarted") {
+      const candidate = event.data.startedAt;
+      if (typeof candidate === "string") startedAt = candidate;
+    }
     if (event.type === "data-workflowStepStarted") {
       const stepId = String(event.data.stepId ?? "");
       if (stepId) {
@@ -753,6 +766,7 @@ function buildProcess(parts: ChatMessage["parts"]): BuiltProcess | null {
 
   return {
     status,
+    startedAt,
     executionTimeMs,
     classification,
     plan,
@@ -763,6 +777,16 @@ function buildProcess(parts: ChatMessage["parts"]): BuiltProcess | null {
     error,
     activity: [...buildActivity(events), ...workflowSteps.values()],
   };
+}
+
+function getElapsedMs(process: BuiltProcess, now: number): number | undefined {
+  if (process.status === "completed" || process.status === "failed") {
+    return process.executionTimeMs;
+  }
+  if (!process.startedAt) return undefined;
+  const startedAt = Date.parse(process.startedAt);
+  if (!Number.isFinite(startedAt)) return undefined;
+  return Math.max(0, now - startedAt);
 }
 
 function traceToEvents(trace: WorkflowTrace): ProcessEvent[] {

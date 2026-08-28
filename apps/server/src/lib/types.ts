@@ -96,6 +96,7 @@ export type CustomUIDataTypes = {
     workflowId: string;
     chatId: string;
     messages: ChatMessage[];
+    startedAt: string;
   };
   workflowStepStarted: {
     workflowId: string;
