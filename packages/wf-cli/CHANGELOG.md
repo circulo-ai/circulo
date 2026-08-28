@@ -1,5 +1,11 @@
 # @circulo-ai/wf-cli
 
+## 0.1.2
+
+### Patch Changes
+
+- dae2f52: Add consistent, typed CLI output formatting with readable tables for human output and stable pretty-printed JSON for automation.
+
 ## 0.1.1
 
 ### Patch Changes
