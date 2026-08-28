@@ -1,5 +1,11 @@
 # @circulo-ai/wf-cli
 
+## 0.1.3
+
+### Patch Changes
+
+- 51165a9: Make project config loading resolve the nearest TypeScript path aliases and support application composition roots that export their WF config as a named `wf` value.
+
 ## 0.1.2
 
 ### Patch Changes

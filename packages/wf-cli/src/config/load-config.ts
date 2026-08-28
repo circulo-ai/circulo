@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { extname, resolve } from "node:path";
+import { dirname, extname, resolve } from "node:path";
 import { createJiti } from "jiti";
 import type { WfConfig, WorkflowStepRegistryPort } from "@circulo-ai/wf";
 import type { LoadedWfProject } from "../types";
@@ -37,6 +37,7 @@ export async function loadWfProject(
 
   const module = await createJiti(import.meta.url, {
     moduleCache: false,
+    tsconfigPaths: findNearestTsconfig(configPath),
   }).import<unknown>(configPath);
   const candidate = unwrapDefaultExport(module);
   if (!isWfConfig(candidate)) {
@@ -50,7 +51,24 @@ export async function loadWfProject(
 function unwrapDefaultExport(value: unknown): unknown {
   if (!isRecord(value)) return value;
   const defaultExport = value["default"];
-  return defaultExport === undefined ? value : defaultExport;
+  if (defaultExport !== undefined && isWfConfig(defaultExport)) {
+    return defaultExport;
+  }
+  // Application composition roots commonly export `wf` as a named value so
+  // the server can keep other helpers in the same module.
+  if (value["wf"] !== undefined) return value["wf"];
+  return defaultExport ?? value;
+}
+
+function findNearestTsconfig(configPath: string): string | false {
+  let directory = dirname(configPath);
+  while (true) {
+    const candidate = resolve(directory, "tsconfig.json");
+    if (existsSync(candidate)) return candidate;
+    const parent = dirname(directory);
+    if (parent === directory) return false;
+    directory = parent;
+  }
 }
 
 function isWfConfig(value: unknown): value is WfConfig<unknown, unknown, unknown> {
