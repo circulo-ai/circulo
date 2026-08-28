@@ -28,7 +28,7 @@ import {
   Sparkles,
   XCircle,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ToolCallPart, type ToolPart } from "./tool-call-part";
 
@@ -54,7 +54,11 @@ export function WorkflowProcess({
   isReadonly?: boolean;
   parts: ChatMessage["parts"];
 }) {
-  const process = useMemo(() => buildProcess(parts), [parts]);
+  // Streaming UI message parts are intentionally rebuilt on every render.
+  // The AI SDK may update a message while retaining nested part references;
+  // memoizing this projection can otherwise leave the activity card stuck on
+  // its first event until the terminal message arrives.
+  const process = buildProcess(parts);
   const [actionStatuses, setActionStatuses] = useState<Record<string, string>>(
     {},
   );
@@ -592,8 +596,13 @@ type ActivityEntry = {
   detail?: string;
   status: "running" | "paused" | "completed" | "error";
   updates?: number;
-  kind?: "agent-start" | "agent-progress" | "agent-completed";
+  kind?:
+    | "agent-start"
+    | "agent-progress"
+    | "agent-completed"
+    | "workflow-step";
   agentId?: string;
+  stepId?: string;
 };
 
 function buildProcess(parts: ChatMessage["parts"]): BuiltProcess | null {
@@ -650,8 +659,36 @@ function buildProcess(parts: ChatMessage["parts"]): BuiltProcess | null {
   const approvals: NonNullable<WorkflowTrace["approvals"]> = [];
   const handoffs: NonNullable<WorkflowTrace["handoffs"]> = [];
   let error: string | undefined;
+  const workflowSteps = new Map<string, ActivityEntry>();
 
   for (const event of events) {
+    if (event.type === "data-workflowStepStarted") {
+      const stepId = String(event.data.stepId ?? "");
+      if (stepId) {
+        workflowSteps.set(stepId, {
+          id: `workflow-step-${stepId}`,
+          label: `Started ${String(event.data.stepName ?? stepId)}`,
+          status: "running",
+          kind: "workflow-step",
+          stepId,
+        });
+      }
+    }
+    if (event.type === "data-workflowStepCompleted") {
+      const stepId = String(event.data.stepId ?? "");
+      const current = workflowSteps.get(stepId);
+      if (current) {
+        workflowSteps.set(stepId, {
+          ...current,
+          label: `${String(event.data.stepName ?? stepId)} finished`,
+          status: "completed",
+          detail:
+            typeof event.data.durationMs === "number"
+              ? formatDuration(event.data.durationMs)
+              : undefined,
+        });
+      }
+    }
     if (event.type === "data-workflowClassification")
       classification = event.data;
     if (event.type === "data-workflowPlan") plan = event.data;
@@ -724,7 +761,7 @@ function buildProcess(parts: ChatMessage["parts"]): BuiltProcess | null {
     approvals,
     handoffs,
     error,
-    activity: buildActivity(events),
+    activity: [...buildActivity(events), ...workflowSteps.values()],
   };
 }
 

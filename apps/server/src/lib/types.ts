@@ -97,6 +97,18 @@ export type CustomUIDataTypes = {
     chatId: string;
     messages: ChatMessage[];
   };
+  workflowStepStarted: {
+    workflowId: string;
+    stepId: string;
+    stepName: string;
+    attempt: number;
+  };
+  workflowStepCompleted: {
+    workflowId: string;
+    stepId: string;
+    stepName: string;
+    durationMs: number;
+  };
   workflowClassification: RequestClassification;
   workflowPlan: ExecutionPlan;
   workflowAgentStarted: WorkflowAgentTrace;

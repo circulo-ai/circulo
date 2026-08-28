@@ -602,6 +602,19 @@ export async function executeAgentTaskStep(params: {
   const agent = chatAgent.agent;
 
   try {
+    // Announce the agent before loading integrations, tools, or model context.
+    // Those operations can be slow; the client must see active progress rather
+    // than appearing frozen after the workflow start event.
+    await sendAgentStartEvent(dataStream, {
+      agentId: agent.id,
+      agentName: agent.name,
+      task: agentPlan.task,
+      model: agent.model,
+      avatarUrl: agent.avatarUrl,
+      status: "running",
+      startedAt: startTime.toISOString(),
+    });
+
     // Build context from previous results
     let previousContext = "";
     if (previousResults.length > 0) {
@@ -788,17 +801,6 @@ Provide a focused response for YOUR specific task. Be concise but complete.`,
         chatAgent.customTemperature ?? agent.temperature,
       ),
       tools: { ...builtinTools, ...connectedAppTools, ...mcpTools },
-    });
-
-    // Send agent started event
-    await sendAgentStartEvent(dataStream, {
-      agentId: agent.id,
-      agentName: agent.name,
-      task: agentPlan.task,
-      model: agent.model,
-      avatarUrl: agent.avatarUrl,
-      status: "running",
-      startedAt: startTime.toISOString(),
     });
 
     const modelHistory = withKnowledgeImageContext(

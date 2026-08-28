@@ -334,13 +334,48 @@ export class WorkflowRunService {
         });
         return;
 
+      case "workflow.step.started": {
+        const payload = event.payload as {
+          stepId?: unknown;
+          stepName?: unknown;
+          attempt?: unknown;
+        };
+        if (
+          typeof payload.stepId !== "string" ||
+          typeof payload.stepName !== "string"
+        ) {
+          return;
+        }
+        publishWorkflowChunk(runId, {
+          type: "data-workflowStepStarted",
+          data: {
+            workflowId: runId,
+            stepId: payload.stepId,
+            stepName: payload.stepName,
+            attempt:
+              typeof payload.attempt === "number" ? payload.attempt : 0,
+          },
+        });
+        return;
+      }
+
       case "workflow.step.completed": {
         const payload = event.payload as {
           stepId: string;
           data: WorkflowOutput;
+          duration?: number;
         };
         const stepName = stepNames.get(payload.stepId);
         const state = payload.data;
+        publishWorkflowChunk(runId, {
+          type: "data-workflowStepCompleted",
+          data: {
+            workflowId: runId,
+            stepId: payload.stepId,
+            stepName: stepName ?? payload.stepId,
+            durationMs: payload.duration ?? 0,
+          },
+        });
 
         if (stepName === "classify-request" && state.classification) {
           publishWorkflowChunk(runId, {
@@ -831,15 +866,53 @@ export class WorkflowRunService {
         continue;
       }
 
+      if (event.eventType === "workflow.step.started") {
+        const payload = event.payload as {
+          stepId?: unknown;
+          stepName?: unknown;
+          attempt?: unknown;
+        };
+        if (
+          typeof payload.stepId === "string" &&
+          typeof payload.stepName === "string"
+        ) {
+          publishWorkflowChunk(runId, {
+            type: "data-workflowStepStarted",
+            data: {
+              workflowId: runId,
+              stepId: payload.stepId,
+              stepName: payload.stepName,
+              attempt:
+                typeof payload.attempt === "number" ? payload.attempt : 0,
+            },
+          });
+        }
+        handled.add(event.id);
+        this.handledEventIds.set(runId, handled);
+        continue;
+      }
+
       if (event.eventType === "workflow.step.completed") {
         const payload = event.payload as {
           stepId?: string;
           data?: WorkflowOutput;
+          duration?: number;
         };
         const state = payload.data;
         const stepName = payload.stepId
           ? stepNames.get(payload.stepId)
           : undefined;
+        if (payload.stepId) {
+          publishWorkflowChunk(runId, {
+            type: "data-workflowStepCompleted",
+            data: {
+              workflowId: runId,
+              stepId: payload.stepId,
+              stepName: stepName ?? payload.stepId,
+              durationMs: payload.duration ?? 0,
+            },
+          });
+        }
         if (stepName === "classify-request" && state?.classification) {
           publishWorkflowChunk(runId, {
             type: "data-workflowClassification",

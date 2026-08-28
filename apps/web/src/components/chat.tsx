@@ -223,6 +223,21 @@ export function Chat({
             });
             break;
 
+          case "data-workflowStepStarted":
+            setWorkflowStatus((prev) => ({
+              ...prev,
+              isRunning: true,
+              currentPhase: `step:${dataPart.data.stepName}`,
+            }));
+            break;
+
+          case "data-workflowStepCompleted":
+            setWorkflowStatus((prev) => ({
+              ...prev,
+              currentPhase: `finished:${dataPart.data.stepName}`,
+            }));
+            break;
+
           case "data-workflowClassification":
             setWorkflowStatus((prev) => ({
               ...prev,
