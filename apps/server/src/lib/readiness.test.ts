@@ -11,6 +11,7 @@ const completeChecks = {
   storage: "ok" as const,
   billing: "ok" as const,
   email: "ok" as const,
+  workflow: "ok" as const,
 };
 
 describe("service readiness", () => {

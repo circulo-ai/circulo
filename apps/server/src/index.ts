@@ -1,9 +1,37 @@
 import app from "@/app";
+import { closeDbPool } from "@/db";
 import { startScheduler } from "@/services/scheduler";
+import { workflowRunService } from "@/workflows/runtime/workflow-run-service";
+import { closeSharedRedis } from "@circulo-ai/redis";
 
 const port = Number.parseInt(process.env.PORT || "3002", 10);
 
-startScheduler();
+const stopScheduler = startScheduler();
+
+let shutdownPromise: Promise<void> | undefined;
+async function shutdown(signal: string): Promise<void> {
+  shutdownPromise ??= (async () => {
+    console.log(`[Server] received ${signal}; shutting down gracefully`);
+    stopScheduler();
+    await workflowRunService.shutdown();
+    await closeDbPool();
+    await closeSharedRedis();
+  })();
+  await shutdownPromise;
+}
+
+process.once("SIGTERM", () => {
+  void shutdown("SIGTERM").then(
+    () => process.exit(0),
+    () => process.exit(1),
+  );
+});
+process.once("SIGINT", () => {
+  void shutdown("SIGINT").then(
+    () => process.exit(0),
+    () => process.exit(1),
+  );
+});
 
 export default {
   port,

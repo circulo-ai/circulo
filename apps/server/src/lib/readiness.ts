@@ -12,6 +12,7 @@ export function isServiceReady(
     checks.ai,
     checks.storage,
     checks.billing,
+    checks.workflow,
     ...(isProduction ? [checks.redis, checks.email] : []),
   ];
 

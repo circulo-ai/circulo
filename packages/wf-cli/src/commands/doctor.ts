@@ -2,6 +2,7 @@ import { loadWfProject } from "../config/load-config";
 import { isJsonOutput, optionString } from "./definition-utils";
 import type { CliArguments } from "./command-runner";
 import type { CliCommandContext, CliCommandResult } from "../types";
+import { renderOutput } from "../output/printer";
 
 export async function executeDoctorCommand(
   args: CliArguments,
@@ -24,16 +25,22 @@ export async function executeDoctorCommand(
     registryKeys,
     runtimeConstruction: "not invoked by doctor",
   } as const;
-  if (isJsonOutput(args)) return { exitCode: 0, output: JSON.stringify(result, null, 2) };
+  if (isJsonOutput(args)) return { exitCode: 0, output: renderOutput({ type: "json", value: result }) };
   return {
     exitCode: 0,
-    output: [
-      "WF project is ready.",
-      `Config: ${project.configPath}`,
-      `Profile: ${profile}`,
-      `Profiles: ${project.config.profiles.join(", ")}`,
-      `Registry entries: ${registryKeys.length}`,
-      "Runtime construction: not invoked by doctor",
-    ].join("\n"),
+    output: `WF project is ready.\n${renderOutput({
+      type: "table",
+      columns: [
+        { key: "property", header: "Property", width: 24 },
+        { key: "value", header: "Value" },
+      ],
+      rows: [
+        { property: "Config", value: project.configPath },
+        { property: "Profile", value: profile },
+        { property: "Profiles", value: project.config.profiles.join(", ") },
+        { property: "Registry entries", value: registryKeys.length },
+        { property: "Runtime construction", value: "not invoked by doctor" },
+      ],
+    })}`,
   };
 }

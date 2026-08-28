@@ -12,6 +12,7 @@ import {
 } from "@azure/storage-blob";
 import { getDb } from "@circulo-ai/db";
 import { createRedis } from "@circulo-ai/redis";
+import { workflowRunService } from "@/workflows/runtime/workflow-run-service";
 import { sql } from "drizzle-orm";
 
 const router = createRouter();
@@ -77,6 +78,12 @@ router.get("/health/ready", async (c) => {
     !isTruthy(env.BILLING_ENABLED) || env.AUTUMN_SECRET_KEY
       ? "ok"
       : "not_configured";
+  try {
+    const workflowHealth = await workflowRunService.getHealth();
+    checks.workflow = workflowHealth.healthy ? "ok" : "failed";
+  } catch {
+    checks.workflow = "failed";
+  }
 
   const ready = isServiceReady(checks, isProduction);
   return c.json(

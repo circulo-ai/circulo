@@ -1,4 +1,4 @@
-import { db, workflowRun, workflowRunEvent } from "@/db";
+import { workflowRun, workflowRunEvent, type DbInstance } from "@/db";
 import type {
   EventStore,
   Lock,
@@ -8,7 +8,7 @@ import type {
   WorkflowFilter,
   WorkflowStore,
 } from "@circulo-ai/wf";
-import { and, asc, eq, isNull, lt, or } from "drizzle-orm";
+import { and, asc, count, eq, gte, isNull, lt, lte, or, sql } from "drizzle-orm";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -30,6 +30,7 @@ export class DurableWorkflowStore<
   private readonly holder = crypto.randomUUID();
 
   constructor(
+    private readonly db: DbInstance,
     private readonly stepsFactory: () => Step<TContext, unknown, unknown>[],
     private readonly ownerOf: WorkflowOwner<TInput>,
   ) {}
@@ -37,7 +38,7 @@ export class DurableWorkflowStore<
   async saveWorkflow(wf: Workflow<TContext, TInput, TOutput>): Promise<void> {
     const owner = this.ownerOf(wf.input);
     const values = this.toRow(wf, owner);
-    await db.insert(workflowRun).values(values).onConflictDoUpdate({
+    await this.db.insert(workflowRun).values(values).onConflictDoUpdate({
       target: workflowRun.id,
       set: values,
     });
@@ -46,7 +47,7 @@ export class DurableWorkflowStore<
   async loadWorkflow(
     id: string,
   ): Promise<Workflow<TContext, TInput, TOutput> | null> {
-    const row = await db.query.workflowRun.findFirst({
+    const row = await this.db.query.workflowRun.findFirst({
       where: eq(workflowRun.id, id),
     });
     return row ? this.fromRow(row) : null;
@@ -55,7 +56,7 @@ export class DurableWorkflowStore<
   async findWorkflowByIdempotencyKey(
     idempotencyKey: string,
   ): Promise<Workflow<TContext, TInput, TOutput> | null> {
-    const row = await db.query.workflowRun.findFirst({
+    const row = await this.db.query.workflowRun.findFirst({
       where: eq(workflowRun.idempotencyKey, idempotencyKey),
     });
     return row ? this.fromRow(row) : null;
@@ -67,7 +68,7 @@ export class DurableWorkflowStore<
   ): Promise<boolean> {
     const owner = this.ownerOf(wf.input);
     const values = this.toRow(wf, owner);
-    const updated = await db
+    const updated = await this.db
       .update(workflowRun)
       .set({ ...values, version: expectedVersion + 1, updatedAt: new Date() })
       .where(
@@ -85,48 +86,33 @@ export class DurableWorkflowStore<
   }
 
   async deleteWorkflow(id: string): Promise<void> {
-    await db.delete(workflowRun).where(eq(workflowRun.id, id));
+    await this.db.delete(workflowRun).where(eq(workflowRun.id, id));
   }
 
   async listWorkflows(
     filter?: WorkflowFilter,
   ): Promise<Workflow<TContext, TInput, TOutput>[]> {
-    const rows = await db
+    const conditions = [];
+    if (filter?.state) conditions.push(eq(workflowRun.state, filter.state));
+    if (filter?.createdAfter !== undefined) {
+      conditions.push(gte(workflowRun.createdAt, new Date(filter.createdAfter)));
+    }
+    if (filter?.createdBefore !== undefined) {
+      conditions.push(lte(workflowRun.createdAt, new Date(filter.createdBefore)));
+    }
+    if (filter?.resumeBefore !== undefined) {
+      conditions.push(lte(workflowRun.resumeAt, new Date(filter.resumeBefore)));
+    }
+    for (const [key, value] of Object.entries(filter?.tags ?? {})) {
+      conditions.push(sql`${workflowRun.tags}->>${key} = ${value}`);
+    }
+
+    const rows = await this.db
       .select()
       .from(workflowRun)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(asc(workflowRun.createdAt));
-
-    return rows
-      .filter((row) => {
-        if (filter?.state && row.state !== filter.state) return false;
-        if (
-          filter?.createdAfter !== undefined &&
-          row.createdAt.getTime() < filter.createdAfter
-        )
-          return false;
-        if (
-          filter?.createdBefore !== undefined &&
-          row.createdAt.getTime() > filter.createdBefore
-        )
-          return false;
-        if (
-          filter?.resumeBefore !== undefined &&
-          (!row.resumeAt || row.resumeAt.getTime() > filter.resumeBefore)
-        )
-          return false;
-        if (filter?.tags) {
-          const tags = (row.tags ?? {}) as Record<string, string>;
-          if (
-            !Object.entries(filter.tags).every(
-              ([key, value]) => tags[key] === value,
-            )
-          )
-            return false;
-        }
-        return true;
-      })
-      .slice(0, filter?.limit)
-      .map((row) => this.fromRow(row));
+    return rows.slice(0, filter?.limit).map((row) => this.fromRow(row));
   }
 
   async acquireLock(workflowId: string, ttl: number): Promise<Lock | null> {
@@ -138,7 +124,7 @@ export class DurableWorkflowStore<
       expiresAt: now.getTime() + ttl,
       holder: this.holder,
     };
-    const result = await db
+    const result = await this.db
       .update(workflowRun)
       .set({
         lockId: lock.id,
@@ -160,7 +146,7 @@ export class DurableWorkflowStore<
   }
 
   async releaseLock(lock: Lock): Promise<void> {
-    await db
+    await this.db
       .update(workflowRun)
       .set({
         lockId: null,
@@ -179,7 +165,7 @@ export class DurableWorkflowStore<
 
   async renewLock(lock: Lock, ttl: number): Promise<boolean> {
     const expiresAt = new Date(Date.now() + ttl);
-    const result = await db
+    const result = await this.db
       .update(workflowRun)
       .set({ lockExpiresAt: expiresAt })
       .where(
@@ -257,45 +243,56 @@ export class DurableWorkflowStore<
 }
 
 export class DurableWorkflowEventStore<TOutput> implements EventStore<TOutput> {
-  async append(event: WorkflowEvent<TOutput>): Promise<void> {
-    await db.insert(workflowRunEvent).values({
-      id: event.id,
-      workflowId: event.workflowId,
-      timestamp: event.timestamp,
-      eventType: event.eventType,
-      payload: toJson(event.payload),
-      correlationId: event.correlationId ?? null,
-    });
-  }
+  constructor(private readonly db: DbInstance) {}
 
-  async appendBatch(events: WorkflowEvent<TOutput>[]): Promise<void> {
-    if (events.length === 0) return;
-    await db.insert(workflowRunEvent).values(
-      events.map((event) => ({
+  async append(event: WorkflowEvent<TOutput>): Promise<void> {
+    await this.db
+      .insert(workflowRunEvent)
+      .values({
         id: event.id,
         workflowId: event.workflowId,
         timestamp: event.timestamp,
         eventType: event.eventType,
         payload: toJson(event.payload),
         correlationId: event.correlationId ?? null,
-      })),
-    );
+      })
+      .onConflictDoNothing({ target: workflowRunEvent.id });
+  }
+
+  async appendBatch(events: WorkflowEvent<TOutput>[]): Promise<void> {
+    if (events.length === 0) return;
+    await this.db
+      .insert(workflowRunEvent)
+      .values(
+        events.map((event) => ({
+          id: event.id,
+          workflowId: event.workflowId,
+          timestamp: event.timestamp,
+          eventType: event.eventType,
+          payload: toJson(event.payload),
+          correlationId: event.correlationId ?? null,
+        })),
+      )
+      .onConflictDoNothing({ target: workflowRunEvent.id });
   }
 
   async list(
     workflowId: string,
     fromTimestamp?: number,
   ): Promise<WorkflowEvent<TOutput>[]> {
-    const rows = await db
+    const rows = await this.db
       .select()
       .from(workflowRunEvent)
-      .where(eq(workflowRunEvent.workflowId, workflowId))
-      .orderBy(asc(workflowRunEvent.sequence), asc(workflowRunEvent.timestamp));
-    return rows
-      .filter(
-        (row) => fromTimestamp === undefined || row.timestamp >= fromTimestamp,
+      .where(
+        fromTimestamp === undefined
+          ? eq(workflowRunEvent.workflowId, workflowId)
+          : and(
+              eq(workflowRunEvent.workflowId, workflowId),
+              gte(workflowRunEvent.timestamp, fromTimestamp),
+            ),
       )
-      .map((row) => ({
+      .orderBy(asc(workflowRunEvent.sequence), asc(workflowRunEvent.timestamp));
+    return rows.map((row) => ({
         id: row.id,
         workflowId: row.workflowId,
         timestamp: row.timestamp,
@@ -306,17 +303,17 @@ export class DurableWorkflowEventStore<TOutput> implements EventStore<TOutput> {
   }
 
   async clear(workflowId: string): Promise<void> {
-    await db
+    await this.db
       .delete(workflowRunEvent)
       .where(eq(workflowRunEvent.workflowId, workflowId));
   }
 
   async count(workflowId: string): Promise<number> {
-    const rows = await db
-      .select({ id: workflowRunEvent.id })
+    const rows = await this.db
+      .select({ total: count() })
       .from(workflowRunEvent)
       .where(eq(workflowRunEvent.workflowId, workflowId));
-    return rows.length;
+    return Number(rows[0]?.total ?? 0);
   }
 }
 

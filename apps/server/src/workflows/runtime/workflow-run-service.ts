@@ -1,9 +1,5 @@
 import { db, humanApproval, taskHandoff, workflowRun } from "@/db";
 import { messageRepo } from "@/db/repositories";
-import {
-  DurableWorkflowEventStore,
-  DurableWorkflowStore,
-} from "@/infrastructure/drizzle/durable-workflow-store";
 import type { CustomUIMessageChunk, WorkflowTrace } from "@/lib/types";
 import {
   createOrchestrationWorkflow,
@@ -11,8 +7,6 @@ import {
 } from "@/workflows/orchestrate/orchestrate";
 import type { OrchestrationInput } from "@/workflows/orchestrate/types";
 import {
-  InMemoryEventBus,
-  WorkflowEngine,
   type Workflow,
   type WorkflowEvent,
 } from "@circulo-ai/wf";
@@ -23,37 +17,20 @@ import {
   getWorkflowOutputChannel,
   publishWorkflowChunk,
 } from "./output-channel";
+import {
+  closeWorkflowRuntime,
+  getWorkflowRuntime,
+  type WorkflowApplicationEngine,
+} from "./wf-config";
 
 type WorkflowOutput = OrchestrationWorkflowState;
 
-const engine = new WorkflowEngine<
-  Record<string, never>,
-  OrchestrationInput,
-  WorkflowOutput
->({
-  workflowStore: new DurableWorkflowStore<
-    Record<string, never>,
-    OrchestrationInput,
-    WorkflowOutput
-  >(
-    () => createOrchestrationWorkflow().steps,
-    (input) => ({
-      chatId: input.chatId,
-      userId: input.actor.userId,
-      organizationId: input.actor.organizationId,
-    }),
-  ),
-  eventStore: new DurableWorkflowEventStore<WorkflowOutput>(),
-  eventBus: new InMemoryEventBus<WorkflowOutput>(),
-  defaultRetries: 2,
-  defaultTimeout: 10 * 60 * 1000,
-  workflowTimeout: 30 * 60 * 1000,
-  maxConcurrentWorkflows: 20,
-  autoResumeIntervalMs: 5_000,
-});
-
 /** The workflow engine boundary and durable chat projection. */
 export class WorkflowRunService {
+  private runtimePromise:
+    | ReturnType<typeof getWorkflowRuntime>
+    | undefined;
+  private recoveryStarted = false;
   private readonly assistantMessageIds = new Map<string, string>();
   private readonly startedAt = new Map<string, number>();
   private readonly subscriptions = new Map<string, () => void>();
@@ -65,14 +42,8 @@ export class WorkflowRunService {
   private readonly handledEventIds = new Map<string, Set<string>>();
   private readonly processingEvents = new Map<string, Promise<void>>();
 
-  constructor() {
-    // A process can stop between two workflow steps. Reclaim those runs on
-    // startup; the database lock prevents two API instances from executing
-    // the same run concurrently.
-    void this.recoverInterruptedRuns();
-  }
-
   async start(input: OrchestrationInput): Promise<{ runId: string }> {
+    const engine = await this.getEngine();
     const definition = {
       ...createOrchestrationWorkflow(),
       // The client message id is the request identity. Retries from a dropped
@@ -82,13 +53,14 @@ export class WorkflowRunService {
         : {}),
     };
     const runId = await engine.createWorkflow(definition, input);
-    this.attachRun(runId, input, definition);
+    await this.attachRun(runId, input, definition);
     this.hydratedRuns.add(runId);
 
     return { runId };
   }
 
   async run(runId: string): Promise<void> {
+    const engine = await this.getEngine();
     try {
       await engine.run(runId);
     } catch (error) {
@@ -98,14 +70,16 @@ export class WorkflowRunService {
   }
 
   async pause(runId: string): Promise<void> {
+    const engine = await this.getEngine();
     await engine.pause(runId);
   }
 
   async resume(runId: string): Promise<void> {
+    const engine = await this.getEngine();
     const workflow = await this.loadWorkflow(runId);
     if (!workflow) return;
     if (!this.subscriptions.has(runId)) {
-      this.attachRun(
+      await this.attachRun(
         runId,
         workflow.input,
         createOrchestrationWorkflow(),
@@ -128,7 +102,7 @@ export class WorkflowRunService {
     // a fresh channel; returning the already-closed channel would replay only
     // whatever happened to be buffered before the disconnect.
     if (!channel || channel.isClosed) {
-      this.attachRun(
+      await this.attachRun(
         runId,
         workflow.input,
         createOrchestrationWorkflow(),
@@ -168,6 +142,7 @@ export class WorkflowRunService {
     OrchestrationInput,
     WorkflowOutput
   > | null> {
+    const engine = await this.getEngine();
     const workflow = await engine.getWorkflow(runId);
     if (workflow) return workflow;
 
@@ -218,7 +193,11 @@ export class WorkflowRunService {
 
   private async replayTerminalResult(
     runId: string,
-    workflow: Awaited<ReturnType<typeof engine.getWorkflow>>,
+    workflow: Workflow<
+      Record<string, never>,
+      OrchestrationInput,
+      WorkflowOutput
+    > | null,
   ): Promise<void> {
     if (!workflow || getWorkflowOutputChannel(runId)?.isClosed) return;
 
@@ -262,7 +241,40 @@ export class WorkflowRunService {
   }
 
   async getEvents(runId: string) {
-    return engine.getEvents(runId);
+    return (await this.getEngine()).getEvents(runId);
+  }
+
+  async getHealth() {
+    return (await this.getEngine()).getHealth();
+  }
+
+  async shutdown(graceful = true): Promise<void> {
+    for (const poller of this.eventPollers.values()) clearInterval(poller);
+    for (const unsubscribe of this.subscriptions.values()) unsubscribe();
+    for (const runId of this.subscriptions.keys()) closeWorkflowOutputChannel(runId);
+    this.eventPollers.clear();
+    this.subscriptions.clear();
+    this.handledEventIds.clear();
+    this.hydratedRuns.clear();
+    this.assistantMessageIds.clear();
+    this.startedAt.clear();
+    await closeWorkflowRuntime();
+    this.runtimePromise = undefined;
+    this.recoveryStarted = false;
+    void graceful;
+  }
+
+  private async getEngine(): Promise<WorkflowApplicationEngine> {
+    this.runtimePromise ??= getWorkflowRuntime();
+    if (!this.recoveryStarted) {
+      this.recoveryStarted = true;
+      void this.runtimePromise.then(({ runtime }) =>
+        this.recoverInterruptedRuns(runtime.engine).catch((error: unknown) => {
+          console.warn("[Workflow Recovery Deferred]", error);
+        }),
+      );
+    }
+    return (await this.runtimePromise).runtime.engine;
   }
 
   private async handleEvent(
@@ -358,7 +370,7 @@ export class WorkflowRunService {
       case "workflow.paused":
         await this.syncRunStatus(runId, "paused");
         {
-          const workflow = await engine.getWorkflow(runId);
+          const workflow = await (await this.getEngine()).getWorkflow(runId);
           const state = workflow?.output;
           if (state?.startedAt) {
             const trace = await this.buildTrace({
@@ -401,7 +413,7 @@ export class WorkflowRunService {
         // committed its result. Project the trace at the wait boundary so a
         // reload sees the pending approval without rerunning the agent.
         await this.syncRunStatus(runId, "paused");
-        const workflow = await engine.getWorkflow(runId);
+        const workflow = await (await this.getEngine()).getWorkflow(runId);
         const state = workflow?.output;
         if (state?.startedAt) {
           const trace = await this.buildTrace({
@@ -694,13 +706,14 @@ export class WorkflowRunService {
     this.startedAt.delete(runId);
   }
 
-  private attachRun(
+  private async attachRun(
     runId: string,
     input: OrchestrationInput,
     definition = createOrchestrationWorkflow(),
     startedAt = Date.now(),
-  ): void {
+  ): Promise<void> {
     if (this.subscriptions.has(runId)) return;
+    const engine = await this.getEngine();
     createWorkflowOutputChannel(runId);
     const stepNames = new Map(
       definition.steps.map((step) => [step.id, step.name]),
@@ -729,13 +742,14 @@ export class WorkflowRunService {
     stepNames: Map<string, string>,
   ): Promise<void> {
     if (!this.subscriptions.has(runId)) return;
+    const engine = await this.getEngine();
     const events = await engine.getEvents(runId);
     for (const event of events) {
       await this.handleEvent(runId, input, stepNames, event);
     }
   }
 
-  private async recoverInterruptedRuns(): Promise<void> {
+  private async recoverInterruptedRuns(engine: WorkflowApplicationEngine): Promise<void> {
     try {
       // Reattach before resuming. Without a subscription, an engine auto-
       // resume after a process restart can finish successfully while the
@@ -745,7 +759,7 @@ export class WorkflowRunService {
       for (const run of runs) {
         if (run.state !== "running" && run.state !== "paused") continue;
         const input = run.input;
-        this.attachRun(
+        await this.attachRun(
           run.id,
           input,
           createOrchestrationWorkflow(),
@@ -782,7 +796,7 @@ export class WorkflowRunService {
     const stepNames = new Map(
       definition.steps.map((step) => [step.id, step.name]),
     );
-    const events = await engine.getEvents(runId);
+    const events = await (await this.getEngine()).getEvents(runId);
 
     for (const event of events) {
       const handled = this.handledEventIds.get(runId) ?? new Set<string>();

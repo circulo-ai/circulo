@@ -52,8 +52,8 @@
   },
   "dependencies": {
     "@circulo-ai/wf": "^2.3.0",
+    "cli-table3": "^0.6.5",
     "jiti": "^2.7.0",
-    "picocolors": "^1.1.1",
     "yaml": "^2.9.0"
   },
   "devDependencies": {
