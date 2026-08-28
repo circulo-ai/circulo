@@ -64,6 +64,11 @@
       "types": "./dist/config.d.mts",
       "import": "./dist/config.mjs",
       "default": "./dist/config.mjs"
+    },
+    "./adapters": {
+      "types": "./dist/adapters.d.mts",
+      "import": "./dist/adapters.mjs",
+      "default": "./dist/adapters.mjs"
     }
   },
   "peerDependencies": {
