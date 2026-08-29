@@ -56,6 +56,48 @@ describe("WorkflowOutputChannel", () => {
     ]);
   });
 
+  it("streams plan and loop lifecycle chunks in order", async () => {
+    const channel = new WorkflowOutputChannel();
+    const planStep: CustomUIMessageChunk = {
+      type: "data-workflowPlanStep",
+      data: {
+        workflowId: "workflow-plan",
+        stepId: "plan:agent-1:0",
+        agentId: "agent-1",
+        agentName: "Researcher",
+        task: "Collect the relevant facts",
+        strategy: "sequential",
+        stepIndex: 0,
+        totalSteps: 1,
+        status: "running",
+      },
+    };
+    const loopDecision: CustomUIMessageChunk = {
+      type: "data-workflowLoopDecision",
+      data: {
+        workflowId: "workflow-plan",
+        iteration: 1,
+        decision: "complete",
+        reasoning: "The requested work is complete.",
+        nextStepCount: 0,
+      },
+    };
+
+    channel.write(planStep);
+    channel.write(loopDecision);
+    channel.close();
+
+    const reader = channel.createReadable().getReader();
+    const chunks: CustomUIMessageChunk[] = [];
+    while (true) {
+      const result = await reader.read();
+      if (result.done) break;
+      chunks.push(result.value);
+    }
+
+    expect(chunks).toEqual([planStep, loopDecision]);
+  });
+
   it("keeps terminal text chunks ordered for a replayed message", () => {
     const chunks: CustomUIMessageChunk[] = [
       { type: "text-start", id: "persisted-message" },

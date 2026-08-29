@@ -227,6 +227,8 @@ function isDurableUIChunk(chunk: CustomUIMessageChunk): boolean {
   if (type.startsWith("text-")) return true;
   return (
     type.startsWith("data-workflowAgent") ||
+    type === "data-workflowPlanStep" ||
+    type.startsWith("data-workflowLoop") ||
     type === "data-workflowApprovalRequested" ||
     type === "data-memoryUpdated" ||
     type === "data-scheduledTaskCreated" ||

@@ -32,6 +32,22 @@ export type WorkflowAgentTrace = {
   toolCalls?: WorkflowToolTrace[];
 };
 
+export type WorkflowPlanStepTrace = {
+  workflowId: string;
+  stepId: string;
+  agentId: string;
+  agentName: string;
+  task: string;
+  strategy: "sequential" | "parallel" | "conditional" | "single";
+  stepIndex: number;
+  totalSteps: number;
+  status: "running" | "completed" | "failed" | "skipped";
+  startedAt?: string;
+  completedAt?: string;
+  durationMs?: number;
+  error?: string;
+};
+
 export type WorkflowTrace = {
   workflowId: string;
   status: "running" | "paused" | "completed" | "failed";
@@ -40,6 +56,10 @@ export type WorkflowTrace = {
   executionTimeMs?: number;
   classification?: RequestClassification;
   plan?: ExecutionPlan;
+  planSteps?: WorkflowPlanStepTrace[];
+  agentLoopIteration?: number;
+  agentLoopStatus?: "completed" | "blocked";
+  agentLoopDecision?: string;
   agents: WorkflowAgentTrace[];
   aggregated?: boolean;
   approvals?: Array<{
@@ -112,6 +132,32 @@ export type CustomUIDataTypes = {
   };
   workflowClassification: RequestClassification;
   workflowPlan: ExecutionPlan;
+  workflowPlanStep: WorkflowPlanStepTrace;
+  workflowLoopStarted: {
+    workflowId: string;
+    maxIterations: number;
+    initialStepCount: number;
+  };
+  workflowLoopIteration: {
+    workflowId: string;
+    iteration: number;
+    status: "evaluating" | "executing";
+    completedStepCount?: number;
+    stepCount?: number;
+  };
+  workflowLoopDecision: {
+    workflowId: string;
+    iteration: number;
+    decision: "complete" | "continue" | "blocked";
+    reasoning: string;
+    nextStepCount: number;
+  };
+  workflowLoopCompleted: {
+    workflowId: string;
+    iterations: number;
+    status: "completed" | "blocked";
+    reason: string;
+  };
   workflowAgentStarted: WorkflowAgentTrace;
   workflowAgentProgress: {
     agentId: string;

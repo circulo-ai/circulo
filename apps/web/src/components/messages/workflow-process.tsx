@@ -615,9 +615,15 @@ type ActivityEntry = {
   detail?: string;
   status: "running" | "paused" | "completed" | "error";
   updates?: number;
-  kind?: "agent-start" | "agent-progress" | "agent-completed" | "workflow-step";
+  kind?:
+    | "agent-start"
+    | "agent-progress"
+    | "agent-completed"
+    | "workflow-step"
+    | "workflow-plan-step";
   agentId?: string;
   stepId?: string;
+  stepIndex?: number;
 };
 
 function buildProcess(parts: ChatMessage["parts"]): BuiltProcess | null {
@@ -661,7 +667,10 @@ function buildProcess(parts: ChatMessage["parts"]): BuiltProcess | null {
       // A reloaded message contains the durable trace rather than the
       // transient lifecycle chunks. Project the same compact activity from
       // that trace so the stream and persisted conversation do not diverge.
-      activity: buildActivity(traceToEvents(trace)),
+      activity: [
+        ...buildActivity(traceToEvents(trace)),
+        ...(trace.planSteps ?? []).map(planStepToActivity),
+      ],
     };
   }
 
@@ -677,6 +686,7 @@ function buildProcess(parts: ChatMessage["parts"]): BuiltProcess | null {
   const handoffs: NonNullable<WorkflowTrace["handoffs"]> = [];
   let error: string | undefined;
   const workflowSteps = new Map<string, ActivityEntry>();
+  const planSteps = new Map<string, ActivityEntry>();
 
   for (const event of events) {
     if (event.type === "data-workflowStarted") {
@@ -707,6 +717,39 @@ function buildProcess(parts: ChatMessage["parts"]): BuiltProcess | null {
             typeof event.data.durationMs === "number"
               ? formatDuration(event.data.durationMs)
               : undefined,
+        });
+      }
+    }
+    if (event.type === "data-workflowPlanStep") {
+      const step = event.data;
+      const stepId = String(step.stepId ?? "");
+      if (stepId) {
+        const status = String(step.status ?? "running");
+        const task = String(step.task ?? "");
+        const durationMs = Number(step.durationMs);
+        planSteps.set(stepId, {
+          id: `workflow-plan-step-${stepId}`,
+          label: `Plan step ${Number(step.stepIndex ?? 0) + 1}: ${String(
+            step.agentName ?? step.agentId ?? "agent",
+          )}`,
+          detail:
+            status === "running"
+              ? task
+              : status === "failed" || status === "skipped"
+                ? String(step.error ?? task)
+                : Number.isFinite(durationMs) && durationMs > 0
+                  ? `${task} · ${formatDuration(durationMs)}`
+                  : task,
+          status:
+            status === "failed"
+              ? "error"
+              : status === "skipped"
+                ? "paused"
+                : status === "completed"
+                  ? "completed"
+                  : "running",
+          kind: "workflow-plan-step",
+          stepIndex: Number(step.stepIndex ?? 0),
         });
       }
     }
@@ -783,7 +826,13 @@ function buildProcess(parts: ChatMessage["parts"]): BuiltProcess | null {
     approvals,
     handoffs,
     error,
-    activity: [...buildActivity(events), ...workflowSteps.values()],
+    activity: [
+      ...buildActivity(events),
+      ...workflowSteps.values(),
+      ...[...planSteps.values()].sort(
+        (left, right) => (left.stepIndex ?? 0) - (right.stepIndex ?? 0),
+      ),
+    ],
   };
 }
 
@@ -817,6 +866,41 @@ function traceToEvents(trace: WorkflowTrace): ProcessEvent[] {
   }
   if (trace.plan) {
     events.push({ type: "data-workflowPlan", data: trace.plan });
+  }
+  for (const step of trace.planSteps ?? []) {
+    events.push({
+      type: "data-workflowPlanStep",
+      data: step as unknown as Record<string, unknown>,
+    });
+  }
+  if (trace.agentLoopIteration) {
+    events.push({
+      type: "data-workflowLoopStarted",
+      data: {
+        workflowId: trace.workflowId,
+        maxIterations: trace.agentLoopIteration,
+        initialStepCount: trace.planSteps?.length ?? 0,
+      },
+    });
+    events.push({
+      type: "data-workflowLoopDecision",
+      data: {
+        workflowId: trace.workflowId,
+        iteration: trace.agentLoopIteration,
+        decision: trace.agentLoopStatus === "blocked" ? "blocked" : "complete",
+        reasoning: trace.agentLoopDecision ?? "",
+        nextStepCount: 0,
+      },
+    });
+    events.push({
+      type: "data-workflowLoopCompleted",
+      data: {
+        workflowId: trace.workflowId,
+        iterations: trace.agentLoopIteration,
+        status: trace.agentLoopStatus ?? "completed",
+        reason: trace.agentLoopDecision ?? "",
+      },
+    });
   }
 
   for (const agent of trace.agents) {
@@ -878,6 +962,32 @@ function traceToEvents(trace: WorkflowTrace): ProcessEvent[] {
   return events;
 }
 
+function planStepToActivity(
+  step: NonNullable<WorkflowTrace["planSteps"]>[number],
+): ActivityEntry {
+  const status = step.status;
+  return {
+    id: `workflow-plan-step-${step.stepId}`,
+    label: `Plan step ${step.stepIndex + 1}: ${step.agentName}`,
+    detail:
+      status === "failed" || status === "skipped"
+        ? (step.error ?? step.task)
+        : step.durationMs !== undefined
+          ? `${step.task} · ${formatDuration(step.durationMs)}`
+          : step.task,
+    status:
+      status === "failed"
+        ? "error"
+        : status === "skipped"
+          ? "paused"
+          : status === "completed"
+            ? "completed"
+            : "running",
+    kind: "workflow-plan-step",
+    stepIndex: step.stepIndex,
+  };
+}
+
 function buildActivity(events: ProcessEvent[]): ActivityEntry[] {
   const agentNames = new Map<string, string>();
   for (const event of events) {
@@ -915,6 +1025,50 @@ function buildActivity(events: ProcessEvent[]): ActivityEntry[] {
             label: "Execution plan prepared",
             detail: String(data.strategy ?? "direct"),
             status: "completed",
+          },
+        ];
+      case "data-workflowLoopStarted":
+        return [
+          {
+            id,
+            label: "Agent loop started",
+            detail: `${String(data.initialStepCount ?? 0)} initial plan steps`,
+            status: "completed",
+          },
+        ];
+      case "data-workflowLoopIteration":
+        return [
+          {
+            id,
+            label: `Agent loop iteration ${String(data.iteration ?? "")}`,
+            detail:
+              data.status === "executing"
+                ? `Executing ${String(data.stepCount ?? 0)} follow-up step(s)`
+                : `Evaluating ${String(data.completedStepCount ?? 0)} completed step(s)`,
+            status: data.status === "executing" ? "running" : "completed",
+          },
+        ];
+      case "data-workflowLoopDecision":
+        return [
+          {
+            id,
+            label: `Loop decision: ${String(data.decision ?? "unknown")}`,
+            detail: String(data.reasoning ?? ""),
+            status:
+              data.decision === "blocked"
+                ? "paused"
+                : data.decision === "continue"
+                  ? "running"
+                  : "completed",
+          },
+        ];
+      case "data-workflowLoopCompleted":
+        return [
+          {
+            id,
+            label: "Agent loop completed",
+            detail: String(data.reason ?? ""),
+            status: data.status === "blocked" ? "paused" : "completed",
           },
         ];
       case "data-workflowAgentStarted":

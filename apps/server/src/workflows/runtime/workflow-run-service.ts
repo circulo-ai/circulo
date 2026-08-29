@@ -1,15 +1,16 @@
 import { db, humanApproval, taskHandoff, workflowRun } from "@/db";
 import { messageRepo } from "@/db/repositories";
-import type { CustomUIMessageChunk, WorkflowTrace } from "@/lib/types";
+import type {
+  CustomUIMessageChunk,
+  WorkflowPlanStepTrace,
+  WorkflowTrace,
+} from "@/lib/types";
 import {
   createOrchestrationWorkflow,
   type OrchestrationWorkflowState,
 } from "@/workflows/orchestrate/orchestrate";
 import type { OrchestrationInput } from "@/workflows/orchestrate/types";
-import {
-  type Workflow,
-  type WorkflowEvent,
-} from "@circulo-ai/wf";
+import { type Workflow, type WorkflowEvent } from "@circulo-ai/wf";
 import { eq } from "drizzle-orm";
 import {
   closeWorkflowOutputChannel,
@@ -27,9 +28,7 @@ type WorkflowOutput = OrchestrationWorkflowState;
 
 /** The workflow engine boundary and durable chat projection. */
 export class WorkflowRunService {
-  private runtimePromise:
-    | ReturnType<typeof getWorkflowRuntime>
-    | undefined;
+  private runtimePromise: ReturnType<typeof getWorkflowRuntime> | undefined;
   private recoveryStarted = false;
   private readonly assistantMessageIds = new Map<string, string>();
   private readonly startedAt = new Map<string, number>();
@@ -251,7 +250,8 @@ export class WorkflowRunService {
   async shutdown(graceful = true): Promise<void> {
     for (const poller of this.eventPollers.values()) clearInterval(poller);
     for (const unsubscribe of this.subscriptions.values()) unsubscribe();
-    for (const runId of this.subscriptions.keys()) closeWorkflowOutputChannel(runId);
+    for (const runId of this.subscriptions.keys())
+      closeWorkflowOutputChannel(runId);
     this.eventPollers.clear();
     this.subscriptions.clear();
     this.handledEventIds.clear();
@@ -353,8 +353,7 @@ export class WorkflowRunService {
             workflowId: runId,
             stepId: payload.stepId,
             stepName: payload.stepName,
-            attempt:
-              typeof payload.attempt === "number" ? payload.attempt : 0,
+            attempt: typeof payload.attempt === "number" ? payload.attempt : 0,
           },
         });
         return;
@@ -599,6 +598,12 @@ export class WorkflowRunService {
       executionTimeMs,
       classification: state.classification,
       plan: state.plan,
+      planSteps:
+        state.agentLoopPlanSteps ??
+        this.buildPlanStepTraces(runId, state.plan, state.agentResults),
+      agentLoopIteration: state.agentLoopIteration,
+      agentLoopStatus: state.agentLoopStatus,
+      agentLoopDecision: state.agentLoopDecision,
       agents: (state.agentResults ?? []).map((result) => ({
         agentId: result.agentId,
         agentName: result.agentName,
@@ -622,6 +627,50 @@ export class WorkflowRunService {
     };
     await this.addWorkflowArtifacts(trace, input.chatId, runId);
     return trace;
+  }
+
+  private buildPlanStepTraces(
+    workflowId: string,
+    plan: OrchestrationWorkflowState["plan"],
+    results: OrchestrationWorkflowState["agentResults"],
+  ): WorkflowPlanStepTrace[] {
+    if (!plan) return [];
+    return plan.selectedAgents.map((agentPlan, stepIndex) => {
+      const result = results?.find(
+        (candidate) =>
+          candidate.agentId === agentPlan.agentId &&
+          candidate.task === agentPlan.task,
+      );
+      const status: WorkflowPlanStepTrace["status"] = !result
+        ? "skipped"
+        : result.success
+          ? "completed"
+          : result.error?.startsWith("Skipped") ||
+              result.error === "Dependencies not met"
+            ? "skipped"
+            : "failed";
+      return {
+        workflowId,
+        stepId: `plan:${agentPlan.agentId}:${agentPlan.order}`,
+        agentId: agentPlan.agentId,
+        agentName: result?.agentName ?? "Unknown Agent",
+        task: agentPlan.task,
+        strategy: plan.strategy,
+        stepIndex,
+        totalSteps: plan.selectedAgents.length,
+        status,
+        ...(result?.startTime
+          ? { startedAt: result.startTime.toISOString() }
+          : {}),
+        ...(result?.endTime
+          ? { completedAt: result.endTime.toISOString() }
+          : {}),
+        ...(result?.durationMs !== undefined
+          ? { durationMs: result.durationMs }
+          : {}),
+        ...(result?.error ? { error: result.error } : {}),
+      };
+    });
   }
 
   private async addWorkflowArtifacts(
@@ -785,7 +834,9 @@ export class WorkflowRunService {
     }
   }
 
-  private async recoverInterruptedRuns(engine: WorkflowApplicationEngine): Promise<void> {
+  private async recoverInterruptedRuns(
+    engine: WorkflowApplicationEngine,
+  ): Promise<void> {
     try {
       // Reattach before resuming. Without a subscription, an engine auto-
       // resume after a process restart can finish successfully while the
