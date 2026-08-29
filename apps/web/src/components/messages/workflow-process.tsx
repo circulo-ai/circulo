@@ -60,6 +60,7 @@ export function WorkflowProcess({
   // its first event until the terminal message arrives.
   const process = buildProcess(parts);
   const [now, setNow] = useState(() => Date.now());
+  const [fallbackStartedAt, setFallbackStartedAt] = useState<number>();
   const [actionStatuses, setActionStatuses] = useState<Record<string, string>>(
     {},
   );
@@ -71,11 +72,22 @@ export function WorkflowProcess({
   }, [process?.status]);
   useEffect(() => {
     if (process?.status !== "running") return;
+    const serverStartedAt = process.startedAt
+      ? Date.parse(process.startedAt)
+      : Number.NaN;
+    setFallbackStartedAt((current) =>
+      Number.isFinite(serverStartedAt)
+        ? serverStartedAt
+        : (current ?? Date.now()),
+    );
+  }, [process?.status, process?.startedAt]);
+  useEffect(() => {
+    if (process?.status !== "running") return;
     const timer = setInterval(() => setNow(Date.now()), 1_000);
     return () => clearInterval(timer);
   }, [process?.status]);
   if (!process) return null;
-  const liveElapsedMs = getElapsedMs(process, now);
+  const liveElapsedMs = getElapsedMs(process, now, fallbackStartedAt);
   const visibleProcess = {
     ...process,
     approvals: process.approvals.map((approval) => ({
@@ -603,11 +615,7 @@ type ActivityEntry = {
   detail?: string;
   status: "running" | "paused" | "completed" | "error";
   updates?: number;
-  kind?:
-    | "agent-start"
-    | "agent-progress"
-    | "agent-completed"
-    | "workflow-step";
+  kind?: "agent-start" | "agent-progress" | "agent-completed" | "workflow-step";
   agentId?: string;
   stepId?: string;
 };
@@ -779,13 +787,18 @@ function buildProcess(parts: ChatMessage["parts"]): BuiltProcess | null {
   };
 }
 
-function getElapsedMs(process: BuiltProcess, now: number): number | undefined {
+function getElapsedMs(
+  process: BuiltProcess,
+  now: number,
+  fallbackStartedAt?: number,
+): number | undefined {
   if (process.status === "completed" || process.status === "failed") {
     return process.executionTimeMs;
   }
-  if (!process.startedAt) return undefined;
-  const startedAt = Date.parse(process.startedAt);
-  if (!Number.isFinite(startedAt)) return undefined;
+  const startedAt = process.startedAt
+    ? Date.parse(process.startedAt)
+    : fallbackStartedAt;
+  if (startedAt === undefined || !Number.isFinite(startedAt)) return undefined;
   return Math.max(0, now - startedAt);
 }
 
