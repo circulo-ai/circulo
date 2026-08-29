@@ -6,7 +6,7 @@ import type { PromptMention } from "./types";
 /** Keeps a classifier miss from suppressing an explicit request for an agent. */
 export function hasExplicitAgentDirective(
   messages: ChatMessage[],
-  agents: Array<{ agent: Agent }>,
+  agents: Array<{ agent: Pick<Agent, "id" | "name"> }>,
   mentions: PromptMention[] = [],
 ): boolean {
   if (mentions.some((mention) => mention.kind === "agent")) return true;
@@ -66,19 +66,64 @@ export function isOrchestratorOwnedRequest(messages: ChatMessage[]): boolean {
 export function shouldUseControllerDirectly(params: {
   messages: ChatMessage[];
   mentions?: PromptMention[];
+  orchestrationAgent?: Pick<Agent, "id" | "name"> | null;
+  agents?: Array<{ agent: Pick<Agent, "id" | "name"> }>;
 }): boolean {
   const mentions = params.mentions ?? [];
+  const explicitlyMentionedAgentIds = params.agents
+    ? getExplicitlyMentionedAgentIds(params.messages, params.agents, mentions)
+    : [];
+  if (
+    explicitlyMentionedAgentIds.some(
+      (agentId) => agentId !== params.orchestrationAgent?.id,
+    )
+  ) {
+    return false;
+  }
+  if (
+    params.orchestrationAgent &&
+    isExplicitOrchestrationAgentMention(
+      params.messages,
+      params.orchestrationAgent,
+      mentions,
+    )
+  ) {
+    return true;
+  }
   if (mentions.some((mention) => mention.kind === "agent")) return false;
   if (hasExplicitToolDirective(params.messages, mentions)) return true;
   if (isOrchestratorOwnedRequest(params.messages)) return true;
   return false;
 }
 
+function isExplicitOrchestrationAgentMention(
+  messages: ChatMessage[],
+  agent: Pick<Agent, "id" | "name">,
+  mentions: PromptMention[],
+): boolean {
+  const handle = normalizeMentionHandle(agent.name);
+  if (
+    mentions.some(
+      (mention) =>
+        mention.kind === "agent" &&
+        (mention.key === agent.id || mention.key === handle),
+    )
+  ) {
+    return true;
+  }
+
+  const text = getTextFromMessages(messages);
+  return new RegExp(
+    `(^|\\s)@(?:${escapeRegExp(agent.id)}|${escapeRegExp(handle)})(?:\\b|$)`,
+    "i",
+  ).test(text);
+}
+
 /** Explicit user directives take precedence over a classifier false negative. */
 export function shouldEngageAgents(
   classifiedEngagement: boolean,
   messages: ChatMessage[],
-  agents: Array<{ agent: Agent }>,
+  agents: Array<{ agent: Pick<Agent, "id" | "name"> }>,
   mentions: PromptMention[] = [],
 ): boolean {
   return (
@@ -91,7 +136,7 @@ export function shouldEngageAgents(
 /** Return agent IDs named by a targeted directive; generic @agent stays planner-selected. */
 export function getExplicitlyMentionedAgentIds(
   messages: ChatMessage[],
-  agents: Array<{ agent: Agent }>,
+  agents: Array<{ agent: Pick<Agent, "id" | "name"> }>,
   mentions: PromptMention[] = [],
 ): string[] {
   const text = getTextFromMessages(messages).toLowerCase();

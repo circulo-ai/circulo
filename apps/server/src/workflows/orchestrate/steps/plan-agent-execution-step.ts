@@ -9,6 +9,8 @@ import type { OrchestrationInput } from "@/workflows/orchestrate/types";
 import { generateText, Output } from "ai";
 import { z } from "zod";
 import { getExplicitlyMentionedAgentIds } from "../agent-engagement";
+import type { OrchestrationAgentProfile } from "../orchestration-agent-profile";
+import { formatOrchestrationAgentProfile } from "../orchestration-agent-profile";
 import type { RequestClassification } from "./classify-request-step";
 
 const executionPlanSchema = z.object({
@@ -50,11 +52,14 @@ export async function planAgentExecutionStep(params: {
   triggerMessages: ChatMessage[];
   mentions?: OrchestrationInput["mentions"];
   webhookPayload?: OrchestrationInput["webhookPayload"];
-  orchestrationAgent?: { model: string; instructions: string } | null;
+  orchestrationAgent?: OrchestrationAgentProfile | null;
   orchestrationModel?: string | null;
   orchestrationFallbackModel?: string | null;
 }): Promise<ExecutionPlan> {
-  const { classification, agents, triggerMessages, webhookPayload } = params;
+  const { classification, triggerMessages, webhookPayload } = params;
+  const agents = params.agents.filter(
+    (candidate) => candidate.agentId !== params.orchestrationAgent?.id,
+  );
 
   if (agents.length === 0) {
     return {
@@ -94,8 +99,6 @@ Event: ${webhookPayload.event}
 This is an automated trigger, not a direct user request.`;
   }
 
-  const controllerInstructions =
-    params.orchestrationAgent?.instructions?.trim();
   const { output } = await withModelFallback({
     modelId: params.orchestrationAgent?.model ?? params.orchestrationModel,
     fallbackModelId:
@@ -104,7 +107,7 @@ This is an automated trigger, not a direct user request.`;
       generateText({
         model,
         output: Output.object({ schema: executionPlanSchema }),
-        system: `${controllerInstructions ? `${controllerInstructions}\n\n` : ""}You are an expert orchestration planner for a multi-agent AI system.
+        system: `${formatOrchestrationAgentProfile(params.orchestrationAgent)}${params.orchestrationAgent ? "\n\n" : ""}You are an expert orchestration planner for a multi-agent AI system.
 
 Your task is to:
 1. Select the best agent(s) for the classified request

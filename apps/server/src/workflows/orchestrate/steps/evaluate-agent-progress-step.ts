@@ -12,6 +12,8 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { type AgentExecutionResult } from "./execute-agent-task-step";
 import type { ExecutionPlan } from "./plan-agent-execution-step";
+import type { OrchestrationAgentProfile } from "../orchestration-agent-profile";
+import { formatOrchestrationAgentProfile } from "../orchestration-agent-profile";
 
 const agentProgressDecisionSchema = z.object({
   decision: z.enum(["complete", "continue", "blocked"]),
@@ -73,7 +75,7 @@ export async function evaluateAgentProgressStep(params: {
   triggerMessages: ChatMessage[];
   mentions?: OrchestrationInput["mentions"];
   previousResults: AgentExecutionResult[];
-  orchestrationAgent?: { model: string; instructions: string } | null;
+  orchestrationAgent?: OrchestrationAgentProfile | null;
   orchestrationModel?: string | null;
   orchestrationFallbackModel?: string | null;
 }): Promise<AgentProgressDecision> {
@@ -93,8 +95,6 @@ export async function evaluateAgentProgressStep(params: {
     error: result.error,
   }));
 
-  const controllerInstructions =
-    params.orchestrationAgent?.instructions?.trim();
   const { output } = await withModelFallback({
     modelId: params.orchestrationAgent?.model ?? params.orchestrationModel,
     fallbackModelId:
@@ -103,7 +103,7 @@ export async function evaluateAgentProgressStep(params: {
       generateText({
         model,
         output: Output.object({ schema: agentProgressDecisionSchema }),
-        system: `${controllerInstructions ? `${controllerInstructions}\n\n` : ""}You are the progress controller for a durable multi-agent workflow.
+        system: `${formatOrchestrationAgentProfile(params.orchestrationAgent)}${params.orchestrationAgent ? "\n\n" : ""}You are the progress controller for a durable multi-agent workflow.
 
 Decide whether the user's goal is complete after reviewing the work already performed. Choose:
 - complete: the response can be composed now and no meaningful work remains.

@@ -9,7 +9,7 @@ import {
 
 const agent = {
   agent: { id: "research-agent", name: "Research Lead" },
-} as never;
+};
 
 function message(content: string) {
   return [{ role: "user", content }] as never;
@@ -114,6 +114,43 @@ describe("agent engagement fallback", () => {
       shouldUseControllerDirectly({
         messages: message("@research-lead, investigate workflow failures."),
         mentions: [{ kind: "agent", key: "research-agent" }],
+      }),
+    ).toBe(false);
+    expect(
+      shouldUseControllerDirectly({
+        messages: message("@workflow-director, coordinate this request."),
+        mentions: [{ kind: "agent", key: "workflow-director" }],
+        orchestrationAgent: {
+          id: "orchestrator-agent",
+          name: "Workflow Director",
+        },
+      }),
+    ).toBe(true);
+    expect(
+      shouldUseControllerDirectly({
+        messages: message("@workflow-director and @research-agent, investigate."),
+        mentions: [
+          { kind: "agent", key: "workflow-director" },
+          { kind: "agent", key: "research-agent" },
+        ],
+        orchestrationAgent: {
+          id: "orchestrator-agent",
+          name: "Workflow Director",
+        },
+        agents: [
+          {
+            agent: {
+              id: "orchestrator-agent",
+              name: "Workflow Director",
+            },
+          },
+          {
+            agent: {
+              id: "research-agent",
+              name: "Research Agent",
+            },
+          },
+        ],
       }),
     ).toBe(false);
   });

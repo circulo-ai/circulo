@@ -38,6 +38,7 @@ import {
   persistDurableAgentProgressDecision,
 } from "./steps/evaluate-agent-progress-step";
 import { type OrchestrationInput } from "./types";
+import type { OrchestrationAgentProfile } from "./orchestration-agent-profile";
 
 export const ORCHESTRATION_WORKFLOW_NAME = "chat-orchestration";
 
@@ -191,6 +192,8 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
           shouldUseControllerDirectly({
             messages: state.input.messages,
             mentions: state.input.mentions,
+            orchestrationAgent: state.context.orchestrationAgent,
+            agents: state.context.agents,
           })
         ) {
           return complete({
@@ -930,7 +933,7 @@ async function executeAgenticLoop(params: {
   triggerMessages: OrchestrationInput["messages"];
   mentions?: OrchestrationInput["mentions"];
   classification: RequestClassification;
-  orchestrationAgent?: { model: string; instructions: string } | null;
+  orchestrationAgent?: OrchestrationAgentProfile | null;
   orchestrationModel?: string | null;
   orchestrationFallbackModel?: string | null;
 }): Promise<AgenticLoopResult> {

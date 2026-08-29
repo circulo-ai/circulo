@@ -8,6 +8,8 @@ import { getTextFromMessages } from "@/lib/utils";
 import { type OrchestrationInput } from "@/workflows/orchestrate/types";
 import { generateText, Output } from "ai";
 import { z } from "zod";
+import type { OrchestrationAgentProfile } from "../orchestration-agent-profile";
+import { formatOrchestrationAgentProfile } from "../orchestration-agent-profile";
 
 const classificationSchema = z.object({
   intent: z.enum([
@@ -48,7 +50,7 @@ export async function classifyRequestStep(params: {
   messages: Message[];
   triggerType: OrchestrationInput["triggerType"];
   webhookPayload?: OrchestrationInput["webhookPayload"];
-  orchestrationAgent?: { model: string; instructions: string } | null;
+  orchestrationAgent?: OrchestrationAgentProfile | null;
   orchestrationModel?: string | null;
   orchestrationFallbackModel?: string | null;
 }): Promise<RequestClassification> {
@@ -78,8 +80,6 @@ User Message: ${getTextFromMessages(message)}`;
     author: m.authorType,
   }));
 
-  const controllerInstructions =
-    params.orchestrationAgent?.instructions?.trim();
   const { output } = await withModelFallback({
     modelId: params.orchestrationAgent?.model ?? params.orchestrationModel,
     fallbackModelId:
@@ -88,7 +88,7 @@ User Message: ${getTextFromMessages(message)}`;
       generateText({
         model,
         output: Output.object({ schema: classificationSchema }),
-        system: `${controllerInstructions ? `${controllerInstructions}\n\n` : ""}You are an intelligent request classifier for a multi-agent orchestration system.
+        system: `${formatOrchestrationAgentProfile(params.orchestrationAgent)}${params.orchestrationAgent ? "\n\n" : ""}You are an intelligent request classifier for a multi-agent orchestration system.
 
 Analyze the user's request and conversation history to determine:
 1. The primary intent (what they want to accomplish)
