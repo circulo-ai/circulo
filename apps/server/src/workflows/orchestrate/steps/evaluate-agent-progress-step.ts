@@ -6,6 +6,7 @@ import {
 import type { ChatMessage } from "@/lib/types";
 import { getTextFromMessages } from "@/lib/utils";
 import type { ChatContext } from "@/workflows/orchestrate/steps/load-chat-step";
+import type { OrchestrationInput } from "../types";
 import { generateText, Output } from "ai";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -70,6 +71,7 @@ export async function evaluateAgentProgressStep(params: {
   plan: ExecutionPlan;
   agents: ChatContext["agents"];
   triggerMessages: ChatMessage[];
+  mentions?: OrchestrationInput["mentions"];
   previousResults: AgentExecutionResult[];
   orchestrationAgent?: { model: string; instructions: string } | null;
   orchestrationModel?: string | null;
@@ -112,6 +114,8 @@ Rules:
 - Never select an agent that is not in AVAILABLE AGENTS.
 - Do not repeat an already completed agent/task unless the next task is materially different.
 - Prefer complete when the goal is satisfied; do not create work merely to extend the loop.
+- The orchestration controller can finish work about workflows, orchestration, agents, tools, MCP, planning, harness behavior, and chat coordination itself. Mark complete when that controller-owned goal is satisfied instead of routing it to a specialist.
+- Never create a handoff just because another agent is available. Continue only when a distinct capability is genuinely required.
 - A blocked decision must not include next steps.
 - Return every schema property, including an empty nextSteps array when appropriate.
 

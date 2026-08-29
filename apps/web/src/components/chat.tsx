@@ -23,6 +23,7 @@ import {
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { generateUUID } from "@/lib/utils";
+import { extractPromptMentions } from "@/lib/prompt-mentions";
 import { useChat } from "@ai-sdk/react";
 import type { Vote } from "@circulo-ai/db/schema";
 import { DefaultChatTransport } from "ai";
@@ -184,6 +185,12 @@ export function Chat({
               },
               visibility: visibilityType,
               agentIds: [],
+              mentions: extractPromptMentions(
+                message.parts
+                  ?.filter((part) => part.type === "text")
+                  .map((part) => part.text)
+                  .join("") ?? "",
+              ),
             },
           };
         },

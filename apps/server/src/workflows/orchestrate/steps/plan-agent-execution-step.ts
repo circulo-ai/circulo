@@ -48,6 +48,7 @@ export async function planAgentExecutionStep(params: {
   classification: RequestClassification;
   agents: Array<ChatAgent & { agent: Agent }>;
   triggerMessages: ChatMessage[];
+  mentions?: OrchestrationInput["mentions"];
   webhookPayload?: OrchestrationInput["webhookPayload"];
   orchestrationAgent?: { model: string; instructions: string } | null;
   orchestrationModel?: string | null;
@@ -165,6 +166,8 @@ RULES:
 - Only select enabled agents
 - Match agent capabilities to required domains
 - For webhook events, consider automation and monitoring agents
+- The orchestration controller can answer requests about workflow design, orchestration, agents, tools, MCP, planning, and harness behavior itself. Prefer no specialist agents for those requests unless the user explicitly names one or the request clearly requires its distinct capability.
+- Never create a handoff merely because another agent exists. A handoff is justified only when the assigned task requires a capability you do not have or the user explicitly requests another participant.
 - Prefer simpler strategies when possible
 - Set realistic timeout based on complexity
 - Assign clear, specific tasks to each agent
@@ -199,7 +202,11 @@ Classification reasoning: ${classification.reasoning}
   // different specialist.
   const requestText = getTextFromMessages(triggerMessages);
   const explicitlyMentionedIds = new Set(
-    getExplicitlyMentionedAgentIds(triggerMessages, agents),
+    getExplicitlyMentionedAgentIds(
+      triggerMessages,
+      agents,
+      params.mentions,
+    ),
   );
   const explicitlyMentioned = agents.filter((chatAgent) =>
     explicitlyMentionedIds.has(chatAgent.agentId),

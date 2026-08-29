@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   getExplicitlyMentionedAgentIds,
   hasExplicitAgentDirective,
+  hasExplicitToolDirective,
+  shouldUseControllerDirectly,
   shouldEngageAgents,
 } from "./agent-engagement";
 
@@ -80,5 +82,39 @@ describe("agent engagement fallback", () => {
         agent,
       ]),
     ).toEqual([]);
+  });
+
+  it("recognizes structured tool mentions without selecting a specialist", () => {
+    expect(
+      hasExplicitToolDirective(message("Please use the selected capability."), [
+        { kind: "tool", key: "searchKnowledge" },
+      ]),
+    ).toBe(true);
+    expect(
+      getExplicitlyMentionedAgentIds(
+        message("Ask the selected specialist."),
+        [agent],
+        [{ kind: "agent", key: "research-lead" }],
+      ),
+    ).toEqual(["research-agent"]);
+    expect(
+      shouldUseControllerDirectly({
+        messages: message("Please use @tool:searchKnowledge."),
+      }),
+    ).toBe(true);
+  });
+
+  it("keeps controller-owned work local and allows explicit agents to opt in", () => {
+    expect(
+      shouldUseControllerDirectly({
+        messages: message("How does our workflow orchestration loop work?"),
+      }),
+    ).toBe(true);
+    expect(
+      shouldUseControllerDirectly({
+        messages: message("@research-lead, investigate workflow failures."),
+        mentions: [{ kind: "agent", key: "research-agent" }],
+      }),
+    ).toBe(false);
   });
 });

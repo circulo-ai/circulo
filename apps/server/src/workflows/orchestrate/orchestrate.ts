@@ -26,6 +26,8 @@ import { complete, defineWorkflow, waitForAndRetry } from "@circulo-ai/wf";
 import { and, asc, eq } from "drizzle-orm";
 import {
   hasExplicitAgentDirective,
+  hasExplicitToolDirective,
+  shouldUseControllerDirectly,
   shouldEngageAgents,
 } from "./agent-engagement";
 import type { RequestClassification } from "./steps/classify-request-step";
@@ -136,6 +138,7 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
             classification.shouldEngageAgents,
             state.input.messages,
             state.context.agents,
+            state.input.mentions,
           );
           return complete({
             ...state,
@@ -177,20 +180,30 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
             state.classification.shouldEngageAgents,
             state.input.messages,
             state.context.agents,
+            state.input.mentions,
           ),
         };
 
         if (
           !state.context.chat.orchestrationEnabled ||
           state.context.agents.length === 0 ||
-          !effectiveClassification.shouldEngageAgents
+          !effectiveClassification.shouldEngageAgents ||
+          shouldUseControllerDirectly({
+            messages: state.input.messages,
+            mentions: state.input.mentions,
+          })
         ) {
           return complete({
             ...state,
             plan: createDirectPlan(
-              effectiveClassification.shouldEngageAgents
-                ? "Direct assistant response mode"
-                : "No agent participation requested for this human conversation",
+              !effectiveClassification.shouldEngageAgents
+                ? "No agent participation requested for this human conversation"
+                : hasExplicitToolDirective(
+                      state.input.messages,
+                      state.input.mentions,
+                    )
+                  ? "The controller will use the explicitly mentioned tool directly"
+                  : "The orchestration controller can handle this request directly",
             ),
           });
         }
@@ -200,6 +213,7 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
             classification: effectiveClassification,
             agents: state.context.agents,
             triggerMessages: state.input.messages,
+            mentions: state.input.mentions,
             webhookPayload: state.input.webhookPayload,
             orchestrationAgent: state.context.orchestrationAgent,
             orchestrationModel: state.context.chat.orchestrationModel,
@@ -235,7 +249,12 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
           state.input.triggerType === "user_message" &&
           state.context.members.length > 1 &&
           !state.classification.shouldEngageAgents &&
-          !hasExplicitAgentDirective(state.input.messages, state.context.agents)
+          !hasExplicitAgentDirective(
+            state.input.messages,
+            state.context.agents,
+            state.input.mentions,
+          ) &&
+          !hasExplicitToolDirective(state.input.messages, state.input.mentions)
         ) {
           return complete({
             ...state,
@@ -806,7 +825,8 @@ function createDirectClassification(
     requiresMultipleAgents: false,
     shouldEngageAgents:
       input.triggerType === "webhook_event" ||
-      hasExplicitAgentDirective(input.messages, agents),
+      hasExplicitAgentDirective(input.messages, agents, input.mentions) ||
+      hasExplicitToolDirective(input.messages, input.mentions),
     estimatedSteps: 1,
     urgency: "medium",
     notifyMembers: false,
@@ -908,6 +928,7 @@ async function executeAgenticLoop(params: {
   workflowId: string;
   durableAgentResults: Map<string, AgentExecutionResult>;
   triggerMessages: OrchestrationInput["messages"];
+  mentions?: OrchestrationInput["mentions"];
   classification: RequestClassification;
   orchestrationAgent?: { model: string; instructions: string } | null;
   orchestrationModel?: string | null;
@@ -961,6 +982,7 @@ async function executeAgenticLoop(params: {
           plan: params.plan,
           agents: params.context.agents,
           triggerMessages: params.triggerMessages,
+          mentions: params.mentions,
           previousResults: results,
           orchestrationAgent: params.orchestrationAgent,
           orchestrationModel: params.orchestrationModel,

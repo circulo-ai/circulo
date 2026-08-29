@@ -105,6 +105,7 @@ Context:
 - This is ${triggerType === "webhook_event" ? "a webhook-triggered automation" : "a direct user request"}
 - Consider the conversation history for context
 - Set shouldEngageAgents to false when the current speaker is addressing human teammates or continuing a human-to-human conversation without a direct or indirect request for an agent. Set it to true for an explicit @mention, a request addressed to an agent/assistant, an actionable request that clearly needs the system, or a webhook event.
+- The orchestration controller is itself capable of answering questions about workflows, orchestration, agents, tools, MCP, planning, and harness behavior. Do not treat those topics as a reason to involve a specialist.
 - Be precise in domain identification for better agent matching`,
         prompt: `Recent conversation:
 ${recentMessages.map((m) => `${m.author}: ${m.content}`).join("\n")}
