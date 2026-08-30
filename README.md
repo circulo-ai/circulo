@@ -39,7 +39,7 @@ bun run build
 
 The server build bundles the application and the Circulo Workflow Engine directly. Production orchestration state, workflow events, optimistic versions, and execution locks are stored in PostgreSQL, and interrupted runs are reclaimed on server startup. The live HTTP output channel is instance-local, so deployments with multiple API instances should use sticky routing for an active stream or add a shared pub/sub adapter at the load-balancer boundary.
 
-The server composes the current `@circulo-ai/wf` 2.3 runtime through
+The server composes the current `@circulo-ai/wf` 3.0 runtime through
 `apps/server/src/workflows/runtime/wf-config.ts`. Runtime creation is lazy and
 profile-aware (`development`, `test`, and `production`). Production uses the
 durable PostgreSQL stores and `AdapterEventBus` over Redis; each API instance

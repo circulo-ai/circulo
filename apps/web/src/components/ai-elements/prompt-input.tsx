@@ -57,6 +57,7 @@ import {
   type FormEvent,
   type FormEventHandler,
   Fragment,
+  type FocusEvent,
   type HTMLAttributes,
   type KeyboardEventHandler,
   type PropsWithChildren,
@@ -790,7 +791,7 @@ export const PromptInput = ({
         ref={formRef}
         {...props}
       >
-        <InputGroup className="min-w-0 overflow-hidden border-border bg-sidebar shadow-xs transition-colors focus-within:border-ring/70">
+        <InputGroup className="min-w-0 overflow-visible border-border bg-sidebar shadow-xs transition-colors focus-within:border-ring/70">
           {children}
         </InputGroup>
       </form>
@@ -836,6 +837,10 @@ export type MentionItemType = {
   name: string;
   icon: ReactNode;
   username: string;
+  /** Text inserted after @. Defaults to username. */
+  insertText?: string;
+  description?: string;
+  kind?: "agent" | "tool";
 };
 
 export type CommandItemType = {
@@ -846,15 +851,18 @@ export type CommandItemType = {
 };
 
 export const PromptInputTextarea = ({
+  ref: forwardedRef,
   onChange,
+  onKeyDown: onKeyDownProp,
+  onFocus: onFocusProp,
   onValueChange,
   className,
   placeholder = "What would you like to know?",
-  enableMentions: _enableMentions,
+  enableMentions = false,
   enableCommands: _enableCommands,
-  mentions: _mentions,
+  mentions,
   commands: _commands,
-  fetchMentions: _fetchMentions,
+  fetchMentions,
   fetchCommands: _fetchCommands,
   minHeight,
   maxHeight,
@@ -863,9 +871,145 @@ export const PromptInputTextarea = ({
 }: PromptInputTextareaProps) => {
   const controller = useOptionalPromptInputController();
   const attachments = usePromptInputAttachments();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isComposing, setIsComposing] = useState(false);
+  const [mentionItems, setMentionItems] = useState<MentionItemType[]>(
+    mentions ?? [],
+  );
+  const [mentionRange, setMentionRange] = useState<{
+    start: number;
+    end: number;
+    query: string;
+  } | null>(null);
+  const [isMentionOpen, setIsMentionOpen] = useState(false);
+  const [isMentionLoading, setIsMentionLoading] = useState(false);
+  const [highlightedMentionIndex, setHighlightedMentionIndex] = useState(0);
+  const mentionRequestRef = useRef(0);
+
+  const updateMentionRange = useCallback(
+    (value: string, cursor: number) => {
+      if (!enableMentions) {
+        setMentionRange(null);
+        setIsMentionOpen(false);
+        return;
+      }
+
+      const beforeCursor = value.slice(0, cursor);
+      const match = beforeCursor.match(/(?:^|\s)@([^\s@]*)$/);
+      if (!match) {
+        setMentionRange(null);
+        setIsMentionOpen(false);
+        return;
+      }
+
+      const query = match[1] ?? "";
+      setMentionRange({
+        start: cursor - query.length - 1,
+        end: cursor,
+        query,
+      });
+      setHighlightedMentionIndex(0);
+      setIsMentionOpen(true);
+    },
+    [enableMentions],
+  );
+
+  useEffect(() => {
+    if (!enableMentions || !mentionRange) {
+      setMentionItems(mentions ?? []);
+      setIsMentionLoading(false);
+      return;
+    }
+
+    const requestId = mentionRequestRef.current + 1;
+    mentionRequestRef.current = requestId;
+    const timer = window.setTimeout(() => {
+      setIsMentionLoading(true);
+      const request = fetchMentions
+        ? fetchMentions(mentionRange.query)
+        : Promise.resolve(mentions ?? []);
+      void request
+        .then((items) => {
+          if (mentionRequestRef.current !== requestId) return;
+          setMentionItems(items.slice(0, 12));
+        })
+        .catch(() => {
+          if (mentionRequestRef.current === requestId) setMentionItems([]);
+        })
+        .finally(() => {
+          if (mentionRequestRef.current === requestId) {
+            setIsMentionLoading(false);
+          }
+        });
+    }, 120);
+
+    return () => window.clearTimeout(timer);
+  }, [enableMentions, fetchMentions, mentionRange, mentions]);
+
+  const selectMention = useCallback(
+    (item: MentionItemType) => {
+      const textarea = textareaRef.current;
+      if (!textarea || !mentionRange) return;
+
+      const value = textarea.value;
+      const insertion = `@${item.insertText ?? item.username} `;
+      const nextValue = `${value.slice(0, mentionRange.start)}${insertion}${value.slice(mentionRange.end)}`;
+      const nextCursor = mentionRange.start + insertion.length;
+      controller?.textInput.setInput(nextValue);
+      onValueChange?.(nextValue);
+      setMentionRange(null);
+      setIsMentionOpen(false);
+      requestAnimationFrame(() => {
+        textarea.focus();
+        textarea.setSelectionRange(nextCursor, nextCursor);
+      });
+    },
+    [controller, mentionRange, onValueChange],
+  );
+
+  const setTextareaRef = useCallback(
+    (node: HTMLTextAreaElement | null) => {
+      textareaRef.current = node;
+      if (!forwardedRef) return;
+      if (typeof forwardedRef === "function") {
+        forwardedRef(node);
+      } else {
+        forwardedRef.current = node;
+      }
+    },
+    [forwardedRef],
+  );
 
   const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
+    if (isMentionOpen && mentionItems.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setHighlightedMentionIndex((index) =>
+          Math.min(index + 1, mentionItems.length - 1),
+        );
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setHighlightedMentionIndex((index) => Math.max(index - 1, 0));
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setIsMentionOpen(false);
+        return;
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault();
+        const item = mentionItems[highlightedMentionIndex];
+        if (item) selectMention(item);
+        return;
+      }
+    }
+
+    onKeyDownProp?.(e);
+    if (e.defaultPrevented) return;
+
     if (e.key === "Enter") {
       if (isComposing || e.nativeEvent.isComposing) {
         return;
@@ -931,6 +1075,18 @@ export const PromptInputTextarea = ({
     }
     onValueChange?.(e.currentTarget.value);
     onChange?.(e);
+    updateMentionRange(
+      e.currentTarget.value,
+      e.currentTarget.selectionStart ?? e.currentTarget.value.length,
+    );
+  };
+
+  const handleFocus = (e: FocusEvent<HTMLTextAreaElement>) => {
+    onFocusProp?.(e);
+    updateMentionRange(
+      e.currentTarget.value,
+      e.currentTarget.selectionStart ?? e.currentTarget.value.length,
+    );
   };
 
   const controlledProps = controller
@@ -938,21 +1094,77 @@ export const PromptInputTextarea = ({
     : { onChange: handleChange };
 
   return (
-    <InputGroupTextarea
-      className={cn("field-sizing-content max-h-48 min-h-16", className)}
-      name="message"
-      onCompositionEnd={() => setIsComposing(false)}
-      onCompositionStart={() => setIsComposing(true)}
-      onKeyDown={handleKeyDown}
-      onPaste={handlePaste}
-      placeholder={placeholder}
-      style={{
-        ...(minHeight === undefined ? {} : { minHeight }),
-        ...(maxHeight === undefined ? {} : { maxHeight }),
-      }}
-      {...props}
-      {...controlledProps}
-    />
+    <div className="relative w-full min-w-0">
+      <InputGroupTextarea
+        aria-controls={isMentionOpen ? "prompt-input-mentions" : undefined}
+        aria-expanded={isMentionOpen}
+        className={cn("field-sizing-content max-h-48 min-h-16", className)}
+        name="message"
+        onCompositionEnd={() => setIsComposing(false)}
+        onCompositionStart={() => setIsComposing(true)}
+        onFocus={handleFocus}
+        onKeyDown={handleKeyDown}
+        onPaste={handlePaste}
+        placeholder={placeholder}
+        style={{
+          ...(minHeight === undefined ? {} : { minHeight }),
+          ...(maxHeight === undefined ? {} : { maxHeight }),
+        }}
+        {...props}
+        ref={setTextareaRef}
+        {...controlledProps}
+      />
+      {enableMentions && isMentionOpen && (
+        <div
+          className="absolute right-2 bottom-full left-2 z-50 mb-2 overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-xl"
+          id="prompt-input-mentions"
+          role="listbox"
+        >
+          {isMentionLoading ? (
+            <div className="flex items-center gap-2 px-3 py-3 text-sm text-muted-foreground">
+              <Loader2Icon className="size-4 animate-spin" />
+              Finding agents and tools…
+            </div>
+          ) : mentionItems.length === 0 ? (
+            <div className="px-3 py-3 text-sm text-muted-foreground">
+              No matching agents or tools
+            </div>
+          ) : (
+            <Command shouldFilter={false}>
+              <CommandList className="max-h-64">
+                <CommandGroup heading="Direct work to">
+                  {mentionItems.map((item, index) => (
+                    <CommandItem
+                      aria-selected={index === highlightedMentionIndex}
+                      key={`${item.kind ?? "mention"}:${item.username}`}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onSelect={() => selectMention(item)}
+                      value={`${item.name} ${item.username}`}
+                    >
+                      <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                        {item.icon}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium">
+                          {item.name}
+                        </span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {item.description ??
+                            (item.kind === "tool" ? "Tool" : "Agent")}
+                        </span>
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {item.kind === "tool" ? "tool" : "agent"}
+                      </span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          )}
+        </div>
+      )}
+    </div>
   );
 };
 

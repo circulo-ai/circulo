@@ -8,6 +8,8 @@ import { getTextFromMessages } from "@/lib/utils";
 import { type OrchestrationInput } from "@/workflows/orchestrate/types";
 import { generateText, Output } from "ai";
 import { z } from "zod";
+import type { OrchestrationAgentProfile } from "../orchestration-agent-profile";
+import { formatOrchestrationAgentProfile } from "../orchestration-agent-profile";
 
 const classificationSchema = z.object({
   intent: z.enum([
@@ -48,7 +50,7 @@ export async function classifyRequestStep(params: {
   messages: Message[];
   triggerType: OrchestrationInput["triggerType"];
   webhookPayload?: OrchestrationInput["webhookPayload"];
-  orchestrationAgent?: { model: string; instructions: string } | null;
+  orchestrationAgent?: OrchestrationAgentProfile | null;
   orchestrationModel?: string | null;
   orchestrationFallbackModel?: string | null;
 }): Promise<RequestClassification> {
@@ -78,8 +80,6 @@ User Message: ${getTextFromMessages(message)}`;
     author: m.authorType,
   }));
 
-  const controllerInstructions =
-    params.orchestrationAgent?.instructions?.trim();
   const { output } = await withModelFallback({
     modelId: params.orchestrationAgent?.model ?? params.orchestrationModel,
     fallbackModelId:
@@ -88,7 +88,7 @@ User Message: ${getTextFromMessages(message)}`;
       generateText({
         model,
         output: Output.object({ schema: classificationSchema }),
-        system: `${controllerInstructions ? `${controllerInstructions}\n\n` : ""}You are an intelligent request classifier for a multi-agent orchestration system.
+        system: `${formatOrchestrationAgentProfile(params.orchestrationAgent)}${params.orchestrationAgent ? "\n\n" : ""}You are an intelligent request classifier for a multi-agent orchestration system.
 
 Analyze the user's request and conversation history to determine:
 1. The primary intent (what they want to accomplish)
@@ -105,6 +105,7 @@ Context:
 - This is ${triggerType === "webhook_event" ? "a webhook-triggered automation" : "a direct user request"}
 - Consider the conversation history for context
 - Set shouldEngageAgents to false when the current speaker is addressing human teammates or continuing a human-to-human conversation without a direct or indirect request for an agent. Set it to true for an explicit @mention, a request addressed to an agent/assistant, an actionable request that clearly needs the system, or a webhook event.
+- The orchestration controller is itself capable of answering questions about workflows, orchestration, agents, tools, MCP, planning, and harness behavior. Do not treat those topics as a reason to involve a specialist.
 - Be precise in domain identification for better agent matching`,
         prompt: `Recent conversation:
 ${recentMessages.map((m) => `${m.author}: ${m.content}`).join("\n")}

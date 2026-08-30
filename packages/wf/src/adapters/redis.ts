@@ -10,6 +10,12 @@ import type {
   WorkflowRunReference,
 } from "../models";
 import type { JsonKeyValueStore, WorkflowLockStore } from "./json-store";
+import {
+  JsonTaskQueue,
+  JsonWorkflowHistoryStore,
+  type JsonTaskQueueOptions,
+  type JsonWorkflowHistoryStoreOptions,
+} from "./durable";
 import { AdapterEventBus, type PubSubAdapter } from "./event-bus";
 import { JsonEventStore, JsonWorkflowStore } from "./json-store";
 import { generateId } from "../utils/id";
@@ -117,6 +123,52 @@ return 1
       if (value !== null) entries.push({ key, value });
     }
     return entries;
+  }
+}
+
+/** Redis-backed append-only replay history. */
+export class RedisWorkflowHistoryStore extends JsonWorkflowHistoryStore {
+  constructor(
+    redis: RedisCommandClient,
+    options: JsonWorkflowHistoryStoreOptions & {
+      lockKeyPrefix?: string;
+      keyValueStore?: JsonKeyValueStore;
+      lockStore?: WorkflowLockStore;
+    } = {},
+  ) {
+    super(
+      options.keyValueStore ?? new RedisJsonKeyValueStore(redis),
+      options.lockStore ??
+        new RedisWorkflowLockStore(
+          redis,
+          options.lockKeyPrefix ?? "wf:history-lock:",
+          options.holderId,
+        ),
+      options,
+    );
+  }
+}
+
+/** Redis-backed delayed task queue for activities and durable timers. */
+export class RedisTaskQueue extends JsonTaskQueue {
+  constructor(
+    redis: RedisCommandClient,
+    options: JsonTaskQueueOptions & {
+      lockKeyPrefix?: string;
+      keyValueStore?: JsonKeyValueStore;
+      lockStore?: WorkflowLockStore;
+    } = {},
+  ) {
+    super(
+      options.keyValueStore ?? new RedisJsonKeyValueStore(redis),
+      options.lockStore ??
+        new RedisWorkflowLockStore(
+          redis,
+          options.lockKeyPrefix ?? "wf:task-lock:",
+          options.holderId,
+        ),
+      options,
+    );
   }
 }
 
@@ -397,6 +449,55 @@ export interface RedisWorkflowAdapters<TContext, TInput, TOutput> {
   readonly eventBus: EventBus<TOutput>;
   readonly idempotencyStore: RedisIdempotencyStore;
   close(): Promise<void>;
+}
+
+export interface RedisDurableAdaptersOptions {
+  client: RedisCommandClient;
+  historyKeyPrefix?: string;
+  taskKeyPrefix?: string;
+  lockKeyPrefix?: string;
+  holderId?: string;
+}
+
+export interface RedisDurableAdapters {
+  readonly keyValueStore: RedisJsonKeyValueStore;
+  readonly lockStore: RedisWorkflowLockStore;
+  readonly history: RedisWorkflowHistoryStore;
+  readonly queue: RedisTaskQueue;
+  initialize(): Promise<void>;
+  close(): Promise<void>;
+}
+
+/** Compose Redis-backed replay history and delayed task adapters. */
+export function createRedisDurableAdapters(
+  options: RedisDurableAdaptersOptions,
+): RedisDurableAdapters {
+  const keyValueStore = new RedisJsonKeyValueStore(options.client);
+  const lockStore = new RedisWorkflowLockStore(
+    options.client,
+    options.lockKeyPrefix ?? "wf:durable-lock:",
+    options.holderId,
+  );
+  return {
+    keyValueStore,
+    lockStore,
+    history: new RedisWorkflowHistoryStore(options.client, {
+      keyValueStore,
+      lockStore,
+      ...(options.historyKeyPrefix === undefined ? {} : { keyPrefix: options.historyKeyPrefix }),
+      ...(options.lockKeyPrefix === undefined ? {} : { lockKeyPrefix: options.lockKeyPrefix }),
+      ...(options.holderId === undefined ? {} : { holderId: options.holderId }),
+    }),
+    queue: new RedisTaskQueue(options.client, {
+      keyValueStore,
+      lockStore,
+      ...(options.taskKeyPrefix === undefined ? {} : { keyPrefix: options.taskKeyPrefix }),
+      ...(options.lockKeyPrefix === undefined ? {} : { lockKeyPrefix: options.lockKeyPrefix }),
+      ...(options.holderId === undefined ? {} : { holderId: options.holderId }),
+    }),
+    initialize: async () => undefined,
+    close: async () => undefined,
+  };
 }
 
 /** Compose the standard Redis-backed adapters required by WorkflowEngine. */

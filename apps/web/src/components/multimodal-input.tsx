@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  MentionItemType,
+  type MentionItemType,
   PromptInput,
   PromptInputSubmit,
   PromptInputTextarea,
@@ -16,10 +16,10 @@ import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { cn } from "@/lib/utils";
 import type { UseChatHelpers } from "@ai-sdk/react";
-import { Agent, ChatAgent } from "@circulo-ai/db";
+import type { Agent, ChatAgent } from "@circulo-ai/db";
 import type { UIMessage } from "ai";
 import equal from "fast-deep-equal";
-import { AtSign, Mic, Square } from "lucide-react";
+import { Bot, Mic, Square, Wrench } from "lucide-react";
 import {
   type ChangeEvent,
   type Dispatch,
@@ -122,6 +122,86 @@ function PureMultimodalInput({
   });
 
   const [isReadingAttachments, setIsReadingAttachments] = useState(false);
+  const mentionCatalogRef = useRef<Promise<MentionItemType[]> | null>(null);
+
+  const fetchPromptMentions = useCallback(
+    async (query: string): Promise<MentionItemType[]> => {
+      if (!mentionCatalogRef.current) {
+        mentionCatalogRef.current = Promise.all([
+          fetch(`/api/chat/${chatId}/agent`),
+          fetch("/api/capabilities"),
+        ]).then(async ([agentsResponse, capabilitiesResponse]) => {
+          const agentsJson = (await agentsResponse.json()) as
+            | Omit<ChatAgent & Agent, "agentId">[]
+            | { agents?: Omit<ChatAgent & Agent, "agentId">[] };
+          const agents = Array.isArray(agentsJson)
+            ? agentsJson
+            : (agentsJson.agents ?? []);
+          const capabilityJson = (await capabilitiesResponse.json()) as {
+            plugins?: Array<{ name: string; tools?: string[] }>;
+            apps?: Array<{ name?: string; tools?: string[] }>;
+          };
+          const agentItems = agents
+            .filter((agent) => agent.isEnabled !== false)
+            .map((agent) => {
+              const handle =
+                agent.name
+                  .trim()
+                  .toLowerCase()
+                  .replaceAll(/\s+/g, "-")
+                  .replaceAll(/[^a-z0-9-]/g, "") || agent.id;
+              return {
+                type: "mention" as const,
+                name: agent.name,
+                username: agent.id,
+                insertText: handle,
+                description: agent.description ?? "Specialist agent",
+                kind: "agent" as const,
+                icon: <Bot aria-hidden="true" />,
+              } satisfies MentionItemType;
+            });
+          const toolNames = [
+            ...(capabilityJson.plugins ?? []).flatMap(
+              (plugin) => plugin.tools ?? [],
+            ),
+            ...(capabilityJson.apps ?? []).flatMap(
+              (app) => app.tools ?? [],
+            ),
+          ];
+          const toolItems = [...new Set(toolNames)].map((toolName) => ({
+            type: "mention" as const,
+            name: toolName,
+            username: `tool:${toolName}`,
+            insertText: `tool:${toolName}`,
+            description: "Available workspace tool",
+            kind: "tool" as const,
+            icon: <Wrench aria-hidden="true" />,
+          } satisfies MentionItemType));
+          return [...agentItems, ...toolItems];
+        });
+      }
+
+      const catalog = await mentionCatalogRef.current;
+      const toolQuery = /^(?:tool|mcp)[:/_-]?/i.test(query);
+      const normalizedQuery = query
+        .replace(/^(?:tool|mcp)[:/_-]?/i, "")
+        .toLowerCase();
+      return catalog.filter((item) => {
+        if (toolQuery && item.kind !== "tool") return false;
+        if (!toolQuery && item.kind === "tool" && query.length > 0) {
+          return item.name.toLowerCase().includes(normalizedQuery);
+        }
+        return `${item.name} ${item.username}`
+          .toLowerCase()
+          .includes(normalizedQuery);
+      });
+    },
+    [chatId],
+  );
+
+  useEffect(() => {
+    mentionCatalogRef.current = null;
+  }, [chatId]);
 
   // Sync successful uploads into parent attachment state. Small files are also
   // carried as data URLs so the server can pass private local uploads to
@@ -391,44 +471,7 @@ function PureMultimodalInput({
               <PromptInputTextarea
                 enableMentions
                 enableCommands
-                fetchMentions={async (query) => {
-                  const response = await fetch(`/api/chat/${chatId}/agent`);
-                  if (!response.ok) {
-                    return [];
-                  }
-
-                  const json = (await response.json()) as
-                    | Omit<ChatAgent & Agent, "agentId">[]
-                    | { agents?: Omit<ChatAgent & Agent, "agentId">[] }
-                    | {
-                        data?: {
-                          agents?: Omit<ChatAgent & Agent, "agentId">[];
-                        };
-                      };
-                  const agents = Array.isArray(json)
-                    ? json
-                    : (("agents" in json
-                        ? json.agents
-                        : "data" in json
-                          ? json.data?.agents
-                          : undefined) ?? []);
-
-                  return agents
-                    .filter((agent) => agent.isEnabled !== false)
-                    .filter((agent) =>
-                      `${agent.name} ${agent.id}`
-                        .toLowerCase()
-                        .includes(query.toLowerCase()),
-                    )
-                    .map((e) => {
-                      return {
-                        type: "mention",
-                        name: e.name,
-                        username: e.id,
-                        icon: <AtSign />,
-                      } satisfies MentionItemType;
-                    });
-                }}
+                fetchMentions={fetchPromptMentions}
                 autoFocus
                 className="block w-full min-w-0 flex-1 grow resize-none [scrollbar-width:none] border-0! border-none! bg-transparent px-2 py-2 text-sm leading-6 ring-0 outline-none [-ms-overflow-style:none] placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none [&::-webkit-scrollbar]:hidden"
                 data-testid="multimodal-input"
@@ -436,7 +479,7 @@ function PureMultimodalInput({
                 maxHeight={200}
                 minHeight={44}
                 onValueChange={setInput}
-                placeholder="Send a message..."
+                placeholder="Message the circle… type @ for an agent or tool"
                 ref={textareaRef}
                 value={input}
               />{" "}

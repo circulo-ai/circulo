@@ -12,6 +12,12 @@ export {
   type PubSubAdapter,
 } from "./event-bus";
 export {
+  JsonTaskQueue,
+  JsonWorkflowHistoryStore,
+  type JsonTaskQueueOptions,
+  type JsonWorkflowHistoryStoreOptions,
+} from "./durable";
+export {
   JsonEventStore,
   JsonWorkflowStore,
   MapJsonKeyValueStore,
@@ -23,6 +29,8 @@ export {
 export {
   PostgresIdempotencyStore,
   PostgresJsonKeyValueStore,
+  PostgresTaskQueue,
+  PostgresWorkflowHistoryStore,
   PostgresNotificationAdapter,
   PostgresWorkflowLockStore,
   createPostgresJsQueryClient,
@@ -34,8 +42,12 @@ export {
   type PostgresRow,
   type PostgresWorkflowAdapters,
   type PostgresWorkflowAdaptersOptions,
+  type PostgresDurableAdapters,
+  type PostgresDurableAdaptersOptions,
 } from "./postgres";
 export {
+  RedisTaskQueue,
+  RedisWorkflowHistoryStore,
   RedisIdempotencyStore,
   RedisJsonKeyValueStore,
   RedisPubSubAdapter,
@@ -46,4 +58,6 @@ export {
   type RedisPubSubClient,
   type RedisWorkflowAdapters,
   type RedisWorkflowAdaptersOptions,
+  type RedisDurableAdapters,
+  type RedisDurableAdaptersOptions,
 } from "./redis";

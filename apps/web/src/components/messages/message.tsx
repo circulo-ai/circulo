@@ -364,7 +364,10 @@ export const PreviewMessage = memo(
     if (prevProps.canEdit !== nextProps.canEdit) {
       return false;
     }
-    if (!equal(prevProps.message.parts, nextProps.message.parts)) {
+    // The AI SDK replaces the message snapshot for each streamed chunk. Use
+    // that identity as the render boundary so nested part mutations cannot be
+    // hidden by a deep-equality short circuit during live workflow updates.
+    if (prevProps.message !== nextProps.message) {
       return false;
     }
     if (!equal(prevProps.vote, nextProps.vote)) {

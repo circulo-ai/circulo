@@ -1,12 +1,16 @@
 import type { Agent } from "@/db";
 import type { ChatMessage } from "@/lib/types";
 import { getTextFromMessages } from "@/lib/utils";
+import type { PromptMention } from "./types";
 
 /** Keeps a classifier miss from suppressing an explicit request for an agent. */
 export function hasExplicitAgentDirective(
   messages: ChatMessage[],
-  agents: Array<{ agent: Agent }>,
+  agents: Array<{ agent: Pick<Agent, "id" | "name"> }>,
+  mentions: PromptMention[] = [],
 ): boolean {
+  if (mentions.some((mention) => mention.kind === "agent")) return true;
+
   const text = getTextFromMessages(messages).toLowerCase();
   if (/(^|\s)@(agent|assistant|circulo|ai)(?:\b|$)/i.test(text)) {
     return true;
@@ -38,24 +42,118 @@ export function hasExplicitAgentDirective(
   });
 }
 
+/** Tool mentions explicitly ask the controller to act, without requiring a specialist. */
+export function hasExplicitToolDirective(
+  messages: ChatMessage[],
+  mentions: PromptMention[] = [],
+): boolean {
+  if (mentions.some((mention) => mention.kind === "tool")) return true;
+  const text = getTextFromMessages(messages);
+  return (
+    /(^|\s)@(?:tool|mcp)(?:\b|$)/i.test(text) ||
+    /(^|\s)@(?:tool|mcp)(?::|[\/_-])[a-z0-9][a-z0-9_.:/-]*/i.test(text)
+  );
+}
+
+/** Requests about the orchestration product itself belong to the controller. */
+export function isOrchestratorOwnedRequest(messages: ChatMessage[]): boolean {
+  return /\b(?:orchestrat(?:e|ion|or)|workflow(?:s)?|agentic|harness|handoff|mcp|execution loop|tool access|chat coordination)\b/i.test(
+    getTextFromMessages(messages),
+  );
+}
+
+/** Keep controller-owned work local unless a named specialist was requested. */
+export function shouldUseControllerDirectly(params: {
+  messages: ChatMessage[];
+  mentions?: PromptMention[];
+  orchestrationAgent?: Pick<Agent, "id" | "name"> | null;
+  agents?: Array<{ agent: Pick<Agent, "id" | "name"> }>;
+}): boolean {
+  const mentions = params.mentions ?? [];
+  const explicitlyMentionedAgentIds = params.agents
+    ? getExplicitlyMentionedAgentIds(params.messages, params.agents, mentions)
+    : [];
+  if (
+    explicitlyMentionedAgentIds.some(
+      (agentId) => agentId !== params.orchestrationAgent?.id,
+    )
+  ) {
+    return false;
+  }
+  if (
+    params.orchestrationAgent &&
+    isExplicitOrchestrationAgentMention(
+      params.messages,
+      params.orchestrationAgent,
+      mentions,
+    )
+  ) {
+    return true;
+  }
+  if (mentions.some((mention) => mention.kind === "agent")) return false;
+  if (hasExplicitToolDirective(params.messages, mentions)) return true;
+  if (isOrchestratorOwnedRequest(params.messages)) return true;
+  return false;
+}
+
+function isExplicitOrchestrationAgentMention(
+  messages: ChatMessage[],
+  agent: Pick<Agent, "id" | "name">,
+  mentions: PromptMention[],
+): boolean {
+  const handle = normalizeMentionHandle(agent.name);
+  if (
+    mentions.some(
+      (mention) =>
+        mention.kind === "agent" &&
+        (mention.key === agent.id || mention.key === handle),
+    )
+  ) {
+    return true;
+  }
+
+  const text = getTextFromMessages(messages);
+  return new RegExp(
+    `(^|\\s)@(?:${escapeRegExp(agent.id)}|${escapeRegExp(handle)})(?:\\b|$)`,
+    "i",
+  ).test(text);
+}
+
 /** Explicit user directives take precedence over a classifier false negative. */
 export function shouldEngageAgents(
   classifiedEngagement: boolean,
   messages: ChatMessage[],
-  agents: Array<{ agent: Agent }>,
+  agents: Array<{ agent: Pick<Agent, "id" | "name"> }>,
+  mentions: PromptMention[] = [],
 ): boolean {
-  return classifiedEngagement || hasExplicitAgentDirective(messages, agents);
+  return (
+    classifiedEngagement ||
+    hasExplicitAgentDirective(messages, agents, mentions) ||
+    hasExplicitToolDirective(messages, mentions)
+  );
 }
 
 /** Return agent IDs named by a targeted directive; generic @agent stays planner-selected. */
 export function getExplicitlyMentionedAgentIds(
   messages: ChatMessage[],
-  agents: Array<{ agent: Agent }>,
+  agents: Array<{ agent: Pick<Agent, "id" | "name"> }>,
+  mentions: PromptMention[] = [],
 ): string[] {
   const text = getTextFromMessages(messages).toLowerCase();
+  const structuredIds = new Set(
+    mentions
+      .filter((mention) => mention.kind === "agent")
+      .map((mention) => mention.key),
+  );
 
   return agents
     .filter(({ agent }) => {
+      if (
+        structuredIds.has(agent.id) ||
+        structuredIds.has(normalizeMentionHandle(agent.name))
+      ) {
+        return true;
+      }
       const name = agent.name.trim().toLowerCase();
       if (name.length < 2) return false;
       const escapedName = escapeRegExp(name);
@@ -78,4 +176,12 @@ export function getExplicitlyMentionedAgentIds(
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeMentionHandle(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replaceAll(/\s+/g, "-")
+    .replaceAll(/[^a-z0-9-]/g, "");
 }

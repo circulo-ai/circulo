@@ -23,6 +23,7 @@ import { convertToUIMessages, getTextFromMessages } from "@/lib/utils";
 import type { ChatContext } from "@/workflows/orchestrate/steps/load-chat-step";
 import type { OrchestrationInput } from "@/workflows/orchestrate/types";
 import { publishWorkflowChunk } from "@/workflows/runtime/output-channel";
+import { formatOrchestrationAgentProfile } from "../orchestration-agent-profile";
 import {
   convertToModelMessages,
   ToolLoopAgent,
@@ -227,6 +228,8 @@ function isDurableUIChunk(chunk: CustomUIMessageChunk): boolean {
   if (type.startsWith("text-")) return true;
   return (
     type.startsWith("data-workflowAgent") ||
+    type === "data-workflowPlanStep" ||
+    type.startsWith("data-workflowLoop") ||
     type === "data-workflowApprovalRequested" ||
     type === "data-memoryUpdated" ||
     type === "data-scheduledTaskCreated" ||
@@ -262,50 +265,105 @@ export async function executeDirectResponseStep(params: {
 }): Promise<AgentExecutionResult> {
   const startTime = new Date();
   const dataStream = toUIMessageStreamWriter(params.workflowId);
-  const agentName = "Circulo";
+  const orchestrationAgent = params.context.orchestrationAgent;
+  const agentId = orchestrationAgent?.id ?? "circulo-default";
+  const agentName = orchestrationAgent?.name?.trim() || "Circulo";
+  const model = orchestrationAgent?.model ?? defaultModel;
+  const hasToolAccess = (...ids: string[]) =>
+    orchestrationAgent
+      ? hasAgentToolAccess(
+          orchestrationAgent.defaultToolIds,
+          orchestrationAgent.toolAccessMode,
+          ...ids,
+        )
+      : true;
   const task = getTextFromMessages(params.inputMessages);
   const mcpTools = await getMcpToolsForAgent({
     organizationId: params.actor.organizationId,
     chatId: params.context.chat.id,
+    agentId: orchestrationAgent?.id,
     session: params.actor,
     workflowId: params.workflowId,
     dataStream,
+    allowedIntegrationIds: orchestrationAgent
+      ? getAllowedMcpIntegrationIds(
+          orchestrationAgent.defaultToolIds,
+          orchestrationAgent.toolAccessMode,
+        )
+      : undefined,
   });
-  const connectedAppTools = await getGithubTools({
-    userId: params.actor.userId,
-    organizationId: params.context.chat.organizationId,
-    allowedConnectionIds: params.context.chat.connectedAppIds ?? [],
-  });
+  const connectedAppTools = hasToolAccess(
+    "app:github",
+    "githubListRepositories",
+    "githubGetRepository",
+    "githubSearchRepositories",
+  )
+    ? await getGithubTools({
+        userId: params.actor.userId,
+        organizationId: params.context.chat.organizationId,
+        allowedConnectionIds: params.context.chat.connectedAppIds ?? [],
+        allowedToolIds: orchestrationAgent
+          ? orchestrationAgent.toolAccessMode === "all"
+            ? undefined
+            : (orchestrationAgent.defaultToolIds ?? [])
+          : undefined,
+      })
+    : {};
   const tools = {
-    createDocument: createDocument({
-      session: { ...params.actor, chatId: params.context.chat.id },
-      dataStream,
-    }),
-    updateDocument: updateDocument({
-      session: { ...params.actor, chatId: params.context.chat.id },
-      dataStream,
-    }),
-    requestSuggestions: requestSuggestions({
-      session: params.actor,
-      dataStream,
-    }),
-    searchKnowledge: searchKnowledge({
-      organizationId: params.context.chat.organizationId,
-      allowedKnowledgeBaseIds: params.context.knowledgeBaseIds,
-    }),
-    searchMemory: searchMemory({
-      organizationId: params.context.chat.organizationId,
-      userId: params.actor.userId,
-      chatId: params.context.chat.id,
-      ...params.context.memoryPolicy,
-    }),
-    requestHumanApproval: requestHumanApproval({
-      session: params.actor,
-      chatId: params.context.chat.id,
-      workflowRunId: params.workflowId,
-      dataStream,
-    }),
-    ...(params.context.memoryPolicy.canWritePersonalMemory
+    ...(hasToolAccess("builtin:document-authoring", "createDocument")
+      ? {
+          createDocument: createDocument({
+            session: { ...params.actor, chatId: params.context.chat.id },
+            dataStream,
+          }),
+        }
+      : {}),
+    ...(hasToolAccess("builtin:document-authoring", "updateDocument")
+      ? {
+          updateDocument: updateDocument({
+            session: { ...params.actor, chatId: params.context.chat.id },
+            dataStream,
+          }),
+        }
+      : {}),
+    ...(hasToolAccess("builtin:suggestions", "requestSuggestions")
+      ? {
+          requestSuggestions: requestSuggestions({
+            session: params.actor,
+            dataStream,
+          }),
+        }
+      : {}),
+    ...(hasToolAccess("builtin:knowledge", "searchKnowledge")
+      ? {
+          searchKnowledge: searchKnowledge({
+            organizationId: params.context.chat.organizationId,
+            allowedKnowledgeBaseIds: params.context.knowledgeBaseIds,
+          }),
+        }
+      : {}),
+    ...(hasToolAccess("builtin:memory", "searchMemory")
+      ? {
+          searchMemory: searchMemory({
+            organizationId: params.context.chat.organizationId,
+            userId: params.actor.userId,
+            chatId: params.context.chat.id,
+            ...params.context.memoryPolicy,
+          }),
+        }
+      : {}),
+    ...(hasToolAccess("builtin:workflow-coordination", "requestHumanApproval")
+      ? {
+          requestHumanApproval: requestHumanApproval({
+            session: params.actor,
+            chatId: params.context.chat.id,
+            workflowRunId: params.workflowId,
+            dataStream,
+          }),
+        }
+      : {}),
+    ...(hasToolAccess("builtin:memory", "rememberMemory") &&
+    params.context.memoryPolicy.canWritePersonalMemory
       ? {
           rememberMemory: rememberMemory({
             session: params.actor,
@@ -314,19 +372,24 @@ export async function executeDirectResponseStep(params: {
           }),
         }
       : {}),
-    scheduleTask: scheduleTask({
-      session: params.actor,
-      chatId: params.context.chat.id,
-      dataStream,
-    }),
+    ...(hasToolAccess("builtin:workflow-coordination", "scheduleTask")
+      ? {
+          scheduleTask: scheduleTask({
+            session: params.actor,
+            chatId: params.context.chat.id,
+            dataStream,
+          }),
+        }
+      : {}),
     ...connectedAppTools,
     ...mcpTools,
   };
   await sendAgentStartEvent(dataStream, {
-    agentId: "circulo-default",
+    agentId,
     agentName,
     task,
-    model: defaultModel,
+    model,
+    avatarUrl: orchestrationAgent?.avatarUrl,
     status: "running",
     startedAt: startTime.toISOString(),
   });
@@ -339,10 +402,12 @@ export async function executeDirectResponseStep(params: {
     params.context,
   );
   const result = await new ToolLoopAgent({
-    model: getLanguageModel(),
+    model: getLanguageModel(model),
+    maxOutputTokens: orchestrationAgent?.maxTokens ?? undefined,
+    temperature: normalizeTemperature(orchestrationAgent?.temperature),
     instructions: buildSharedContextPrompt(
       params.context,
-      "You are Circulo, the default assistant. Answer the user's request directly, clearly, and accurately. No specialist agent was selected, so complete the task yourself using only the tools provided in this run.",
+      `${formatOrchestrationAgentProfile(orchestrationAgent)}${orchestrationAgent ? "\n\n" : ""}You are ${agentName}, the orchestration controller and default assistant. Answer the user's request directly, clearly, and accurately. Requests about workflow design, orchestration, agents, tools, MCP, planning, harness behavior, and chat coordination are within your responsibility. Do not hand off or involve a specialist unless the user explicitly names one or the request requires a capability unavailable to you. No specialist agent was selected, so complete the task yourself using only the tools provided in this run.`,
     ),
     tools,
   }).stream({
@@ -383,7 +448,7 @@ export async function executeDirectResponseStep(params: {
       inputTokens,
       outputTokens,
       totalTokens: tokenCount,
-      modelId: defaultModel,
+      modelId: model,
       cost,
       inputTokenDetails: usage.inputTokenDetails,
       outputTokenDetails: usage.outputTokenDetails,
@@ -392,19 +457,19 @@ export async function executeDirectResponseStep(params: {
 
   const endTime = new Date();
   await sendAgentCompletedEvent(dataStream, {
-    agentId: "circulo-default",
+    agentId,
     agentName,
     task,
     output: streamedText || resultText,
     durationMs: endTime.getTime() - startTime.getTime(),
-    model: defaultModel,
+    model,
     toolCalls,
     status: "completed",
     startedAt: startTime.toISOString(),
     completedAt: endTime.toISOString(),
   });
   return {
-    agentId: "circulo-default",
+    agentId,
     agentName,
     task,
     success: true,
@@ -414,8 +479,8 @@ export async function executeDirectResponseStep(params: {
     durationMs: endTime.getTime() - startTime.getTime(),
     tokenCount,
     cost,
-    model: defaultModel,
-    avatarUrl: null,
+    model,
+    avatarUrl: orchestrationAgent?.avatarUrl ?? null,
     toolCalls,
   };
 }
@@ -602,6 +667,19 @@ export async function executeAgentTaskStep(params: {
   const agent = chatAgent.agent;
 
   try {
+    // Announce the agent before loading integrations, tools, or model context.
+    // Those operations can be slow; the client must see active progress rather
+    // than appearing frozen after the workflow start event.
+    await sendAgentStartEvent(dataStream, {
+      agentId: agent.id,
+      agentName: agent.name,
+      task: agentPlan.task,
+      model: agent.model,
+      avatarUrl: agent.avatarUrl,
+      status: "running",
+      startedAt: startTime.toISOString(),
+    });
+
     // Build context from previous results
     let previousContext = "";
     if (previousResults.length > 0) {
@@ -788,17 +866,6 @@ Provide a focused response for YOUR specific task. Be concise but complete.`,
         chatAgent.customTemperature ?? agent.temperature,
       ),
       tools: { ...builtinTools, ...connectedAppTools, ...mcpTools },
-    });
-
-    // Send agent started event
-    await sendAgentStartEvent(dataStream, {
-      agentId: agent.id,
-      agentName: agent.name,
-      task: agentPlan.task,
-      model: agent.model,
-      avatarUrl: agent.avatarUrl,
-      status: "running",
-      startedAt: startTime.toISOString(),
     });
 
     const modelHistory = withKnowledgeImageContext(

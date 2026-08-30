@@ -23,6 +23,7 @@ import {
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { generateUUID } from "@/lib/utils";
+import { extractPromptMentions } from "@/lib/prompt-mentions";
 import { useChat } from "@ai-sdk/react";
 import type { Vote } from "@circulo-ai/db/schema";
 import { DefaultChatTransport } from "ai";
@@ -184,6 +185,12 @@ export function Chat({
               },
               visibility: visibilityType,
               agentIds: [],
+              mentions: extractPromptMentions(
+                message.parts
+                  ?.filter((part) => part.type === "text")
+                  .map((part) => part.text)
+                  .join("") ?? "",
+              ),
             },
           };
         },
@@ -221,6 +228,21 @@ export function Chat({
               currentPhase: "started",
               progress: 0,
             });
+            break;
+
+          case "data-workflowStepStarted":
+            setWorkflowStatus((prev) => ({
+              ...prev,
+              isRunning: true,
+              currentPhase: `step:${dataPart.data.stepName}`,
+            }));
+            break;
+
+          case "data-workflowStepCompleted":
+            setWorkflowStatus((prev) => ({
+              ...prev,
+              currentPhase: `finished:${dataPart.data.stepName}`,
+            }));
             break;
 
           case "data-workflowClassification":

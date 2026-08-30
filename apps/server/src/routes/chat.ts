@@ -27,6 +27,12 @@ import { createUIMessageStreamResponse, generateText } from "ai";
 import { and, count, eq, gte } from "drizzle-orm";
 import { z } from "zod";
 
+const promptMentionSchema = z.object({
+  kind: z.enum(["agent", "tool"]),
+  key: z.string().trim().min(1).max(200),
+  label: z.string().trim().min(1).max(200).optional(),
+});
+
 const deleteQuerySchema = z.object({
   id: z.uuid(),
 });
@@ -91,6 +97,7 @@ const createChatSchema = z.object({
       }
     }),
   message: messageSchema,
+  mentions: z.array(promptMentionSchema).max(20).optional().default([]),
 });
 
 const router = createRouter();
@@ -206,6 +213,7 @@ router.post(
         message,
         visibility: selectedVisibilityType,
         agentIds,
+        mentions,
       } = c.req.valid("json");
       const { user } = c.var;
       const di: RequestServices = c.di;
@@ -369,6 +377,7 @@ router.post(
         chatId: id,
         messageId: message.id,
         messages,
+        mentions,
         triggerType: "user_message",
         actor: {
           userId: user!.id,

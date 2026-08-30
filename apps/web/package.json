@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "bun ./node_modules/next/dist/bin/next dev -p 3000",
+    "dev": "bun ./node_modules/next/dist/bin/next dev -H 127.0.0.1 -p 3000",
     "build": "bun ./node_modules/next/dist/bin/next build --webpack",
     "start": "bun ./node_modules/next/dist/bin/next start",
     "lint": "eslint",

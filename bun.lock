@@ -384,7 +384,7 @@
     },
     "packages/wf": {
       "name": "@circulo-ai/wf",
-      "version": "2.3.0",
+      "version": "2.4.0",
       "devDependencies": {
         "@types/node": "^20.0.0",
         "@types/react": "19.2.2",
@@ -404,12 +404,12 @@
     },
     "packages/wf-cli": {
       "name": "@circulo-ai/wf-cli",
-      "version": "0.1.1",
+      "version": "2.0.0",
       "bin": {
         "wf": "dist/cli.mjs",
       },
       "dependencies": {
-        "@circulo-ai/wf": "^2.3.0",
+        "@circulo-ai/wf": "^2.4.0",
         "cli-table3": "^0.6.5",
         "jiti": "^2.7.0",
         "yaml": "^2.9.0",

@@ -5,8 +5,16 @@ export interface WorkflowActor {
   organizationId: string;
 }
 
+export type PromptMention = {
+  kind: "agent" | "tool";
+  key: string;
+  label?: string;
+};
+
 export interface OrchestrationInput {
   messages: ChatMessage[];
+  /** Structured composer mentions; text parsing remains the compatibility fallback. */
+  mentions?: PromptMention[];
   /** The durable user-message version that owns this run. */
   messageId?: string;
   chatId: string;

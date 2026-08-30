@@ -34,6 +34,13 @@ export {
 } from "./activity/activity-registry";
 export * from "./adapters";
 export { ActivityWorker } from "./durable/activity-worker";
+export { defineDurableWorkflow } from "./durable/definition";
+export {
+  assertDuration,
+  formatDuration,
+  parseDuration,
+  type DurationInput,
+} from "./durable/duration";
 export { ReplayWorkflowRunner } from "./durable/replay-workflow-runner";
 export { TimerWorker } from "./durable/timer-worker";
 export { WorkflowEventGateway } from "./gateway/event-gateway";

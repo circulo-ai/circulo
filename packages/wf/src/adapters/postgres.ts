@@ -10,6 +10,12 @@ import type {
   WorkflowRunReference,
 } from "../models";
 import type { JsonKeyValueStore, WorkflowLockStore } from "./json-store";
+import {
+  JsonTaskQueue,
+  JsonWorkflowHistoryStore,
+  type JsonTaskQueueOptions,
+  type JsonWorkflowHistoryStoreOptions,
+} from "./durable";
 import { AdapterEventBus, type PubSubAdapter } from "./event-bus";
 import { JsonEventStore, JsonWorkflowStore } from "./json-store";
 import { generateId } from "../utils/id";
@@ -139,6 +145,46 @@ export class PostgresJsonKeyValueStore implements JsonKeyValueStore {
       key: row.key,
       value: cloneJson<T>(row.value),
     }));
+  }
+}
+
+/** PostgreSQL-backed append-only replay history. */
+export class PostgresWorkflowHistoryStore extends JsonWorkflowHistoryStore {
+  constructor(
+    client: PostgresQueryClient,
+    options: JsonWorkflowHistoryStoreOptions & {
+      table?: string;
+      lockTable?: string;
+      holderId?: string;
+      keyValueStore?: JsonKeyValueStore;
+      lockStore?: WorkflowLockStore;
+    } = {},
+  ) {
+    super(
+      options.keyValueStore ?? new PostgresJsonKeyValueStore(client, options.table),
+      options.lockStore ?? new PostgresWorkflowLockStore(client, options.lockTable, options.holderId),
+      options,
+    );
+  }
+}
+
+/** PostgreSQL-backed delayed task queue for activities and durable timers. */
+export class PostgresTaskQueue extends JsonTaskQueue {
+  constructor(
+    client: PostgresQueryClient,
+    options: JsonTaskQueueOptions & {
+      table?: string;
+      lockTable?: string;
+      holderId?: string;
+      keyValueStore?: JsonKeyValueStore;
+      lockStore?: WorkflowLockStore;
+    } = {},
+  ) {
+    super(
+      options.keyValueStore ?? new PostgresJsonKeyValueStore(client, options.table),
+      options.lockStore ?? new PostgresWorkflowLockStore(client, options.lockTable, options.holderId),
+      options,
+    );
   }
 }
 
@@ -442,6 +488,63 @@ export interface PostgresWorkflowAdapters<TContext, TInput, TOutput> {
   readonly idempotencyStore: PostgresIdempotencyStore;
   initialize(): Promise<void>;
   close(): Promise<void>;
+}
+
+export interface PostgresDurableAdaptersOptions extends PostgresAdapterSchema {
+  client: PostgresQueryClient;
+  historyKeyPrefix?: string;
+  taskKeyPrefix?: string;
+  lockKeyPrefix?: string;
+  holderId?: string;
+}
+
+export interface PostgresDurableAdapters {
+  readonly keyValueStore: PostgresJsonKeyValueStore;
+  readonly lockStore: PostgresWorkflowLockStore;
+  readonly history: PostgresWorkflowHistoryStore;
+  readonly queue: PostgresTaskQueue;
+  initialize(): Promise<void>;
+  close(): Promise<void>;
+}
+
+/** Compose PostgreSQL-backed replay history and delayed task adapters. */
+export function createPostgresDurableAdapters(
+  options: PostgresDurableAdaptersOptions,
+): PostgresDurableAdapters {
+  const keyValueStore = new PostgresJsonKeyValueStore(
+    options.client,
+    options.jsonValuesTable,
+  );
+  const lockStore = new PostgresWorkflowLockStore(
+    options.client,
+    options.locksTable,
+    options.holderId,
+  );
+  return {
+    keyValueStore,
+    lockStore,
+    history: new PostgresWorkflowHistoryStore(options.client, {
+      keyValueStore,
+      lockStore,
+      ...(options.historyKeyPrefix === undefined ? {} : { keyPrefix: options.historyKeyPrefix }),
+      ...(options.jsonValuesTable === undefined ? {} : { table: options.jsonValuesTable }),
+      ...(options.locksTable === undefined ? {} : { lockTable: options.locksTable }),
+      ...(options.holderId === undefined ? {} : { holderId: options.holderId }),
+    }),
+    queue: new PostgresTaskQueue(options.client, {
+      keyValueStore,
+      lockStore,
+      ...(options.taskKeyPrefix === undefined ? {} : { keyPrefix: options.taskKeyPrefix }),
+      ...(options.jsonValuesTable === undefined ? {} : { table: options.jsonValuesTable }),
+      ...(options.locksTable === undefined ? {} : { lockTable: options.locksTable }),
+      ...(options.holderId === undefined ? {} : { holderId: options.holderId }),
+    }),
+    initialize: async () => {
+      await keyValueStore.initialize();
+      await lockStore.initialize();
+    },
+    close: async () => undefined,
+  };
 }
 
 /** Compose PostgreSQL workflow, event, lock, idempotency, and notification adapters. */
