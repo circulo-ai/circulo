@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.0.1
+
+### Patch Changes
+
+- f182213: Add a progressive, executable examples suite covering durable activities,
+  signals, durable sleeps, fan-out and batching, saga compensation, deadlines,
+  and scheduled replay workflows. Improve package-level discoverability and
+  example typechecking documentation.
+
 ## 3.0.0
 
 ### Major Changes

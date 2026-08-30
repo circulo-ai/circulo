@@ -17,9 +17,18 @@ execution, external events, signed webhooks, queries, cron scheduling, Saga
 compensation, duplicate-run coalescing, rate limits, tenant admission, secure
 stream access, and OpenTelemetry-compatible adapters.
 
+## Runnable examples
+
+The package includes progressive, executable examples in
+[`examples/`](./examples/README.md), from a typed durable activity through
+signals, durable sleeps, fan-out, batches, compensation, deadlines, and cron
+scheduling. Run them with `bun run --cwd packages/wf examples:check` and
+`bun examples/01-basic-durable-activity.ts` from the package directory.
+
 ## Contents
 
 - [Install](#install)
+- [Runnable examples](#runnable-examples)
 - [Mental model](#mental-model)
 - [Shared application and CLI configuration](#shared-application-and-cli-configuration)
 - [Production reference architecture](#production-reference-architecture)

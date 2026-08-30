@@ -1,6 +1,6 @@
 {
   "name": "@circulo-ai/wf",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Production-quality, framework-agnostic TypeScript workflow orchestration runtime with event-sourced execution and strongly-typed DSL",
   "type": "module",
   "private": false,
@@ -12,6 +12,7 @@
     "test": "bun ./node_modules/vitest/vitest.mjs run --passWithNoTests",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "examples:check": "bun ./node_modules/typescript/bin/tsc --noEmit -p examples/tsconfig.json",
     "release": "bun run build && npm publish --access public",
     "prepublishOnly": "bun run build"
   },
