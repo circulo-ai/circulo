@@ -1,6 +1,6 @@
 {
   "name": "@circulo-ai/wf-cli",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Type-safe developer toolkit for validating, inspecting, and authoring Circulo WF projects",
   "type": "module",
   "private": false,
@@ -51,7 +51,7 @@
     "prepublishOnly": "bun run build"
   },
   "dependencies": {
-    "@circulo-ai/wf": "^2.4.0",
+    "@circulo-ai/wf": "^3.0.0",
     "cli-table3": "^0.6.5",
     "jiti": "^2.7.0",
     "yaml": "^2.9.0"
