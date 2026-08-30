@@ -1,13 +1,13 @@
 import {
-  defineDurableWorkflow,
-  InMemoryTaskQueue,
-  InMemoryWorkflowHistoryStore,
-  ReplayWorkflowRunner,
-  type ReplayWorkflowDefinition,
+	defineDurableWorkflow,
+	InMemoryTaskQueue,
+	InMemoryWorkflowHistoryStore,
+	ReplayWorkflowRunner,
+	type ReplayWorkflowDefinition,
 } from "@circulo-ai/wf";
 
 export interface OrderInput {
-  orderId: string;
+	orderId: string;
 }
 
 /**
@@ -15,18 +15,18 @@ export interface OrderInput {
  * application before starting it with a durable runner and queue.
  */
 export const orderFulfillment: ReplayWorkflowDefinition<OrderInput, string> =
-  defineDurableWorkflow({
-    name: "order-fulfillment",
-    version: 1,
-    run: async (wf, input) => {
-      await wf.sleep("wait-for-fulfillment", "3 days");
-      return `ready:${input.orderId}`;
-    },
-  });
+	defineDurableWorkflow({
+		name: "order-fulfillment",
+		version: 1,
+		run: async (wf, input) => {
+			await wf.sleep("wait-for-fulfillment", "3 days");
+			return `ready:${input.orderId}`;
+		},
+	});
 
 export function createLocalExampleRunner(): ReplayWorkflowRunner {
-  return new ReplayWorkflowRunner(
-    new InMemoryWorkflowHistoryStore(),
-    new InMemoryTaskQueue(),
-  );
+	return new ReplayWorkflowRunner(
+		new InMemoryWorkflowHistoryStore(),
+		new InMemoryTaskQueue(),
+	);
 }
