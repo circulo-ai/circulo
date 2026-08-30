@@ -1,11 +1,18 @@
 import type { ActivityExecutionContext, ActivityRegistry } from "./activity";
+import type { Lock } from "./store";
 import type { WorkflowError } from "./workflow";
+import type { DurationInput } from "../durable/duration";
 
 export interface ReplayWorkflowDefinition<TInput, TOutput> {
   readonly name: string;
   readonly version: number;
   readonly activityRegistry: ActivityRegistry;
   run(context: ReplayWorkflowContext, input: TInput): Promise<TOutput>;
+}
+
+export interface ActivityOptions {
+  version?: number | undefined;
+  queue?: string | undefined;
 }
 
 export interface ReplayWorkflowContext {
@@ -15,7 +22,7 @@ export interface ReplayWorkflowContext {
   activity<TInput, TOutput>(
     name: string,
     input: TInput,
-    options?: { version?: number | undefined; queue?: string | undefined },
+    options?: ActivityOptions,
   ): Promise<TOutput>;
   parallel<TOutput>(
     operations: readonly (() => Promise<TOutput>)[],
@@ -30,12 +37,23 @@ export interface ReplayWorkflowContext {
     operation: (item: TInput, index: number) => Promise<TOutput>,
     options?: BatchOptions | undefined,
   ): Promise<BatchResult<TOutput>>;
-  sleep(id: string, durationMs: number): Promise<void>;
+  sleep(id: string, duration: DurationInput): Promise<void>;
+  sleepUntil(id: string, timestamp: number | Date): Promise<void>;
   waitForEvent<TPayload = unknown>(
     id: string,
     eventName: string,
   ): Promise<TPayload>;
   saga<TOutput>(run: (scope: SagaScope) => Promise<TOutput>): Promise<TOutput>;
+}
+
+/** Context exposed to replay-safe workflow functions. */
+export interface DurableWorkflowContext extends ReplayWorkflowContext {}
+
+export interface DurableWorkflowOptions<TInput, TOutput> {
+  name: string;
+  version: number;
+  activityRegistry?: ActivityRegistry | undefined;
+  run(context: DurableWorkflowContext, input: TInput): Promise<TOutput>;
 }
 
 export interface BatchOptions {
@@ -124,6 +142,10 @@ export interface TimerWorkerOptions {
 export interface TimerTaskPayload {
   timerId: string;
   fireAt: number;
+  /** Stable authoring identifier for diagnostics and reconciliation. */
+  sleepId?: string | undefined;
+  /** Normalized duration in milliseconds when created through sleep(). */
+  durationMs?: number | undefined;
 }
 
 export interface ReplayWorkflowRunnerOptions {
@@ -132,6 +154,22 @@ export interface ReplayWorkflowRunnerOptions {
   maxAppendRetries?: number | undefined;
   workflowId?: string | undefined;
   runId?: string | undefined;
+}
+
+/** Distributed lock used to coalesce duplicate replay attempts for one run. */
+export interface WorkflowResumeLock {
+  acquireLock(
+    workflowId: string,
+    ttl: number,
+    holder: string,
+  ): Promise<Lock | null>;
+  releaseLock(lock: Lock): Promise<void>;
+}
+
+export interface ReplayWorkflowRunnerDependencies {
+  resumeLock?: WorkflowResumeLock | undefined;
+  resumeLockTtlMs?: number | undefined;
+  holderId?: string | undefined;
 }
 
 export type ActivityRunnerContext = ActivityExecutionContext;

@@ -57,10 +57,7 @@ export class TimerWorker {
       eventId: `${task.payload.timerId}:fired`,
       ...(task.tenantId === undefined ? {} : { tenantId: task.tenantId }),
       eventType: "timer.fired",
-      payload: {
-        timerId: task.payload.timerId,
-        fireAt: task.payload.fireAt,
-      },
+      payload: task.payload,
     });
     await this.options.onWorkflowReady?.(task.workflowId, task.runId);
     return { type: "acknowledge" };

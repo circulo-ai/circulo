@@ -11,7 +11,7 @@ It runs in Node.js, Bun, Deno, serverless handlers, queues, and TypeScript web
 backends. React support is available through the optional
 `@circulo-ai/wf/react` entry point.
 
-The v2 durable runtime adds a replay-safe execution model for activities and
+The v3 durable runtime adds a replay-safe execution model for activities and
 long-running workflows, leased workers with recovery, parallel/fan-out/fan-in
 execution, external events, signed webhooks, queries, cron scheduling, Saga
 compensation, duplicate-run coalescing, rate limits, tenant admission, secure
@@ -31,6 +31,7 @@ stream access, and OpenTelemetry-compatible adapters.
 - [Retries and timeouts](#retries-and-timeouts)
 - [Waiting and polling](#waiting-and-polling)
 - [Durable replay workflows](#durable-replay-workflows)
+- [Durable sleep](#durable-sleep)
 - [Platform comparison](#platform-comparison)
 - [Workers and recovery](#workers-and-recovery)
 - [Triggers, webhooks, queries, and scheduling](#triggers-webhooks-queries-and-scheduling)
@@ -299,31 +300,19 @@ resulting runtime into request handlers.
 
 ### Reusing the configuration from the CLI
 
-The planned CLI can load the same `wf.config.ts` and select a profile:
+The `wf` CLI can load the same `wf.config.ts` and select a profile for
+side-effect-free authoring and CI checks:
 
 ```bash
-wf --profile development status workflow_123
-wf --profile staging events workflow_123 --follow
-wf --profile production run OrdersWorkflow --input ./input.json
+wf doctor --profile development
+wf validate workflows/orders.json --profile development --json
+wf graph workflows/orders.json --format mermaid
 ```
 
-The CLI supplies its environment and receives the runtime handle from the
-configuration. No Redis URL, PostgreSQL pool, or memory store needs to be
-passed as a command-line argument. Commands that need a capability should
-fail clearly when that capability is not included in the selected runtime.
-
-For example:
-
-```text
-WF-2001 No workflow query capability configured for profile "production".
-Configure a WorkflowStore or a remote workflow client for this command.
-```
-
-The same configuration contract can also return a remote client instead of a
-direct engine for production operations. Direct mode is useful for local
-tools, migrations, and trusted administrative jobs; remote mode is safer when
-the server already owns authorization, tenant isolation, connection pools, and
-workflow control.
+The CLI reads workflow metadata and the allowlisted registry, but never calls
+`createRuntime()` for these commands. It does not run workflows or open Redis,
+PostgreSQL, queues, or network connections. Runtime operations belong in the
+application or in an explicitly authenticated operational tool.
 
 ### Memory and file adapter boundaries
 
@@ -470,7 +459,7 @@ result supplies a type.
 
 ## Platform comparison
 
-The table below compares the v2 durable runtime with the four products most
+The table below compares the v3 durable runtime with the four products most
 often evaluated alongside it. “Native” means the capability is part of the
 product's primary execution model. “Adapter” means wf defines the production
 contract and ships a reference implementation, while the application supplies
@@ -478,7 +467,7 @@ the durable Redis, SQL, broker, or service adapter. “Partial” means the
 product can model the behavior, but it is not a first-class primitive with the
 same guarantees.
 
-| Capability                     | wf v2                                                                                                  | BullMQ                                                           | Inngest                                                                              | Trigger.dev                                                           | Temporal                                                                             |
+| Capability                     | wf v3                                                                                                  | BullMQ                                                           | Inngest                                                                              | Trigger.dev                                                           | Temporal                                                                             |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | Primary abstraction            | Replay-safe workflows plus leased tasks                                                                | Redis-backed jobs and queues                                     | Event-triggered durable functions and steps                                          | Long-running tasks and runs                                           | Durable workflow executions and activities                                           |
 | Runtime/deployment             | Framework-agnostic TypeScript library; self-hosted                                                     | Node.js library; Redis required                                  | Managed/self-hosted execution service with app compute                               | Cloud or self-hosted task platform                                    | Temporal Service/Cloud plus application workers                                      |
@@ -957,6 +946,122 @@ replay completed activities by deterministic activity ID. `batch()` adds
 bounded concurrency and returns partial failures. `saga()` records reverse-order
 compensation activities and keeps compensation retryable. `sleep()` persists a
 timer task, and `waitForEvent()` persists an approval/event subscription.
+
+## Durable sleep
+
+`ReplayWorkflowRunner` provides line-level durable suspension for workflow
+functions. Use a stable sleep ID and a readable duration:
+
+See the [dedicated durable sleep guide](docs/durable-sleep.md) for deployment,
+recovery, inspection, migration, and cancellation guidance.
+
+```typescript
+import {
+  defineDurableWorkflow,
+  defineActivity,
+  InMemoryActivityRegistry,
+  InMemoryTaskQueue,
+  InMemoryWorkflowHistoryStore,
+  ReplayWorkflowRunner,
+} from "@circulo-ai/wf";
+
+const activities = new InMemoryActivityRegistry();
+activities.register(
+  defineActivity<{ orderId: string }, { orderId: string }>(
+    "load-order",
+    async (input) => input,
+  ),
+);
+activities.register(
+  defineActivity<{ orderId: string }, { status: string }>(
+    "fulfill-order",
+    async () => ({ status: "fulfilled" }),
+  ),
+);
+
+const workflow = defineDurableWorkflow({
+  name: "fulfill-order",
+  version: 1,
+  activityRegistry: activities,
+  run: async (wf, input: { orderId: string }) => {
+    const order = await wf.activity("load-order", input);
+    await wf.sleep("wait-for-fulfillment", "3 days");
+    return wf.activity("fulfill-order", order);
+  },
+});
+
+const runner = new ReplayWorkflowRunner(
+  new InMemoryWorkflowHistoryStore(),
+  new InMemoryTaskQueue(),
+);
+const result = await runner.start(workflow, { orderId: "order-42" });
+// result.status is "waiting" until a TimerWorker fires the durable timer.
+```
+
+The workflow function is replayed from the beginning after the timer fires.
+Completed activities resolve from history, so `load-order` is not executed a
+second time. The code after `await wf.sleep(...)` then runs normally. Keep
+external side effects inside registered activities and protect them with
+business idempotency keys because task delivery is at least once.
+
+For an absolute deadline, use `sleepUntil()`:
+
+```typescript
+await wf.sleepUntil(
+  "fulfillment-deadline",
+  new Date("2026-09-03T09:00:00Z"),
+);
+return wf.activity("fulfill-order", order);
+```
+
+Sleep IDs are part of the replay contract and must be unique and stable for a
+workflow definition. WF persists the absolute fire time and deterministic
+timer ID on the first pass; it does not recalculate the deadline during
+replay. Numeric durations are milliseconds. Supported string units are `ms`,
+`s`, `m`, `h`, `d`, and `w`, including singular/plural names and compound
+values. Months and years are intentionally rejected because they are
+calendar-dependent.
+
+### Production timer durability
+
+An in-memory history or queue is suitable for tests only. A production sleep
+requires both an append-only durable history store and a delayed task queue:
+
+```typescript
+import {
+  createRedisDurableAdapters,
+} from "@circulo-ai/wf/adapters";
+import { ReplayWorkflowRunner, TimerWorker } from "@circulo-ai/wf/durable";
+import Redis from "ioredis";
+
+const redis = new Redis(process.env.REDIS_URL);
+const durable = createRedisDurableAdapters({ client: redis });
+const runner = new ReplayWorkflowRunner(
+  durable.history,
+  durable.queue,
+  { resumeLock: durable.lockStore },
+);
+const timerWorker = new TimerWorker({
+  id: "timer-worker-1",
+  queue: durable.queue,
+  history: durable.history,
+  onWorkflowReady: (workflowId, runId) =>
+    runner.run(workflow, workflowId, runId).then(() => undefined),
+});
+
+await durable.initialize();
+await timerWorker.start();
+```
+
+Use `createPostgresDurableAdapters()` for PostgreSQL. Both compositions store
+history and delayed tasks outside the process, use leases for worker ownership,
+and make timer history/task delivery idempotent. If a worker crashes after a
+timer is fired but before replay resumes, the persisted `timer.fired` event
+allows a later worker to resume the run safely.
+
+The classic `waitFor()` and `waitUntil()` helpers remain useful for step-based
+workflows. `waitFor()` advances to the next persisted step, while replay
+`sleep()` resumes the same workflow function at the line after the await.
 
 Replay validates the input supplied to an already-scheduled activity against
 the input recorded in history. A changed input fails with
@@ -2172,8 +2277,11 @@ The repository covers these scenarios in `test/workflow.test.ts` and
 | `createRedisWorkflowAdapters` / `createPostgresWorkflowAdapters`              | Ready-to-compose durable backend adapters.                               |
 | `Redis*` / `Postgres*` adapters                                               | JSON storage, locks, idempotency, and notification transports.           |
 | `ReplayWorkflowRunner` / `WorkflowReplayCursor`                              | Replay-safe durable workflow execution and history validation.           |
+| `defineDurableWorkflow` / `DurableWorkflowContext`                            | Canonical replay workflow definition with `sleep()` and `sleepUntil()`.  |
+| `parseDuration` / `formatDuration`                                             | Validated numeric and readable duration utilities.                       |
 | `Worker` / `RecoveryWorker`                                                  | Leased at-least-once task processing and expired-lease recovery.         |
 | `ActivityWorker` / `TimerWorker`                                             | Durable activity and timer task handlers.                                |
+| `createRedisDurableAdapters` / `createPostgresDurableAdapters`                 | Durable replay history, delayed task queue, locks, and lifecycle.        |
 | `WorkflowEventGateway` / `WorkflowQueryService`                              | Event/webhook triggers and current-state projections.                    |
 | `ScheduleWorker` / `createScheduleWorker` / `nextCronOccurrence`             | Leased production scheduler and UTC cron calculation.                    |
 | `TokenBucketRateLimiter` / `TenantConcurrencyGate`                           | Rate limits and per-tenant admission.                                    |
@@ -2201,10 +2309,12 @@ src/
 ├── react.ts                 # Optional React exports
 ├── dsl/                     # Typed builder and result helpers
 ├── definitions/             # Class, registry, JSON/YAML, and replay compilers
+├── durable/                 # Replay runner, durable context, timers, and activities
 ├── engine/                  # Scheduling and durable execution
 ├── hooks/                   # Hook registry and dispatch
 ├── models/                  # Public contracts and unions
 ├── adapters/                # JSON, Redis, PostgreSQL, and pub/sub bridges
+├── workers/                 # Public worker subpath facade
 ├── store/                   # In-memory implementations
 └── utils/                   # IDs, backoff, logging, and metrics
 

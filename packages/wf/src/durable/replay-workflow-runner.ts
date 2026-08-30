@@ -1,9 +1,11 @@
 import type {
   ActivityTaskPayload,
+  ActivityOptions,
   BatchOptions,
   BatchResult,
   ReplayWorkflowContext,
   ReplayWorkflowDefinition,
+  ReplayWorkflowRunnerDependencies,
   ReplayWorkflowResult,
   ReplayWorkflowRunnerOptions,
   SagaScope,
@@ -11,19 +13,29 @@ import type {
   TimerTaskPayload,
   WorkflowError,
   WorkflowHistoryEvent,
+  WorkflowHistoryEventInput,
   WorkflowHistoryStore,
+  WorkflowResumeLock,
 } from "../models";
 import {
   WorkflowReplayCursor,
   WorkflowReplayError,
 } from "../replay/replay-cursor";
 import { generateId } from "../utils/id";
-import { appendHistoryEvent } from "./history-append";
+import { appendHistoryEvent as appendHistoryEventInternal } from "./history-append";
+import { parseDuration, type DurationInput } from "./duration";
 
 class WorkflowSuspended extends Error {
   constructor(readonly reason: "activity" | "timer" | "event") {
     super(`Workflow suspended waiting for ${reason}`);
     this.name = "WorkflowSuspended";
+  }
+}
+
+class WorkflowInfrastructureError extends Error {
+  constructor(override readonly cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause));
+    this.name = "WorkflowInfrastructureError";
   }
 }
 
@@ -33,10 +45,22 @@ class WorkflowSuspended extends Error {
  * recorded activity results.
  */
 export class ReplayWorkflowRunner {
+  private readonly resumeLock: WorkflowResumeLock | undefined;
+  private readonly resumeLockTtlMs: number;
+  private readonly holderId: string;
+
   constructor(
     private readonly history: WorkflowHistoryStore,
     private readonly queue: import("../models").TaskQueueAdapter,
-  ) {}
+    dependencies: ReplayWorkflowRunnerDependencies = {},
+  ) {
+    this.resumeLock = dependencies.resumeLock;
+    this.resumeLockTtlMs = dependencies.resumeLockTtlMs ?? 30_000;
+    this.holderId = dependencies.holderId ?? generateId("replay-holder");
+    if (!Number.isInteger(this.resumeLockTtlMs) || this.resumeLockTtlMs < 1) {
+      throw new RangeError("Replay resume lock ttl must be a positive integer");
+    }
+  }
 
   async start<TInput, TOutput>(
     definition: ReplayWorkflowDefinition<TInput, TOutput>,
@@ -75,7 +99,7 @@ export class ReplayWorkflowRunner {
       }
       return this.run(definition, workflowId, runId, options);
     }
-    await appendHistoryEvent(
+    await appendDurableHistoryEvent(
       this.history,
       {
         workflowId,
@@ -97,6 +121,28 @@ export class ReplayWorkflowRunner {
   }
 
   async run<TInput, TOutput>(
+    definition: ReplayWorkflowDefinition<TInput, TOutput>,
+    workflowId: string,
+    runId: string,
+    options: ReplayWorkflowRunnerOptions = {},
+  ): Promise<ReplayWorkflowResult<TOutput>> {
+    if (!this.resumeLock) {
+      return this.runUnlocked(definition, workflowId, runId, options);
+    }
+    const lock = await this.resumeLock.acquireLock(
+      `replay:${workflowId}:${runId}`,
+      this.resumeLockTtlMs,
+      this.holderId,
+    );
+    if (!lock) return { workflowId, runId, status: "waiting" };
+    try {
+      return await this.runUnlocked(definition, workflowId, runId, options);
+    } finally {
+      await this.resumeLock.releaseLock(lock);
+    }
+  }
+
+  private async runUnlocked<TInput, TOutput>(
     definition: ReplayWorkflowDefinition<TInput, TOutput>,
     workflowId: string,
     runId: string,
@@ -137,6 +183,74 @@ export class ReplayWorkflowRunner {
 
     let activityCallIndex = 0;
     let waitCallIndex = 0;
+    const usedSleepIds = new Set<string>();
+    const scheduleSleep = async (
+      id: string,
+      timestamp: number | Date,
+      durationMs?: number,
+    ): Promise<void> => {
+      if (!id.trim()) throw new RangeError("Workflow sleep id must not be empty");
+      if (usedSleepIds.has(id)) {
+        throw new WorkflowReplayError(`Workflow sleep id ${id} was used more than once`);
+      }
+      usedSleepIds.add(id);
+      const fireAt = timestamp instanceof Date ? timestamp.getTime() : timestamp;
+      if (!Number.isSafeInteger(fireAt) || fireAt < 0) {
+        throw new RangeError("Workflow sleep timestamp must be a non-negative safe integer");
+      }
+      const timerId = `${workflowId}:${runId}:timer:${encodeURIComponent(id)}`;
+      const startedTimer = cursor.find<TimerTaskPayload>(
+        "timer.started",
+        (event) => event.payload.timerId === timerId,
+      );
+      const fired = cursor.find<{ timerId: string }>(
+        "timer.fired",
+        (event) => event.payload.timerId === timerId,
+      );
+      if (fired) return;
+
+      const payload: TimerTaskPayload = startedTimer?.payload ?? {
+        timerId,
+        fireAt,
+        sleepId: id,
+        ...(durationMs === undefined ? {} : { durationMs }),
+      };
+      if (!startedTimer) {
+        await appendDurableHistoryEvent(
+          this.history,
+          {
+            workflowId,
+            runId,
+            eventId: `${timerId}:started`,
+            ...(options.tenantId === undefined
+              ? {}
+              : { tenantId: options.tenantId }),
+            eventType: "timer.started",
+            payload,
+          },
+          options.maxAppendRetries,
+        );
+      }
+      // Enqueue on every replay. Queue implementations must be idempotent by
+      // task ID; this repairs the history-written/task-not-enqueued crash gap.
+      await enqueueDurable(this.queue, {
+        id: timerId,
+        kind: "timer",
+        queue: "timer",
+        workflowId,
+        runId,
+        ...(options.tenantId === undefined
+          ? {}
+          : { tenantId: options.tenantId }),
+        payload,
+        attempt: 0,
+        maxAttempts: 1,
+        priority: 0,
+        createdAt: startedTimer?.timestamp ?? Date.now(),
+        availableAt: payload.fireAt,
+      });
+      throw new WorkflowSuspended("timer");
+    };
     const context: ReplayWorkflowContext = {
       workflowId,
       runId,
@@ -144,10 +258,7 @@ export class ReplayWorkflowRunner {
       activity: async <TActivityInput, TActivityOutput>(
         name: string,
         input: TActivityInput,
-        activityOptions: {
-          version?: number | undefined;
-          queue?: string | undefined;
-        } = {},
+        activityOptions: ActivityOptions = {},
       ): Promise<TActivityOutput> => {
         activityCallIndex += 1;
         const version = activityOptions.version ?? 1;
@@ -180,7 +291,7 @@ export class ReplayWorkflowRunner {
             activityVersion: version,
             input,
           };
-          await appendHistoryEvent(
+          await appendDurableHistoryEvent(
             this.history,
             {
               workflowId,
@@ -216,7 +327,7 @@ export class ReplayWorkflowRunner {
             createdAt: Date.now(),
             availableAt: Date.now(),
           };
-          await this.queue.enqueue(task);
+          await enqueueDurable(this.queue, task);
           throw new WorkflowSuspended("activity");
         }
 
@@ -326,60 +437,16 @@ export class ReplayWorkflowRunner {
           completed: results.filter((value) => value !== undefined).length,
         };
       },
-      sleep: async (id: string, durationMs: number): Promise<void> => {
-        if (!Number.isFinite(durationMs) || durationMs < 0) {
-          throw new RangeError(
-            "Workflow sleep duration must be finite and non-negative",
-          );
+      sleep: async (id: string, duration: DurationInput): Promise<void> => {
+        const durationMs = parseDuration(duration);
+        const fireAt = Date.now() + durationMs;
+        if (!Number.isSafeInteger(fireAt)) {
+          throw new RangeError("Workflow sleep timestamp exceeds the safe integer limit");
         }
-        waitCallIndex += 1;
-        const timerId = `${workflowId}:${runId}:timer:${id}:${waitCallIndex}`;
-        const startedTimer = cursor.find<{ timerId: string }>(
-          "timer.started",
-          (event) => event.payload.timerId === timerId,
-        );
-        const fired = cursor.find<{ timerId: string }>(
-          "timer.fired",
-          (event) => event.payload.timerId === timerId,
-        );
-        if (fired) return;
-
-        if (!startedTimer) {
-          const fireAt = Date.now() + durationMs;
-          const payload: TimerTaskPayload = { timerId, fireAt };
-          await appendHistoryEvent(
-            this.history,
-            {
-              workflowId,
-              runId,
-              eventId: `${timerId}:started`,
-              ...(options.tenantId === undefined
-                ? {}
-                : { tenantId: options.tenantId }),
-              eventType: "timer.started",
-              payload,
-            },
-            options.maxAppendRetries,
-          );
-          await this.queue.enqueue({
-            id: timerId,
-            kind: "timer",
-            queue: "timer",
-            workflowId,
-            runId,
-            ...(options.tenantId === undefined
-              ? {}
-              : { tenantId: options.tenantId }),
-            payload,
-            attempt: 0,
-            maxAttempts: 1,
-            priority: 0,
-            createdAt: Date.now(),
-            availableAt: fireAt,
-          });
-        }
-        throw new WorkflowSuspended("timer");
+        await scheduleSleep(id, fireAt, durationMs);
       },
+      sleepUntil: (id: string, timestamp: number | Date): Promise<void> =>
+        scheduleSleep(id, timestamp),
       waitForEvent: async <TPayload = unknown>(
         id: string,
         eventName: string,
@@ -402,7 +469,7 @@ export class ReplayWorkflowRunner {
         );
         if (received) return received.payload.data;
         if (!waiting) {
-          await appendHistoryEvent(
+          await appendDurableHistoryEvent(
             this.history,
             {
               workflowId,
@@ -493,7 +560,7 @@ export class ReplayWorkflowRunner {
     try {
       const output = await definition.run(context, started.payload.input);
       cursor.assertDone();
-      await appendHistoryEvent(
+      await appendDurableHistoryEvent(
         this.history,
         {
           workflowId,
@@ -512,8 +579,11 @@ export class ReplayWorkflowRunner {
       if (error instanceof WorkflowSuspended) {
         return { workflowId, runId, status: "waiting" };
       }
+      if (error instanceof WorkflowInfrastructureError) {
+        throw error.cause;
+      }
       const workflowError = toWorkflowError(error);
-      await appendHistoryEvent(
+      await appendDurableHistoryEvent(
         this.history,
         {
           workflowId,
@@ -552,7 +622,7 @@ export class ReplayWorkflowRunner {
           eventName,
     );
     if (alreadyReceived) return;
-    await appendHistoryEvent(
+    await appendDurableHistoryEvent(
       this.history,
       {
         workflowId,
@@ -566,6 +636,29 @@ export class ReplayWorkflowRunner {
       },
       options.maxAppendRetries,
     );
+  }
+}
+
+async function appendDurableHistoryEvent(
+  store: WorkflowHistoryStore,
+  event: WorkflowHistoryEventInput<unknown>,
+  maxRetries?: number,
+): Promise<void> {
+  try {
+    await appendHistoryEventInternal(store, event, maxRetries);
+  } catch (error) {
+    throw new WorkflowInfrastructureError(error);
+  }
+}
+
+async function enqueueDurable<TPayload>(
+  queue: import("../models").TaskQueueAdapter,
+  task: TaskEnvelope<TPayload>,
+): Promise<void> {
+  try {
+    await queue.enqueue(task);
+  } catch (error) {
+    throw new WorkflowInfrastructureError(error);
   }
 }
 

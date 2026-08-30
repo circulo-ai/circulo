@@ -4,6 +4,8 @@ import {
   PostgresJsonKeyValueStore,
   RedisJsonKeyValueStore,
   RedisPubSubAdapter,
+  RedisTaskQueue,
+  RedisWorkflowHistoryStore,
   RedisWorkflowLockStore,
   createPostgresJsQueryClient,
   type PostgresQueryClient,
@@ -156,6 +158,45 @@ function event(id: string): WorkflowEvent<string> {
 }
 
 describe("Redis reusable adapters", () => {
+  it("provides durable replay history and delayed task implementations", async () => {
+    const redis = new FakeRedis();
+    const history = new RedisWorkflowHistoryStore(redis);
+    await history.append(
+      {
+        workflowId: "workflow-1",
+        runId: "run-1",
+        eventId: "started",
+        eventType: "workflow.started",
+        payload: { workflowVersion: 1 },
+      },
+      0,
+    );
+    expect(await history.nextSequence("workflow-1", "run-1")).toBe(1);
+
+    const queue = new RedisTaskQueue(redis);
+    await queue.enqueue({
+      id: "timer-1",
+      kind: "timer",
+      queue: "timer",
+      workflowId: "workflow-1",
+      runId: "run-1",
+      payload: { timerId: "timer-1", fireAt: 1000 },
+      attempt: 0,
+      maxAttempts: 1,
+      priority: 0,
+      createdAt: 1,
+      availableAt: 1000,
+    });
+    expect(
+      await queue.claim({
+        queue: "timer",
+        workerId: "timer-worker",
+        leaseDurationMs: 1000,
+        now: 1000,
+      }),
+    ).not.toBeNull();
+  });
+
   it("uses atomic CAS and SCAN-backed listing", async () => {
     const redis = new FakeRedis();
     const store = new RedisJsonKeyValueStore(redis);

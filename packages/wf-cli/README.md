@@ -1,6 +1,6 @@
 # @circulo-ai/wf-cli
 
-`@circulo-ai/wf-cli` is the developer toolkit for [@circulo-ai/wf](https://www.npmjs.com/package/@circulo-ai/wf). It loads the same application-owned `wf.config.ts` used by a server, validates declarative JSON/YAML workflows against an explicit allowlisted registry, prints normalized definitions, renders linear graphs, and checks project configuration.
+`@circulo-ai/wf-cli` is the static authoring and CI toolkit for [@circulo-ai/wf](https://www.npmjs.com/package/@circulo-ai/wf). It loads the same application-owned `wf.config.ts` used by a server, validates declarative JSON/YAML workflows against an explicit allowlisted registry, prints normalized definitions, renders linear graphs, and checks project configuration.
 
 The CLI is intentionally safe by default:
 
@@ -16,6 +16,28 @@ npm install @circulo-ai/wf @circulo-ai/wf-cli
 ```
 
 The package installs the YAML parser for the CLI, so `.yaml` and `.yml` files work without an extra CLI dependency. The runtime package remains free to use its optional YAML peer dependency independently.
+
+For durable code-level waits, define the workflow with `@circulo-ai/wf` and
+use the CLI to validate any declarative definitions that share the same
+registry. A replay workflow can safely suspend for days without keeping the
+CLI or application process occupied:
+
+```ts
+import { defineDurableWorkflow } from "@circulo-ai/wf";
+
+const workflow = defineDurableWorkflow({
+  name: "approval-follow-up",
+  version: 1,
+  run: async (wf, input: { approvalId: string }) => {
+    await wf.sleep("follow-up", "30 days");
+    return wf.activity("send-follow-up", input);
+  },
+});
+// The replay runner resumes on the line after this await.
+```
+
+The CLI is intentionally a static authoring and CI tool; it does not execute,
+resume, or inspect live workflow runs.
 
 ## Output formatting
 
