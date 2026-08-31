@@ -78,6 +78,8 @@ export interface WorkflowHttpAdapterOptions {
   baseUrl: string;
   fetch?: WorkflowFetch;
   headers?: Record<string, string>;
+  /** Timeout for query and control requests. Streaming is intentionally open-ended. */
+  requestTimeoutMs?: number | undefined;
 }
 
 export interface WorkflowFetchRequest {
@@ -114,11 +116,22 @@ export class WorkflowHttpAdapter implements WorkflowBackendAdapter {
   private readonly fetcher: WorkflowFetch;
   private readonly baseUrl: string;
   private readonly headers: Record<string, string>;
+  private readonly requestTimeoutMs: number;
 
   constructor(options: WorkflowHttpAdapterOptions) {
+    if (!options.baseUrl.trim()) {
+      throw new Error("Workflow HTTP adapter baseUrl must not be empty");
+    }
     this.baseUrl = options.baseUrl.replace(/\/$/u, "");
     this.fetcher = options.fetch ?? defaultFetch;
     this.headers = { ...options.headers };
+    this.requestTimeoutMs = options.requestTimeoutMs ?? 30_000;
+    if (
+      !Number.isFinite(this.requestTimeoutMs) ||
+      this.requestTimeoutMs <= 0
+    ) {
+      throw new RangeError("Workflow HTTP requestTimeoutMs must be positive");
+    }
   }
 
   async queryWorkflow(
@@ -130,7 +143,7 @@ export class WorkflowHttpAdapter implements WorkflowBackendAdapter {
       `/workflows/${encodeURIComponent(workflowId)}`,
       options.tenantId,
     );
-    const response = await this.fetcher(url, {
+    const response = await this.fetchWithTimeout(url, {
       headers: this.authHeaders(token),
     });
     await assertOk(response);
@@ -201,7 +214,7 @@ export class WorkflowHttpAdapter implements WorkflowBackendAdapter {
     const body = JSON.stringify(
       payload.tenantId === undefined ? { reason: payload.reason } : payload,
     );
-    const response = await this.fetcher(
+    const response = await this.fetchWithTimeout(
       this.url(
         `/workflows/${encodeURIComponent(workflowId)}/actions/${action}`,
       ),
@@ -221,6 +234,47 @@ export class WorkflowHttpAdapter implements WorkflowBackendAdapter {
     return { ...this.headers, Authorization: `Bearer ${token}` };
   }
 
+  private async fetchWithTimeout(
+    input: string,
+    init: WorkflowFetchRequest,
+  ): Promise<WorkflowFetchResponse> {
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    let timedOut = false;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    init.signal?.addEventListener("abort", abort, { once: true });
+    try {
+      if (init.signal?.aborted) controller.abort();
+      const request = this.fetcher(input, {
+        ...init,
+        signal: controller.signal,
+      });
+      const timeoutError = new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => {
+          timedOut = true;
+          abort();
+          reject(
+            new Error(
+              `Workflow backend request timed out after ${this.requestTimeoutMs}ms`,
+            ),
+          );
+        }, this.requestTimeoutMs);
+      });
+      return await Promise.race([request, timeoutError]);
+    } catch (error) {
+      if (timedOut) {
+        throw new Error(
+          `Workflow backend request timed out after ${this.requestTimeoutMs}ms`,
+          { cause: error },
+        );
+      }
+      throw error;
+    } finally {
+      if (timeout) clearTimeout(timeout);
+      init.signal?.removeEventListener("abort", abort);
+    }
+  }
+
   private url(path: string, tenantId?: string): string {
     if (!tenantId) return `${this.baseUrl}${path}`;
     return `${this.baseUrl}${path}?tenantId=${encodeURIComponent(tenantId)}`;
@@ -232,7 +286,7 @@ async function resolveToken(
 ): Promise<string> {
   const token = typeof provider === "function" ? await provider() : provider;
   if (!token.trim()) throw new Error("Workflow access token is empty");
-  return token;
+  return token.trim();
 }
 
 async function assertOk(response: WorkflowFetchResponse): Promise<void> {

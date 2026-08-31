@@ -4,7 +4,6 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - master
       - dev
     paths:
       - ".changeset/**"
@@ -18,6 +17,7 @@ concurrency: ${{ github.workflow }}-${{ github.ref }}
 jobs:
   version:
     name: Create Version PR
+    if: github.ref_name == 'dev'
     runs-on: ubuntu-latest
 
     steps:
@@ -45,5 +45,6 @@ jobs:
           version: bunx changeset version
           commit: "chore: version packages"
           title: "chore: version packages"
+          branch: dev
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

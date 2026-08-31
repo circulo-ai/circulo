@@ -4,6 +4,7 @@ export * from "./auth";
 export * from "./automation";
 
 export * from "./agent";
+export * from "./ai-provider";
 
 export * from "./chat";
 export * from "./knowledge";

@@ -12,6 +12,15 @@ interface TokenEnvelope {
   claims: WorkflowAccessClaims;
 }
 
+const MAX_TOKEN_LENGTH = 16 * 1024;
+const MAX_CLAIM_VALUE_LENGTH = 256;
+const MAX_WORKFLOW_IDS = 1000;
+const ACCESS_SCOPES: readonly WorkflowAccessScope[] = [
+  "workflow:read",
+  "workflow:stream",
+  "workflow:control",
+];
+
 export class WorkflowAccessTokenError extends Error {
   constructor(message: string) {
     super(message);
@@ -25,11 +34,12 @@ export class WorkflowAccessTokenSigner {
     private readonly defaults: WorkflowAccessTokenOptions = {},
     private readonly revocations?: TokenRevocationStore,
   ) {
-    if (secret.length < 32) {
+    if (secret.trim().length < 32) {
       throw new Error(
         "Workflow access token secret must be at least 32 characters",
       );
     }
+    validateTokenOptions(defaults);
   }
 
   async issue(
@@ -38,11 +48,17 @@ export class WorkflowAccessTokenSigner {
     options: WorkflowAccessTokenOptions = {},
   ): Promise<string> {
     const issuedAt = input.issuedAt ?? Date.now();
+    const expiresInMs = options.expiresInMs ?? this.defaults.expiresInMs;
     const expiresAt =
       input.expiresAt ??
       issuedAt +
-        (options.expiresInMs ?? this.defaults.expiresInMs ?? 5 * 60 * 1000);
-    if (expiresAt <= issuedAt) {
+        (expiresInMs ?? 5 * 60 * 1000);
+    validateTokenOptions(options);
+    if (
+      !Number.isFinite(issuedAt) ||
+      !Number.isFinite(expiresAt) ||
+      expiresAt <= issuedAt
+    ) {
       throw new RangeError(
         "Workflow access token expiration must be in the future",
       );
@@ -67,6 +83,9 @@ export class WorkflowAccessTokenSigner {
   }
 
   async verify(token: string): Promise<WorkflowAccessClaims> {
+    if (typeof token !== "string" || token.length > MAX_TOKEN_LENGTH) {
+      throw new WorkflowAccessTokenError("Malformed access token");
+    }
     const parts = token.split(".");
     if (parts.length !== 2)
       throw new WorkflowAccessTokenError("Malformed access token");
@@ -92,8 +111,11 @@ export class WorkflowAccessTokenSigner {
     } catch {
       throw new WorkflowAccessTokenError("Invalid access token payload");
     }
-    if (envelope.version !== 1) {
+    if (!isRecord(envelope) || envelope["version"] !== 1) {
       throw new WorkflowAccessTokenError("Unsupported access token version");
+    }
+    if (!isTokenEnvelope(envelope)) {
+      throw new WorkflowAccessTokenError("Invalid access token claims");
     }
     if (this.defaults.issuer && envelope.issuer !== this.defaults.issuer) {
       throw new WorkflowAccessTokenError("Access token issuer is invalid");
@@ -121,6 +143,7 @@ export class WorkflowAccessTokenSigner {
     scope: WorkflowAccessScope,
     tenantId?: string,
   ): void {
+    validateClaims(claims);
     if (!claims.scopes.includes(scope)) {
       throw new WorkflowAccessTokenError(`Access token lacks ${scope} scope`);
     }
@@ -165,16 +188,107 @@ export class InMemoryTokenRevocationStore implements TokenRevocationStore {
 }
 
 export function validateClaims(claims: WorkflowAccessClaims): void {
-  if (!claims.subject.trim())
+  if (!isRecord(claims)) {
+    throw new WorkflowAccessTokenError("Token claims are invalid");
+  }
+  if (
+    typeof claims.subject !== "string" ||
+    !claims.subject.trim() ||
+    claims.subject.length > MAX_CLAIM_VALUE_LENGTH
+  ) {
     throw new WorkflowAccessTokenError("Token subject is required");
-  if (claims.workflowIds.length === 0) {
-    throw new WorkflowAccessTokenError(
-      "Token must include at least one workflow id",
-    );
   }
-  if (claims.scopes.length === 0) {
-    throw new WorkflowAccessTokenError("Token must include at least one scope");
+  if (
+    !Array.isArray(claims.scopes) ||
+    claims.scopes.length === 0 ||
+    claims.scopes.some(
+      (scope) =>
+        typeof scope !== "string" ||
+        !ACCESS_SCOPES.includes(scope as WorkflowAccessScope),
+    )
+  ) {
+    throw new WorkflowAccessTokenError("Token scopes are invalid");
   }
+  if (
+    !Array.isArray(claims.workflowIds) ||
+    claims.workflowIds.length === 0 ||
+    claims.workflowIds.length > MAX_WORKFLOW_IDS ||
+    claims.workflowIds.some(
+      (workflowId) =>
+        typeof workflowId !== "string" ||
+        !workflowId.trim() ||
+        workflowId.length > MAX_CLAIM_VALUE_LENGTH,
+    )
+  ) {
+    throw new WorkflowAccessTokenError("Token workflow ids are invalid");
+  }
+  if (
+    claims.tenantId !== undefined &&
+    (typeof claims.tenantId !== "string" ||
+      !claims.tenantId.trim() ||
+      claims.tenantId.length > MAX_CLAIM_VALUE_LENGTH)
+  ) {
+    throw new WorkflowAccessTokenError("Token tenant id is invalid");
+  }
+  if (
+    typeof claims.issuedAt !== "number" ||
+    !Number.isFinite(claims.issuedAt) ||
+    typeof claims.expiresAt !== "number" ||
+    !Number.isFinite(claims.expiresAt) ||
+    claims.expiresAt <= claims.issuedAt
+  ) {
+    throw new WorkflowAccessTokenError("Token timestamps are invalid");
+  }
+  if (
+    typeof claims.tokenId !== "string" ||
+    !claims.tokenId.trim() ||
+    claims.tokenId.length > MAX_CLAIM_VALUE_LENGTH
+  ) {
+    throw new WorkflowAccessTokenError("Token id is invalid");
+  }
+}
+
+function validateTokenOptions(options: WorkflowAccessTokenOptions): void {
+  if (
+    options.expiresInMs !== undefined &&
+    (!Number.isFinite(options.expiresInMs) || options.expiresInMs <= 0)
+  ) {
+    throw new RangeError("Workflow access token expiresInMs must be positive");
+  }
+  if (
+    options.issuer !== undefined &&
+    (typeof options.issuer !== "string" ||
+      !options.issuer.trim() ||
+      options.issuer.length > MAX_CLAIM_VALUE_LENGTH)
+  ) {
+    throw new RangeError("Workflow access token issuer must be non-empty");
+  }
+}
+
+function isTokenEnvelope(value: unknown): value is TokenEnvelope {
+  if (
+    !isRecord(value) ||
+    value["version"] !== 1 ||
+    !isRecord(value["claims"])
+  ) {
+    return false;
+  }
+  if (
+    value["issuer"] !== undefined &&
+    typeof value["issuer"] !== "string"
+  ) {
+    return false;
+  }
+  try {
+    validateClaims(value["claims"] as unknown as WorkflowAccessClaims);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function encodeJson(value: unknown): string {
@@ -225,6 +339,9 @@ function base64UrlEncode(bytes: Uint8Array): string {
 }
 
 function base64UrlDecode(value: string): Uint8Array {
+  if (!/^[A-Za-z0-9_-]+$/u.test(value) || value.length % 4 === 1) {
+    throw new Error("Invalid base64url value");
+  }
   const padded =
     value.replaceAll("-", "+").replaceAll("_", "/") +
     "===".slice((value.length + 3) % 4);

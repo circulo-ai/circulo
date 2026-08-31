@@ -1,7 +1,11 @@
 import { db, workflowRunEvent } from "@/db";
 import { normalizeAttachmentContext } from "@/lib/ai/attachment-context";
 import { readOpenRouterUsage } from "@/lib/ai/openrouter-client";
-import { defaultModel, getLanguageModel } from "@/lib/ai/providers";
+import {
+  redactProviderError,
+  resolveLanguageModel,
+} from "@/lib/ai/provider-registry";
+import { defaultModel } from "@/lib/ai/providers";
 import { createDocument } from "@/lib/ai/tools/create-document";
 import { getGithubTools } from "@/lib/ai/tools/github";
 import { handoffTask } from "@/lib/ai/tools/handoff-task";
@@ -23,7 +27,6 @@ import { convertToUIMessages, getTextFromMessages } from "@/lib/utils";
 import type { ChatContext } from "@/workflows/orchestrate/steps/load-chat-step";
 import type { OrchestrationInput } from "@/workflows/orchestrate/types";
 import { publishWorkflowChunk } from "@/workflows/runtime/output-channel";
-import { formatOrchestrationAgentProfile } from "../orchestration-agent-profile";
 import {
   convertToModelMessages,
   ToolLoopAgent,
@@ -31,6 +34,7 @@ import {
   type UIMessageStreamWriter,
 } from "ai";
 import { and, eq } from "drizzle-orm";
+import { formatOrchestrationAgentProfile } from "../orchestration-agent-profile";
 import {
   getAllowedMcpIntegrationIds,
   hasAgentToolAccess,
@@ -269,6 +273,12 @@ export async function executeDirectResponseStep(params: {
   const agentId = orchestrationAgent?.id ?? "circulo-default";
   const agentName = orchestrationAgent?.name?.trim() || "Circulo";
   const model = orchestrationAgent?.model ?? defaultModel;
+  const aiSession = {
+    ...params.actor,
+    chatId: params.context.chat.id,
+    providerId: orchestrationAgent?.providerId,
+    modelId: model,
+  };
   const hasToolAccess = (...ids: string[]) =>
     orchestrationAgent
       ? hasAgentToolAccess(
@@ -282,7 +292,7 @@ export async function executeDirectResponseStep(params: {
     organizationId: params.actor.organizationId,
     chatId: params.context.chat.id,
     agentId: orchestrationAgent?.id,
-    session: params.actor,
+    session: aiSession,
     workflowId: params.workflowId,
     dataStream,
     allowedIntegrationIds: orchestrationAgent
@@ -313,7 +323,7 @@ export async function executeDirectResponseStep(params: {
     ...(hasToolAccess("builtin:document-authoring", "createDocument")
       ? {
           createDocument: createDocument({
-            session: { ...params.actor, chatId: params.context.chat.id },
+            session: aiSession,
             dataStream,
           }),
         }
@@ -321,7 +331,7 @@ export async function executeDirectResponseStep(params: {
     ...(hasToolAccess("builtin:document-authoring", "updateDocument")
       ? {
           updateDocument: updateDocument({
-            session: { ...params.actor, chatId: params.context.chat.id },
+            session: aiSession,
             dataStream,
           }),
         }
@@ -329,7 +339,7 @@ export async function executeDirectResponseStep(params: {
     ...(hasToolAccess("builtin:suggestions", "requestSuggestions")
       ? {
           requestSuggestions: requestSuggestions({
-            session: params.actor,
+            session: aiSession,
             dataStream,
           }),
         }
@@ -339,6 +349,7 @@ export async function executeDirectResponseStep(params: {
           searchKnowledge: searchKnowledge({
             organizationId: params.context.chat.organizationId,
             allowedKnowledgeBaseIds: params.context.knowledgeBaseIds,
+            userId: aiSession.userId,
           }),
         }
       : {}),
@@ -355,7 +366,7 @@ export async function executeDirectResponseStep(params: {
     ...(hasToolAccess("builtin:workflow-coordination", "requestHumanApproval")
       ? {
           requestHumanApproval: requestHumanApproval({
-            session: params.actor,
+            session: aiSession,
             chatId: params.context.chat.id,
             workflowRunId: params.workflowId,
             dataStream,
@@ -366,7 +377,7 @@ export async function executeDirectResponseStep(params: {
     params.context.memoryPolicy.canWritePersonalMemory
       ? {
           rememberMemory: rememberMemory({
-            session: params.actor,
+            session: aiSession,
             chatId: params.context.chat.id,
             dataStream,
           }),
@@ -375,7 +386,7 @@ export async function executeDirectResponseStep(params: {
     ...(hasToolAccess("builtin:workflow-coordination", "scheduleTask")
       ? {
           scheduleTask: scheduleTask({
-            session: params.actor,
+            session: aiSession,
             chatId: params.context.chat.id,
             dataStream,
           }),
@@ -402,7 +413,11 @@ export async function executeDirectResponseStep(params: {
     params.context,
   );
   const result = await new ToolLoopAgent({
-    model: getLanguageModel(model),
+    model: await resolveLanguageModel({
+      userId: params.actor.userId,
+      providerId: orchestrationAgent?.providerId,
+      modelId: model,
+    }),
     maxOutputTokens: orchestrationAgent?.maxTokens ?? undefined,
     temperature: normalizeTemperature(orchestrationAgent?.temperature),
     instructions: buildSharedContextPrompt(
@@ -665,6 +680,12 @@ export async function executeAgentTaskStep(params: {
   }
 
   const agent = chatAgent.agent;
+  const aiSession = {
+    ...actor,
+    chatId: context.chat.id,
+    providerId: agent.providerId,
+    modelId: agent.model,
+  };
 
   try {
     // Announce the agent before loading integrations, tools, or model context.
@@ -747,7 +768,7 @@ Provide a focused response for YOUR specific task. Be concise but complete.`,
       organizationId: actor.organizationId ?? context.chat.organizationId,
       chatId: context.chat.id,
       agentId: agent.id,
-      session: actor,
+      session: aiSession,
       workflowId,
       dataStream,
       allowedIntegrationIds: getAllowedMcpIntegrationIds(
@@ -777,7 +798,7 @@ Provide a focused response for YOUR specific task. Be concise but complete.`,
       ...(hasToolAccess("builtin:document-authoring", "createDocument")
         ? {
             createDocument: createDocument({
-              session: { ...actor, chatId: context.chat.id },
+              session: aiSession,
               dataStream,
             }),
           }
@@ -785,7 +806,7 @@ Provide a focused response for YOUR specific task. Be concise but complete.`,
       ...(hasToolAccess("builtin:document-authoring", "updateDocument")
         ? {
             updateDocument: updateDocument({
-              session: { ...actor, chatId: context.chat.id },
+              session: aiSession,
               dataStream,
             }),
           }
@@ -793,7 +814,7 @@ Provide a focused response for YOUR specific task. Be concise but complete.`,
       ...(hasToolAccess("builtin:suggestions", "requestSuggestions")
         ? {
             requestSuggestions: requestSuggestions({
-              session: actor,
+              session: aiSession,
               dataStream,
             }),
           }
@@ -803,6 +824,7 @@ Provide a focused response for YOUR specific task. Be concise but complete.`,
             searchKnowledge: searchKnowledge({
               organizationId: context.chat.organizationId,
               allowedKnowledgeBaseIds: context.knowledgeBaseIds,
+              userId: aiSession.userId,
             }),
           }
         : {}),
@@ -819,7 +841,7 @@ Provide a focused response for YOUR specific task. Be concise but complete.`,
       ...(hasToolAccess("builtin:workflow-coordination", "requestHumanApproval")
         ? {
             requestHumanApproval: requestHumanApproval({
-              session: actor,
+              session: aiSession,
               chatId: context.chat.id,
               workflowRunId: workflowId,
               dataStream,
@@ -829,7 +851,7 @@ Provide a focused response for YOUR specific task. Be concise but complete.`,
       ...(hasToolAccess("builtin:workflow-coordination", "scheduleTask")
         ? {
             scheduleTask: scheduleTask({
-              session: actor,
+              session: aiSession,
               chatId: context.chat.id,
               dataStream,
             }),
@@ -838,7 +860,7 @@ Provide a focused response for YOUR specific task. Be concise but complete.`,
       ...(hasToolAccess("builtin:workflow-coordination", "handoffTask")
         ? {
             handoffTask: handoffTask({
-              session: actor,
+              session: aiSession,
               chatId: context.chat.id,
               workflowRunId: workflowId,
               fromAgentId: agent.id,
@@ -850,7 +872,7 @@ Provide a focused response for YOUR specific task. Be concise but complete.`,
       context.memoryPolicy.canWritePersonalMemory
         ? {
             rememberMemory: rememberMemory({
-              session: actor,
+              session: aiSession,
               chatId: context.chat.id,
               dataStream,
             }),
@@ -859,7 +881,11 @@ Provide a focused response for YOUR specific task. Be concise but complete.`,
     };
 
     const agentLoop = new ToolLoopAgent({
-      model: getLanguageModel(agent.model),
+      model: await resolveLanguageModel({
+        userId: actor.userId,
+        providerId: agent.providerId,
+        modelId: agent.model,
+      }),
       instructions: systemPrompt,
       maxOutputTokens: agent.maxTokens ?? undefined,
       temperature: normalizeTemperature(
@@ -988,7 +1014,7 @@ Provide a focused response for YOUR specific task. Be concise but complete.`,
     };
   } catch (error) {
     const endTime = new Date();
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage = redactProviderError(error);
 
     // Send error event
     await sendAgentErrorEvent(dataStream, {

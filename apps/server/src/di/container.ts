@@ -370,8 +370,10 @@ export function buildRootProvider(): ServiceProvider {
     const store = new CompositeRateLimitStore(redisStore, dbStore);
 
     return new RateLimiter(store, redis);
+  }, {
+    dependencies: [DI_TOKENS.Redis, DI_TOKENS.Db],
   });
 
-  rootProvider = services.build();
+  rootProvider = services.buildServiceProvider({ validateOnBuild: true });
   return rootProvider;
 }

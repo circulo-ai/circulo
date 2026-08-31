@@ -150,6 +150,12 @@ describe("defineWfConfig", () => {
     ).rejects.toMatchObject({
       code: "WF_PROFILE_NOT_FOUND",
     });
+
+    expect(() =>
+      defineWfConfig({
+        profiles: { broken: null as never },
+      }),
+    ).toThrow(WfConfigError);
   });
 
   it("does not create a connection when a factory rejects", async () => {

@@ -1,15 +1,19 @@
 import { updateDocumentPrompt } from "@/lib/ai/prompts";
-import { myProvider } from "@/lib/ai/providers";
+import { resolveLanguageModel } from "@/lib/ai/provider-registry";
 import { createDocumentHandler } from "@/lib/artifacts/server";
 import { smoothStream, streamText } from "ai";
 
 export const textDocumentHandler = createDocumentHandler<"text">({
   kind: "text",
-  onCreateDocument: async ({ title, dataStream }) => {
+  onCreateDocument: async ({ title, dataStream, session }) => {
     let draftContent = "";
 
     const { fullStream } = streamText({
-      model: myProvider.languageModel("artifact-model"),
+      model: await resolveLanguageModel({
+        userId: session.userId,
+        providerId: session.providerId,
+        modelId: session.modelId,
+      }),
       system:
         "Write about the given topic. Markdown is supported. Use headings wherever appropriate.",
       experimental_transform: smoothStream({ chunking: "word" }),
@@ -34,22 +38,18 @@ export const textDocumentHandler = createDocumentHandler<"text">({
 
     return draftContent;
   },
-  onUpdateDocument: async ({ document, description, dataStream }) => {
+  onUpdateDocument: async ({ document, description, dataStream, session }) => {
     let draftContent = "";
 
     const { fullStream } = streamText({
-      model: myProvider.languageModel("artifact-model"),
+      model: await resolveLanguageModel({
+        userId: session.userId,
+        providerId: session.providerId,
+        modelId: session.modelId,
+      }),
       system: updateDocumentPrompt(document.content, "text"),
       experimental_transform: smoothStream({ chunking: "word" }),
       prompt: description,
-      providerOptions: {
-        openai: {
-          prediction: {
-            type: "content",
-            content: document.content,
-          },
-        },
-      },
     });
 
     for await (const delta of fullStream) {

@@ -253,6 +253,13 @@
       "when": 1787358322971,
       "tag": "0036_clumsy_zombie",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1788097772171,
+      "tag": "0037_charming_major_mapleleaf",
+      "breakpoints": true
     }
   ]
 }

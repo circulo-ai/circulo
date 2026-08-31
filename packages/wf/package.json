@@ -1,6 +1,6 @@
 {
   "name": "@circulo-ai/wf",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "description": "Production-quality, framework-agnostic TypeScript workflow orchestration runtime with event-sourced execution and strongly-typed DSL",
   "type": "module",
   "private": false,

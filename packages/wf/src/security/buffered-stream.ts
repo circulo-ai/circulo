@@ -15,6 +15,7 @@ export function createBufferedAsyncStream<T>(
   let started = false;
   let closed = false;
   let failure: unknown;
+  let failed = false;
   let unsubscribe: (() => void) | undefined;
   let ready: Promise<void> | undefined;
   let waiter:
@@ -36,6 +37,7 @@ export function createBufferedAsyncStream<T>(
 
   const fail = (error: unknown): void => {
     failure = error;
+    failed = true;
     closed = true;
     unsubscribe?.();
     unsubscribe = undefined;
@@ -80,7 +82,7 @@ export function createBufferedAsyncStream<T>(
     next: async (): Promise<IteratorResult<T>> => {
       start();
       await ready;
-      if (failure !== undefined) throw failure;
+      if (failed) throw failure;
       if (closed) return { done: true, value: undefined };
       if (buffered.length > 0) {
         const value = buffered.shift()!;

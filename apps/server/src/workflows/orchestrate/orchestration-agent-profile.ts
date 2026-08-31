@@ -7,6 +7,7 @@ export type OrchestrationAgentProfile = Pick<
   | "description"
   | "instructions"
   | "model"
+  | "providerId"
   | "avatarUrl"
   | "maxTokens"
   | "temperature"

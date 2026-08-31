@@ -1,4 +1,5 @@
 import { db, knowledgeDocument } from "@/db";
+import { getUserProviderCredential } from "@/lib/ai/provider-registry";
 import { env } from "@/lib/env";
 import { eq } from "drizzle-orm";
 import {
@@ -15,6 +16,7 @@ export {
 
 const DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 const DEFAULT_EMBEDDING_MODEL = "openai/text-embedding-3-small";
+const DEFAULT_OPENAI_EMBEDDING_MODEL = "text-embedding-3-small";
 
 type EmbeddingResponse = {
   data?: Array<{ embedding?: number[] }>;
@@ -27,6 +29,34 @@ function getBaseUrl() {
   );
 }
 
+async function getEmbeddingConfig(userId?: string) {
+  if (userId) {
+    const credential =
+      (await getUserProviderCredential(userId, "openrouter")) ??
+      (await getUserProviderCredential(userId, "openai"));
+    if (!credential) return null;
+    return {
+      apiKey: credential.apiKey,
+      baseUrl:
+        credential.baseUrl ??
+        (credential.providerId === "openai"
+          ? "https://api.openai.com/v1"
+          : DEFAULT_OPENROUTER_BASE_URL),
+      model:
+        credential.providerId === "openai"
+          ? DEFAULT_OPENAI_EMBEDDING_MODEL
+          : getEmbeddingModel(),
+    };
+  }
+
+  if (!env.OPENROUTER_API_KEY) return null;
+  return {
+    apiKey: env.OPENROUTER_API_KEY,
+    baseUrl: getBaseUrl(),
+    model: getEmbeddingModel(),
+  };
+}
+
 function getEmbeddingModel() {
   return env.CIRCULO_EMBEDDING_MODEL ?? DEFAULT_EMBEDDING_MODEL;
 }
@@ -34,16 +64,18 @@ function getEmbeddingModel() {
 export async function createKnowledgeEmbedding(
   title: string,
   content: string,
+  options?: { userId?: string },
 ): Promise<number[] | null> {
-  if (!env.OPENROUTER_API_KEY) return null;
+  const config = await getEmbeddingConfig(options?.userId);
+  if (!config) return null;
 
   const chunks = chunkKnowledgeText(`${title}\n\n${content}`);
   if (!chunks.length) return null;
 
-  const response = await fetch(`${getBaseUrl()}/embeddings`, {
+  const response = await fetch(`${config.baseUrl}/embeddings`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
+      Authorization: `Bearer ${config.apiKey}`,
       "Content-Type": "application/json",
       Accept: "application/json",
       ...(env.OPENROUTER_HTTP_REFERER
@@ -54,7 +86,7 @@ export async function createKnowledgeEmbedding(
         : {}),
     },
     body: JSON.stringify({
-      model: getEmbeddingModel(),
+      model: config.model,
       input: chunks,
     }),
     signal: AbortSignal.timeout(15_000),
@@ -83,10 +115,15 @@ export async function refreshKnowledgeDocumentEmbedding(params: {
   documentId: string;
   title: string;
   content: string;
+  userId?: string;
 }): Promise<boolean> {
+  const config = await getEmbeddingConfig(params.userId);
+  if (!config) return false;
+
   const embedding = await createKnowledgeEmbedding(
     params.title,
     params.content,
+    params.userId ? { userId: params.userId } : undefined,
   );
   if (!embedding) return false;
 
@@ -94,7 +131,7 @@ export async function refreshKnowledgeDocumentEmbedding(params: {
     .update(knowledgeDocument)
     .set({
       embedding,
-      embeddingModel: getEmbeddingModel(),
+      embeddingModel: config.model,
       embeddingUpdatedAt: new Date(),
       updatedAt: new Date(),
     })

@@ -96,6 +96,8 @@ export type ActorContext = {
   userId: string;
   organizationId?: string;
   chatId?: string;
+  providerId?: import("@circulo-ai/types").AiProviderId;
+  modelId?: string;
 };
 
 export type CustomUIDataTypes = {

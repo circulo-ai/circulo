@@ -204,9 +204,9 @@ router.get(
         limit: z.coerce.number().int().min(1).max(50).default(10),
       })
       .parse(c.req.query());
-    const queryEmbedding = await createKnowledgeEmbedding(query.q, "").catch(
-      () => null,
-    );
+    const queryEmbedding = await createKnowledgeEmbedding(query.q, "", {
+      userId: c.var.user!.id,
+    }).catch(() => null);
     const lexicalMatch = sql`to_tsvector('simple', ${knowledgeDocument.title} || ' ' || ${knowledgeDocument.content}) @@ plainto_tsquery('simple', ${query.q})`;
     const vectorDistance = queryEmbedding
       ? sql<number>`${knowledgeDocument.embedding} <=> ${JSON.stringify(queryEmbedding)}::vector`
@@ -277,6 +277,7 @@ router.post(
       documentId: created.id,
       title: created.title,
       content: created.content,
+      userId: c.var.user!.id,
     }).catch((error) => {
       console.warn("[Knowledge Embedding] document indexing skipped", {
         documentId: created.id,
@@ -418,6 +419,7 @@ router.post(
       documentId: created.id,
       title: created.title,
       content: created.content,
+      userId: c.var.user!.id,
     }).catch((error) => {
       console.warn("[Knowledge Embedding] document indexing skipped", {
         documentId: created.id,
@@ -479,6 +481,7 @@ router.post(
           documentId: document.id,
           title: document.title,
           content: document.content,
+          userId: c.var.user!.id,
         })
       ) {
         indexed += 1;

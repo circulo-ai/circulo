@@ -60,6 +60,7 @@ import { useVoiceRecorder } from "@/hooks/use-voice-recorder";
 import { ApiRequestError } from "@/lib/api/client";
 import { attachmentFromUploadTask } from "@/lib/attachments";
 import { deepReplace } from "@/lib/deep-replace";
+import { defaultModelForProvider } from "@/lib/ai-providers";
 import {
   clearCachePattern,
   fetchWithErrorHandlers,
@@ -109,7 +110,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Path, useForm } from "react-hook-form";
+import { Path, useForm, useFormContext, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import useSWR, { Key, useSWRConfig } from "swr";
 import { unstable_serialize } from "swr/infinite";
@@ -838,6 +839,7 @@ function toSerializableAgentPayload(
       payload.instructions,
       fallback?.instructions ?? "",
     ),
+    providerId: readAgentString(payload.providerId, "openrouter"),
     model: readAgentString(payload.model, fallback?.model ?? defaultModel),
     temperature: readAgentNumber(
       payload.temperature,
@@ -988,18 +990,34 @@ function AgentFormContent({
   formId,
   goBack,
 }: AgentFormContentProps) {
+  const { control, setValue } = useFormContext<AgentRequest>();
+  const providerId = useWatch({ control, name: "providerId" }) ?? "openrouter";
+  const modelId = useWatch({ control, name: "model" });
+  const { data: providerData } = useSWR<{
+    providers: Array<{ id: string; name: string }>;
+    credentials: Array<{ providerId: string }>;
+  }>("/api/ai-providers", { shouldRetryOnError: false });
   const { data: modelCatalog } = useSWR<{
     models: Array<{ id: string; name: string }>;
-  }>("/api/models?toolsOnly=true", {
-    shouldRetryOnError: false,
-    onError: () => undefined,
-  });
+  }>(
+    `/api/models?providerId=${encodeURIComponent(providerId)}&toolsOnly=true`,
+    {
+      shouldRetryOnError: false,
+      onError: () => undefined,
+    },
+  );
   const modelOptions = useMemo(
     () =>
       (
         modelCatalog?.models ?? [
-          { id: defaultModel, name: defaultModel },
-          { id: "openrouter/free", name: "OpenRouter Free Router" },
+          {
+            id:
+              defaultModelForProvider(providerId),
+            name:
+              providerId === "openrouter"
+                ? "OpenRouter Free Router"
+                : defaultModelForProvider(providerId),
+          },
         ]
       ).map((model) => ({
         value: model.id,
@@ -1007,8 +1025,25 @@ function AgentFormContent({
           model.name === model.id ? model.id : `${model.name} (${model.id})`,
         type: "single" as const,
       })),
-    [modelCatalog],
+    [modelCatalog, providerId],
   );
+
+  useEffect(() => {
+    if (!modelId || !modelOptions.some((option) => option.value === modelId)) {
+      const firstOption = modelOptions[0];
+      if (firstOption)
+        setValue("model", firstOption.value, { shouldDirty: false });
+    }
+  }, [modelId, modelOptions, setValue]);
+
+  const availableProviders = useMemo(() => {
+    const connected = new Set(
+      providerData?.credentials.map((item) => item.providerId),
+    );
+    return (providerData?.providers ?? []).filter(
+      (provider) => provider.id === "openrouter" || connected.has(provider.id),
+    );
+  }, [providerData]);
 
   return (
     <>
@@ -1053,8 +1088,33 @@ function AgentFormContent({
             inputProps={{ placeholder: "Be friendly, Be harsh, etc" }}
           />
           <ControlledInput
+            name={"providerId" satisfies Path<AgentRequest>}
+            description="Use your connected key, or Circulo's default provider"
+            className="mx-4 w-auto"
+            errorPosition="before-input"
+            orientation="horizontal"
+            inputStyle="no-input-group"
+            inputComponent={SelectInput}
+            inputProps={{
+              options: [
+                {
+                  value: "openrouter",
+                  label: "OpenRouter",
+                  type: "single" as const,
+                },
+                ...availableProviders
+                  .filter((provider) => provider.id !== "openrouter")
+                  .map((provider) => ({
+                    value: provider.id,
+                    label: provider.name,
+                    type: "single" as const,
+                  })),
+              ],
+            }}
+          />
+          <ControlledInput
             name={"model" satisfies Path<AgentRequest>}
-            description="Models are loaded from OpenRouter"
+            description="Models are loaded from the selected provider"
             className="mx-4 w-auto"
             errorPosition="before-input"
             orientation="horizontal"

@@ -1,5 +1,8 @@
 import { db, humanApproval } from "@/db";
-import { getLanguageModel } from "@/lib/ai/providers";
+import {
+  getDefaultModelForProvider,
+  resolveLanguageModel,
+} from "@/lib/ai/provider-registry";
 import type { ChatMessage } from "@/lib/types";
 import { getTextFromMessages } from "@/lib/utils";
 import { Output, streamText, type UIMessageStreamWriter } from "ai";
@@ -24,6 +27,9 @@ const aggregatedResultSchema = z.object({
 export type AggregatedResult = z.infer<typeof aggregatedResultSchema>;
 
 export async function aggregateResultsStep(params: {
+  userId: string;
+  providerId?: import("@circulo-ai/types").AiProviderId | null;
+  modelId?: string | null;
   agentResults: AgentExecutionResult[];
   plan: ExecutionPlan;
   classification: RequestClassification;
@@ -108,7 +114,13 @@ Duration: ${r.durationMs}ms`,
 
   try {
     const result = streamText({
-      model: getLanguageModel(),
+      model: await resolveLanguageModel({
+        userId: params.userId,
+        providerId: params.providerId,
+        modelId:
+          params.modelId ??
+          getDefaultModelForProvider(params.providerId ?? "openrouter"),
+      }),
       output: Output.object({ schema: aggregatedResultSchema }),
       system: `You are synthesizing the outputs from multiple AI agents into a coherent final response.
 

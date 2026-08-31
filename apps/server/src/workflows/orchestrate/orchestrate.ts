@@ -27,9 +27,10 @@ import { and, asc, eq } from "drizzle-orm";
 import {
   hasExplicitAgentDirective,
   hasExplicitToolDirective,
-  shouldUseControllerDirectly,
   shouldEngageAgents,
+  shouldUseControllerDirectly,
 } from "./agent-engagement";
+import type { OrchestrationAgentProfile } from "./orchestration-agent-profile";
 import type { RequestClassification } from "./steps/classify-request-step";
 import { classifyRequestStep } from "./steps/classify-request-step";
 import {
@@ -38,7 +39,6 @@ import {
   persistDurableAgentProgressDecision,
 } from "./steps/evaluate-agent-progress-step";
 import { type OrchestrationInput } from "./types";
-import type { OrchestrationAgentProfile } from "./orchestration-agent-profile";
 
 export const ORCHESTRATION_WORKFLOW_NAME = "chat-orchestration";
 
@@ -125,6 +125,7 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
 
         try {
           const classification = await classifyRequestStep({
+            userId: state.input.actor.userId,
             inputMessages: state.input.messages,
             messages: state.context.messages,
             triggerType: state.input.triggerType,
@@ -213,6 +214,7 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
 
         try {
           const plan = await planAgentExecutionStep({
+            userId: state.input.actor.userId,
             classification: effectiveClassification,
             agents: state.context.agents,
             triggerMessages: state.input.messages,
@@ -698,7 +700,14 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
           });
         }
 
+        const context = state.context;
+        if (!context) return complete(state);
         const finalResult = await aggregateResultsStep({
+          userId: state.input.actor.userId,
+          providerId: context.orchestrationAgent?.providerId,
+          modelId:
+            context.orchestrationAgent?.model ??
+            context.chat.orchestrationModel,
           agentResults: state.agentResults,
           plan: state.plan,
           classification: state.classification,
@@ -980,6 +989,7 @@ async function executeAgenticLoop(params: {
     if (!decision) {
       try {
         decision = await evaluateAgentProgressStep({
+          userId: params.actor.userId,
           workflowId: params.workflowId,
           classification: params.classification,
           plan: params.plan,

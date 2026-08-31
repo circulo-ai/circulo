@@ -1,5 +1,5 @@
 import { AggregateRoot, Identifier, ValidationError } from "@circulo-ai/core";
-import { type SupportedModels } from "@circulo-ai/types";
+import { type AiProviderId, type SupportedModels } from "@circulo-ai/types";
 
 export type AgentProps = {
   id: Identifier;
@@ -10,6 +10,7 @@ export type AgentProps = {
   description?: string;
   avatarUrl?: string;
   model: SupportedModels;
+  providerId: AiProviderId;
   maxTokens?: number | null;
   temperature?: number | null;
   isArchived?: boolean;

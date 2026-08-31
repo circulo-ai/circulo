@@ -1,6 +1,7 @@
 "use client";
 
 import { Account } from "@/components/sidebar/settings-modal/components/account/account";
+import { AIProviders } from "@/components/sidebar/settings-modal/components/ai-providers/ai-providers";
 import { General } from "@/components/sidebar/settings-modal/components/general/general";
 import { SettingsNavigation } from "@/components/sidebar/settings-modal/components/settings-navigation/settings-navigation";
 import { Team } from "@/components/sidebar/settings-modal/components/team/team";
@@ -26,7 +27,12 @@ interface SettingsModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type SettingsSection = "general" | "account" | "subscription" | "team";
+type SettingsSection =
+  | "general"
+  | "account"
+  | "ai-providers"
+  | "subscription"
+  | "team";
 
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const [activeSection, setActiveSection] =
@@ -121,6 +127,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                 <Account onOpenChange={onOpenChange} />
               </div>
             )}
+            {activeSection === "ai-providers" && <AIProviders />}
             {activeSection === "subscription" && isBillingEnabled && (
               <div className="p-6">
                 <h2 className="mb-2 text-base font-medium">Subscription</h2>

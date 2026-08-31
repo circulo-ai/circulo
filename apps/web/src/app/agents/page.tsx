@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { WorkspaceShell } from "@/components/workspace/workspace-shell";
+import { defaultModelForProvider } from "@/lib/ai-providers";
 import { Pencil, Plus, Save, Trash2 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -32,6 +33,7 @@ type Agent = {
   description: string | null;
   instructions: string;
   model: string;
+  providerId: string;
   maxTokens: number | null;
   temperature: number | null;
   defaultKnowledgeBaseIds: string[];
@@ -78,6 +80,7 @@ const emptyForm = {
   name: "",
   description: "",
   instructions: "",
+  providerId: "openrouter",
   model: "openrouter/free",
   maxTokens: "1000",
   temperature: "70",
@@ -100,6 +103,10 @@ function AgentsPageContent() {
     plugins: CapabilityPlugin[];
     apps: CapabilityApp[];
   }>("/api/capabilities", fetcher);
+  const { data: providerData } = useSWR<{
+    providers: Array<{ id: string; name: string }>;
+    credentials: Array<{ providerId: string }>;
+  }>("/api/ai-providers", fetcher);
   const selectablePlugins = useMemo(
     () => [...(capabilityData?.plugins ?? []), ...(capabilityData?.apps ?? [])],
     [capabilityData?.apps, capabilityData?.plugins],
@@ -117,6 +124,7 @@ function AgentsPageContent() {
       name: agent.name,
       description: agent.description ?? "",
       instructions: agent.instructions,
+      providerId: agent.providerId ?? "openrouter",
       model: agent.model,
       maxTokens: String(agent.maxTokens ?? 1000),
       temperature: String(agent.temperature ?? 70),
@@ -125,6 +133,36 @@ function AgentsPageContent() {
       defaultToolIds: agent.defaultToolIds ?? [],
     });
   }, [agents, editingId]);
+
+  const { data: modelData } = useSWR<{
+    models: Array<{ id: string; name: string }>;
+  }>(
+    `/api/models?providerId=${encodeURIComponent(form.providerId)}&toolsOnly=true`,
+    fetcher,
+    { shouldRetryOnError: false },
+  );
+
+  useEffect(() => {
+    const firstModel = modelData?.models[0];
+    if (
+      !firstModel ||
+      modelData.models.some((model) => model.id === form.model)
+    )
+      return;
+    setForm((current) => ({ ...current, model: firstModel.id }));
+  }, [form.model, modelData]);
+
+  const availableProviders = useMemo(() => {
+    const connected = new Set(
+      providerData?.credentials.map((item) => item.providerId),
+    );
+    const providers = (providerData?.providers ?? []).filter(
+      (provider) => provider.id === "openrouter" || connected.has(provider.id),
+    );
+    return providers.length
+      ? providers
+      : [{ id: "openrouter", name: "OpenRouter" }];
+  }, [providerData]);
 
   const save = async () => {
     if (!form.name.trim() || !form.instructions.trim()) {
@@ -138,6 +176,7 @@ function AgentsPageContent() {
         name: form.name,
         description: form.description || undefined,
         instructions: form.instructions,
+        providerId: form.providerId,
         model: form.model,
         maxTokens: Number(form.maxTokens),
         temperature: Number(form.temperature),
@@ -306,6 +345,36 @@ function AgentsPageContent() {
                 {formError && <FieldError>{formError}</FieldError>}
               </Field>
               <Field>
+                <FieldLabel>Provider</FieldLabel>
+                <Select
+                  onValueChange={(value) =>
+                    setForm((current) => ({
+                      ...current,
+                      providerId: value ?? "openrouter",
+                      model: defaultModelForProvider(value ?? "openrouter"),
+                    }))
+                  }
+                  value={form.providerId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a provider" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {availableProviders.map((provider) => (
+                        <SelectItem key={provider.id} value={provider.id}>
+                          {provider.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <FieldDescription>
+                  Connected providers use your key and do not consume Circulo AI
+                  credits.
+                </FieldDescription>
+              </Field>
+              <Field>
                 <FieldLabel>Model</FieldLabel>
                 <Select
                   onValueChange={(value) =>
@@ -321,12 +390,20 @@ function AgentsPageContent() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      <SelectItem value="openai/gpt-4o-mini">
-                        GPT-4o mini
-                      </SelectItem>
-                      <SelectItem value="openrouter/free">
-                        OpenRouter Free Router
-                      </SelectItem>
+                      {(
+                        modelData?.models ?? [
+                          {
+                            id: "openrouter/free",
+                            name: "OpenRouter Free Router",
+                          },
+                        ]
+                      ).map((model) => (
+                        <SelectItem key={model.id} value={model.id}>
+                          {model.name === model.id
+                            ? model.id
+                            : `${model.name} (${model.id})`}
+                        </SelectItem>
+                      ))}
                     </SelectGroup>
                   </SelectContent>
                 </Select>

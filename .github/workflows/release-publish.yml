@@ -8,7 +8,7 @@ on:
     paths:
       - ".changeset/**"
       - ".github/workflows/release-publish.yml"
-      - "packages/**/package.json"
+      - "packages/**"
       - "bun.lock"
 
 permissions:
@@ -23,6 +23,7 @@ concurrency:
 jobs:
   publish:
     name: Build, verify, and publish public packages
+    if: github.ref_name == 'master'
     runs-on: ubuntu-latest
 
     steps:
@@ -40,7 +41,6 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: "24"
-          registry-url: "https://registry.npmjs.org"
           package-manager-cache: false
 
       - name: Verify npm trusted publishing support
@@ -101,8 +101,12 @@ jobs:
       - name: Publish changed packages with npm trusted publishing
         uses: changesets/action@v1
         with:
+          # On master, Changesets either opens the version PR for newly merged
+          # changesets or publishes the versions from an already merged one.
+          version: bunx changeset version
           # Run Changesets through the npm CLI installed above so npm's OIDC
           # trusted-publisher flow is the publisher of record.
           publish: npx --no-install changeset publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_REGISTRY: https://registry.npmjs.org

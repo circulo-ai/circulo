@@ -67,6 +67,8 @@ export interface WebhookOptions {
   signatureHeader?: string | undefined;
   timestampHeader?: string | undefined;
   maxAgeMs?: number | undefined;
+  /** Maximum UTF-8 request body size accepted before JSON parsing. */
+  maxBodyBytes?: number | undefined;
 }
 
 export interface WorkflowEventGatewayOptions {

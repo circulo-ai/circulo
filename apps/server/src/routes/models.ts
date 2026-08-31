@@ -1,13 +1,16 @@
+import { getOpenRouterFallbackModels } from "@/lib/ai/openrouter-client";
 import {
-  getOpenRouterFallbackModels,
-  listOpenRouterModels,
-} from "@/lib/ai/openrouter-client";
+  listProviderModels,
+  redactProviderError,
+} from "@/lib/ai/provider-registry";
 import { createRouter } from "@/lib/create-app";
 import { requireAuth } from "@/middleware/auth";
+import { aiProviderIdSchema } from "@circulo-ai/types";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 
 const querySchema = z.object({
+  providerId: aiProviderIdSchema.optional().default("openrouter"),
   refresh: z.coerce.boolean().optional().default(false),
   toolsOnly: z.coerce.boolean().optional().default(false),
 });
@@ -20,8 +23,37 @@ router.get(
   zValidator("query", querySchema),
   async (c) => {
     const query = c.req.valid("query");
+    if (query.providerId !== "openrouter") {
+      try {
+        const models = await listProviderModels({
+          providerId: query.providerId,
+          userId: c.var.user!.id,
+          toolsOnly: query.toolsOnly,
+        });
+        return c.json({
+          provider: query.providerId,
+          models,
+          cached: false,
+          degraded: false,
+          fetchedAt: new Date().toISOString(),
+        });
+      } catch (error) {
+        return c.json({
+          provider: query.providerId,
+          models: [],
+          cached: false,
+          degraded: true,
+          warning: redactProviderError(error),
+          fetchedAt: new Date().toISOString(),
+        });
+      }
+    }
     try {
-      const models = await listOpenRouterModels(query);
+      const models = await listProviderModels({
+        providerId: "openrouter",
+        userId: c.var.user!.id,
+        toolsOnly: query.toolsOnly,
+      });
       return c.json({
         provider: "openrouter",
         models,
@@ -36,8 +68,7 @@ router.get(
         models: getOpenRouterFallbackModels(),
         cached: false,
         degraded: true,
-        warning:
-          error instanceof Error ? error.message : "OpenRouter unavailable",
+        warning: redactProviderError(error),
         fetchedAt: new Date().toISOString(),
       });
     }

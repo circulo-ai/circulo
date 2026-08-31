@@ -1,4 +1,5 @@
-import { z } from "zod";
+import z from "zod";
+import { DEFAULT_AI_PROVIDER_ID, aiProviderIdSchema } from "../ai-providers";
 import { defaultModel } from "../types/models";
 
 export const getAgentQuerySchema = z.object({
@@ -13,6 +14,7 @@ export const baseAgentSchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
   instructions: z.string().min(1, "Instructions are required"),
+  providerId: aiProviderIdSchema.default(DEFAULT_AI_PROVIDER_ID),
   avatarUrl: z.url().or(z.string().startsWith("/")).optional(),
   model: z.string().min(1).default(defaultModel),
   maxTokens: z.coerce.number().int().positive().optional(),

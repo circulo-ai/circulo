@@ -25,8 +25,11 @@ export class SecureWorkflowStreamGateway implements WorkflowEventStreamGateway {
     options: Pick<WorkflowStreamOptions, "tenantId"> = {},
   ): Promise<() => void> {
     const claims = await this.tokens.verify(token);
-    const tenantId =
-      options.tenantId ?? (await this.tenantResolver?.(workflowId));
+    const tenantId = await resolveTenantId(
+      workflowId,
+      options.tenantId,
+      this.tenantResolver,
+    );
     this.tokens.authorize(claims, workflowId, "workflow:stream", tenantId);
     return this.eventBus.subscribe(workflowId, callback);
   }
@@ -37,31 +40,44 @@ export class SecureWorkflowStreamGateway implements WorkflowEventStreamGateway {
     options: WorkflowStreamOptions = {},
   ): AsyncIterable<WorkflowEvent<unknown>> {
     const maxBufferedEvents = options.maxBufferedEvents ?? 1000;
-    if (maxBufferedEvents < 1)
-      throw new RangeError("maxBufferedEvents must be positive");
+    if (!Number.isInteger(maxBufferedEvents) || maxBufferedEvents < 1)
+      throw new RangeError("maxBufferedEvents must be a positive integer");
     return createBufferedAsyncStream<WorkflowEvent<unknown>>(
       async (push) => {
-        const unsubscribe = this.eventBus.subscribe(workflowId, (event) => {
+        const claims = await this.tokens.verify(token);
+        const tenantId = await resolveTenantId(
+          workflowId,
+          options.tenantId,
+          this.tenantResolver,
+        );
+        this.tokens.authorize(claims, workflowId, "workflow:stream", tenantId);
+        return this.eventBus.subscribe(workflowId, (event) => {
           push(event);
         });
-        try {
-          const claims = await this.tokens.verify(token);
-          const tenantId =
-            options.tenantId ?? (await this.tenantResolver?.(workflowId));
-          this.tokens.authorize(
-            claims,
-            workflowId,
-            "workflow:stream",
-            tenantId,
-          );
-          return unsubscribe;
-        } catch (error) {
-          unsubscribe();
-          throw error;
-        }
       },
       maxBufferedEvents,
       options.signal,
     );
   }
+}
+
+async function resolveTenantId(
+  workflowId: string,
+  requestedTenantId: string | undefined,
+  resolver:
+    | ((workflowId: string) => string | Promise<string | undefined> | undefined)
+    | undefined,
+): Promise<string | undefined> {
+  if (!resolver) return requestedTenantId;
+  const resolvedTenantId = await resolver(workflowId);
+  if (resolvedTenantId === undefined) {
+    throw new Error("Workflow tenant could not be resolved");
+  }
+  if (
+    requestedTenantId !== undefined &&
+    resolvedTenantId !== requestedTenantId
+  ) {
+    throw new Error("Requested tenant does not match the workflow tenant");
+  }
+  return resolvedTenantId;
 }

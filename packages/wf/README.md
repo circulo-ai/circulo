@@ -46,6 +46,7 @@ scheduling. Run them with `bun run --cwd packages/wf examples:check` and
 - [Triggers, webhooks, queries, and scheduling](#triggers-webhooks-queries-and-scheduling)
 - [Limits, tenancy, and observability](#limits-tenancy-and-observability)
 - [Streaming](#streaming)
+- [Security model and secure defaults](#security-model-and-secure-defaults)
 - [Dynamic plans and compensation](#dynamic-plans-and-compensation)
 - [Validation and idempotency](#validation-and-idempotency)
 - [Events](#events)
@@ -387,6 +388,59 @@ A workflow has four layers:
 3. A **store** persists state and coordinates worker locks.
 4. Events, hooks, logging, and metrics expose execution to integrations.
 
+### System flow
+
+The runtime is intentionally split into ports. Definitions describe work;
+stores and queues own durability; workers own execution. This keeps the core
+portable and makes each infrastructure boundary replaceable.
+
+```mermaid
+flowchart LR
+  Trigger["HTTP / event / cron"] --> Validate["Validate input<br/>authorize tenant"]
+  Validate --> Create["createWorkflow()<br/>or runner.start()"]
+  Create --> State[("Workflow state<br/>CAS store")]
+  Create --> Queue[("Task queue")]
+  Queue --> Worker["Worker / ActivityWorker<br/>lease + heartbeat"]
+  Worker --> Step["Step or activity<br/>idempotent side effect"]
+  Step --> State
+  State --> Resume["Resume / recover<br/>from durable cursor"]
+  Resume --> Queue
+  Worker --> Events[("Event store + pub/sub")]
+  Events --> Observability["Hooks / logs / metrics / traces"]
+  Events --> UI["Secure query / SSE / React"]
+```
+
+The classic engine persists a mutable workflow snapshot after each step. The
+replay runner persists an append-only history and derives the next work item by
+replaying deterministic workflow code. Do not mix the two persistence models
+for one run.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant C as Caller
+  participant E as Engine or Runner
+  participant S as Durable store
+  participant W as Worker
+  participant X as External service
+
+  C->>E: start with validated, serializable input
+  E->>S: persist pending state / history
+  E->>W: enqueue idempotent task
+  W->>S: claim task with lease
+  W->>X: execute side effect with idempotency key
+  X-->>W: result
+  W->>S: append result / CAS update
+  alt worker crashes after side effect
+    S-->>W: lease expires
+    W->>X: retry same idempotency key
+    X-->>W: previously committed result
+  else wait or external signal
+    E->>S: persist paused cursor / timer / event wait
+    C->>E: resume or signal
+  end
+```
+
 The runtime persists state between steps. A worker can stop after a step,
 release its lock, and resume later from durable `currentStep` and `resumeAt`
 values.
@@ -465,6 +519,21 @@ at-least-once.
 operation on an already-terminal workflow is a no-op. A thrown step error is
 classified as `unknown` unless the step classifier or an explicit `error()`
 result supplies a type.
+
+```mermaid
+stateDiagram-v2
+  [*] --> pending
+  pending --> running: run()
+  running --> running: retry
+  running --> paused: wait / pause
+  paused --> running: resume / timer
+  running --> completed: all steps complete
+  running --> failed: permanent or exhausted error
+  paused --> failed: abort()
+  pending --> failed: abort()
+  completed --> [*]
+  failed --> [*]
+```
 
 ## Platform comparison
 
@@ -894,6 +963,52 @@ const workflow = defineWorkflow<Context, { files: string[] }>()
 
 `streamStep(items)` is a convenience generator for non-empty arrays. It
 rejects empty arrays because there is no final value.
+
+## Security model and secure defaults
+
+`wf` does not assume an authentication provider. The secure boundary is
+explicit: validate and authorize before creating or resuming work, scope
+tokens to workflow IDs and tenants, and put secrets in application-owned
+adapters rather than workflow input, context, metadata, or logs.
+
+`WorkflowAccessTokenSigner` uses HMAC-SHA-256, requires a secret of at least 32
+characters, validates claims at issue and verify time, supports expiry and
+revocation, and rejects malformed or oversized tokens. `SecureWorkflowStreamGateway`
+and `SecureWorkflowHistoryStreamGateway` verify and authorize before creating
+an event-bus subscription. If a tenant resolver is configured, its result is
+authoritative; a caller-supplied tenant must match it.
+
+```mermaid
+flowchart TD
+  Request["Query / SSE / control request"] --> Token["Verify signature<br/>expiry + revocation"]
+  Token --> Scope["Check scope<br/>workflow allowlist"]
+  Scope --> Tenant["Resolve tenant<br/>authoritative resolver"]
+  Tenant -->|allowed| Operation["Perform query, stream,<br/>or control action"]
+  Tenant -->|mismatch| Reject["Reject without<br/>subscribing or mutating"]
+  Token -->|invalid| Reject
+```
+
+Production security checklist:
+
+- Use short-lived access tokens and a durable revocation store for emergency
+  invalidation; never put signing secrets in client bundles or persisted
+  workflow payloads.
+- Verify webhook signatures over the exact raw body before parsing JSON, enforce
+  a timestamp window, and keep the default 1 MiB body limit (or configure
+  `maxBodyBytes` for the provider contract). Add a durable idempotency store
+  for retries and duplicate delivery.
+- Treat task delivery and external side effects as at-least-once. Use a
+  provider idempotency key or an application outbox/inbox boundary for every
+  non-idempotent operation.
+- Use durable CAS stores, atomic queue lease operations, and a lock renewal
+  interval shorter than the lock TTL. In-memory adapters are for tests and
+  single-process development only.
+- Keep payloads bounded and JSON-safe. Pass object-storage references for large
+  data, and use `maxBufferedEvents` to bound live stream memory. A bounded
+  stream drops the oldest buffered event when its buffer is full; consumers
+  that require lossless delivery should read the durable event/history store.
+- Pass `AbortSignal` through network and database clients. Gracefully stop
+  workers and engines so leases expire or are acknowledged deliberately.
 
 ## Durable replay workflows
 
@@ -1363,7 +1478,10 @@ engine hooks remain available.
 ```tsx
 // Server/client setup; the token provider should return a short-lived token.
 const client = new SecureWorkflowClient(
-  new WorkflowHttpAdapter({ baseUrl: "https://api.example.com/wf" }),
+  new WorkflowHttpAdapter({
+    baseUrl: "https://api.example.com/wf",
+    requestTimeoutMs: 15_000,
+  }),
   () => getWorkflowToken(),
 );
 

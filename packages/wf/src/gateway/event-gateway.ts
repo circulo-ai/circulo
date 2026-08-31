@@ -37,6 +37,12 @@ export class WorkflowEventGateway {
   ) {
     this.idempotency = options.idempotency ?? new InMemoryIdempotencyStore();
     this.idempotencyTtlMs = options.idempotencyTtlMs ?? 24 * 60 * 60 * 1000;
+    if (
+      !Number.isFinite(this.idempotencyTtlMs) ||
+      this.idempotencyTtlMs <= 0
+    ) {
+      throw new RangeError("Idempotency TTL must be positive");
+    }
     this.rateLimiter = options.rateLimiter;
     this.duplicateWaitTimeoutMs = options.duplicateWaitTimeoutMs ?? 10_000;
     this.duplicatePollIntervalMs = options.duplicatePollIntervalMs ?? 25;
@@ -205,6 +211,13 @@ async function verifyWebhook(
   options: WebhookOptions,
 ): Promise<void> {
   if (!options.secret) throw new Error("Webhook secret must not be empty");
+  const maxBodyBytes = options.maxBodyBytes ?? 1_000_000;
+  if (!Number.isInteger(maxBodyBytes) || maxBodyBytes < 1) {
+    throw new RangeError("Webhook maxBodyBytes must be a positive integer");
+  }
+  if (new TextEncoder().encode(request.body).byteLength > maxBodyBytes) {
+    throw new Error("Webhook request body exceeds the configured size limit");
+  }
   const signatureHeader = options.signatureHeader ?? "x-wf-signature";
   const timestampHeader = options.timestampHeader ?? "x-wf-timestamp";
   const signature = request.headers[signatureHeader];
@@ -212,6 +225,9 @@ async function verifyWebhook(
   if (!signature || !timestamp) throw new Error("Webhook signature is missing");
   const timestampMs = Number(timestamp);
   const maxAgeMs = options.maxAgeMs ?? 5 * 60 * 1000;
+  if (!Number.isFinite(maxAgeMs) || maxAgeMs <= 0) {
+    throw new RangeError("Webhook maxAgeMs must be positive");
+  }
   if (
     !Number.isFinite(timestampMs) ||
     Math.abs(Date.now() - timestampMs) > maxAgeMs

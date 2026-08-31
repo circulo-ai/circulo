@@ -21,7 +21,7 @@ export async function withRequestServices<TResult>(
     const di = new Proxy({} as RequestServices, {
       get(_target, prop: string | symbol) {
         if (typeof prop !== "string") return undefined;
-        if (!(prop in DI_TOKENS)) return undefined;
+        if (!Object.prototype.hasOwnProperty.call(DI_TOKENS, prop)) return undefined;
         const key = prop as keyof typeof DI_TOKENS;
         const token = DI_TOKENS[key] as Parameters<
           RequestContainer["resolve"]
