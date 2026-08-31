@@ -7,6 +7,7 @@ import { z } from "zod";
 export function searchKnowledge(params: {
   organizationId: string;
   allowedKnowledgeBaseIds: string[];
+  userId: string;
 }): Tool {
   return {
     description:
@@ -29,9 +30,9 @@ export function searchKnowledge(params: {
         );
       const baseIds = activeBases.map((base) => base.id);
       if (!baseIds.length) return { results: [] };
-      const queryEmbedding = await createKnowledgeEmbedding(query, "").catch(
-        () => null,
-      );
+      const queryEmbedding = await createKnowledgeEmbedding(query, "", {
+        userId: params.userId,
+      }).catch(() => null);
       const rank = sql<number>`ts_rank(to_tsvector('simple', ${knowledgeDocument.title} || ' ' || ${knowledgeDocument.content}), plainto_tsquery('simple', ${query}))`;
       const vectorDistance = queryEmbedding
         ? sql<number>`${knowledgeDocument.embedding} <=> ${JSON.stringify(queryEmbedding)}::vector`

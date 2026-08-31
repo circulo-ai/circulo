@@ -1,3 +1,8 @@
+import {
+  getDefaultModelForProvider,
+  resolveLanguageModel,
+  type ResolvedProviderCredential,
+} from "@/lib/ai/provider-registry";
 import { env } from "@/lib/env";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { customProvider, type LanguageModel } from "ai";
@@ -26,21 +31,32 @@ export function getLanguageModel(modelId = defaultModel): LanguageModel {
 }
 
 export async function withModelFallback<T>(options: {
+  userId?: string;
+  providerId?: import("@circulo-ai/types").AiProviderId | null;
   modelId?: string | null;
   fallbackModelId?: string | null;
   run: (model: LanguageModel) => Promise<T>;
 }): Promise<T> {
+  const providerId = options.providerId ?? "openrouter";
+  const providerFallbackModel = getProviderFallbackModel(providerId);
   const modelIds = [
     options.modelId?.trim(),
     options.fallbackModelId?.trim(),
-    orchestrationFallbackModel,
+    providerFallbackModel,
+    ...(providerId === "openrouter" ? [orchestrationFallbackModel] : []),
   ].filter((modelId): modelId is string => Boolean(modelId));
   const uniqueModelIds = [...new Set(modelIds)];
   const errors: unknown[] = [];
 
   for (const modelId of uniqueModelIds) {
     try {
-      return await options.run(getLanguageModel(modelId));
+      return await options.run(
+        await resolveLanguageModel({
+          userId: options.userId,
+          providerId: options.providerId,
+          modelId,
+        }),
+      );
     } catch (error) {
       errors.push(error);
     }
@@ -51,6 +67,15 @@ export async function withModelFallback<T>(options: {
     `All orchestration models failed: ${uniqueModelIds.join(", ")}`,
   );
 }
+
+function getProviderFallbackModel(
+  providerId: import("@circulo-ai/types").AiProviderId,
+): string {
+  return getDefaultModelForProvider(providerId);
+}
+
+export { resolveLanguageModel };
+export type { ResolvedProviderCredential };
 
 // Compatibility aliases for artifact and legacy callers. New model IDs are
 // resolved dynamically with getLanguageModel so the catalog is not hardcoded.

@@ -47,6 +47,7 @@ const executionPlanSchema = z.object({
 export type ExecutionPlan = z.infer<typeof executionPlanSchema>;
 
 export async function planAgentExecutionStep(params: {
+  userId: string;
   classification: RequestClassification;
   agents: Array<ChatAgent & { agent: Agent }>;
   triggerMessages: ChatMessage[];
@@ -100,6 +101,8 @@ This is an automated trigger, not a direct user request.`;
   }
 
   const { output } = await withModelFallback({
+    userId: params.userId,
+    providerId: params.orchestrationAgent?.providerId,
     modelId: params.orchestrationAgent?.model ?? params.orchestrationModel,
     fallbackModelId:
       params.orchestrationFallbackModel ?? orchestrationFallbackModel,
@@ -205,11 +208,7 @@ Classification reasoning: ${classification.reasoning}
   // different specialist.
   const requestText = getTextFromMessages(triggerMessages);
   const explicitlyMentionedIds = new Set(
-    getExplicitlyMentionedAgentIds(
-      triggerMessages,
-      agents,
-      params.mentions,
-    ),
+    getExplicitlyMentionedAgentIds(triggerMessages, agents, params.mentions),
   );
   const explicitlyMentioned = agents.filter((chatAgent) =>
     explicitlyMentionedIds.has(chatAgent.agentId),

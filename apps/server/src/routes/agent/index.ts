@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { agentRepo } from "@/db/repositories";
 import { agent, knowledgeBase } from "@/db/schema";
+import { requireProviderCredential } from "@/lib/ai/provider-registry";
 import { enforceOrganizationFeatureLimit } from "@/lib/billing/limits";
 import { createRouter } from "@/lib/create-app";
 import { hasPermissionForUser, isMemberOf } from "@/lib/permissions";
@@ -83,6 +84,16 @@ router.post(
       );
     }
 
+    try {
+      await requireProviderCredential(body.providerId, user!.id);
+    } catch (error) {
+      throw new BadRequestError(
+        error instanceof Error
+          ? error.message
+          : "AI provider is not configured",
+      );
+    }
+
     const existing = await agentRepo.findByName(organizationId, body.name);
     if (existing) {
       throw new BadRequestError(
@@ -115,6 +126,7 @@ router.post(
         description: body.description,
         instructions: body.instructions,
         avatarUrl: body.avatarUrl,
+        providerId: body.providerId,
         model: body.model,
         maxTokens: body.maxTokens,
         temperature: body.temperature,
@@ -182,6 +194,18 @@ router.patch(
 
     const { id, ...updates } = body;
 
+    if (updates.providerId !== undefined) {
+      try {
+        await requireProviderCredential(updates.providerId, user!.id);
+      } catch (error) {
+        throw new BadRequestError(
+          error instanceof Error
+            ? error.message
+            : "AI provider is not configured",
+        );
+      }
+    }
+
     if (updates.defaultKnowledgeBaseIds !== undefined) {
       const ids = updates.defaultKnowledgeBaseIds;
       const bases =
@@ -213,6 +237,8 @@ router.patch(
       updateData.instructions = updates.instructions;
     if (updates.avatarUrl !== undefined)
       updateData.avatarUrl = updates.avatarUrl;
+    if (updates.providerId !== undefined)
+      updateData.providerId = updates.providerId;
     if (updates.model !== undefined) updateData.model = updates.model;
     if (updates.maxTokens !== undefined)
       updateData.maxTokens = updates.maxTokens;

@@ -78,6 +78,12 @@
 
 ### Minor Changes
 
+- Harden secure workflow boundaries with strict access-token claim validation,
+  secure-only identifier generation, authorization-before-subscription, tenant
+  resolver enforcement, bounded webhook bodies, and configurable HTTP request
+  timeouts.
+- Expand the package README with Mermaid system, lifecycle, execution, and
+  security diagrams plus production security invariants.
 - Add a typed lifecycle hook manager with priorities, wildcard listeners,
   one-shot subscriptions, error isolation, and engine integration.
 - Add optional `@circulo-ai/wf/react` hooks for workflow state, event history,

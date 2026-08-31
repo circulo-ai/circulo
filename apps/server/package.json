@@ -17,7 +17,9 @@
     "db:studio": "bun --env-file=.env ../../node_modules/drizzle-kit/bin.cjs studio --config=../../packages/db/drizzle.config.ts"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "4.0.39",
     "@ai-sdk/google": "4.0.44",
+    "@ai-sdk/openai": "4.0.42",
     "@aws-sdk/client-s3": "^3.940.0",
     "@aws-sdk/s3-request-presigner": "^3.940.0",
     "@azure/communication-email": "^1.1.0",

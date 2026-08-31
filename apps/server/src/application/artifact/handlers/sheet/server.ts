@@ -1,16 +1,20 @@
 import { sheetPrompt, updateDocumentPrompt } from "@/lib/ai/prompts";
-import { myProvider } from "@/lib/ai/providers";
+import { resolveLanguageModel } from "@/lib/ai/provider-registry";
 import { createDocumentHandler } from "@/lib/artifacts/server";
 import { Output, streamText } from "ai";
 import { z } from "zod";
 
 export const sheetDocumentHandler = createDocumentHandler<"sheet">({
   kind: "sheet",
-  onCreateDocument: async ({ title, dataStream }) => {
+  onCreateDocument: async ({ title, dataStream, session }) => {
     let draftContent = "";
 
     const { partialOutputStream } = streamText({
-      model: myProvider.languageModel("artifact-model"),
+      model: await resolveLanguageModel({
+        userId: session.userId,
+        providerId: session.providerId,
+        modelId: session.modelId,
+      }),
       system: sheetPrompt,
       prompt: title,
       output: Output.object({
@@ -39,11 +43,15 @@ export const sheetDocumentHandler = createDocumentHandler<"sheet">({
 
     return draftContent;
   },
-  onUpdateDocument: async ({ document, description, dataStream }) => {
+  onUpdateDocument: async ({ document, description, dataStream, session }) => {
     let draftContent = "";
 
     const { partialOutputStream } = streamText({
-      model: myProvider.languageModel("artifact-model"),
+      model: await resolveLanguageModel({
+        userId: session.userId,
+        providerId: session.providerId,
+        modelId: session.modelId,
+      }),
       system: updateDocumentPrompt(document.content, "sheet"),
       prompt: description,
       output: Output.object({ schema: z.object({ csv: z.string() }) }),

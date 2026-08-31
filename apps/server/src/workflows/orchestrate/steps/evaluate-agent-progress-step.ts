@@ -6,14 +6,14 @@ import {
 import type { ChatMessage } from "@/lib/types";
 import { getTextFromMessages } from "@/lib/utils";
 import type { ChatContext } from "@/workflows/orchestrate/steps/load-chat-step";
-import type { OrchestrationInput } from "../types";
 import { generateText, Output } from "ai";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { type AgentExecutionResult } from "./execute-agent-task-step";
-import type { ExecutionPlan } from "./plan-agent-execution-step";
 import type { OrchestrationAgentProfile } from "../orchestration-agent-profile";
 import { formatOrchestrationAgentProfile } from "../orchestration-agent-profile";
+import type { OrchestrationInput } from "../types";
+import { type AgentExecutionResult } from "./execute-agent-task-step";
+import type { ExecutionPlan } from "./plan-agent-execution-step";
 
 const agentProgressDecisionSchema = z.object({
   decision: z.enum(["complete", "continue", "blocked"]),
@@ -68,6 +68,7 @@ export async function persistDurableAgentProgressDecision(
 }
 
 export async function evaluateAgentProgressStep(params: {
+  userId: string;
   workflowId: string;
   classification: Record<string, unknown>;
   plan: ExecutionPlan;
@@ -96,6 +97,8 @@ export async function evaluateAgentProgressStep(params: {
   }));
 
   const { output } = await withModelFallback({
+    userId: params.userId,
+    providerId: params.orchestrationAgent?.providerId,
     modelId: params.orchestrationAgent?.model ?? params.orchestrationModel,
     fallbackModelId:
       params.orchestrationFallbackModel ?? orchestrationFallbackModel,

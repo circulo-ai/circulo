@@ -46,6 +46,7 @@ const classificationSchema = z.object({
 export type RequestClassification = z.infer<typeof classificationSchema>;
 
 export async function classifyRequestStep(params: {
+  userId: string;
   inputMessages: ChatMessage[];
   messages: Message[];
   triggerType: OrchestrationInput["triggerType"];
@@ -81,6 +82,8 @@ User Message: ${getTextFromMessages(message)}`;
   }));
 
   const { output } = await withModelFallback({
+    userId: params.userId,
+    providerId: params.orchestrationAgent?.providerId,
     modelId: params.orchestrationAgent?.model ?? params.orchestrationModel,
     fallbackModelId:
       params.orchestrationFallbackModel ?? orchestrationFallbackModel,

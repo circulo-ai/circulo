@@ -2,8 +2,6 @@ import { db } from "@/db";
 import { messageRepo } from "@/db/repositories";
 import { chat as chatTable, message as messageTable } from "@/db/schema";
 import type { RequestServices } from "@/di/di-context";
-import { titlePrompt } from "@/lib/ai/prompts";
-import { getLanguageModel } from "@/lib/ai/providers";
 import { getActiveOrganizationId, getSession } from "@/lib/auth";
 import { enforceOrganizationFeatureLimit } from "@/lib/billing/limits";
 import { createRouter } from "@/lib/create-app";
@@ -23,7 +21,7 @@ import {
   RateLimitError,
 } from "@circulo-ai/types";
 import { zValidator } from "@hono/zod-validator";
-import { createUIMessageStreamResponse, generateText } from "ai";
+import { createUIMessageStreamResponse } from "ai";
 import { and, count, eq, gte } from "drizzle-orm";
 import { z } from "zod";
 
@@ -138,26 +136,9 @@ router.patch(
   },
 );
 
-async function generateTitleFromUserMessages({
-  messages,
-}: {
-  messages: ChatMessage[];
-}) {
-  try {
-    const { text: title } = await generateText({
-      model: getLanguageModel(),
-      system: titlePrompt,
-      prompt: getTextFromMessages(messages),
-    });
-    return title.trim() || "New chat";
-  } catch (error) {
-    console.error(
-      "Failed to generate chat title; using a local fallback",
-      error,
-    );
-    const fallback = getTextFromMessages(messages).trim().replace(/\s+/g, " ");
-    return fallback.slice(0, 80) || "New chat";
-  }
+function generateTitleFromUserMessages(messages: ChatMessage[]) {
+  const fallback = getTextFromMessages(messages).trim().replace(/\s+/g, " ");
+  return fallback.slice(0, 80) || "New chat";
 }
 
 router.get(
@@ -336,7 +317,7 @@ router.post(
           resourceName: "Chat",
         });
 
-        const title = await generateTitleFromUserMessages({ messages });
+        const title = generateTitleFromUserMessages(messages);
         const agents = await Promise.all(
           agentIds.map((agentId) => di.AgentRepository.findById(agentId)),
         );

@@ -1,4 +1,9 @@
-import { defaultModel, type SupportedModels } from "@circulo-ai/types";
+import {
+  DEFAULT_AI_PROVIDER_ID,
+  defaultModel,
+  type AiProviderId,
+  type SupportedModels,
+} from "@circulo-ai/types";
 import { relations } from "drizzle-orm";
 import {
   boolean,
@@ -44,6 +49,10 @@ export const agent = pgTable(
       .$type<SupportedModels>()
       .notNull()
       .default(defaultModel),
+    providerId: text("provider_id")
+      .$type<AiProviderId>()
+      .notNull()
+      .default(DEFAULT_AI_PROVIDER_ID),
     maxTokens: integer("max_tokens").default(1000),
     temperature: integer("temperature").default(70), // 0-100 scale
 

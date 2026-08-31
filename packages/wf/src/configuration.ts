@@ -185,13 +185,18 @@ function createProfileEntries<TEnvironment, TRuntime>(
         "WF_CONFIG_INVALID",
       );
     }
-    entries.set(name, typeof value === "function" ? { create: value } : value);
-    if (typeof value !== "function" && typeof value.create !== "function") {
+    if (
+      typeof value !== "function" &&
+      (typeof value !== "object" ||
+        value === null ||
+        typeof value.create !== "function")
+    ) {
       throw new WfConfigError(
         `Workflow runtime profile "${name}" must define a create function.`,
         "WF_CONFIG_INVALID",
       );
     }
+    entries.set(name, typeof value === "function" ? { create: value } : value);
   }
 
   if (entries.size === 0) {

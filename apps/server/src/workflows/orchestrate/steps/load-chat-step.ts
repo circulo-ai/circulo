@@ -120,7 +120,9 @@ export async function loadChatContextStep(
     : [];
   const readableKnowledgeBaseIds = activeKnowledgeBases.map((base) => base.id);
   const queryEmbedding = queryText?.trim()
-    ? await createKnowledgeEmbedding(queryText.trim(), "").catch(() => null)
+    ? await createKnowledgeEmbedding(queryText.trim(), "", { userId }).catch(
+        () => null,
+      )
     : null;
   const lexicalKnowledgeMatch = queryText?.trim()
     ? sql`to_tsvector('simple', ${knowledgeDocument.title} || ' ' || ${knowledgeDocument.content}) @@ plainto_tsquery('simple', ${queryText.trim()})`

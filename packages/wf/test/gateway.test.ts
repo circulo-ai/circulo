@@ -105,6 +105,25 @@ describe("workflow event gateway", () => {
     ).rejects.toThrow("invalid");
   });
 
+  it("rejects oversized webhook bodies before parsing or dispatching", async () => {
+    const { runner } = createGateway();
+    const gateway = new WorkflowEventGateway(runner);
+
+    await expect(
+      gateway.handleWebhook(
+        "provider.updated",
+        {
+          body: "0123456789",
+          headers: {
+            "x-wf-timestamp": String(Date.now()),
+            "x-wf-signature": "ignored",
+          },
+        },
+        { secret: "secret", maxBodyBytes: 5 },
+      ),
+    ).rejects.toThrow("exceeds the configured size limit");
+  });
+
   it("rejects idempotency-key reuse with a conflicting payload", async () => {
     const { runner } = createGateway();
     const gateway = new WorkflowEventGateway(runner);

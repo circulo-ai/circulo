@@ -2,20 +2,27 @@ import { env, isTruthy } from "@/lib/env";
 import { isHosted } from "@/lib/environment";
 import { cn } from "@/lib/utils";
 import { useGeneralStore } from "@/stores/settings/general/store";
-import { CreditCard, Home, Settings, User, Users } from "lucide-react";
+import {
+  CreditCard,
+  Home,
+  KeyRound,
+  Settings,
+  User,
+  Users,
+} from "lucide-react";
 
 const isBillingEnabled = isTruthy(env.NEXT_PUBLIC_BILLING_ENABLED);
 
 interface SettingsNavigationProps {
   activeSection: string;
   onSectionChange: (
-    section: "general" | "account" | "subscription" | "team",
+    section: "general" | "account" | "ai-providers" | "subscription" | "team",
   ) => void;
   hasOrganization: boolean;
 }
 
 type NavigationItem = {
-  id: "general" | "account" | "subscription" | "team";
+  id: "general" | "account" | "ai-providers" | "subscription" | "team";
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   hideWhenBillingDisabled?: boolean;
@@ -34,6 +41,11 @@ const allNavigationItems: NavigationItem[] = [
     id: "account",
     label: "Account",
     icon: User,
+  },
+  {
+    id: "ai-providers",
+    label: "AI providers",
+    icon: KeyRound,
   },
   {
     id: "subscription",
