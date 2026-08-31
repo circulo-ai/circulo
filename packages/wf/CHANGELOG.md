@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.0.2
+
+### Patch Changes
+
+- bd08de9: Harden workflow runtime configuration validation, access-token bounds and claims, stream authorization, and gateway lifecycle behavior.
+
 ## 3.0.1
 
 ### Patch Changes
