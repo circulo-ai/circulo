@@ -74,6 +74,21 @@ jobs:
           bun --filter @circulo-ai/wf-cli typecheck
           bun --filter @circulo-ai/wf-cli build
 
+      - name: Verify DI package artifact
+        run: |
+          set -euo pipefail
+          cd packages/di
+          npm pack --dry-run --json --ignore-scripts > "$RUNNER_TEMP/di-pack.json"
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const packages = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/di-pack.json", "utf8"));
+            const files = new Set(packages[0].files.map((file) => file.path));
+            for (const required of ["package.json", "README.md", "dist/index.js", "dist/index.d.ts", "dist/hono.js", "dist/next.js", "dist/devtools/index.js", "dist/devtools/index.d.ts"]) {
+              if (!files.has(required)) throw new Error(`Missing ${required} from @circulo-ai/di package artifact`);
+            }
+          '
+          node --input-type=module -e 'const di = await import("./dist/index.js"); const devtools = await import("./dist/devtools/index.js"); const c = new di.Container(); c.register("release-smoke", { useValue: true }); if (c.resolve("release-smoke") !== true) process.exit(1); if (typeof devtools.RuntimeDependencyGraph !== "function" || typeof devtools.renderDependencyGraphHtml !== "function") process.exit(1);'
+
       - name: Verify CLI package artifact
         run: |
           set -euo pipefail

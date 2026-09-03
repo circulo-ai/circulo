@@ -20,6 +20,11 @@
       }
     }
   },
+  "javascript": {
+    "parser": {
+      "unsafeParameterDecoratorsEnabled": true
+    }
+  },
   "css": {
     "parser": {
       "tailwindDirectives": true
