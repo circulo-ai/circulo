@@ -1,0 +1,51 @@
+name: CI - Upload production contract
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths: ["packages/upload/**", "bun.lock", ".github/workflows/ci-upload.yml"]
+  push:
+    branches: [master, dev]
+    paths: ["packages/upload/**", "bun.lock", ".github/workflows/ci-upload.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 22, 24]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+      - run: bun install --frozen-lockfile
+      - name: Verify packed package and unit contracts
+        working-directory: packages/upload
+        run: bun run check:release
+      - name: Verify S3 contract against disposable MinIO
+        working-directory: packages/upload
+        env:
+          UPLOAD_S3_TEST_ENDPOINT: http://127.0.0.1:19007
+        run: |
+          set -euo pipefail
+          docker run -d --name upload-contract \
+            -p 127.0.0.1:19007:9000 \
+            -e MINIO_ROOT_USER=upload-test \
+            -e MINIO_ROOT_PASSWORD=upload-test-password \
+            minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
+          trap 'docker rm -f upload-contract' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent "$UPLOAD_S3_TEST_ENDPOINT/minio/health/ready"; then break; fi
+            sleep 1
+          done
+          curl --fail --silent "$UPLOAD_S3_TEST_ENDPOINT/minio/health/ready"
+          bun run test:integration
