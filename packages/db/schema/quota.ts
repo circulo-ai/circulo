@@ -56,9 +56,7 @@ export const quotaReservation = pgTable(
     consumedAt: timestamp("consumed_at", { withTimezone: true }),
   },
   (table) => [
-    uniqueIndex("quota_reservations_idempotency_idx").on(
-      table.idempotencyKey,
-    ),
+    uniqueIndex("quota_reservations_idempotency_idx").on(table.idempotencyKey),
   ],
 );
 

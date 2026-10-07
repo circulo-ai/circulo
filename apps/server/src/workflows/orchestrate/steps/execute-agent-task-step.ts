@@ -17,6 +17,7 @@ import { scheduleTask } from "@/lib/ai/tools/schedule-task";
 import { searchKnowledge } from "@/lib/ai/tools/search-knowledge";
 import { searchMemory } from "@/lib/ai/tools/search-memory";
 import { updateDocument } from "@/lib/ai/tools/update-document";
+import { consumeQuota, reserveQuota } from "@/lib/billing/quota";
 import { getMcpToolsForAgent } from "@/lib/mcp/client";
 import type {
   ChatMessage,
@@ -25,7 +26,6 @@ import type {
   WorkflowToolTrace,
 } from "@/lib/types";
 import { usageEventForModel } from "@/lib/usage-ledger";
-import { consumeQuota, reserveQuota } from "@/lib/billing/quota";
 import { convertToUIMessages, getTextFromMessages } from "@/lib/utils";
 import type { ChatContext } from "@/workflows/orchestrate/steps/load-chat-step";
 import type { OrchestrationInput } from "@/workflows/orchestrate/types";
