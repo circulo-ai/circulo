@@ -31,18 +31,24 @@ jobs:
       - name: Verify packed package and unit contracts
         working-directory: packages/upload
         run: bun run check:release
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.25.6"
+          cache: false
+      - name: Build pinned MinIO contract backend
+        run: go install github.com/minio/minio@9e49d5e7a648f00e26f2246f4dc28e6b07f8c84a
       - name: Verify S3 contract against disposable MinIO
         working-directory: packages/upload
         env:
           UPLOAD_S3_TEST_ENDPOINT: http://127.0.0.1:19007
         run: |
           set -euo pipefail
-          docker run -d --name upload-contract \
-            -p 127.0.0.1:19007:9000 \
-            -e MINIO_ROOT_USER=upload-test \
-            -e MINIO_ROOT_PASSWORD=upload-test-password \
-            minio/minio:RELEASE.2025-09-07T16-13-09Z server /data
-          trap 'docker rm -f upload-contract' EXIT
+          export MINIO_ROOT_USER=upload-test
+          export MINIO_ROOT_PASSWORD=upload-test-password
+          "$(go env GOPATH)/bin/minio" server "$RUNNER_TEMP/upload-contract-data" \
+            --address 127.0.0.1:19007 > "$RUNNER_TEMP/upload-contract.log" 2>&1 &
+          minio_pid=$!
+          trap 'kill "$minio_pid" || true' EXIT
           for attempt in $(seq 1 30); do
             if curl --fail --silent "$UPLOAD_S3_TEST_ENDPOINT/minio/health/ready"; then break; fi
             sleep 1
