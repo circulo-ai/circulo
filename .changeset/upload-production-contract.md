@@ -16,3 +16,5 @@ Add an optional tRPC 11 adapter with composable typed resolvers, bounded Zod
 schemas, required authorization, verified completion and safe error mapping.
 Separate capability contracts, route builders and policy modules; move all tests
 outside source, add API inference checks and bound ordered batch concurrency.
+Require Node 22 or newer and patched AWS/FTP peers; make Vercel Blob an optional
+peer so unused provider SDKs are neither installed nor loaded by the core package.
