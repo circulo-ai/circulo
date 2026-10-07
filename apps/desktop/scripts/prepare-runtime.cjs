@@ -70,10 +70,7 @@ const pgliteVectorBundle = path.join(
   "packages/db/node_modules/@electric-sql/pglite-pgvector/dist/vector.tar.gz",
 );
 if (fs.existsSync(pgliteVectorBundle)) {
-  copy(
-    pgliteVectorBundle,
-    path.join(stagingRoot, "server/vector.tar.gz"),
-  );
+  copy(pgliteVectorBundle, path.join(stagingRoot, "server/vector.tar.gz"));
 }
 const pgliteDataBundle = path.join(
   repoRoot,
