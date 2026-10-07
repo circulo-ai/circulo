@@ -7,8 +7,9 @@ import type { ChatMessage } from "@/lib/types";
 import { getTextFromMessages } from "@/lib/utils";
 import type { ChatContext } from "@/workflows/orchestrate/steps/load-chat-step";
 import { generateText, Output } from "ai";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { z } from "zod";
+import { deterministicWorkflowEventId } from "../agent-loop-state";
 import type { OrchestrationAgentProfile } from "../orchestration-agent-profile";
 import { formatOrchestrationAgentProfile } from "../orchestration-agent-profile";
 import type { OrchestrationInput } from "../types";
@@ -41,7 +42,8 @@ export async function loadDurableAgentProgressDecisions(
   const rows = await db
     .select()
     .from(workflowRunEvent)
-    .where(eq(workflowRunEvent.workflowId, workflowId));
+    .where(eq(workflowRunEvent.workflowId, workflowId))
+    .orderBy(asc(workflowRunEvent.sequence), asc(workflowRunEvent.timestamp));
   const decisions = new Map<number, AgentProgressDecision>();
   for (const row of rows) {
     if (row.eventType !== AGENT_LOOP_DECISION_EVENT) continue;
@@ -57,14 +59,32 @@ export async function persistDurableAgentProgressDecision(
   workflowId: string,
   iteration: number,
   decision: AgentProgressDecision,
-): Promise<void> {
-  await db.insert(workflowRunEvent).values({
-    id: crypto.randomUUID(),
+): Promise<AgentProgressDecision> {
+  const eventId = deterministicWorkflowEventId(
+    "agent-loop-decision",
     workflowId,
-    timestamp: Date.now(),
-    eventType: AGENT_LOOP_DECISION_EVENT,
-    payload: { iteration, decision },
-  });
+    String(iteration),
+  );
+  await db
+    .insert(workflowRunEvent)
+    .values({
+      id: eventId,
+      workflowId,
+      timestamp: Date.now(),
+      eventType: AGENT_LOOP_DECISION_EVENT,
+      payload: { iteration, decision },
+    })
+    .onConflictDoNothing({ target: workflowRunEvent.id });
+
+  const [persisted] = await db
+    .select({ payload: workflowRunEvent.payload })
+    .from(workflowRunEvent)
+    .where(eq(workflowRunEvent.id, eventId))
+    .limit(1);
+  const parsed = agentProgressDecisionSchema.safeParse(
+    (persisted?.payload as { decision?: unknown } | undefined)?.decision,
+  );
+  return parsed.success ? parsed.data : decision;
 }
 
 export async function evaluateAgentProgressStep(params: {
@@ -135,14 +155,22 @@ ${JSON.stringify(params.classification, null, 2)}`,
   });
 
   const enabledAgentIds = new Set(availableAgents.map((agent) => agent.id));
-  const nextSteps = output.nextSteps.filter(
-    (step) =>
-      enabledAgentIds.has(step.agentId) &&
-      !params.previousResults.some(
+  const seenTasks = new Set<string>();
+  const nextSteps = output.nextSteps.filter((step) => {
+    const taskKey = `${step.agentId}\u001f${step.task}`;
+    if (
+      !enabledAgentIds.has(step.agentId) ||
+      seenTasks.has(taskKey) ||
+      params.previousResults.some(
         (result) =>
           result.agentId === step.agentId && result.task === step.task,
-      ),
-  );
+      )
+    ) {
+      return false;
+    }
+    seenTasks.add(taskKey);
+    return true;
+  });
 
   if (output.decision === "continue" && nextSteps.length === 0) {
     return {

@@ -78,10 +78,7 @@ describe("secure workflow access", () => {
       "a-secret-that-is-longer-than-32-characters",
     );
     const gateway = new SecureWorkflowStreamGateway(bus, signer);
-    const stream = gateway.stream(
-      "workflow-1",
-      "not-a-valid-token",
-    );
+    const stream = gateway.stream("workflow-1", "not-a-valid-token");
 
     await expect(stream[Symbol.asyncIterator]().next()).rejects.toThrow(
       "Malformed access token",
@@ -124,7 +121,11 @@ describe("secure workflow access", () => {
       workflowIds: ["workflow-1"],
       tenantId: "tenant-1",
     });
-    const gateway = new SecureWorkflowStreamGateway(bus, signer, () => undefined);
+    const gateway = new SecureWorkflowStreamGateway(
+      bus,
+      signer,
+      () => undefined,
+    );
 
     await expect(
       gateway.subscribe("workflow-1", token, () => undefined, {
@@ -143,9 +144,9 @@ describe("secure workflow access", () => {
       workflowIds: ["workflow-1"] as const,
     };
 
-    await expect(
-      signer.issue(baseClaims, { expiresInMs: 0 }),
-    ).rejects.toThrow("expiresInMs must be positive");
+    await expect(signer.issue(baseClaims, { expiresInMs: 0 })).rejects.toThrow(
+      "expiresInMs must be positive",
+    );
     await expect(
       signer.issue({
         ...baseClaims,

@@ -1,11 +1,12 @@
 import { db } from "@/db";
 import { member, workspaceRole, workspaceRolePermission } from "@/db/schema";
-import { statement } from "@/lib/auth";
+import { adminRole, memberRole, ownerRole, statement } from "@/lib/auth";
 import { createRouter } from "@/lib/create-app";
 import {
   getUserRole,
   hasPermissionForUser,
   isMemberOf,
+  type ApiKeyPermissions,
 } from "@/lib/permissions";
 import { ensureWorkspaceRoleCatalog } from "@/lib/workspace-role-catalog";
 import { requireAuth } from "@/middleware/auth";
@@ -55,13 +56,83 @@ function assertPermissions(
   return [...unique.values()];
 }
 
-async function requireManager(userId: string, organizationId: string) {
+/**
+ * A role manager may only create or grant permissions that the manager already
+ * has. Without this check an admin could manufacture a custom role containing
+ * owner-only actions and then assign it to another member.
+ */
+async function assertCanGrantPermissions(
+  userId: string,
+  organizationId: string,
+  permissions: Array<{ resource: string; action: string }>,
+  apiKeyPermissions?: ApiKeyPermissions,
+) {
+  for (const permission of permissions) {
+    if (
+      !(await hasPermissionForUser(
+        userId,
+        organizationId,
+        permission.resource,
+        permission.action,
+        apiKeyPermissions,
+      ))
+    ) {
+      throw new ForbiddenError(
+        `You cannot grant the ${permission.resource}:${permission.action} permission`,
+      );
+    }
+  }
+}
+
+function getBuiltInRolePermissions(roleKey: string) {
+  const role =
+    roleKey === "owner"
+      ? ownerRole
+      : roleKey === "admin"
+        ? adminRole
+        : roleKey === "member"
+          ? memberRole
+          : undefined;
+  return Object.entries(role?.statements ?? {}).flatMap(
+    ([resource, actions]) => {
+      const typedActions = actions as readonly string[];
+      return typedActions.map((action) => ({ resource, action }));
+    },
+  );
+}
+
+async function getRolePermissions(roleId: string, roleKey: string) {
+  const builtInPermissions = getBuiltInRolePermissions(roleKey);
+  if (
+    builtInPermissions.length > 0 ||
+    ["owner", "admin", "member"].includes(roleKey)
+  ) {
+    return builtInPermissions;
+  }
+
+  const permissions = await db.query.workspaceRolePermission.findMany({
+    where: eq(workspaceRolePermission.roleId, roleId),
+  });
+  return permissions.map(({ resource, action }) => ({ resource, action }));
+}
+
+async function requireManager(
+  userId: string,
+  organizationId: string,
+  apiKeyPermissions?: ApiKeyPermissions,
+) {
   if (!(await isMemberOf(userId, organizationId))) {
     throw new ForbiddenError("You don't have access to this organization");
   }
   const role = await getUserRole(userId, organizationId);
   if (
-    !(await hasPermissionForUser(userId, organizationId, "workspace", "manage"))
+    !(await hasPermissionForUser(
+      userId,
+      organizationId,
+      "workspace",
+      "manage",
+      apiKeyPermissions,
+    ))
   ) {
     throw new ForbiddenError("Only workspace managers can manage roles");
   }
@@ -78,7 +149,7 @@ function activeOrganization(c: {
 
 router.get("/workspace/permissions/catalog", requireAuth, async (c) => {
   const organizationId = activeOrganization(c);
-  await requireManager(c.var.user!.id, organizationId);
+  await requireManager(c.var.user!.id, organizationId, c.var.apiKeyPermissions);
   return c.json({ permissions: permissionCatalog });
 });
 
@@ -106,9 +177,19 @@ router.post(
   zValidator("json", roleBody),
   async (c) => {
     const organizationId = activeOrganization(c);
-    await requireManager(c.var.user!.id, organizationId);
+    await requireManager(
+      c.var.user!.id,
+      organizationId,
+      c.var.apiKeyPermissions,
+    );
     const body = c.req.valid("json");
     const permissions = assertPermissions(body.permissions);
+    await assertCanGrantPermissions(
+      c.var.user!.id,
+      organizationId,
+      permissions,
+      c.var.apiKeyPermissions,
+    );
     const key = `custom_${body.name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "_")
@@ -147,10 +228,20 @@ router.patch(
   zValidator("json", roleBody),
   async (c) => {
     const organizationId = activeOrganization(c);
-    await requireManager(c.var.user!.id, organizationId);
+    await requireManager(
+      c.var.user!.id,
+      organizationId,
+      c.var.apiKeyPermissions,
+    );
     const { id } = c.req.valid("param");
     const body = c.req.valid("json");
     const permissions = assertPermissions(body.permissions);
+    await assertCanGrantPermissions(
+      c.var.user!.id,
+      organizationId,
+      permissions,
+      c.var.apiKeyPermissions,
+    );
     const current = await db.query.workspaceRole.findFirst({
       where: and(
         eq(workspaceRole.id, id),
@@ -195,7 +286,11 @@ router.delete(
   zValidator("param", roleParams),
   async (c) => {
     const organizationId = activeOrganization(c);
-    await requireManager(c.var.user!.id, organizationId);
+    await requireManager(
+      c.var.user!.id,
+      organizationId,
+      c.var.apiKeyPermissions,
+    );
     const { id } = c.req.valid("param");
     const current = await db.query.workspaceRole.findFirst({
       where: and(
@@ -235,7 +330,11 @@ router.patch(
   zValidator("json", memberRoleBody),
   async (c) => {
     const organizationId = activeOrganization(c);
-    const actorRole = await requireManager(c.var.user!.id, organizationId);
+    const actorRole = await requireManager(
+      c.var.user!.id,
+      organizationId,
+      c.var.apiKeyPermissions,
+    );
     const { id } = c.req.valid("param");
     const { roleKey } = c.req.valid("json");
     if (roleKey === "owner" && actorRole !== "owner") {
@@ -248,6 +347,12 @@ router.patch(
       ),
     });
     if (!targetRole) throw new BadRequestError("Choose a valid workspace role");
+    await assertCanGrantPermissions(
+      c.var.user!.id,
+      organizationId,
+      await getRolePermissions(targetRole.id, targetRole.key),
+      c.var.apiKeyPermissions,
+    );
     const existing = await db.query.member.findFirst({
       where: and(eq(member.id, id), eq(member.organizationId, organizationId)),
     });

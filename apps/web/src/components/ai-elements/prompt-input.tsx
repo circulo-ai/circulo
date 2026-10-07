@@ -54,10 +54,10 @@ import {
   type ClipboardEventHandler,
   type ComponentProps,
   createContext,
+  type FocusEvent,
   type FormEvent,
   type FormEventHandler,
   Fragment,
-  type FocusEvent,
   type HTMLAttributes,
   type KeyboardEventHandler,
   type PropsWithChildren,
@@ -668,7 +668,6 @@ export const PromptInput = ({
         }
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- cleanup only on unmount; filesRef always current
     [usingProvider],
   );
 

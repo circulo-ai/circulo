@@ -7,7 +7,11 @@ import {
 } from "@/db";
 import { chatMemberRepo, chatRepo } from "@/db/repositories";
 import { createRouter } from "@/lib/create-app";
-import { hasPermissionForUser, isMemberOf } from "@/lib/permissions";
+import {
+  hasPermissionForUser,
+  isMemberOf,
+  type ApiKeyPermissions,
+} from "@/lib/permissions";
 import { decryptSecret, encryptSecret } from "@/lib/server-utils";
 import {
   DEFAULT_WEBHOOK_MAX_AGE_MS,
@@ -73,7 +77,11 @@ function publicWebhook(row: typeof workflowWebhook.$inferSelect) {
   };
 }
 
-async function requireManager(userId: string, organizationId: string) {
+async function requireManager(
+  userId: string,
+  organizationId: string,
+  apiKeyPermissions?: ApiKeyPermissions,
+) {
   if (!(await isMemberOf(userId, organizationId))) {
     throw new ForbiddenError("You don't have access to this organization");
   }
@@ -83,6 +91,7 @@ async function requireManager(userId: string, organizationId: string) {
       organizationId,
       "automation",
       "manage",
+      apiKeyPermissions,
     ))
   ) {
     throw new ForbiddenError("Only workspace managers can manage webhooks");
@@ -108,7 +117,7 @@ async function requireConfiguredChat(
 router.get("/automation/webhooks", requireAuth, async (c) => {
   const organizationId = c.get("activeOrgId");
   if (!organizationId) throw new BadRequestError("No active organization");
-  await requireManager(c.var.user!.id, organizationId);
+  await requireManager(c.var.user!.id, organizationId, c.var.apiKeyPermissions);
   const rows = await db.query.workflowWebhook.findMany({
     where: eq(workflowWebhook.organizationId, organizationId),
     orderBy: desc(workflowWebhook.createdAt),
@@ -122,7 +131,11 @@ router.post(
   zValidator("json", managementSchema),
   async (c) => {
     const body = c.req.valid("json");
-    await requireManager(c.var.user!.id, body.organizationId);
+    await requireManager(
+      c.var.user!.id,
+      body.organizationId,
+      c.var.apiKeyPermissions,
+    );
     await requireConfiguredChat(
       c.var.user!.id,
       body.organizationId,
@@ -163,7 +176,11 @@ router.patch(
       where: eq(workflowWebhook.id, id),
     });
     if (!current) throw new NotFoundError("Webhook not found");
-    await requireManager(c.var.user!.id, current.organizationId);
+    await requireManager(
+      c.var.user!.id,
+      current.organizationId,
+      c.var.apiKeyPermissions,
+    );
     const [updated] = await db
       .update(workflowWebhook)
       .set({ ...body, updatedAt: new Date() })
@@ -183,7 +200,11 @@ router.post(
       where: eq(workflowWebhook.id, id),
     });
     if (!current) throw new NotFoundError("Webhook not found");
-    await requireManager(c.var.user!.id, current.organizationId);
+    await requireManager(
+      c.var.user!.id,
+      current.organizationId,
+      c.var.apiKeyPermissions,
+    );
     const secret = randomBytes(32).toString("hex");
     const encrypted = await encryptSecret(secret);
     const [updated] = await db
@@ -210,7 +231,11 @@ router.delete(
       where: eq(workflowWebhook.id, id),
     });
     if (!current) throw new NotFoundError("Webhook not found");
-    await requireManager(c.var.user!.id, current.organizationId);
+    await requireManager(
+      c.var.user!.id,
+      current.organizationId,
+      c.var.apiKeyPermissions,
+    );
     await db.delete(workflowWebhook).where(eq(workflowWebhook.id, id));
     return c.json({ deleted: true });
   },
@@ -226,7 +251,11 @@ router.get(
       where: eq(workflowWebhook.id, id),
     });
     if (!current) throw new NotFoundError("Webhook not found");
-    await requireManager(c.var.user!.id, current.organizationId);
+    await requireManager(
+      c.var.user!.id,
+      current.organizationId,
+      c.var.apiKeyPermissions,
+    );
     return c.json(
       await db.query.workflowWebhookDelivery.findMany({
         where: eq(workflowWebhookDelivery.webhookId, id),

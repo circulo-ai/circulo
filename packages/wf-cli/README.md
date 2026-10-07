@@ -59,7 +59,10 @@ import { formatJson, formatTable, renderOutput } from "@circulo-ai/wf-cli";
 
 const json = formatJson({ healthy: true, attempts: 2 });
 const table = formatTable(
-  [{ key: "name", header: "Name" }, { key: "status", header: "Status" }],
+  [
+    { key: "name", header: "Name" },
+    { key: "status", header: "Status" },
+  ],
   [{ name: "orders", status: "ready" }],
 );
 const output = renderOutput({ type: "json", value: { json, table } });
@@ -107,7 +110,10 @@ import { createPostgresStores } from "./src/infrastructure/workflow-stores";
 
 type OrderData = { orderId: string };
 
-class ReserveInventory implements IWorkflowStep<OrderData, { reservationId: string }> {
+class ReserveInventory implements IWorkflowStep<
+  OrderData,
+  { reservationId: string }
+> {
   async execute(
     context: WorkflowStepContext<OrderData>,
   ): Promise<{ reservationId: string }> {
@@ -122,8 +128,12 @@ registry.register("orders.ReserveInventory", () => new ReserveInventory());
 export default defineWfConfig({
   registry,
   profiles: {
-    development: async () => ({ stores: createPostgresStores(process.env.DATABASE_URL) }),
-    test: async () => ({ stores: createPostgresStores("postgres://localhost/test") }),
+    development: async () => ({
+      stores: createPostgresStores(process.env.DATABASE_URL),
+    }),
+    test: async () => ({
+      stores: createPostgresStores("postgres://localhost/test"),
+    }),
   },
   defaultProfile: "development",
   workflows: {
@@ -359,7 +369,9 @@ For example, this document fails because `missing` is not declared:
 {
   "id": "Broken",
   "version": 1,
-  "steps": [{ "id": "start", "stepType": "orders.Start", "nextStepId": "missing" }]
+  "steps": [
+    { "id": "start", "stepType": "orders.Start", "nextStepId": "missing" }
+  ]
 }
 ```
 

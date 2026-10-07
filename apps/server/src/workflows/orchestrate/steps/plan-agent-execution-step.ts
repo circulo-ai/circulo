@@ -195,13 +195,39 @@ Classification reasoning: ${classification.reasoning}
     agents.filter((a) => a.isEnabled).map((a) => a.agentId),
   );
 
-  const validatedAgents = output.selectedAgents.filter((sa) => {
-    if (!validAgentIds.has(sa.agentId)) {
-      console.warn(`Agent ${sa.agentId} not found or disabled, skipping`);
-      return false;
-    }
-    return true;
-  });
+  const seenTaskKeys = new Set<string>();
+  const enabledAgentIds = new Set(validAgentIds);
+  const validatedAgents = output.selectedAgents
+    .filter((sa) => {
+      if (!validAgentIds.has(sa.agentId)) {
+        console.warn(`Agent ${sa.agentId} not found or disabled, skipping`);
+        return false;
+      }
+      const task = sa.task.trim();
+      const taskKey = `${sa.agentId}\u001f${task}`;
+      if (!task || seenTaskKeys.has(taskKey)) return false;
+      seenTaskKeys.add(taskKey);
+      return true;
+    })
+    .map((agent, order) => ({
+      ...agent,
+      order,
+      task: agent.task.trim().slice(0, 8_000),
+      reason: agent.reason.trim().slice(0, 2_000),
+      parallelGroup:
+        agent.parallelGroup === null ||
+        !Number.isFinite(agent.parallelGroup) ||
+        agent.parallelGroup < 0
+          ? null
+          : Math.floor(agent.parallelGroup),
+      dependsOn: agent.dependsOn
+        ? agent.dependsOn.filter(
+            (dependencyId) =>
+              dependencyId !== agent.agentId &&
+              enabledAgentIds.has(dependencyId),
+          )
+        : null,
+    }));
 
   // An explicit @agent-id mention is an execution directive, not merely
   // prompt text. Preserve it even if the planner would otherwise choose a
@@ -229,8 +255,48 @@ Classification reasoning: ${classification.reasoning}
     selectedIds.add(chatAgent.agentId);
   }
 
+  let boundedAgents = validatedAgents.slice(0, 12);
+  let fallbackAgentId =
+    output.fallbackAgentId && validAgentIds.has(output.fallbackAgentId)
+      ? output.fallbackAgentId
+      : null;
+
+  // A fallback is a reserve worker, not a second primary attempt. Keeping it
+  // in the primary plan made the fallback branch replay the same checkpoint
+  // instead of actually trying the reserve agent.
+  if (fallbackAgentId && boundedAgents.length > 1) {
+    boundedAgents = boundedAgents.filter(
+      (agent) => agent.agentId !== fallbackAgentId,
+    );
+  } else {
+    fallbackAgentId = null;
+  }
+
+  const boundedAgentIds = new Set(boundedAgents.map((agent) => agent.agentId));
+
   return {
     ...output,
-    selectedAgents: validatedAgents,
+    selectedAgents: boundedAgents.map((agent, order) => ({
+      ...agent,
+      order,
+      dependsOn: agent.dependsOn
+        ? agent.dependsOn.filter((dependencyId) =>
+            boundedAgentIds.has(dependencyId),
+          )
+        : null,
+    })),
+    fallbackAgentId:
+      fallbackAgentId && !boundedAgentIds.has(fallbackAgentId)
+        ? fallbackAgentId
+        : null,
+    timeoutMinutes: Math.min(
+      30,
+      Math.max(
+        1,
+        Number.isFinite(output.timeoutMinutes)
+          ? Math.ceil(output.timeoutMinutes)
+          : 10,
+      ),
+    ),
   };
 }

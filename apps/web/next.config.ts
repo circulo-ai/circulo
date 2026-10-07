@@ -54,6 +54,7 @@ const contentSecurityPolicy = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   devIndicators: false,
   images: {
     remotePatterns: [

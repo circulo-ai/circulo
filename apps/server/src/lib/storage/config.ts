@@ -59,7 +59,11 @@ const storageDriver =
   (env.NODE_ENV === "production" ? "s3" : "local");
 const localStoragePath = env.CIRCULO_LOCAL_STORAGE_PATH || "./.local-storage";
 
-if (env.NODE_ENV === "production" && storageDriver === "local") {
+if (
+  env.NODE_ENV === "production" &&
+  env.CIRCULO_DEPLOYMENT_MODE !== "local" &&
+  storageDriver === "local"
+) {
   throw new Error(
     "Local storage cannot be used in production. Configure S3 or Azure Blob Storage.",
   );

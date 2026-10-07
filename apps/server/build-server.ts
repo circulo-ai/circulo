@@ -5,9 +5,13 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 const result = await Bun.build({
-  entrypoints: ["./src/index.ts"],
+  entrypoints: ["./src/index.ts", "./src/node-server.ts"],
   outdir: "./dist",
-  target: "bun",
+  // The packaged Electron shell starts node-server.js through Electron's
+  // Node runtime, so the production bundle must not depend on Bun globals
+  // such as import.meta.require.
+  target: "node",
+  format: "esm",
   sourcemap: "external",
 });
 

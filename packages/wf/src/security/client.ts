@@ -126,10 +126,7 @@ export class WorkflowHttpAdapter implements WorkflowBackendAdapter {
     this.fetcher = options.fetch ?? defaultFetch;
     this.headers = { ...options.headers };
     this.requestTimeoutMs = options.requestTimeoutMs ?? 30_000;
-    if (
-      !Number.isFinite(this.requestTimeoutMs) ||
-      this.requestTimeoutMs <= 0
-    ) {
+    if (!Number.isFinite(this.requestTimeoutMs) || this.requestTimeoutMs <= 0) {
       throw new RangeError("Workflow HTTP requestTimeoutMs must be positive");
     }
   }

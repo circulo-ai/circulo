@@ -89,18 +89,21 @@ router.get("/capabilities", requireAuth, async (c) => {
     organizationId,
     "workspace",
     "manage",
+    c.var.apiKeyPermissions,
   );
   const canReadSkills = await hasPermissionForUser(
     userId,
     organizationId,
     "skills",
     "read",
+    c.var.apiKeyPermissions,
   );
   const canReadApps = await hasPermissionForUser(
     userId,
     organizationId,
     "apps",
     "read",
+    c.var.apiKeyPermissions,
   );
 
   const integrations = await db.query.mcpIntegration.findMany({

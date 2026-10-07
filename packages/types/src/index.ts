@@ -6,4 +6,4 @@ export * from "./schemas/common";
 export * from "./types/http-errors";
 export * from "./types/models";
 
-// TODO remove this file and use its exports directly
+// Keep this barrel as the stable public entrypoint for the shared types package.

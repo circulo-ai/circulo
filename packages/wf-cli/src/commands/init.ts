@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { CliArguments } from "./command-runner";
 import type { CliCommandContext, CliCommandResult } from "../types";
+import type { CliArguments } from "./command-runner";
 
 export function executeInitCommand(
   args: CliArguments,

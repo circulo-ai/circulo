@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { estimateProviderCost } from "./cost";
 import {
   getDefaultModelForProvider,
   listProviderModels,
@@ -14,6 +15,7 @@ describe("AI provider registry", () => {
     expect(getDefaultModelForProvider("openai")).toBe("gpt-4o-mini");
     expect(getDefaultModelForProvider("anthropic")).toBe("claude-sonnet-4-5");
     expect(getDefaultModelForProvider("google")).toBe("gemini-2.5-flash");
+    expect(getDefaultModelForProvider("ollama")).toBe("llama3.2");
   });
 
   it("filters OpenRouter model discovery to tool-capable generation models", async () => {
@@ -64,5 +66,24 @@ describe("AI provider registry", () => {
     expect(message).not.toContain("super-secret");
     expect(message).not.toContain("another-secret");
     expect(message).toContain("[redacted]");
+  });
+
+  it("estimates direct-provider cost when provider metadata is absent", () => {
+    expect(
+      estimateProviderCost({
+        providerId: "openai",
+        modelId: "gpt-4o-mini",
+        inputTokens: 1_000_000,
+        outputTokens: 1_000_000,
+      }),
+    ).toBe(0.75);
+    expect(
+      estimateProviderCost({
+        providerId: "ollama",
+        modelId: "llama3.2",
+        inputTokens: 10_000,
+        outputTokens: 10_000,
+      }),
+    ).toBe(0);
   });
 });

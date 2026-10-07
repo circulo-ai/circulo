@@ -1,4 +1,5 @@
-import { env } from "@/lib/env";
+import { isCloudRuntime } from "@/lib/deployment/instance-auth";
+import { env, isTruthy } from "@/lib/env";
 import { BILLING_FEATURES, getBillingPlan } from "@circulo-ai/types";
 
 import { Autumn } from "autumn-js";
@@ -96,6 +97,39 @@ function createLocalDevSubscription(planId: string): SubscriptionInfo | null {
   };
 }
 
+function createSelfHostedSubscription(): SubscriptionInfo {
+  const featureIds = [
+    "max_agents",
+    "api_calls",
+    "max_messages_per_day",
+    "kb_slots",
+    "max_chats",
+    "team_members",
+    "max_agents_in_chat",
+    "rate_limit_per_minute",
+    "create_team_org",
+    "priority_support",
+  ];
+  return {
+    plan: "self-hosted",
+    status: "local",
+    products: [],
+    features: Object.fromEntries(
+      featureIds.map((id) => [
+        id,
+        {
+          id,
+          name: id,
+          type: "continuous_use",
+          unlimited: true,
+          included_usage: undefined,
+          usage: 0,
+        },
+      ]),
+    ),
+  };
+}
+
 /**
  * Get subscription information for an organization
  * Since we're using customerScope: "organization" in our Autumn config,
@@ -104,6 +138,13 @@ function createLocalDevSubscription(planId: string): SubscriptionInfo | null {
 export async function getSubscriptionForOrg(
   organizationId: string,
 ): Promise<SubscriptionInfo | null> {
+  // Billing is a cloud adapter. Local desktop and self-hosted runtimes get
+  // unlimited product entitlements even when shared environment variables
+  // happen to contain billing configuration.
+  if (!isCloudRuntime() || !isTruthy(env.BILLING_ENABLED)) {
+    return createSelfHostedSubscription();
+  }
+
   if (env.NODE_ENV !== "production" && env.BILLING_LOCAL_DEV_PLAN) {
     return createLocalDevSubscription(env.BILLING_LOCAL_DEV_PLAN);
   }
@@ -173,6 +214,7 @@ export async function orgHasPlan(
 ): Promise<boolean> {
   const subscription = await getSubscriptionForOrg(organizationId);
   if (!subscription || !subscription.plan) return false;
+  if (subscription.plan === "self-hosted") return true;
   return requiredPlans.includes(subscription.plan);
 }
 

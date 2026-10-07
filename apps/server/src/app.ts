@@ -1,4 +1,5 @@
 import createApp from "@/lib/create-app";
+import { isCloudRuntime } from "@/lib/deployment/instance-auth";
 import { env } from "@/lib/env";
 import { getBaseUrl } from "@/lib/urls/utils";
 import { auditRequest } from "@/middleware/audit";
@@ -30,12 +31,14 @@ import conversations from "@/routes/conversations";
 import files from "@/routes/files";
 import health from "@/routes/health";
 import history from "@/routes/history";
+import instance from "@/routes/instance";
 import knowledge from "@/routes/knowledge";
 import memories from "@/routes/memories";
 import messages from "@/routes/messages";
 import models from "@/routes/models";
 import skills from "@/routes/skills";
 import suggestions from "@/routes/suggestions";
+import sync from "@/routes/sync";
 import userProfile from "@/routes/users/profile";
 import userSettings from "@/routes/users/settings";
 import userUnsubscribe from "@/routes/users/unsubscribe";
@@ -50,7 +53,8 @@ import { requestId } from "hono/request-id";
 
 const app = createApp();
 const IS_DEVELOPMENT = env.NODE_ENV === "development";
-const SHOULD_APPLY_RATE_LIMITING = env.NODE_ENV === "production";
+const SHOULD_APPLY_RATE_LIMITING =
+  env.NODE_ENV === "production" && isCloudRuntime();
 const OPENAPI_PATH = "/openapi.json";
 
 // Middlewares (register before routes)
@@ -82,7 +86,13 @@ const corsMiddleware = cors({
     }
     return getBaseUrl();
   },
-  allowHeaders: ["Content-Type", "Authorization", "X-API-Key", "X-Request-Id"],
+  allowHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-API-Key",
+    "X-Request-Id",
+    "X-Circulo-Device-Id",
+  ],
   allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   exposeHeaders: ["Content-Length"],
   maxAge: 600,
@@ -122,10 +132,12 @@ const routes = [
   models,
   conversations,
   history,
+  instance,
   knowledge,
   memories,
   suggestions,
   skills,
+  sync,
   userProfile,
   userSettings,
   userUnsubscribe,

@@ -7,7 +7,11 @@ import {
   skillAssignment,
 } from "@/db/schema";
 import { createRouter } from "@/lib/create-app";
-import { hasPermissionForUser, isMemberOf } from "@/lib/permissions";
+import {
+  hasPermissionForUser,
+  isMemberOf,
+  type ApiKeyPermissions,
+} from "@/lib/permissions";
 import { requireAuth } from "@/middleware/auth";
 import {
   BadRequestError,
@@ -74,22 +78,44 @@ const assignmentBody = z
     }
   });
 
-async function requireManager(userId: string, organizationId: string) {
+async function requireManager(
+  userId: string,
+  organizationId: string,
+  apiKeyPermissions?: ApiKeyPermissions,
+) {
   if (!(await isMemberOf(userId, organizationId))) {
     throw new ForbiddenError("You don't have access to this organization");
   }
   if (
-    !(await hasPermissionForUser(userId, organizationId, "skills", "manage"))
+    !(await hasPermissionForUser(
+      userId,
+      organizationId,
+      "skills",
+      "manage",
+      apiKeyPermissions,
+    ))
   ) {
     throw new ForbiddenError("Only workspace managers can manage skills");
   }
 }
 
-async function requireSkillReader(userId: string, organizationId: string) {
+async function requireSkillReader(
+  userId: string,
+  organizationId: string,
+  apiKeyPermissions?: ApiKeyPermissions,
+) {
   if (!(await isMemberOf(userId, organizationId))) {
     throw new ForbiddenError("You don't have access to this organization");
   }
-  if (!(await hasPermissionForUser(userId, organizationId, "skills", "read"))) {
+  if (
+    !(await hasPermissionForUser(
+      userId,
+      organizationId,
+      "skills",
+      "read",
+      apiKeyPermissions,
+    ))
+  ) {
     throw new ForbiddenError("You don't have permission to read skills");
   }
 }
@@ -134,7 +160,11 @@ async function validateMcpReference(
 router.get("/skills", requireAuth, async (c) => {
   const organizationId = c.get("activeOrgId");
   if (!organizationId) throw new BadRequestError("No active organization");
-  await requireSkillReader(c.var.user!.id, organizationId);
+  await requireSkillReader(
+    c.var.user!.id,
+    organizationId,
+    c.var.apiKeyPermissions,
+  );
   return c.json(
     await db.query.skill.findMany({
       where: eq(skill.organizationId, organizationId),
@@ -151,7 +181,11 @@ router.post(
   async (c) => {
     const organizationId = c.get("activeOrgId");
     if (!organizationId) throw new BadRequestError("No active organization");
-    await requireManager(c.var.user!.id, organizationId);
+    await requireManager(
+      c.var.user!.id,
+      organizationId,
+      c.var.apiKeyPermissions,
+    );
     const body = c.req.valid("json");
     await validateMcpReference(
       organizationId,
@@ -179,7 +213,11 @@ router.patch(
   async (c) => {
     const organizationId = c.get("activeOrgId");
     if (!organizationId) throw new BadRequestError("No active organization");
-    await requireManager(c.var.user!.id, organizationId);
+    await requireManager(
+      c.var.user!.id,
+      organizationId,
+      c.var.apiKeyPermissions,
+    );
     const { id } = c.req.valid("param");
     const current = await requireSkill(id, organizationId);
     const body = c.req.valid("json");
@@ -210,7 +248,11 @@ router.delete(
   async (c) => {
     const organizationId = c.get("activeOrgId");
     if (!organizationId) throw new BadRequestError("No active organization");
-    await requireManager(c.var.user!.id, organizationId);
+    await requireManager(
+      c.var.user!.id,
+      organizationId,
+      c.var.apiKeyPermissions,
+    );
     const { id } = c.req.valid("param");
     await requireSkill(id, organizationId);
     await db
@@ -228,7 +270,11 @@ router.post(
   async (c) => {
     const organizationId = c.get("activeOrgId");
     if (!organizationId) throw new BadRequestError("No active organization");
-    await requireManager(c.var.user!.id, organizationId);
+    await requireManager(
+      c.var.user!.id,
+      organizationId,
+      c.var.apiKeyPermissions,
+    );
     const { id } = c.req.valid("param");
     await requireSkill(id, organizationId);
     const body = c.req.valid("json");
@@ -278,7 +324,11 @@ router.patch(
   async (c) => {
     const organizationId = c.get("activeOrgId");
     if (!organizationId) throw new BadRequestError("No active organization");
-    await requireManager(c.var.user!.id, organizationId);
+    await requireManager(
+      c.var.user!.id,
+      organizationId,
+      c.var.apiKeyPermissions,
+    );
     const { id, assignmentId } = c.req.valid("param");
     await requireSkill(id, organizationId);
     const [updated] = await db
@@ -303,7 +353,11 @@ router.delete(
   async (c) => {
     const organizationId = c.get("activeOrgId");
     if (!organizationId) throw new BadRequestError("No active organization");
-    await requireManager(c.var.user!.id, organizationId);
+    await requireManager(
+      c.var.user!.id,
+      organizationId,
+      c.var.apiKeyPermissions,
+    );
     const { id, assignmentId } = c.req.valid("param");
     await requireSkill(id, organizationId);
     await db

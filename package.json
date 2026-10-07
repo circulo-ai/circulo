@@ -13,6 +13,8 @@
     "dev": "bun ./node_modules/turbo/bin/turbo run dev",
     "dev:stack": "bun run build:workspace && bun ./node_modules/concurrently/dist/bin/concurrently.js -k -s first -n db,server,web \"bun --filter @circulo-ai/db dev\" \"bun --filter server dev\" \"bun --filter web dev\"",
     "build:workspace": "turbo run build --filter=server...",
+    "desktop:package": "bun run build:workspace && bun --cwd apps/desktop build:web && bun --cwd apps/desktop prepare-runtime && bun --cwd apps/desktop package",
+    "desktop:package:dir": "bun run build:workspace && bun --cwd apps/desktop build:web && bun --cwd apps/desktop prepare-runtime && bun --cwd apps/desktop package:dir",
     "dev:server": "bun --filter server dev",
     "db:generate": "bun --env-file=apps/server/.env --filter @circulo-ai/db db:generate",
     "db:check": "bun --env-file=apps/server/.env --filter @circulo-ai/db db:check",

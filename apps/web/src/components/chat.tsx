@@ -14,6 +14,7 @@ import {
 import { useChatVisibility } from "@/hooks/api/chats/use-chat-visibility";
 import type { ChatMessagePagination } from "@/hooks/api/chats/use-message-pagination";
 import { ApiRequestError } from "@/lib/api/client";
+import { extractPromptMentions } from "@/lib/prompt-mentions";
 import {
   clearCachePattern,
   fetchWithErrorHandlers,
@@ -23,7 +24,6 @@ import {
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { generateUUID } from "@/lib/utils";
-import { extractPromptMentions } from "@/lib/prompt-mentions";
 import { useChat } from "@ai-sdk/react";
 import type { Vote } from "@circulo-ai/db/schema";
 import { DefaultChatTransport } from "ai";

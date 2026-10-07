@@ -19,8 +19,8 @@ export default async function SettingsPage({
 
   return (
     <RequireSession>
-      <main className="flex min-h-full justify-center overflow-y-auto p-4 sm:p-8">
-        <div className="w-full max-w-4xl">
+      <main className="flex min-h-dvh min-w-0 justify-center overflow-hidden p-4 sm:p-8">
+        <div className="min-h-0 w-full max-w-4xl overflow-y-auto overscroll-contain pb-8">
           <Settings path={settingsPath} />
         </div>
       </main>

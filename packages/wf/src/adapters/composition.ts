@@ -1,11 +1,8 @@
-import type {
-  EventBus,
-  Workflow,
-} from "../models";
+import { InMemoryIdempotencyStore } from "../gateway/idempotency-store";
+import type { EventBus, Workflow } from "../models";
 import { InMemoryEventBus } from "../store/memory-event-bus";
 import { InMemoryEventStore } from "../store/memory-event-store";
 import { InMemoryWorkflowStore } from "../store/memory-workflow-store";
-import { InMemoryIdempotencyStore } from "../gateway/idempotency-store";
 import {
   AdapterEventBus,
   MapPubSubAdapter,
@@ -90,11 +87,7 @@ export function createInMemoryWorkflowAdapters<
  * Development-only JSON composition for callers that want the same shape as
  * a durable adapter without provisioning Redis or PostgreSQL.
  */
-export function createInMemoryJsonWorkflowAdapters<
-  TContext,
-  TInput,
-  TOutput,
->(
+export function createInMemoryJsonWorkflowAdapters<TContext, TInput, TOutput>(
   stepsFactory: () => Workflow<TContext, TInput, TOutput>["steps"],
 ): JsonWorkflowAdapters<TContext, TInput, TOutput> {
   return createJsonWorkflowAdapters({

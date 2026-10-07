@@ -17,6 +17,7 @@ const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
 const ANTHROPIC_BASE_URL = "https://api.anthropic.com/v1";
 const GOOGLE_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
+const OLLAMA_BASE_URL = "http://127.0.0.1:11434/v1";
 
 export const AI_PROVIDER_DEFINITIONS: readonly AiProviderDefinition[] = [
   {
@@ -24,30 +25,43 @@ export const AI_PROVIDER_DEFINITIONS: readonly AiProviderDefinition[] = [
     name: "OpenRouter",
     description: "Access many providers through one OpenRouter API key.",
     defaultBaseUrl: OPENROUTER_BASE_URL,
+    capabilities: ["chat", "tools", "vision", "embeddings"],
   },
   {
     id: "openai",
     name: "OpenAI",
     description: "Use your OpenAI API key directly.",
     defaultBaseUrl: OPENAI_BASE_URL,
+    capabilities: ["chat", "tools", "vision", "embeddings", "audio-input"],
   },
   {
     id: "anthropic",
     name: "Anthropic",
     description: "Use your Anthropic API key directly.",
     defaultBaseUrl: ANTHROPIC_BASE_URL,
+    capabilities: ["chat", "tools", "vision"],
   },
   {
     id: "google",
     name: "Google AI",
     description: "Use your Google AI Studio API key directly.",
     defaultBaseUrl: GOOGLE_BASE_URL,
+    capabilities: ["chat", "tools", "vision", "embeddings"],
+  },
+  {
+    id: "ollama",
+    name: "Ollama",
+    description: "Run local models through an Ollama installation.",
+    defaultBaseUrl: OLLAMA_BASE_URL,
+    local: true,
+    capabilities: ["chat", "tools", "vision"],
   },
   {
     id: "openai-compatible",
     name: "OpenAI-compatible",
     description: "Connect any provider exposing the OpenAI-compatible API.",
     requiresBaseUrl: true,
+    capabilities: ["chat", "tools", "vision", "embeddings"],
   },
 ] as const;
 
@@ -92,7 +106,11 @@ export async function getUserProviderCredential(
     return {
       providerId,
       apiKey: decrypted,
-      ...(row.baseUrl ? { baseUrl: row.baseUrl } : {}),
+      ...(row.baseUrl
+        ? { baseUrl: row.baseUrl }
+        : providerId === "ollama"
+          ? { baseUrl: `${env.OLLAMA_URL.replace(/\/$/, "")}/v1` }
+          : {}),
     };
   } catch {
     throw new Error(
@@ -131,6 +149,19 @@ function getServerCredential(
   if (providerId === "google" && env.GOOGLE_GENERATIVE_AI_API_KEY) {
     return { providerId, apiKey: env.GOOGLE_GENERATIVE_AI_API_KEY };
   }
+  if (providerId === "openai" && env.OPENAI_API_KEY) {
+    return { providerId, apiKey: env.OPENAI_API_KEY };
+  }
+  if (providerId === "anthropic" && env.ANTHROPIC_API_KEY) {
+    return { providerId, apiKey: env.ANTHROPIC_API_KEY };
+  }
+  if (providerId === "ollama" && env.OLLAMA_URL) {
+    return {
+      providerId,
+      apiKey: env.OLLAMA_API_KEY ?? "ollama",
+      baseUrl: `${env.OLLAMA_URL.replace(/\/$/, "")}/v1`,
+    };
+  }
   return null;
 }
 
@@ -157,10 +188,13 @@ export async function resolveLanguageModel(params: {
         baseURL: credential.baseUrl ?? OPENROUTER_BASE_URL,
       })(modelId, { usage: { include: true } });
     case "openai":
+    case "ollama":
     case "openai-compatible":
       return createOpenAI({
         apiKey: credential.apiKey,
-        baseURL: credential.baseUrl ?? OPENAI_BASE_URL,
+        baseURL:
+          credential.baseUrl ??
+          (providerId === "ollama" ? OLLAMA_BASE_URL : OPENAI_BASE_URL),
       })(modelId);
     case "anthropic":
       return createAnthropic({
@@ -202,7 +236,11 @@ async function fetchProviderModels(
 
   const baseUrl = (
     credential.baseUrl ??
-    (providerId === "openrouter" ? OPENROUTER_BASE_URL : OPENAI_BASE_URL)
+    (providerId === "openrouter"
+      ? OPENROUTER_BASE_URL
+      : providerId === "ollama"
+        ? OLLAMA_BASE_URL
+        : OPENAI_BASE_URL)
   ).replace(/\/$/, "");
   const modelsPath =
     providerId === "openrouter" ? "/models?output_modalities=text" : "/models";
@@ -381,6 +419,8 @@ export function getDefaultModelForProvider(providerId: AiProviderId): string {
       return "claude-sonnet-4-5";
     case "google":
       return "gemini-2.5-flash";
+    case "ollama":
+      return "llama3.2";
   }
 }
 

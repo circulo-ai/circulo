@@ -156,7 +156,7 @@ export async function fetchWithErrorHandlers(
     if (!response.ok) {
       let message = response.statusText;
       let details: unknown;
-      let code = "API_ERROR";
+      const code = "API_ERROR";
       try {
         const data = await response.json();
         message = data?.message || message;

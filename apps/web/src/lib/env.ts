@@ -34,6 +34,9 @@ export const env = createEnv({
     NEXT_PUBLIC_BRAND_LOGO_URL: optionalUrlFromEnv,
     NEXT_PUBLIC_BRAND_FAVICON_URL: optionalUrlFromEnv,
     NEXT_PUBLIC_BETTER_AUTH_URL: z.string().optional(),
+    NEXT_PUBLIC_CIRCULO_RUNTIME_KIND: z
+      .enum(["cloud", "self-hosted", "desktop"])
+      .optional(),
     // Comma-separated object-storage origins used by browser presigned uploads.
     NEXT_PUBLIC_STORAGE_ORIGINS: z.string().optional(),
   },
@@ -48,6 +51,8 @@ export const env = createEnv({
     NEXT_PUBLIC_BRAND_LOGO_URL: process.env.NEXT_PUBLIC_BRAND_LOGO_URL,
     NEXT_PUBLIC_BRAND_FAVICON_URL: process.env.NEXT_PUBLIC_BRAND_FAVICON_URL,
     NEXT_PUBLIC_BETTER_AUTH_URL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL,
+    NEXT_PUBLIC_CIRCULO_RUNTIME_KIND:
+      process.env.NEXT_PUBLIC_CIRCULO_RUNTIME_KIND,
     NEXT_PUBLIC_STORAGE_ORIGINS: process.env.NEXT_PUBLIC_STORAGE_ORIGINS,
     NODE_ENV: process.env.NODE_ENV,
     NEXT_TELEMETRY_DISABLED: process.env.NEXT_TELEMETRY_DISABLED,

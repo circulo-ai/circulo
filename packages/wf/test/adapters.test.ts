@@ -32,7 +32,10 @@ class FakeRedis implements RedisPubSubClient {
   }
 
   async del(...keys: string[]): Promise<number> {
-    return keys.reduce((deleted, key) => deleted + Number(this.values.delete(key)), 0);
+    return keys.reduce(
+      (deleted, key) => deleted + Number(this.values.delete(key)),
+      0,
+    );
   }
 
   async scan(
@@ -41,10 +44,17 @@ class FakeRedis implements RedisPubSubClient {
   ): Promise<[string, string[]]> {
     if (cursor !== "0") return ["0", []];
     const match = String(arguments_[1] ?? "*").replace("*", "");
-    return ["0", [...this.values.keys()].filter((key) => key.startsWith(match))];
+    return [
+      "0",
+      [...this.values.keys()].filter((key) => key.startsWith(match)),
+    ];
   }
 
-  async eval<T>(script: string, _numberOfKeys: number, ...arguments_: string[]): Promise<T> {
+  async eval<T>(
+    script: string,
+    _numberOfKeys: number,
+    ...arguments_: string[]
+  ): Promise<T> {
     const key = arguments_[0]!;
     const raw = this.values.get(key);
     if (script.includes("current.version")) {
@@ -56,14 +66,25 @@ class FakeRedis implements RedisPubSubClient {
     }
     if (script.includes("current.reference")) {
       if (!raw) return 0 as T;
-      const current = JSON.parse(raw) as { reference: { workflowId: string; runId: string } };
-      if (current.reference.workflowId !== arguments_[1] || current.reference.runId !== arguments_[2]) return 0 as T;
+      const current = JSON.parse(raw) as {
+        reference: { workflowId: string; runId: string };
+      };
+      if (
+        current.reference.workflowId !== arguments_[1] ||
+        current.reference.runId !== arguments_[2]
+      )
+        return 0 as T;
       this.values.delete(key);
       return 1 as T;
     }
     if (!raw) return 0 as T;
-    const current = JSON.parse(raw) as { id: string; holder: string; expiresAt: number };
-    if (current.id !== arguments_[1] || current.holder !== arguments_[2]) return 0 as T;
+    const current = JSON.parse(raw) as {
+      id: string;
+      holder: string;
+      expiresAt: number;
+    };
+    if (current.id !== arguments_[1] || current.holder !== arguments_[2])
+      return 0 as T;
     if (script.includes("DEL")) {
       this.values.delete(key);
       return 1 as T;
@@ -74,7 +95,8 @@ class FakeRedis implements RedisPubSubClient {
   }
 
   async publish(channel: string, message: string): Promise<number> {
-    for (const callback of this.subscribers.get(channel) ?? []) callback(message);
+    for (const callback of this.subscribers.get(channel) ?? [])
+      callback(message);
     return this.subscribers.get(channel)?.size ?? 0;
   }
 
@@ -83,7 +105,8 @@ class FakeRedis implements RedisPubSubClient {
   }
 
   async subscribe(channel: string): Promise<number> {
-    if (!this.subscribers.has(channel)) this.subscribers.set(channel, new Set());
+    if (!this.subscribers.has(channel))
+      this.subscribers.set(channel, new Set());
     return this.subscribers.get(channel)!.size;
   }
 
@@ -94,7 +117,9 @@ class FakeRedis implements RedisPubSubClient {
 
   on(
     _event: "message" | "error",
-    _listener: ((channel: string, message: string) => void) | ((error: Error) => void),
+    _listener:
+      | ((channel: string, message: string) => void)
+      | ((error: Error) => void),
   ): this {
     return this;
   }
@@ -129,7 +154,8 @@ class FakePostgres implements PostgresQueryClient {
     }
     if (text.includes("UPDATE") && text.includes("wf_json_values")) {
       const current = this.values.get(String(parameters[0]));
-      if (!current || current.version !== Number(parameters[3])) return { rows: [], rowCount: 0 };
+      if (!current || current.version !== Number(parameters[3]))
+        return { rows: [], rowCount: 0 };
       this.values.set(String(parameters[0]), {
         value: JSON.parse(String(parameters[1])),
         version: Number(parameters[2]),
@@ -140,7 +166,9 @@ class FakePostgres implements PostgresQueryClient {
       const prefix = String(parameters[0]);
       const rows = [...this.values.entries()]
         .filter(([key]) => key.startsWith(prefix))
-        .map(([key, entry]) => ({ key, value: entry.value }) as unknown as TRow);
+        .map(
+          ([key, entry]) => ({ key, value: entry.value }) as unknown as TRow,
+        );
       return { rows, rowCount: rows.length };
     }
     return { rows: [], rowCount: 0 };
@@ -202,10 +230,12 @@ describe("Redis reusable adapters", () => {
     const store = new RedisJsonKeyValueStore(redis);
     await store.set("wf:one", { version: 0, value: "a" });
     expect(await store.compareAndSet("wf:one", 1, { version: 2 })).toBe(false);
-    expect(await store.compareAndSet("wf:one", 0, { version: 1, value: "b" })).toBe(true);
-    expect(await store.list<{ version: number; value: string }>("wf:")).toEqual([
-      { key: "wf:one", value: { version: 1, value: "b" } },
-    ]);
+    expect(
+      await store.compareAndSet("wf:one", 0, { version: 1, value: "b" }),
+    ).toBe(true);
+    expect(await store.list<{ version: number; value: string }>("wf:")).toEqual(
+      [{ key: "wf:one", value: { version: 1, value: "b" } }],
+    );
   });
 
   it("enforces lock ownership and renews leases", async () => {
@@ -214,7 +244,9 @@ describe("Redis reusable adapters", () => {
     const first = await locks.acquireLock("workflow-1", 1000);
     expect(first).not.toBeNull();
     expect(await locks.acquireLock("workflow-1", 1000, "worker-2")).toBeNull();
-    expect(await locks.renewLock({ ...first!, holder: "worker-2" }, 1000)).toBe(false);
+    expect(await locks.renewLock({ ...first!, holder: "worker-2" }, 1000)).toBe(
+      false,
+    );
     expect(await locks.renewLock(first!, 2000)).toBe(true);
     await locks.releaseLock(first!);
     expect(await locks.acquireLock("workflow-1", 1000)).not.toBeNull();
@@ -241,14 +273,19 @@ describe("PostgreSQL reusable adapters", () => {
     const store = new PostgresJsonKeyValueStore(client);
     await store.initialize();
     await store.set("wf:one", { version: 0, state: "pending" });
-    expect(await store.compareAndSet("wf:one", 0, { version: 1, state: "done" })).toBe(true);
-    expect(await store.get<{ version: number; state: string }>("wf:one")).toEqual({
+    expect(
+      await store.compareAndSet("wf:one", 0, { version: 1, state: "done" }),
+    ).toBe(true);
+    expect(
+      await store.get<{ version: number; state: string }>("wf:one"),
+    ).toEqual({
       version: 1,
       state: "done",
     });
-    expect(() => new PostgresJsonKeyValueStore(client, "wf_values; DROP TABLE users")).toThrow(
-      "Invalid PostgreSQL identifier",
-    );
+    expect(
+      () =>
+        new PostgresJsonKeyValueStore(client, "wf_values; DROP TABLE users"),
+    ).toThrow("Invalid PostgreSQL identifier");
   });
 
   it("adapts a postgres.js unsafe client without adding a runtime dependency", async () => {
@@ -267,6 +304,8 @@ describe("PostgreSQL reusable adapters", () => {
 
   it("keeps the adapter contracts strongly typed", () => {
     expectTypeOf<PostgresQueryClient["query"]>().toBeFunction();
-    expectTypeOf<RedisPubSubClient["publish"]>().returns.resolves.toEqualTypeOf<number>();
+    expectTypeOf<
+      RedisPubSubClient["publish"]
+    >().returns.resolves.toEqualTypeOf<number>();
   });
 });

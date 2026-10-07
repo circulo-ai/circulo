@@ -13,6 +13,7 @@ import { and, eq, inArray } from "drizzle-orm";
 
 export type Resource = keyof typeof statement;
 export type Action<R extends Resource> = (typeof statement)[R][number];
+export type ApiKeyPermissions = Record<string, string[]> | null | undefined;
 
 type RoleType = "owner" | "admin" | "member" | (string & {});
 
@@ -331,7 +332,12 @@ export async function hasPermissionForUser(
   organizationId: string,
   resource: string,
   action: string,
+  apiKeyPermissions?: ApiKeyPermissions,
 ): Promise<boolean> {
+  if (apiKeyPermissions && !apiKeyPermissions[resource]?.includes(action)) {
+    return false;
+  }
+
   const roles = await getUserRoles(userId, organizationId);
   if (roles.some((role) => roleAllows(role, resource, action))) return true;
   return customRoleAllows(organizationId, roles, resource, action);

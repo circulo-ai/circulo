@@ -5,6 +5,7 @@ import {
   hasInvalidTrustedProxy,
   parseTrustedProxyIps,
 } from "@/lib/trusted-proxies";
+import { workflowRunService } from "@/workflows/runtime/workflow-run-service";
 import { HeadBucketCommand, S3Client } from "@aws-sdk/client-s3";
 import {
   BlobServiceClient,
@@ -12,7 +13,6 @@ import {
 } from "@azure/storage-blob";
 import { getDb } from "@circulo-ai/db";
 import { createRedis } from "@circulo-ai/redis";
-import { workflowRunService } from "@/workflows/runtime/workflow-run-service";
 import { sql } from "drizzle-orm";
 
 const router = createRouter();
@@ -35,7 +35,8 @@ router.get("/health", (c) =>
 
 router.get("/health/ready", async (c) => {
   const checks: Record<string, ReadinessState> = {};
-  const isProduction = env.NODE_ENV === "production";
+  const isProduction =
+    env.NODE_ENV === "production" && env.CIRCULO_DEPLOYMENT_MODE !== "local";
 
   try {
     await withTimeout(getDb().execute(sql`select 1`), 2_000);

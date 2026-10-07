@@ -1,6 +1,12 @@
 import Table from "cli-table3";
 
-export type CliTableValue = string | number | boolean | bigint | null | undefined;
+export type CliTableValue =
+  | string
+  | number
+  | boolean
+  | bigint
+  | null
+  | undefined;
 
 export interface CliTableColumn {
   readonly key: string;
@@ -36,9 +42,12 @@ export function renderOutput(output: CliOutput): string {
 
 export function formatJson(value: unknown, indent = 2): string {
   const normalizedIndent = Math.max(0, Math.min(10, Math.trunc(indent)));
-  const serialized = JSON.stringify(value, (_key, nestedValue: unknown) => (
-    typeof nestedValue === "bigint" ? `${nestedValue}n` : nestedValue
-  ), normalizedIndent);
+  const serialized = JSON.stringify(
+    value,
+    (_key, nestedValue: unknown) =>
+      typeof nestedValue === "bigint" ? `${nestedValue}n` : nestedValue,
+    normalizedIndent,
+  );
   return serialized ?? "null";
 }
 
@@ -46,7 +55,8 @@ export function formatTable(
   columns: readonly CliTableColumn[],
   rows: readonly CliTableRow[],
 ): string {
-  if (columns.length === 0) return rows.length === 0 ? "No results." : "Results have no columns.";
+  if (columns.length === 0)
+    return rows.length === 0 ? "No results." : "Results have no columns.";
 
   const table = new Table({
     head: columns.map((column) => column.header),
@@ -63,7 +73,9 @@ export function formatTable(
   for (const row of rows) {
     table.push(columns.map((column) => formatTableValue(row[column.key])));
   }
-  return rows.length === 0 ? `${table.toString()}\n(no results)` : table.toString();
+  return rows.length === 0
+    ? `${table.toString()}\n(no results)`
+    : table.toString();
 }
 
 function formatTableValue(value: CliTableValue): string {

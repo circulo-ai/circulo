@@ -13,6 +13,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { getSafePreviewUrl } from "@/lib/urls/safe";
 import { cn } from "@/lib/utils";
 import { ChevronDownIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
@@ -178,13 +179,14 @@ export const WebPreviewBody = ({
   ...props
 }: WebPreviewBodyProps) => {
   const { url } = useWebPreview();
+  const safeSrc = getSafePreviewUrl(src ?? url);
 
   return (
     <div className="flex-1">
       <iframe
         className={cn("size-full", className)}
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
-        src={(src ?? url) || undefined}
+        src={safeSrc}
         title="Preview"
         {...props}
       />

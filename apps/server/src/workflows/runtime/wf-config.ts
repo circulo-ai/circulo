@@ -1,23 +1,23 @@
 import { getDb } from "@/db";
+import {
+  DurableWorkflowEventStore,
+  DurableWorkflowStore,
+} from "@/infrastructure/drizzle/durable-workflow-store";
 import { RedisWorkflowPubSubAdapter } from "@/infrastructure/workflow/redis-pubsub-adapter";
 import { env } from "@/lib/env";
 import { getRedisClient } from "@/lib/redis";
+import type { OrchestrationWorkflowState } from "@/workflows/orchestrate/orchestrate";
+import { createOrchestrationWorkflow } from "@/workflows/orchestrate/orchestrate";
+import type { OrchestrationInput } from "@/workflows/orchestrate/types";
 import {
   AdapterEventBus,
   ConsoleLogger,
   InMemoryEventBus,
   InMemoryMetrics,
-  type EventBus,
   WorkflowEngine,
+  type EventBus,
 } from "@circulo-ai/wf";
 import { defineWfConfig } from "@circulo-ai/wf/config";
-import {
-  DurableWorkflowEventStore,
-  DurableWorkflowStore,
-} from "@/infrastructure/drizzle/durable-workflow-store";
-import { createOrchestrationWorkflow } from "@/workflows/orchestrate/orchestrate";
-import type { OrchestrationInput } from "@/workflows/orchestrate/types";
-import type { OrchestrationWorkflowState } from "@/workflows/orchestrate/orchestrate";
 
 export type WorkflowApplicationEngine = WorkflowEngine<
   Record<string, never>,
@@ -137,7 +137,10 @@ async function createEventBus(
 > {
   const redis = getRedisClient();
   if (!redis) {
-    if (runtimeProfile === "production") {
+    if (
+      runtimeProfile === "production" &&
+      env.CIRCULO_DEPLOYMENT_MODE !== "local"
+    ) {
       throw new Error("REDIS_URL is required for the production wf runtime");
     }
     return new InMemoryEventBus<OrchestrationWorkflowState>();
@@ -160,11 +163,9 @@ async function createEventBus(
   };
 }
 
-function workflowLogLevel(value: string | undefined):
-  | "debug"
-  | "info"
-  | "warn"
-  | "error" {
+function workflowLogLevel(
+  value: string | undefined,
+): "debug" | "info" | "warn" | "error" {
   switch (value?.toLowerCase()) {
     case "debug":
       return "debug";

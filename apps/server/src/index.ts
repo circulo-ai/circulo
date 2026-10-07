@@ -1,5 +1,5 @@
 import app from "@/app";
-import { closeDbPool } from "@/db";
+import { closeDbPool, waitForDb } from "@/db";
 import { startScheduler } from "@/services/scheduler";
 import { workflowRunService } from "@/workflows/runtime/workflow-run-service";
 import { closeSharedRedis } from "@circulo-ai/redis";
@@ -7,6 +7,8 @@ import { closeSharedRedis } from "@circulo-ai/redis";
 const port = Number.parseInt(process.env.PORT || "3002", 10);
 const hostname =
   process.env.NODE_ENV === "development" ? "127.0.0.1" : undefined;
+
+await waitForDb();
 
 const stopScheduler = startScheduler();
 

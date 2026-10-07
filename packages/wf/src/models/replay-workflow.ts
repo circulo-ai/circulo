@@ -1,7 +1,7 @@
+import type { DurationInput } from "../durable/duration";
 import type { ActivityExecutionContext, ActivityRegistry } from "./activity";
 import type { Lock } from "./store";
 import type { WorkflowError } from "./workflow";
-import type { DurationInput } from "../durable/duration";
 
 export interface ReplayWorkflowDefinition<TInput, TOutput> {
   readonly name: string;

@@ -37,10 +37,7 @@ export class WorkflowEventGateway {
   ) {
     this.idempotency = options.idempotency ?? new InMemoryIdempotencyStore();
     this.idempotencyTtlMs = options.idempotencyTtlMs ?? 24 * 60 * 60 * 1000;
-    if (
-      !Number.isFinite(this.idempotencyTtlMs) ||
-      this.idempotencyTtlMs <= 0
-    ) {
+    if (!Number.isFinite(this.idempotencyTtlMs) || this.idempotencyTtlMs <= 0) {
       throw new RangeError("Idempotency TTL must be positive");
     }
     this.rateLimiter = options.rateLimiter;

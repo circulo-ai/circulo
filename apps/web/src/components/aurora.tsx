@@ -143,6 +143,8 @@ export default function Aurora(props: AuroraProps) {
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.canvas.style.backgroundColor = "transparent";
 
+    // The resize and animation closures need the program before it is initialized.
+    // eslint-disable-next-line prefer-const
     let program: Program | undefined;
 
     function resize() {

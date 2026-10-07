@@ -34,6 +34,11 @@ import {
 import { and, eq, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { createHash } from "node:crypto";
+import {
+  authorizeUserProvisioning,
+  finalizeBootstrap,
+  getRuntimeKind,
+} from "./deployment/instance-auth";
 import { env } from "./env";
 import { getValidTrustedProxyIps } from "./trusted-proxies";
 
@@ -104,6 +109,34 @@ const memberRole = ac.newRole({
 export { adminRole, memberRole, ac as organizationAccessControl, ownerRole };
 
 const createPersonalOrganization = async (user: User) => {
+  const memberships = await db
+    .select({
+      organizationId: schema.organization.id,
+      metadata: schema.organization.metadata,
+    })
+    .from(schema.member)
+    .innerJoin(
+      schema.organization,
+      eq(schema.member.organizationId, schema.organization.id),
+    )
+    .where(eq(schema.member.userId, user.id));
+
+  const existingPersonalOrganization = memberships.find((membership) => {
+    if (!membership.metadata) return false;
+    try {
+      const metadata = JSON.parse(membership.metadata) as {
+        type?: string;
+      };
+      return metadata.type === "personal";
+    } catch {
+      return false;
+    }
+  });
+
+  if (existingPersonalOrganization) {
+    return existingPersonalOrganization.organizationId;
+  }
+
   try {
     const firstName = user.name?.trim()?.split(" ")[0] ?? null;
 
@@ -111,8 +144,14 @@ const createPersonalOrganization = async (user: User) => {
       ? `${firstName}'s Workspace`
       : "Personal Workspace";
 
-    const orgId = nanoid(); // you are using text pk, so nanoid is perfect
-    const slug = `personal-${orgId}`; // guaranteed unique
+    // Stable identifiers make this operation idempotent under concurrent
+    // session creation and the queued Better Auth user hook.
+    const personalSuffix = createHash("sha256")
+      .update(user.id)
+      .digest("hex")
+      .slice(0, 24);
+    const orgId = `personal-${personalSuffix}`;
+    const slug = orgId;
 
     await db.transaction(async (tx) => {
       // 1. Create organization
@@ -142,6 +181,32 @@ const createPersonalOrganization = async (user: User) => {
 
     return orgId;
   } catch (error) {
+    // A concurrent request may have won the deterministic insert. Re-read
+    // before treating the error as a failed workspace bootstrap.
+    const concurrentMembership = await db
+      .select({
+        organizationId: schema.organization.id,
+        metadata: schema.organization.metadata,
+      })
+      .from(schema.member)
+      .innerJoin(
+        schema.organization,
+        eq(schema.member.organizationId, schema.organization.id),
+      )
+      .where(eq(schema.member.userId, user.id));
+    const concurrentPersonal = concurrentMembership.find((membership) => {
+      if (!membership.metadata) return false;
+      try {
+        return (
+          (JSON.parse(membership.metadata) as { type?: string }).type ===
+          "personal"
+        );
+      } catch {
+        return false;
+      }
+    });
+    if (concurrentPersonal) return concurrentPersonal.organizationId;
+
     logger.error("Failed to create personal organization", {
       userId: user.id,
       error,
@@ -156,7 +221,33 @@ const authOptions: BetterAuthOptions = {
   databaseHooks: {
     user: {
       create: {
+        before: async (user) => {
+          const decision = await authorizeUserProvisioning(user);
+          if (!decision.allowed) return false;
+
+          if (getRuntimeKind() !== "cloud" || decision.isBootstrap) {
+            return {
+              data: {
+                ...user,
+                ...(getRuntimeKind() !== "cloud"
+                  ? { emailVerified: true }
+                  : {}),
+                ...(decision.isBootstrap ? { role: "admin" } : {}),
+              },
+            };
+          }
+        },
         after: async (user) => {
+          // The bootstrap claim is finalized only after Better Auth has
+          // persisted the user. This closes the race between two first-run
+          // sign-up requests without making an incomplete request permanent.
+          await finalizeBootstrap(user.id).catch((error) => {
+            logger.error("Failed to finalize local auth bootstrap", {
+              userId: user.id,
+              error,
+            });
+          });
+
           try {
             await createPersonalOrganization(user);
           } catch (error) {
@@ -176,11 +267,28 @@ const authOptions: BetterAuthOptions = {
         before: async (session) => {
           try {
             // Find the first organization this user is a member of
-            const members = await db
+            let members = await db
               .select()
               .from(schema.member)
               .where(eq(schema.member.userId, session.userId))
               .limit(1);
+
+            // Better Auth queues user.create.after work. On first sign-up the
+            // session can therefore be created before the personal workspace
+            // exists; repair it synchronously at the session boundary.
+            if (members.length === 0) {
+              const user = await db.query.user.findFirst({
+                where: eq(schema.user.id, session.userId),
+              });
+              if (user) {
+                await createPersonalOrganization(user);
+                members = await db
+                  .select()
+                  .from(schema.member)
+                  .where(eq(schema.member.userId, session.userId))
+                  .limit(1);
+              }
+            }
 
             if (members.length > 0) {
               logger.info("Found organization for user", {
@@ -245,8 +353,11 @@ const authOptions: BetterAuthOptions = {
     },
   },
   emailAndPassword: {
-    enabled: false,
-    requireEmailVerification: true,
+    // Cloud keeps its existing passwordless/OAuth surface. Local runtimes
+    // need a real credential so the first account can be created and reused
+    // offline without an email provider or cloud identity.
+    enabled: getRuntimeKind() !== "cloud",
+    requireEmailVerification: getRuntimeKind() === "cloud",
     // async sendResetPassword({ user, url }) {
     //     await sendEmail({
     //         from,
@@ -1532,13 +1643,56 @@ export type AuthType = {
   user: typeof auth.$Infer.Session.user | null;
   session: typeof auth.$Infer.Session.session | null;
   authenticated?: boolean;
-  authMethod?: "session" | "api_key";
+  authMethod?: "session" | "api_key" | "sync_token";
   apiKeyId?: string;
   apiKeyPermissions?: Record<string, string[]> | null;
 };
 
 export type SessionResponse = Awaited<ReturnType<typeof auth.api.getSession>>;
 export type Session = NonNullable<SessionResponse>;
+
+async function hydrateSessionOrganization(session: SessionResponse) {
+  if (!session?.user?.id) return session;
+
+  let membership = await db
+    .select({ organizationId: schema.member.organizationId })
+    .from(schema.member)
+    .where(eq(schema.member.userId, session.user.id))
+    .limit(1);
+
+  if (membership.length === 0) {
+    // This also repairs sessions created during the small window between a
+    // Better Auth user insert and the queued personal-workspace hook.
+    await createPersonalOrganization(session.user as User);
+    membership = await db
+      .select({ organizationId: schema.member.organizationId })
+      .from(schema.member)
+      .where(eq(schema.member.userId, session.user.id))
+      .limit(1);
+  }
+
+  const organizationId = membership[0]?.organizationId;
+  if (!organizationId) return session;
+
+  if (session.session?.activeOrganizationId !== organizationId) {
+    if (session.session?.id) {
+      await db
+        .update(schema.session)
+        .set({ activeOrganizationId: organizationId, updatedAt: new Date() })
+        .where(eq(schema.session.id, session.session.id));
+    }
+
+    return {
+      ...session,
+      session: {
+        ...session.session,
+        activeOrganizationId: organizationId,
+      },
+    };
+  }
+
+  return session;
+}
 
 // Helpers to read session/organization in the non-Next runtime
 export async function getSession(
@@ -1552,7 +1706,8 @@ export async function getSession(
     headers: headers ? new Headers(headers) : undefined,
   });
 
-  if (session || !headers) return session;
+  if (session) return hydrateSessionOrganization(session);
+  if (!headers) return session;
 
   const apiKey = new Headers(headers).get("x-api-key")?.trim();
   if (!apiKey) return session;
@@ -1613,7 +1768,8 @@ export async function getActiveOrganizationId(
       ? (sessionOrHeaders as SessionResponse)
       : await getSession(sessionOrHeaders as any);
 
-  const activeOrgId = (session?.session as any)?.activeOrganizationId;
+  const hydratedSession = await hydrateSessionOrganization(session);
+  const activeOrgId = (hydratedSession?.session as any)?.activeOrganizationId;
   if (!activeOrgId) {
     throw new Error("No organization id provided");
   }

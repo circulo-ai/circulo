@@ -50,9 +50,7 @@ export class WorkflowAccessTokenSigner {
     const issuedAt = input.issuedAt ?? Date.now();
     const expiresInMs = options.expiresInMs ?? this.defaults.expiresInMs;
     const expiresAt =
-      input.expiresAt ??
-      issuedAt +
-        (expiresInMs ?? 5 * 60 * 1000);
+      input.expiresAt ?? issuedAt + (expiresInMs ?? 5 * 60 * 1000);
     validateTokenOptions(options);
     if (
       !Number.isFinite(issuedAt) ||
@@ -273,10 +271,7 @@ function isTokenEnvelope(value: unknown): value is TokenEnvelope {
   ) {
     return false;
   }
-  if (
-    value["issuer"] !== undefined &&
-    typeof value["issuer"] !== "string"
-  ) {
+  if (value["issuer"] !== undefined && typeof value["issuer"] !== "string") {
     return false;
   }
   try {

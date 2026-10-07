@@ -1,11 +1,12 @@
 import type {
   ActivityRegistry,
   ErrorType,
+  Logger,
+  MetricsCollector,
   StepResult,
   WorkflowContext,
   WorkflowDefinition,
 } from "../models";
-import type { Logger, MetricsCollector } from "../models";
 
 export enum WorkflowErrorHandling {
   Retry = "retry",
@@ -33,8 +34,10 @@ export interface WorkflowStepContext<TData> {
   abort(reason: string, errorType?: ErrorType): void;
 }
 
-export interface WorkflowCompensationContext<TData, TOutput = unknown>
-  extends WorkflowStepContext<TData> {
+export interface WorkflowCompensationContext<
+  TData,
+  TOutput = unknown,
+> extends WorkflowStepContext<TData> {
   readonly output: TOutput;
 }
 
@@ -47,7 +50,11 @@ export interface IWorkflowStep<TData, TOutput = unknown> {
   ): Promise<void>;
 }
 
-export type WorkflowStepClass<TData, TInput = unknown, TOutput = unknown> = new (
+export type WorkflowStepClass<
+  TData,
+  TInput = unknown,
+  TOutput = unknown,
+> = new (
   ...args: never[]
 ) => IWorkflowStep<TData, TOutput> & { readonly __input?: TInput };
 
@@ -146,8 +153,12 @@ export interface IWorkflowBuilder<TData, TInput = unknown, TCurrent = unknown> {
     options?: WorkflowRetryOptions,
   ): IWorkflowBuilder<TData, TInput, TCurrent>;
   timeout(milliseconds: number): IWorkflowBuilder<TData, TInput, TCurrent>;
-  tags(value: Record<string, string>): IWorkflowBuilder<TData, TInput, TCurrent>;
-  metadata(value: Record<string, unknown>): IWorkflowBuilder<TData, TInput, TCurrent>;
+  tags(
+    value: Record<string, string>,
+  ): IWorkflowBuilder<TData, TInput, TCurrent>;
+  metadata(
+    value: Record<string, unknown>,
+  ): IWorkflowBuilder<TData, TInput, TCurrent>;
   validate(
     validator: (input: TInput) => boolean | Promise<boolean>,
   ): IWorkflowBuilder<TData, TInput, TCurrent>;

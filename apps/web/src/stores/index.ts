@@ -1,6 +1,7 @@
 "use client";
 
 import { createLogger } from "@/lib/logs/console/logger";
+import { startOfflineSync } from "@/lib/offline-sync";
 import { useEffect } from "react";
 
 const logger = createLogger("Stores");
@@ -9,6 +10,7 @@ const logger = createLogger("Stores");
 let isInitializing = false;
 let appFullyInitialized = false;
 let dataInitialized = false; // Flag for actual data loading completion
+let stopOfflineSync: (() => void) | undefined;
 
 /**
  * Initialize the application state and sync system
@@ -24,6 +26,10 @@ async function initializeApplication(): Promise<void> {
   const initStartTime = Date.now();
 
   try {
+    stopOfflineSync?.();
+    stopOfflineSync = startOfflineSync(
+      process.env.NEXT_PUBLIC_CIRCULO_CLOUD_SYNC_URL,
+    );
     // Mark data as initialized only after sync managers have loaded data from DB
     dataInitialized = true;
 
@@ -87,7 +93,8 @@ function handleBeforeUnload(event: BeforeUnloadEvent): void {
  */
 function cleanupApplication(): void {
   window.removeEventListener("beforeunload", handleBeforeUnload);
-  // Note: No sync managers to dispose - Socket.IO handles cleanup
+  stopOfflineSync?.();
+  stopOfflineSync = undefined;
 }
 
 /**
@@ -98,7 +105,8 @@ export async function clearUserData(): Promise<void> {
   if (typeof window === "undefined") return;
 
   try {
-    // Note: No sync managers to dispose - Socket.IO handles cleanup
+    stopOfflineSync?.();
+    stopOfflineSync = undefined;
 
     // Reset all stores to their initial state
     resetAllStores();
@@ -156,7 +164,8 @@ export async function reinitializeAfterLogin(): Promise<void> {
     appFullyInitialized = false;
     dataInitialized = false;
 
-    // Note: No sync managers to dispose - Socket.IO handles cleanup
+    stopOfflineSync?.();
+    stopOfflineSync = undefined;
 
     // Clean existing state to avoid stale data
     resetAllStores();

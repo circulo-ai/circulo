@@ -5,6 +5,7 @@ export function getGlobalPrettierConfig({
   ...config
 }: Config = {}): Config {
   return {
+    endOfLine: "lf",
     plugins: ["prettier-plugin-organize-imports", ...(plugins ?? [])],
     ...config,
   };

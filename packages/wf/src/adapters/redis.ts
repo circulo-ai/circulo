@@ -9,7 +9,7 @@ import type {
   WorkflowEvent,
   WorkflowRunReference,
 } from "../models";
-import type { JsonKeyValueStore, WorkflowLockStore } from "./json-store";
+import { generateId } from "../utils/id";
 import {
   JsonTaskQueue,
   JsonWorkflowHistoryStore,
@@ -17,8 +17,8 @@ import {
   type JsonWorkflowHistoryStoreOptions,
 } from "./durable";
 import { AdapterEventBus, type PubSubAdapter } from "./event-bus";
+import type { JsonKeyValueStore, WorkflowLockStore } from "./json-store";
 import { JsonEventStore, JsonWorkflowStore } from "./json-store";
-import { generateId } from "../utils/id";
 
 /**
  * The small Redis surface used by the first-party adapters.
@@ -28,10 +28,21 @@ import { generateId } from "../utils/id";
  */
 export interface RedisCommandClient {
   get(key: string): Promise<string | null>;
-  set(key: string, value: string, ...arguments_: Array<string | number>): Promise<unknown>;
+  set(
+    key: string,
+    value: string,
+    ...arguments_: Array<string | number>
+  ): Promise<unknown>;
   del(...keys: string[]): Promise<number>;
-  scan(cursor: string, ...arguments_: Array<string | number>): Promise<[string, string[]]>;
-  eval<T>(script: string, numberOfKeys: number, ...arguments_: string[]): Promise<T>;
+  scan(
+    cursor: string,
+    ...arguments_: Array<string | number>
+  ): Promise<[string, string[]]>;
+  eval<T>(
+    script: string,
+    numberOfKeys: number,
+    ...arguments_: string[]
+  ): Promise<T>;
 }
 
 export interface RedisPubSubClient extends RedisCommandClient {
@@ -39,7 +50,10 @@ export interface RedisPubSubClient extends RedisCommandClient {
   duplicate(): RedisPubSubClient;
   subscribe(channel: string): Promise<number>;
   unsubscribe(channel: string): Promise<number>;
-  on(event: "message", listener: (channel: string, message: string) => void): this;
+  on(
+    event: "message",
+    listener: (channel: string, message: string) => void,
+  ): this;
   on(event: "error", listener: (error: Error) => void): this;
   quit(): Promise<unknown>;
   disconnect(): void;
@@ -47,7 +61,11 @@ export interface RedisPubSubClient extends RedisCommandClient {
 
 export interface RedisAdapterLogger {
   warn(message: string, context?: Record<string, unknown>): void;
-  error(message: string, error?: Error, context?: Record<string, unknown>): void;
+  error(
+    message: string,
+    error?: Error,
+    context?: Record<string, unknown>,
+  ): void;
 }
 
 const silentLogger: RedisAdapterLogger = {
@@ -296,9 +314,13 @@ export class RedisPubSubAdapter<TOutput> implements PubSubAdapter<TOutput> {
     this.callbacks.set(topic, callbacks);
     if (callbacks.size === 1) {
       void this.subscriber.subscribe(topic).catch((error: unknown) => {
-        this.logger.error("Redis workflow subscription failed", toError(error), {
-          topic,
-        });
+        this.logger.error(
+          "Redis workflow subscription failed",
+          toError(error),
+          {
+            topic,
+          },
+        );
       });
     }
     return () => {
@@ -343,7 +365,10 @@ export class RedisPubSubAdapter<TOutput> implements PubSubAdapter<TOutput> {
     await this.dispatch(topic, event);
   }
 
-  private async dispatch(topic: string, event: WorkflowEvent<TOutput>): Promise<void> {
+  private async dispatch(
+    topic: string,
+    event: WorkflowEvent<TOutput>,
+  ): Promise<void> {
     const callbacks = [...(this.callbacks.get(topic) ?? [])];
     await Promise.allSettled(
       callbacks.map((callback) => callback(structuredClone(event))),
@@ -383,7 +408,8 @@ export class RedisIdempotencyStore implements IdempotencyStore {
       return { claimed: true, reference: structuredClone(reference) };
     }
     const existing = await this.redis.get(this.key(key));
-    if (existing === null) return this.claim(key, reference, expiresAt, fingerprint);
+    if (existing === null)
+      return this.claim(key, reference, expiresAt, fingerprint);
     const parsed = parseJson<{
       reference: WorkflowRunReference;
       fingerprint?: string;
@@ -399,7 +425,10 @@ export class RedisIdempotencyStore implements IdempotencyStore {
     };
   }
 
-  async release(key: string, reference: WorkflowRunReference): Promise<boolean> {
+  async release(
+    key: string,
+    reference: WorkflowRunReference,
+  ): Promise<boolean> {
     const result = await this.redis.eval<number>(
       `
 local raw = redis.call("GET", KEYS[1])
@@ -484,15 +513,23 @@ export function createRedisDurableAdapters(
     history: new RedisWorkflowHistoryStore(options.client, {
       keyValueStore,
       lockStore,
-      ...(options.historyKeyPrefix === undefined ? {} : { keyPrefix: options.historyKeyPrefix }),
-      ...(options.lockKeyPrefix === undefined ? {} : { lockKeyPrefix: options.lockKeyPrefix }),
+      ...(options.historyKeyPrefix === undefined
+        ? {}
+        : { keyPrefix: options.historyKeyPrefix }),
+      ...(options.lockKeyPrefix === undefined
+        ? {}
+        : { lockKeyPrefix: options.lockKeyPrefix }),
       ...(options.holderId === undefined ? {} : { holderId: options.holderId }),
     }),
     queue: new RedisTaskQueue(options.client, {
       keyValueStore,
       lockStore,
-      ...(options.taskKeyPrefix === undefined ? {} : { keyPrefix: options.taskKeyPrefix }),
-      ...(options.lockKeyPrefix === undefined ? {} : { lockKeyPrefix: options.lockKeyPrefix }),
+      ...(options.taskKeyPrefix === undefined
+        ? {}
+        : { keyPrefix: options.taskKeyPrefix }),
+      ...(options.lockKeyPrefix === undefined
+        ? {}
+        : { lockKeyPrefix: options.lockKeyPrefix }),
       ...(options.holderId === undefined ? {} : { holderId: options.holderId }),
     }),
     initialize: async () => undefined,
@@ -525,8 +562,14 @@ export function createRedisWorkflowAdapters<TContext, TInput, TOutput>(
     keyValueStore,
     options.eventKeyPrefix,
   );
-  const pubSub = new RedisPubSubAdapter<TOutput>(options.client, options.logger);
-  const eventBus = new AdapterEventBus<TOutput>(pubSub, options.eventTopicPrefix);
+  const pubSub = new RedisPubSubAdapter<TOutput>(
+    options.client,
+    options.logger,
+  );
+  const eventBus = new AdapterEventBus<TOutput>(
+    pubSub,
+    options.eventTopicPrefix,
+  );
   const idempotencyStore = new RedisIdempotencyStore(
     options.client,
     options.idempotencyKeyPrefix,
@@ -545,7 +588,8 @@ export function createRedisWorkflowAdapters<TContext, TInput, TOutput>(
 
 function stringifyJson(value: unknown, key: string): string {
   const result = JSON.stringify(value);
-  if (result === undefined) throw new TypeError(`Value for ${key} is not JSON serializable`);
+  if (result === undefined)
+    throw new TypeError(`Value for ${key} is not JSON serializable`);
   return result;
 }
 
@@ -562,11 +606,13 @@ function parseJson<T>(value: string, key: string): T {
 }
 
 function assertVersion(value: number, name: string): void {
-  if (!Number.isInteger(value) || value < 0) throw new RangeError(`${name} must be a non-negative integer`);
+  if (!Number.isInteger(value) || value < 0)
+    throw new RangeError(`${name} must be a non-negative integer`);
 }
 
 function assertPositiveInteger(value: number, name: string): void {
-  if (!Number.isInteger(value) || value < 1) throw new RangeError(`${name} must be a positive integer`);
+  if (!Number.isInteger(value) || value < 1)
+    throw new RangeError(`${name} must be a positive integer`);
 }
 
 function toError(error: unknown): Error {

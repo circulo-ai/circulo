@@ -9,14 +9,14 @@ for example in examples/0*.ts; do bun "$example"; done
 
 They progress from a single durable activity to production-shaped composition:
 
-| Example | Demonstrates |
-| --- | --- |
-| `01-basic-durable-activity.ts` | typed input/output and activity replay |
+| Example                            | Demonstrates                                      |
+| ---------------------------------- | ------------------------------------------------- |
+| `01-basic-durable-activity.ts`     | typed input/output and activity replay            |
 | `02-approval-and-durable-sleep.ts` | external signals, durable sleep, and continuation |
-| `03-parallel-fanout-and-batch.ts` | parallel work, fan-out, and bounded batches |
-| `04-saga-compensation.ts` | forward actions and compensating activities |
-| `05-sleep-until-deadline.ts` | an absolute `Date`/timestamp deadline |
-| `06-scheduled-workflow.ts` | cron scheduling and deterministic replay runs |
+| `03-parallel-fanout-and-batch.ts`  | parallel work, fan-out, and bounded batches       |
+| `04-saga-compensation.ts`          | forward actions and compensating activities       |
+| `05-sleep-until-deadline.ts`       | an absolute `Date`/timestamp deadline             |
+| `06-scheduled-workflow.ts`         | cron scheduling and deterministic replay runs     |
 
 ## Run a durable workflow in production
 
@@ -28,7 +28,11 @@ activity worker and timer worker against the shared adapters.
 
 ```ts
 import { createRedisDurableAdapters } from "@circulo-ai/wf/adapters";
-import { ActivityWorker, ReplayWorkflowRunner, TimerWorker } from "@circulo-ai/wf/durable";
+import {
+  ActivityWorker,
+  ReplayWorkflowRunner,
+  TimerWorker,
+} from "@circulo-ai/wf/durable";
 
 const adapters = createRedisDurableAdapters({ redis });
 const runner = new ReplayWorkflowRunner(adapters.history, adapters.queue);

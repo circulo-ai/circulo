@@ -1,8 +1,11 @@
+import type { ApiKeyPermissions } from "@/lib/permissions";
 import { type ChatMessage } from "@/lib/types";
 
 export interface WorkflowActor {
   userId: string;
   organizationId: string;
+  /** Preserve request-scoped API-key restrictions across durable execution. */
+  apiKeyPermissions?: ApiKeyPermissions;
 }
 
 export type PromptMention = {

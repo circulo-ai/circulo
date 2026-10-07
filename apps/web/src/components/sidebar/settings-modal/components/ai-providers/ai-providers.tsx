@@ -2,6 +2,12 @@
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { AiProviderDefinition, AiProviderId } from "@circulo-ai/types";
@@ -31,7 +37,12 @@ const emptyForm = {
   baseUrl: "",
 };
 
-export function AIProviders() {
+export function AIProviders({
+  variant = "modal",
+}: {
+  variant?: "modal" | "workspace";
+}) {
+  const isWorkspace = variant === "workspace";
   const { data, error, mutate } =
     useSWR<ProvidersResponse>("/api/ai-providers");
   const [form, setForm] = useState(emptyForm);
@@ -109,14 +120,21 @@ export function AIProviders() {
   }
 
   return (
-    <div className="space-y-6 px-6 pt-4 pb-6">
-      <div>
-        <h2 className="text-base font-medium">AI providers</h2>
-        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Connect your own API keys. Requests made with a connected provider go
-          directly to that provider and are not charged to your Circulo account.
-        </p>
-      </div>
+    <div
+      className={
+        isWorkspace ? "flex flex-col gap-6" : "space-y-6 px-6 pt-4 pb-6"
+      }
+    >
+      {!isWorkspace && (
+        <div>
+          <h2 className="text-base font-medium">AI providers</h2>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Connect your own API keys. Requests made with a connected provider
+            go directly to that provider and are not charged to your Circulo
+            account.
+          </p>
+        </div>
+      )}
 
       {error && (
         <Alert variant="destructive">
@@ -126,7 +144,13 @@ export function AIProviders() {
       )}
 
       {data?.credentials.length ? (
-        <div className="divide-y rounded-xl border">
+        <div
+          className={
+            isWorkspace
+              ? "divide-y rounded-xl border bg-card"
+              : "divide-y rounded-xl border"
+          }
+        >
           {data.credentials.map((credential) => (
             <div key={credential.id} className="flex items-center gap-3 p-3">
               <KeyRound className="size-4 shrink-0 text-muted-foreground" />
@@ -162,15 +186,24 @@ export function AIProviders() {
           ))}
         </div>
       ) : (
-        <div className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">
-          No provider keys connected yet. Add one below to use your own billing
-          account.
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Connected providers</CardTitle>
+            <CardDescription>
+              No provider keys connected yet. Add one below to use your own
+              provider account.
+            </CardDescription>
+          </CardHeader>
+        </Card>
       )}
 
       <form
         onSubmit={(event) => void addCredential(event)}
-        className="space-y-4 rounded-xl border bg-muted/20 p-4"
+        className={
+          isWorkspace
+            ? "space-y-4 rounded-xl border bg-card p-5"
+            : "space-y-4 rounded-xl border bg-muted/20 p-4"
+        }
       >
         <div className="flex items-center gap-2 text-sm font-medium">
           <Plus className="size-4" /> Add provider key
@@ -220,14 +253,19 @@ export function AIProviders() {
             onChange={(event) =>
               setForm((current) => ({ ...current, apiKey: event.target.value }))
             }
-            placeholder="Paste your provider key"
-            required
+            placeholder={
+              form.providerId === "ollama"
+                ? "Optional for local Ollama"
+                : "Paste your provider key"
+            }
+            required={form.providerId !== "ollama"}
           />
           <p className="text-xs text-muted-foreground">
             The key is encrypted before it is stored and is never shown again.
           </p>
         </div>
-        {form.providerId === "openai-compatible" && (
+        {(form.providerId === "openai-compatible" ||
+          form.providerId === "ollama") && (
           <div className="space-y-2">
             <Label htmlFor="ai-provider-base-url">API base URL</Label>
             <Input
@@ -240,8 +278,12 @@ export function AIProviders() {
                   baseUrl: event.target.value,
                 }))
               }
-              placeholder="https://your-provider.example/v1"
-              required
+              placeholder={
+                form.providerId === "ollama"
+                  ? "http://localhost:11434/v1"
+                  : "https://your-provider.example/v1"
+              }
+              required={form.providerId === "openai-compatible"}
             />
           </div>
         )}

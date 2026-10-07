@@ -260,6 +260,34 @@
       "when": 1788097772171,
       "tag": "0037_charming_major_mapleleaf",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1789839068000,
+      "tag": "0038_usage_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1789843000000,
+      "tag": "0039_sync_changes",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1789843100451,
+      "tag": "0040_sync_quota_and_pairing",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1789849762342,
+      "tag": "0041_pink_chamber",
+      "breakpoints": true
     }
   ]
 }

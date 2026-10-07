@@ -16,8 +16,8 @@ export function FaqSection() {
         <div className="col-span-full flex flex-col items-center justify-center gap-4 text-center text-balance sm:col-span-2">
           <h3 className="text-4xl font-semibold">Frequently asked questions</h3>
           <p className="text-lg">
-            These are the most commonly asked questions about Circulo. Can't
-            find what you're looking for?{" "}
+            These are the most commonly asked questions about Circulo.
+            Can&apos;t find what you&apos;re looking for?{" "}
             <Button asChild variant="link" size="text" className="text-lg">
               <a href="#contact-us">Chat to our friendly team!</a>
             </Button>

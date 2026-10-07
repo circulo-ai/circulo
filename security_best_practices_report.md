@@ -2,9 +2,38 @@
 
 ## Executive summary
 
-The local security review found no confirmed critical or high-severity vulnerability in the code paths exercised. Authentication, server-side authorization, cookie mutation origin checks, security headers, CSP, webhook signatures, MCP endpoint validation, encrypted secrets, and client/server secret separation are implemented and locally verified.
+The local security review found no unresolved critical or high-severity vulnerability in the code paths exercised. This follow-up pass did identify and remediate high-severity authorization and stored-XSS paths; authentication, server-side authorization, cookie mutation origin checks, security headers, CSP, webhook signatures, MCP endpoint validation, encrypted secrets, and client/server secret separation are now locally verified.
 
 The application now emits a compatible CSP baseline and CI includes a pinned OSV scan for `bun.lock`. External deployment security tooling still needs to be verified in the repository's GitHub environment.
+
+The follow-up repo-wide audit found and fixed two additional application issues: workspace role managers could previously grant permissions they did not possess, and user-scoped API-key restrictions were not consistently applied across route helpers and durable AI execution. The audit also closed a stored-XSS navigation path caused by unvalidated message URLs.
+
+## Follow-up findings fixed in this audit
+
+### SEC-004 — Custom workspace roles could escalate privileges
+
+- Status: Fixed.
+- Severity: High before mitigation.
+- Location: `apps/server/src/routes/workspace-roles.ts:64-78, 175-182, 222-230, 333-337`.
+- Evidence: role creation, role edits, and member role assignment now require every granted permission to be held by the acting user and, when applicable, explicitly allowed by the API key.
+- Impact: an admin could previously manufacture a custom role containing an owner-only action and assign it to another member.
+
+### SEC-005 — API-key restrictions and organization-key identity were inconsistent
+
+- Status: Fixed for the existing user-scoped API surface.
+- Severity: High before mitigation.
+- Location: `apps/server/src/lib/permissions.ts:330-342`, route permission helpers, `apps/server/src/middleware/auth.ts:55-73`, and durable workflow actor propagation in `apps/server/src/workflows/orchestrate/types.ts:3-9`.
+- Evidence: direct user permission checks now accept and enforce API-key permissions; the request middleware rejects organization API keys from handlers that require a user identity; chat workflow state preserves the restriction into memory and GitHub tool checks.
+- Impact: a restricted user API key could otherwise inherit the full organization role through direct helper calls, while an organization key could enter user-scoped handlers with no user identity.
+- Follow-up: if organization API keys must call application routes, add a deliberate organization-scoped API surface with organization-principal authorization rather than re-enabling them in `requireAuth`.
+
+### SEC-006 — User-controlled message URLs could become executable links
+
+- Status: Fixed.
+- Severity: High before mitigation.
+- Location: `apps/server/src/lib/security/message-url.ts`, `apps/server/src/routes/chat.ts`, `apps/server/src/routes/messages.ts`, and the affected web navigation/preview components.
+- Evidence: message URL fields accept only relative app paths, HTTP(S), data, or blob URLs at ingestion; client-side links and web previews further restrict navigation to relative app paths or HTTP(S).
+- Impact: a crafted `javascript:` URL could previously be stored in a message/resource and executed when another chat member clicked it.
 
 ## Medium findings
 
@@ -46,7 +75,7 @@ The application now emits a compatible CSP baseline and CI includes a pinned OSV
 - MCP endpoints are scheme-validated and production DNS/private-network checks are applied (`apps/server/src/lib/mcp/endpoint.ts:4-39`).
 - Public workflow webhooks use encrypted secrets, HMAC/timing-safe verification, timestamp windows, body limits, and replay-safe delivery records (`apps/server/src/lib/webhooks/signature.ts:1-61`, `apps/server/src/routes/webhooks.ts:230-330`).
 - Client-side secret-bearing dead modules were removed; no sensitive server environment references remain under `apps/web/src`.
-- CI uses the lockfile, and the local Biome lint, typecheck, full tests, production build, migration graph, and readiness checks pass.
+- CI uses the lockfile, and the local Biome lint, package lint gates, Prettier check, typecheck, full tests, production build, migration graph, and readiness checks pass. The web ESLint gate exits cleanly with legacy warnings retained for follow-up cleanup.
 
 ## Scope limitations
 

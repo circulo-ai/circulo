@@ -1,7 +1,10 @@
-import { loadAndValidateDefinitionAsync, isJsonOutput } from "./definition-utils";
-import type { CliArguments } from "./command-runner";
-import type { CliCommandContext, CliCommandResult } from "../types";
 import { renderOutput } from "../output/printer";
+import type { CliCommandContext, CliCommandResult } from "../types";
+import type { CliArguments } from "./command-runner";
+import {
+  isJsonOutput,
+  loadAndValidateDefinitionAsync,
+} from "./definition-utils";
 
 export async function executeValidateCommand(
   args: CliArguments,
@@ -11,13 +14,20 @@ export async function executeValidateCommand(
   const result = {
     valid: true,
     format: validated.format,
-    workflow: { id: validated.document.id, version: validated.document.version },
+    workflow: {
+      id: validated.document.id,
+      version: validated.document.version,
+    },
     steps: validated.document.steps.length,
     orderedStepIds: validated.orderedStepIds,
     registryEntries: validated.registry.list().length,
     profile: validated.profile,
   };
-  if (isJsonOutput(args)) return { exitCode: 0, output: renderOutput({ type: "json", value: result }) };
+  if (isJsonOutput(args))
+    return {
+      exitCode: 0,
+      output: renderOutput({ type: "json", value: result }),
+    };
   return {
     exitCode: 0,
     output: `${renderOutput({
@@ -27,8 +37,14 @@ export async function executeValidateCommand(
         { key: "result", header: "Result" },
       ],
       rows: [
-        { check: "Document", result: `${validated.format.toUpperCase()} parsed` },
-        { check: "Workflow", result: `${validated.document.id} v${validated.document.version}` },
+        {
+          check: "Document",
+          result: `${validated.format.toUpperCase()} parsed`,
+        },
+        {
+          check: "Workflow",
+          result: `${validated.document.id} v${validated.document.version}`,
+        },
         { check: "Steps", result: validated.document.steps.length },
         { check: "Linear chain", result: validated.orderedStepIds.join(" → ") },
         { check: "Registry entries", result: validated.registry.list().length },

@@ -4,7 +4,23 @@ import type {
   WorkflowContext,
   WorkflowDefinition,
 } from "../models";
-import { WorkflowErrorHandling, type ClassWorkflowPlan, type ClassWorkflowPlanStep, type ClassWorkflowSagaPlan, type ClassWorkflowStepPlan, type ClassWorkflowBuildOptions, type IWorkflow, type IWorkflowBuilder, type IWorkflowSagaBuilder, type WorkflowCompensationContext, type WorkflowErrorPolicy, type WorkflowRetryOptions, type WorkflowStepClass, type WorkflowStepContext, type WorkflowStepToken } from "./models";
+import {
+  WorkflowErrorHandling,
+  type ClassWorkflowBuildOptions,
+  type ClassWorkflowPlan,
+  type ClassWorkflowPlanStep,
+  type ClassWorkflowSagaPlan,
+  type ClassWorkflowStepPlan,
+  type IWorkflow,
+  type IWorkflowBuilder,
+  type IWorkflowSagaBuilder,
+  type WorkflowCompensationContext,
+  type WorkflowErrorPolicy,
+  type WorkflowRetryOptions,
+  type WorkflowStepClass,
+  type WorkflowStepContext,
+  type WorkflowStepToken,
+} from "./models";
 
 interface MutableStepPlan<TData> {
   readonly kind: "step";
@@ -74,7 +90,8 @@ export class ClassWorkflowBuilder<
     options: WorkflowRetryOptions = {},
   ): ClassWorkflowBuilder<TData, TInput, TCurrent> {
     const current = this.stepPlans[this.stepPlans.length - 1];
-    if (!current) throw new Error("onError() requires a preceding workflow step");
+    if (!current)
+      throw new Error("onError() requires a preceding workflow step");
     const policy = createPolicy(handling, options);
     if (current.kind === "saga") {
       (current as MutableSagaPlan<TData>).policy = policy;
@@ -82,9 +99,10 @@ export class ClassWorkflowBuilder<
       const step = current as MutableStepPlan<TData>;
       step.policy = policy;
       step.retries = policy.retry ? policy.retry.maxAttempts! - 1 : 0;
-      step.backoff = policy.retry?.delayMs === undefined
-        ? undefined
-        : () => policy.retry!.delayMs!;
+      step.backoff =
+        policy.retry?.delayMs === undefined
+          ? undefined
+          : () => policy.retry!.delayMs!;
     }
     return this;
   }
@@ -101,12 +119,16 @@ export class ClassWorkflowBuilder<
     return this;
   }
 
-  tags(value: Record<string, string>): ClassWorkflowBuilder<TData, TInput, TCurrent> {
+  tags(
+    value: Record<string, string>,
+  ): ClassWorkflowBuilder<TData, TInput, TCurrent> {
     this.tagsValue = { ...value };
     return this;
   }
 
-  metadata(value: Record<string, unknown>): ClassWorkflowBuilder<TData, TInput, TCurrent> {
+  metadata(
+    value: Record<string, unknown>,
+  ): ClassWorkflowBuilder<TData, TInput, TCurrent> {
     this.metadataValue = { ...value };
     return this;
   }
@@ -133,30 +155,42 @@ export class ClassWorkflowBuilder<
   saga(
     configure: (saga: IWorkflowSagaBuilder<TData>) => void,
   ): ClassWorkflowBuilder<TData, TInput, TCurrent> {
-    const saga = new SagaBuilder<TData>(`${this.workflowId}:saga:${this.stepPlans.length}`);
+    const saga = new SagaBuilder<TData>(
+      `${this.workflowId}:saga:${this.stepPlans.length}`,
+    );
     configure(saga);
     this.stepPlans.push(saga.plan);
     return this;
   }
 
-  buildPlan(options: ClassWorkflowBuildOptions<TData>): ClassWorkflowPlan<TData, TInput> {
-    if (this.stepPlans.length === 0) throw new Error("Workflow must have at least one step");
+  buildPlan(
+    options: ClassWorkflowBuildOptions<TData>,
+  ): ClassWorkflowPlan<TData, TInput> {
+    if (this.stepPlans.length === 0)
+      throw new Error("Workflow must have at least one step");
     return {
       id: this.workflowId,
       version: this.workflowVersion,
-      initialContext: this.contextValue ?? options.initialContext ?? ({} as TData),
+      initialContext:
+        this.contextValue ?? options.initialContext ?? ({} as TData),
       steps: this.stepPlans.map((step) => ({
         ...step,
-        ...(step.kind === "saga" ? { steps: step.steps.map((item) => ({ ...item })) } : {}),
+        ...(step.kind === "saga"
+          ? { steps: step.steps.map((item) => ({ ...item })) }
+          : {}),
       })),
       tags: { ...this.tagsValue },
       metadata: { ...this.metadataValue },
       ...(this.validatorFn ? { validate: this.validatorFn } : {}),
-      ...(this.idempotencyKeyValue ? { idempotencyKey: this.idempotencyKeyValue } : {}),
+      ...(this.idempotencyKeyValue
+        ? { idempotencyKey: this.idempotencyKeyValue }
+        : {}),
     };
   }
 
-  private addStep<TStepInput, TOutput>(step: WorkflowStepClass<TData, TStepInput, TOutput>): void {
+  private addStep<TStepInput, TOutput>(
+    step: WorkflowStepClass<TData, TStepInput, TOutput>,
+  ): void {
     this.stepPlans.push({
       kind: "step",
       id: `${this.workflowId}:step:${this.stepPlans.length}`,
@@ -173,7 +207,9 @@ class SagaBuilder<TData> implements IWorkflowSagaBuilder<TData> {
     this.plan = { kind: "saga", id, steps: [] };
   }
 
-  startWith<TInput, TOutput>(step: WorkflowStepClass<TData, TInput, TOutput>): this {
+  startWith<TInput, TOutput>(
+    step: WorkflowStepClass<TData, TInput, TOutput>,
+  ): this {
     this.add(step);
     return this;
   }
@@ -184,17 +220,23 @@ class SagaBuilder<TData> implements IWorkflowSagaBuilder<TData> {
   }
 
   compensateWith(step: WorkflowStepClass<TData, unknown, unknown>): this {
-    if (!this.current) throw new Error("compensateWith() requires a preceding saga step");
+    if (!this.current)
+      throw new Error("compensateWith() requires a preceding saga step");
     this.current.compensate = step;
     return this;
   }
 
-  onError(handling: WorkflowErrorHandling, options: WorkflowRetryOptions = {}): this {
+  onError(
+    handling: WorkflowErrorHandling,
+    options: WorkflowRetryOptions = {},
+  ): this {
     this.plan.policy = createPolicy(handling, options);
     return this;
   }
 
-  private add<TInput, TOutput>(step: WorkflowStepClass<TData, TInput, TOutput>): void {
+  private add<TInput, TOutput>(
+    step: WorkflowStepClass<TData, TInput, TOutput>,
+  ): void {
     this.current = { token: step };
     this.plan.steps.push(this.current);
   }
@@ -204,19 +246,33 @@ export function createClassWorkflowPlan<TData, TInput = unknown>(
   workflow: IWorkflow<TData>,
   options: ClassWorkflowBuildOptions<TData> = { registry: undefined as never },
 ): ClassWorkflowPlan<TData, TInput> {
-  const builder = new ClassWorkflowBuilder<TData>(workflow.id, workflow.version);
+  const builder = new ClassWorkflowBuilder<TData>(
+    workflow.id,
+    workflow.version,
+  );
   workflow.build(builder);
   return builder.buildPlan(options) as ClassWorkflowPlan<TData, TInput>;
 }
 
-export function compileClassWorkflow<TData, TInput = unknown, TOutput = unknown>(
+export function compileClassWorkflow<
+  TData,
+  TInput = unknown,
+  TOutput = unknown,
+>(
   workflow: IWorkflow<TData>,
   options: ClassWorkflowBuildOptions<TData>,
 ): WorkflowDefinition<TData, TInput, TOutput> {
-  return compileClassWorkflowPlan(createClassWorkflowPlan(workflow, options), options);
+  return compileClassWorkflowPlan(
+    createClassWorkflowPlan(workflow, options),
+    options,
+  );
 }
 
-export function compileClassWorkflowPlan<TData, TInput = unknown, TOutput = unknown>(
+export function compileClassWorkflowPlan<
+  TData,
+  TInput = unknown,
+  TOutput = unknown,
+>(
   plan: ClassWorkflowPlan<TData, TInput>,
   options: ClassWorkflowBuildOptions<TData>,
 ): WorkflowDefinition<TData, TInput, TOutput> {
@@ -242,7 +298,13 @@ export function compileClassWorkflowPlan<TData, TInput = unknown, TOutput = unkn
     steps,
     tags: plan.tags,
     metadata: { ...plan.metadata, classWorkflow: true },
-    ...(plan.validate ? { validate: plan.validate as (input: TInput) => boolean | Promise<boolean> } : {}),
+    ...(plan.validate
+      ? {
+          validate: plan.validate as (
+            input: TInput,
+          ) => boolean | Promise<boolean>,
+        }
+      : {}),
     ...(plan.idempotencyKey ? { idempotencyKey: plan.idempotencyKey } : {}),
   };
 }
@@ -252,7 +314,9 @@ function assertRegistered<TData>(
   token: WorkflowStepToken<TData>,
 ): void {
   if (!options.registry.has(token)) {
-    throw new Error(`Unknown workflow step type: ${options.registry.key(token)}`);
+    throw new Error(
+      `Unknown workflow step type: ${options.registry.key(token)}`,
+    );
   }
 }
 
@@ -267,7 +331,10 @@ function compileClassStep<TData>(
     timeout: plan.timeout,
     backoff: plan.backoff,
     errorClassifier: plan.policy
-      ? () => (plan.policy!.handling === WorkflowErrorHandling.Retry ? "transient" : "permanent")
+      ? () =>
+          plan.policy!.handling === WorkflowErrorHandling.Retry
+            ? "transient"
+            : "permanent"
       : undefined,
     run: async (input, context) => {
       const instance = options.registry.create(plan.token, {
@@ -275,7 +342,9 @@ function compileClassStep<TData>(
         workflowVersion: context.workflow.version,
         stepId: plan.id,
       });
-      return normalizeResult(await instance.execute(toStepContext(input, context)));
+      return normalizeResult(
+        await instance.execute(toStepContext(input, context)),
+      );
     },
     compensation: async (input, context) => {
       const instance = options.registry.create(plan.token);
@@ -293,17 +362,34 @@ function compileSagaStep<TData>(
   return {
     id: plan.id,
     name: plan.id,
-    retries: plan.policy?.retry ? plan.policy.retry.maxAttempts! - 1 : undefined,
-    backoff: plan.policy?.retry?.delayMs === undefined ? undefined : () => plan.policy!.retry!.delayMs!,
+    retries: plan.policy?.retry
+      ? plan.policy.retry.maxAttempts! - 1
+      : undefined,
+    backoff:
+      plan.policy?.retry?.delayMs === undefined
+        ? undefined
+        : () => plan.policy!.retry!.delayMs!,
     errorClassifier: plan.policy
-      ? () => (plan.policy!.handling === WorkflowErrorHandling.Retry ? "transient" : "permanent")
+      ? () =>
+          plan.policy!.handling === WorkflowErrorHandling.Retry
+            ? "transient"
+            : "permanent"
       : undefined,
     run: async (input, context) => {
       let current = input;
-      const completed: Array<{ item: (typeof plan.steps)[number]; input: unknown; output: unknown }> = [];
+      const completed: Array<{
+        item: (typeof plan.steps)[number];
+        input: unknown;
+        output: unknown;
+      }> = [];
       try {
         for (const item of plan.steps) {
-          const output = await executeClassToken(item.token, current, context, options);
+          const output = await executeClassToken(
+            item.token,
+            current,
+            context,
+            options,
+          );
           completed.push({ item, input: current, output });
           current = output;
         }
@@ -313,11 +399,20 @@ function compileSagaStep<TData>(
           const item = completed[index]!;
           if (!item.item.compensate) continue;
           try {
-            await executeClassToken(item.item.compensate, item.output, context, options);
+            await executeClassToken(
+              item.item.compensate,
+              item.output,
+              context,
+              options,
+            );
           } catch (compensationError) {
-            context.logger.error("Workflow saga compensation failed", compensationError as Error, {
-              sagaStep: options.registry.key(item.item.token),
-            });
+            context.logger.error(
+              "Workflow saga compensation failed",
+              compensationError as Error,
+              {
+                sagaStep: options.registry.key(item.item.token),
+              },
+            );
           }
         }
         throw error;
@@ -343,7 +438,10 @@ async function executeClassToken<TData>(
   return normalized.data;
 }
 
-function toStepContext<TData>(input: unknown, context: WorkflowContext<TData>): WorkflowStepContext<TData> {
+function toStepContext<TData>(
+  input: unknown,
+  context: WorkflowContext<TData>,
+): WorkflowStepContext<TData> {
   return {
     signal: context.signal,
     workflow: context.workflow,
@@ -371,7 +469,10 @@ export function normalizeResult<TOutput>(
     typeof result === "object" &&
     result !== null &&
     "type" in result &&
-    (result.type === "chunk" || result.type === "complete" || result.type === "error" || result.type === "wait")
+    (result.type === "chunk" ||
+      result.type === "complete" ||
+      result.type === "error" ||
+      result.type === "wait")
   ) {
     return result as StepResult<TOutput>;
   }

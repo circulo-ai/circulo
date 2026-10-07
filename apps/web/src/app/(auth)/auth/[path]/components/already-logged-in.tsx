@@ -41,7 +41,7 @@ export const AlreadyLoggedInCard = () => {
               Welcome back, {user.name?.split(" ")[0]}!
             </h1>
             <p className="text-sm text-muted-foreground">
-              You're already signed in as
+              You&apos;re already signed in as
             </p>
             <p className="text-sm font-medium text-foreground">{user.email}</p>
           </div>

@@ -52,11 +52,18 @@ export const loadAuthContext = createMiddleware<AppEnv>(async (c, next) => {
   await next();
 });
 
-/** Require a Better Auth session or a verified Better Auth API key. */
+/**
+ * Require an actor with a user identity.
+ *
+ * Organization API keys intentionally do not impersonate a user. Letting
+ * them through this middleware makes the many user-scoped handlers dereference
+ * `c.var.user!` and, worse, creates an ambiguous audit identity. They must use
+ * an explicitly organization-scoped API surface instead.
+ */
 export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
   if (!c.var.user) await loadContext(c);
 
-  if (!c.var.user && c.var.authenticated !== true) {
+  if (!c.var.user) {
     return c.json({ error: "Unauthorized" }, 401);
   }
 

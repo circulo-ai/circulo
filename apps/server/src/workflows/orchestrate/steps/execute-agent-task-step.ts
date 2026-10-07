@@ -1,5 +1,6 @@
 import { db, workflowRunEvent } from "@/db";
 import { normalizeAttachmentContext } from "@/lib/ai/attachment-context";
+import { estimateProviderCost } from "@/lib/ai/cost";
 import { readOpenRouterUsage } from "@/lib/ai/openrouter-client";
 import {
   redactProviderError,
@@ -23,6 +24,8 @@ import type {
   WorkflowAgentTrace,
   WorkflowToolTrace,
 } from "@/lib/types";
+import { usageEventForModel } from "@/lib/usage-ledger";
+import { consumeQuota, reserveQuota } from "@/lib/billing/quota";
 import { convertToUIMessages, getTextFromMessages } from "@/lib/utils";
 import type { ChatContext } from "@/workflows/orchestrate/steps/load-chat-step";
 import type { OrchestrationInput } from "@/workflows/orchestrate/types";
@@ -33,7 +36,8 @@ import {
   type ModelMessage,
   type UIMessageStreamWriter,
 } from "ai";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
+import { deterministicWorkflowEventId } from "../agent-loop-state";
 import { formatOrchestrationAgentProfile } from "../orchestration-agent-profile";
 import {
   getAllowedMcpIntegrationIds,
@@ -163,7 +167,8 @@ export async function loadDurableAgentResults(
         eq(workflowRunEvent.workflowId, workflowId),
         eq(workflowRunEvent.eventType, AGENT_EXECUTION_EVENT),
       ),
-    );
+    )
+    .orderBy(asc(workflowRunEvent.sequence), asc(workflowRunEvent.timestamp));
   const results = new Map<string, AgentExecutionResult>();
   for (const row of rows) {
     const payload = row.payload as {
@@ -182,20 +187,23 @@ export async function persistDurableAgentResult(
   key: string,
   result: AgentExecutionResult,
 ): Promise<void> {
-  await db.insert(workflowRunEvent).values({
-    id: crypto.randomUUID(),
-    workflowId,
-    timestamp: Date.now(),
-    eventType: AGENT_EXECUTION_EVENT,
-    payload: {
-      key,
-      result: {
-        ...result,
-        startTime: result.startTime.toISOString(),
-        endTime: result.endTime.toISOString(),
+  await db
+    .insert(workflowRunEvent)
+    .values({
+      id: deterministicWorkflowEventId("agent-execution", workflowId, key),
+      workflowId,
+      timestamp: Date.now(),
+      eventType: AGENT_EXECUTION_EVENT,
+      payload: {
+        key,
+        result: {
+          ...result,
+          startTime: result.startTime.toISOString(),
+          endTime: result.endTime.toISOString(),
+        },
       },
-    },
-  });
+    })
+    .onConflictDoNothing({ target: workflowRunEvent.id });
 }
 
 function deserializeDurableAgentResult(
@@ -312,6 +320,7 @@ export async function executeDirectResponseStep(params: {
         userId: params.actor.userId,
         organizationId: params.context.chat.organizationId,
         allowedConnectionIds: params.context.chat.connectedAppIds ?? [],
+        apiKeyPermissions: params.actor.apiKeyPermissions,
         allowedToolIds: orchestrationAgent
           ? orchestrationAgent.toolAccessMode === "all"
             ? undefined
@@ -412,6 +421,12 @@ export async function executeDirectResponseStep(params: {
     ),
     params.context,
   );
+  const apiCallReservation = await reserveQuota({
+    organizationId: params.context.chat.organizationId,
+    userId: params.actor.userId,
+    feature: "api_calls",
+    idempotencyKey: `${params.workflowId}:quota:orchestration:${agentId}`,
+  });
   const result = await new ToolLoopAgent({
     model: await resolveLanguageModel({
       userId: params.actor.userId,
@@ -456,7 +471,29 @@ export async function executeDirectResponseStep(params: {
   const inputTokens = usage.inputTokens ?? 0;
   const outputTokens = usage.outputTokens ?? 0;
   const tokenCount = providerUsage?.totalTokens ?? inputTokens + outputTokens;
-  const cost = providerUsage?.cost ?? 0;
+  const providerId = orchestrationAgent?.providerId ?? "openrouter";
+  const cost =
+    providerUsage?.cost ??
+    estimateProviderCost({
+      providerId,
+      modelId: model,
+      inputTokens,
+      outputTokens,
+    });
+  await usageEventForModel({
+    organizationId: params.context.chat.organizationId,
+    userId: params.actor.userId,
+    workflowRunId: params.workflowId,
+    provider: providerId,
+    model,
+    feature: "orchestration",
+    inputTokens,
+    outputTokens,
+    providerCost: cost,
+    durationMs: Date.now() - startTime.getTime(),
+    idempotencyKey: `${params.workflowId}:orchestration:${agentId}`,
+  });
+  await consumeQuota(apiCallReservation);
   dataStream.write({
     type: "data-usage",
     data: {
@@ -788,6 +825,7 @@ Provide a focused response for YOUR specific task. Be concise but complete.`,
           userId: actor.userId,
           organizationId: context.chat.organizationId,
           allowedConnectionIds: context.chat.connectedAppIds ?? [],
+          apiKeyPermissions: actor.apiKeyPermissions,
           allowedToolIds:
             agent.toolAccessMode === "all"
               ? undefined
@@ -903,6 +941,13 @@ Provide a focused response for YOUR specific task. Be concise but complete.`,
       context,
     );
 
+    const apiCallReservation = await reserveQuota({
+      organizationId: params.context.chat.organizationId,
+      userId: params.actor.userId,
+      feature: "api_calls",
+      idempotencyKey: `${params.workflowId}:quota:agent:${agent.id}`,
+    });
+
     // Stream the agent response
     const result = await agentLoop.stream({
       messages: modelHistory,
@@ -946,7 +991,29 @@ Provide a focused response for YOUR specific task. Be concise but complete.`,
     const outputTokens =
       typeof usage.outputTokens === "number" ? usage.outputTokens : 0;
     const tokenCount = providerUsage?.totalTokens ?? inputTokens + outputTokens;
-    const cost = providerUsage?.cost ?? 0;
+    const cost =
+      providerUsage?.cost ??
+      estimateProviderCost({
+        providerId: agent.providerId,
+        modelId: agent.model,
+        inputTokens,
+        outputTokens,
+      });
+
+    await usageEventForModel({
+      organizationId: params.context.chat.organizationId,
+      userId: params.actor.userId,
+      workflowRunId: params.workflowId,
+      provider: agent.providerId,
+      model: agent.model,
+      feature: "agent",
+      inputTokens,
+      outputTokens,
+      providerCost: cost,
+      durationMs: Date.now() - startTime.getTime(),
+      idempotencyKey: `${params.workflowId}:agent:${agent.id}`,
+    });
+    await consumeQuota(apiCallReservation);
 
     dataStream.write({
       type: "data-usage",

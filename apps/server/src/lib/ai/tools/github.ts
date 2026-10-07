@@ -1,5 +1,8 @@
 import { account, db } from "@/db";
-import { hasPermissionForUser } from "@/lib/permissions";
+import {
+  hasPermissionForUser,
+  type ApiKeyPermissions,
+} from "@/lib/permissions";
 import { tool, type ToolSet } from "ai";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
@@ -55,6 +58,7 @@ export async function getGithubTools(params: {
   organizationId: string;
   allowedToolIds?: string[];
   allowedConnectionIds?: string[];
+  apiKeyPermissions?: ApiKeyPermissions;
 }): Promise<ToolSet> {
   if (
     !(await hasPermissionForUser(
@@ -62,6 +66,7 @@ export async function getGithubTools(params: {
       params.organizationId,
       "apps",
       "read",
+      params.apiKeyPermissions,
     ))
   ) {
     return {};

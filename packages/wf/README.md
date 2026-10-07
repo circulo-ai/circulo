@@ -1131,10 +1131,7 @@ business idempotency keys because task delivery is at least once.
 For an absolute deadline, use `sleepUntil()`:
 
 ```typescript
-await wf.sleepUntil(
-  "fulfillment-deadline",
-  new Date("2026-09-03T09:00:00Z"),
-);
+await wf.sleepUntil("fulfillment-deadline", new Date("2026-09-03T09:00:00Z"));
 return wf.activity("fulfill-order", order);
 ```
 
@@ -1152,19 +1149,15 @@ An in-memory history or queue is suitable for tests only. A production sleep
 requires both an append-only durable history store and a delayed task queue:
 
 ```typescript
-import {
-  createRedisDurableAdapters,
-} from "@circulo-ai/wf/adapters";
+import { createRedisDurableAdapters } from "@circulo-ai/wf/adapters";
 import { ReplayWorkflowRunner, TimerWorker } from "@circulo-ai/wf/durable";
 import Redis from "ioredis";
 
 const redis = new Redis(process.env.REDIS_URL);
 const durable = createRedisDurableAdapters({ client: redis });
-const runner = new ReplayWorkflowRunner(
-  durable.history,
-  durable.queue,
-  { resumeLock: durable.lockStore },
-);
+const runner = new ReplayWorkflowRunner(durable.history, durable.queue, {
+  resumeLock: durable.lockStore,
+});
 const timerWorker = new TimerWorker({
   id: "timer-worker-1",
   queue: durable.queue,
@@ -2002,10 +1995,7 @@ For an ioredis-compatible client, the complete engine composition is:
 
 ```typescript
 import Redis from "ioredis";
-import {
-  createRedisWorkflowAdapters,
-  WorkflowEngine,
-} from "@circulo-ai/wf";
+import { createRedisWorkflowAdapters, WorkflowEngine } from "@circulo-ai/wf";
 
 const redis = new Redis(process.env.REDIS_URL);
 const adapters = createRedisWorkflowAdapters({
@@ -2071,10 +2061,7 @@ const eventBus = new AdapterEventBus(
   new RedisPubSubAdapter(redis),
   "acme:wf:topic:",
 );
-const idempotency = new RedisIdempotencyStore(
-  redis,
-  "acme:wf:idempotency:",
-);
+const idempotency = new RedisIdempotencyStore(redis, "acme:wf:idempotency:");
 ```
 
 For local development, use the same composition shape without infrastructure:
@@ -2082,7 +2069,11 @@ For local development, use the same composition shape without infrastructure:
 ```typescript
 import { createInMemoryWorkflowAdapters } from "@circulo-ai/wf";
 
-const adapters = createInMemoryWorkflowAdapters<CheckoutState, CheckoutInput, CheckoutOutput>();
+const adapters = createInMemoryWorkflowAdapters<
+  CheckoutState,
+  CheckoutInput,
+  CheckoutOutput
+>();
 const engine = new WorkflowEngine(adapters);
 ```
 
@@ -2151,8 +2142,7 @@ const postgresNotifications: PostgresNotificationTransport = {
   publish: async (channel, payload) => {
     await listenClient.notify(channel, payload);
   },
-  subscribe: (channel, callback) =>
-    listenClient.subscribe(channel, callback),
+  subscribe: (channel, callback) => listenClient.subscribe(channel, callback),
   close: async () => listenClient.close(),
 };
 ```
@@ -2165,13 +2155,13 @@ are independent and do not require one backend for every concern.
 
 ### Choosing and replacing adapters
 
-| Concern | Development | Redis deployment | PostgreSQL deployment | Custom replacement |
-| --- | --- | --- | --- | --- |
-| Workflow state | `InMemoryWorkflowStore` | `createRedisWorkflowAdapters().workflowStore` | `createPostgresWorkflowAdapters().workflowStore` | Implement `WorkflowStore` or use `JsonWorkflowStore` |
-| Workflow events | `InMemoryEventStore` | Redis JSON event store | PostgreSQL JSON event store | Implement `EventStore` |
-| Live notifications | `InMemoryEventBus` | `RedisPubSubAdapter` | `PostgresNotificationAdapter` | Implement `EventBus` or `PubSubAdapter` |
-| Idempotency | `InMemoryIdempotencyStore` | `RedisIdempotencyStore` | `PostgresIdempotencyStore` | Implement `IdempotencyStore` |
-| History, queues, schedules, limits | Existing in-memory adapters | Keep the explicit port or provide a backend-specific implementation | Keep the explicit port or provide a backend-specific implementation | Implement the corresponding model contract |
+| Concern                            | Development                 | Redis deployment                                                    | PostgreSQL deployment                                               | Custom replacement                                   |
+| ---------------------------------- | --------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------- |
+| Workflow state                     | `InMemoryWorkflowStore`     | `createRedisWorkflowAdapters().workflowStore`                       | `createPostgresWorkflowAdapters().workflowStore`                    | Implement `WorkflowStore` or use `JsonWorkflowStore` |
+| Workflow events                    | `InMemoryEventStore`        | Redis JSON event store                                              | PostgreSQL JSON event store                                         | Implement `EventStore`                               |
+| Live notifications                 | `InMemoryEventBus`          | `RedisPubSubAdapter`                                                | `PostgresNotificationAdapter`                                       | Implement `EventBus` or `PubSubAdapter`              |
+| Idempotency                        | `InMemoryIdempotencyStore`  | `RedisIdempotencyStore`                                             | `PostgresIdempotencyStore`                                          | Implement `IdempotencyStore`                         |
+| History, queues, schedules, limits | Existing in-memory adapters | Keep the explicit port or provide a backend-specific implementation | Keep the explicit port or provide a backend-specific implementation | Implement the corresponding model contract           |
 
 The package intentionally does not pretend that a generic JSON store is a
 durable replay history, task queue, scheduler, or rate limiter. Those ports
@@ -2401,14 +2391,14 @@ The repository covers these scenarios in `test/workflow.test.ts` and
 | `JsonWorkflowStore` / `JsonEventStore`                                       | JSON-backed durable adapters.                                            |
 | `createJsonWorkflowAdapters` / `createInMemoryWorkflowAdapters`              | Backend-neutral and local composition helpers.                           |
 | `AdapterEventBus`                                                            | Pub/sub transport bridge.                                                |
-| `createRedisWorkflowAdapters` / `createPostgresWorkflowAdapters`              | Ready-to-compose durable backend adapters.                               |
-| `Redis*` / `Postgres*` adapters                                               | JSON storage, locks, idempotency, and notification transports.           |
+| `createRedisWorkflowAdapters` / `createPostgresWorkflowAdapters`             | Ready-to-compose durable backend adapters.                               |
+| `Redis*` / `Postgres*` adapters                                              | JSON storage, locks, idempotency, and notification transports.           |
 | `ReplayWorkflowRunner` / `WorkflowReplayCursor`                              | Replay-safe durable workflow execution and history validation.           |
-| `defineDurableWorkflow` / `DurableWorkflowContext`                            | Canonical replay workflow definition with `sleep()` and `sleepUntil()`.  |
-| `parseDuration` / `formatDuration`                                             | Validated numeric and readable duration utilities.                       |
+| `defineDurableWorkflow` / `DurableWorkflowContext`                           | Canonical replay workflow definition with `sleep()` and `sleepUntil()`.  |
+| `parseDuration` / `formatDuration`                                           | Validated numeric and readable duration utilities.                       |
 | `Worker` / `RecoveryWorker`                                                  | Leased at-least-once task processing and expired-lease recovery.         |
 | `ActivityWorker` / `TimerWorker`                                             | Durable activity and timer task handlers.                                |
-| `createRedisDurableAdapters` / `createPostgresDurableAdapters`                 | Durable replay history, delayed task queue, locks, and lifecycle.        |
+| `createRedisDurableAdapters` / `createPostgresDurableAdapters`               | Durable replay history, delayed task queue, locks, and lifecycle.        |
 | `WorkflowEventGateway` / `WorkflowQueryService`                              | Event/webhook triggers and current-state projections.                    |
 | `ScheduleWorker` / `createScheduleWorker` / `nextCronOccurrence`             | Leased production scheduler and UTC cron calculation.                    |
 | `TokenBucketRateLimiter` / `TenantConcurrencyGate`                           | Rate limits and per-tenant admission.                                    |

@@ -1,12 +1,12 @@
 {
-	"extends": "../tsconfig.json",
-	"compilerOptions": {
-		"noEmit": true,
-		"rootDir": "..",
-		"paths": {
-			"@circulo-ai/wf": ["../src/index.ts"],
-			"@circulo-ai/wf/*": ["../src/*"]
-		}
-	},
-	"include": ["./*.ts"]
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "..",
+    "paths": {
+      "@circulo-ai/wf": ["../src/index.ts"],
+      "@circulo-ai/wf/*": ["../src/*"]
+    }
+  },
+  "include": ["./*.ts"]
 }

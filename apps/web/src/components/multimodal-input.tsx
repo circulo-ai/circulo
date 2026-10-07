@@ -103,7 +103,6 @@ function PureMultimodalInput({
       adjustHeight();
     }
     // Only run once after hydration
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adjustHeight, localStorageInput, setInput]);
 
   useEffect(() => {
@@ -164,19 +163,20 @@ function PureMultimodalInput({
             ...(capabilityJson.plugins ?? []).flatMap(
               (plugin) => plugin.tools ?? [],
             ),
-            ...(capabilityJson.apps ?? []).flatMap(
-              (app) => app.tools ?? [],
-            ),
+            ...(capabilityJson.apps ?? []).flatMap((app) => app.tools ?? []),
           ];
-          const toolItems = [...new Set(toolNames)].map((toolName) => ({
-            type: "mention" as const,
-            name: toolName,
-            username: `tool:${toolName}`,
-            insertText: `tool:${toolName}`,
-            description: "Available workspace tool",
-            kind: "tool" as const,
-            icon: <Wrench aria-hidden="true" />,
-          } satisfies MentionItemType));
+          const toolItems = [...new Set(toolNames)].map(
+            (toolName) =>
+              ({
+                type: "mention" as const,
+                name: toolName,
+                username: `tool:${toolName}`,
+                insertText: `tool:${toolName}`,
+                description: "Available workspace tool",
+                kind: "tool" as const,
+                icon: <Wrench aria-hidden="true" />,
+              }) satisfies MentionItemType,
+          );
           return [...agentItems, ...toolItems];
         });
       }

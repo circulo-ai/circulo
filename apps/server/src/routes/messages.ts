@@ -3,6 +3,7 @@ import type { DrizzleChatRepository } from "@/infrastructure/drizzle/chat-reposi
 import type { DrizzleMessageRepository } from "@/infrastructure/drizzle/message-repository";
 import { getActiveOrganizationId } from "@/lib/auth";
 import { createRouter } from "@/lib/create-app";
+import { isSafeMessageUrl } from "@/lib/security/message-url";
 import { requireAuth } from "@/middleware/auth";
 import { ForbiddenError, NotFoundError } from "@circulo-ai/types";
 import { zValidator } from "@hono/zod-validator";
@@ -12,6 +13,26 @@ const paramsSchema = z.object({
   id: z.uuid(),
 });
 
+const safePartsSchema = z
+  .array(z.record(z.string(), z.unknown()))
+  .superRefine((parts, ctx) => {
+    for (const [index, part] of parts.entries()) {
+      for (const field of ["url", "downloadUrl"] as const) {
+        const value = part[field];
+        if (
+          value !== undefined &&
+          (typeof value !== "string" || !isSafeMessageUrl(value))
+        ) {
+          ctx.addIssue({
+            code: "custom",
+            path: [index, field],
+            message: "URL scheme is not allowed",
+          });
+        }
+      }
+    }
+  });
+
 const editMessageSchema = z.object({
   replacementId: z.uuid(),
   content: z
@@ -19,8 +40,8 @@ const editMessageSchema = z.object({
     .min(1)
     .max(100_000)
     .refine((value) => value.trim().length > 0, "Message cannot be blank"),
-  parts: z.array(z.record(z.string(), z.unknown())).optional(),
-  attachments: z.array(z.record(z.string(), z.unknown())).optional(),
+  parts: safePartsSchema.optional(),
+  attachments: safePartsSchema.optional(),
 });
 
 const router = createRouter();

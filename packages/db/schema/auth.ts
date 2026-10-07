@@ -241,6 +241,32 @@ export const settings = pgTable("settings", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+/**
+ * Deployment-local authentication policy.
+ *
+ * Cloud accounts are managed by the cloud control plane and do not use this
+ * singleton. Self-hosted and desktop runtimes use it to bootstrap the first
+ * local administrator and to control whether additional local accounts may
+ * be created.
+ */
+export const instanceAuthSettings = pgTable("instance_auth_settings", {
+  id: integer("id").primaryKey().default(1),
+  signupEnabled: boolean("signup_enabled").notNull().default(false),
+  bootstrapCompleted: boolean("bootstrap_completed").notNull().default(false),
+  bootstrapUserId: text("bootstrap_user_id").references(() => user.id, {
+    onDelete: "set null",
+  }),
+  bootstrapClaimedAt: timestamp("bootstrap_claimed_at"),
+  updatedBy: text("updated_by").references(() => user.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at")
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => /* @__PURE__ */ new Date()),
+});
+
 export const userRateLimits = pgTable("user_rate_limits", {
   referenceId: text("reference_id").primaryKey(), // Can be userId or organizationId for pooling
   syncApiRequests: integer("sync_api_requests").notNull().default(0), // Sync API requests counter

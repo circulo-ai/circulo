@@ -1,3 +1,4 @@
+export { ActivityWorker } from "./activity-worker";
 export { defineDurableWorkflow } from "./definition";
 export {
   assertDuration,
@@ -5,6 +6,5 @@ export {
   parseDuration,
   type DurationInput,
 } from "./duration";
-export { ActivityWorker } from "./activity-worker";
 export { ReplayWorkflowRunner } from "./replay-workflow-runner";
 export { TimerWorker } from "./timer-worker";

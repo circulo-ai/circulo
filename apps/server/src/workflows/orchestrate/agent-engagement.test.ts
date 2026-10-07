@@ -3,8 +3,8 @@ import {
   getExplicitlyMentionedAgentIds,
   hasExplicitAgentDirective,
   hasExplicitToolDirective,
-  shouldUseControllerDirectly,
   shouldEngageAgents,
+  shouldUseControllerDirectly,
 } from "./agent-engagement";
 
 const agent = {
@@ -128,7 +128,9 @@ describe("agent engagement fallback", () => {
     ).toBe(true);
     expect(
       shouldUseControllerDirectly({
-        messages: message("@workflow-director and @research-agent, investigate."),
+        messages: message(
+          "@workflow-director and @research-agent, investigate.",
+        ),
         mentions: [
           { kind: "agent", key: "workflow-director" },
           { kind: "agent", key: "research-agent" },

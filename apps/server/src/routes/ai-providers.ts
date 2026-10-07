@@ -51,7 +51,7 @@ router.post(
   zValidator("json", aiProviderCredentialCreateSchema),
   async (c) => {
     const body = c.req.valid("json");
-    const baseUrl = normalizeBaseUrl(body.baseUrl);
+    const baseUrl = normalizeBaseUrl(body.baseUrl, body.providerId);
     const definition = publicProviderDefinitions().find(
       (provider) => provider.id === body.providerId,
     );
@@ -63,7 +63,8 @@ router.post(
       await listProviderModels({
         providerId: body.providerId,
         toolsOnly: false,
-        apiKey: body.apiKey,
+        apiKey:
+          body.providerId === "ollama" && !body.apiKey ? "ollama" : body.apiKey,
         ...(baseUrl ? { baseUrl } : {}),
       });
     } catch (error) {
@@ -161,7 +162,10 @@ router.delete(
   },
 );
 
-function normalizeBaseUrl(value?: string) {
+function normalizeBaseUrl(
+  value?: string,
+  providerId?: import("@circulo-ai/types").AiProviderId,
+) {
   if (!value) return null;
   let url: URL;
   try {
@@ -174,7 +178,7 @@ function normalizeBaseUrl(value?: string) {
       "Provider API URLs must not include embedded credentials.",
     );
   }
-  if (envProduction() && url.protocol !== "https:") {
+  if (envProduction() && providerId !== "ollama" && url.protocol !== "https:") {
     throw new BadRequestError(
       "Custom provider endpoints must use HTTPS in production.",
     );

@@ -59,7 +59,12 @@ export class JsonWorkflowHistoryStore implements WorkflowHistoryStore {
       return { appended: [], nextSequence: expectedNextSequence };
     }
     const first = events[0]!;
-    if (events.some((event) => event.workflowId !== first.workflowId || event.runId !== first.runId)) {
+    if (
+      events.some(
+        (event) =>
+          event.workflowId !== first.workflowId || event.runId !== first.runId,
+      )
+    ) {
       throw new Error("History append batch must target one workflow run");
     }
 
@@ -80,14 +85,18 @@ export class JsonWorkflowHistoryStore implements WorkflowHistoryStore {
       const duplicateResults: WorkflowHistoryEvent<unknown>[] = [];
       for (const input of events) {
         const existing = input.eventId
-          ? existingEvents.find((candidate) => candidate.eventId === input.eventId)
+          ? existingEvents.find(
+              (candidate) => candidate.eventId === input.eventId,
+            )
           : undefined;
         if (!existing) continue;
         if (
           existing.eventType !== input.eventType ||
           stableSerialize(existing.payload) !== stableSerialize(input.payload)
         ) {
-          throw new Error(`History event id ${input.eventId} was reused with different content`);
+          throw new Error(
+            `History event id ${input.eventId} was reused with different content`,
+          );
         }
         duplicateResults.push(existing);
       }
@@ -98,7 +107,9 @@ export class JsonWorkflowHistoryStore implements WorkflowHistoryStore {
         };
       }
       if (duplicateResults.length > 0) {
-        throw new Error("History append batch partially overlaps existing events");
+        throw new Error(
+          "History append batch partially overlaps existing events",
+        );
       }
 
       const appended = events.map((input, index) => ({
@@ -121,7 +132,10 @@ export class JsonWorkflowHistoryStore implements WorkflowHistoryStore {
         );
         if (!saved) return null;
       } else {
-        await this.store.set(this.runKey(first.workflowId, first.runId), nextRecord);
+        await this.store.set(
+          this.runKey(first.workflowId, first.runId),
+          nextRecord,
+        );
       }
       return {
         appended: structuredClone(appended),
@@ -141,14 +155,17 @@ export class JsonWorkflowHistoryStore implements WorkflowHistoryStore {
             this.runKey(options.workflowId, options.runId),
           ),
         ]
-      : (await this.store.list<HistoryRecord>(this.workflowPrefix(options.workflowId))).map(
-          (entry) => entry.value,
-        );
+      : (
+          await this.store.list<HistoryRecord>(
+            this.workflowPrefix(options.workflowId),
+          )
+        ).map((entry) => entry.value);
     const events = records
       .flatMap((record) => record?.events ?? [])
       .filter(
         (event) =>
-          options.fromSequence === undefined || event.sequence >= options.fromSequence,
+          options.fromSequence === undefined ||
+          event.sequence >= options.fromSequence,
       )
       .sort((left, right) =>
         options.runId
@@ -163,7 +180,9 @@ export class JsonWorkflowHistoryStore implements WorkflowHistoryStore {
   }
 
   async nextSequence(workflowId: string, runId: string): Promise<number> {
-    const record = await this.store.get<HistoryRecord>(this.runKey(workflowId, runId));
+    const record = await this.store.get<HistoryRecord>(
+      this.runKey(workflowId, runId),
+    );
     return record?.events.length ?? 0;
   }
 
@@ -172,7 +191,9 @@ export class JsonWorkflowHistoryStore implements WorkflowHistoryStore {
       await this.store.delete(this.runKey(workflowId, runId));
       return;
     }
-    const records = await this.store.list<HistoryRecord>(this.workflowPrefix(workflowId));
+    const records = await this.store.list<HistoryRecord>(
+      this.workflowPrefix(workflowId),
+    );
     await Promise.all(records.map((record) => this.store.delete(record.key)));
   }
 
@@ -226,7 +247,8 @@ export class JsonTaskQueue implements TaskQueueAdapter {
         if (
           existing.task.kind !== task.kind ||
           existing.task.queue !== task.queue ||
-          stableSerialize(existing.task.payload) !== stableSerialize(task.payload)
+          stableSerialize(existing.task.payload) !==
+            stableSerialize(task.payload)
         ) {
           throw new Error(`Task ${task.id} was reused with different content`);
         }
@@ -245,10 +267,13 @@ export class JsonTaskQueue implements TaskQueueAdapter {
       const candidates = (await this.store.list<TaskRecord>(this.keyPrefix))
         .filter(({ value }) => {
           const task = value.task;
-          if (options.queue !== "*" && task.queue !== options.queue) return false;
+          if (options.queue !== "*" && task.queue !== options.queue)
+            return false;
           if (task.availableAt > now) return false;
           if (task.lease && task.lease.expiresAt > now) return false;
-          return options.tenantId === undefined || task.tenantId === options.tenantId;
+          return (
+            options.tenantId === undefined || task.tenantId === options.tenantId
+          );
         })
         .sort(
           ({ value: left }, { value: right }) =>
@@ -274,12 +299,19 @@ export class JsonTaskQueue implements TaskQueueAdapter {
         { version: candidates.value.version + 1, task },
       );
       return saved
-        ? { task: structuredClone(task) as TaskEnvelope<TPayload>, lease: structuredClone(lease) }
+        ? {
+            task: structuredClone(task) as TaskEnvelope<TPayload>,
+            lease: structuredClone(lease),
+          }
         : null;
     });
   }
 
-  heartbeat(taskId: string, leaseToken: string, leaseDurationMs: number): Promise<boolean> {
+  heartbeat(
+    taskId: string,
+    leaseToken: string,
+    leaseDurationMs: number,
+  ): Promise<boolean> {
     assertPositiveInteger(leaseDurationMs, "lease duration");
     return this.withQueueLock(async () => {
       const entry = await this.store.get<TaskRecord>(this.taskKey(taskId));
@@ -313,7 +345,11 @@ export class JsonTaskQueue implements TaskQueueAdapter {
     });
   }
 
-  reject(taskId: string, leaseToken: string, _failure: TaskFailure): Promise<boolean> {
+  reject(
+    taskId: string,
+    leaseToken: string,
+    _failure: TaskFailure,
+  ): Promise<boolean> {
     return this.acknowledge(taskId, leaseToken);
   }
 
@@ -322,7 +358,8 @@ export class JsonTaskQueue implements TaskQueueAdapter {
       let reclaimed = 0;
       const entries = await this.store.list<TaskRecord>(this.keyPrefix);
       for (const entry of entries) {
-        if (!entry.value.task.lease || entry.value.task.lease.expiresAt > now) continue;
+        if (!entry.value.task.lease || entry.value.task.lease.expiresAt > now)
+          continue;
         const task = structuredClone(entry.value.task);
         task.lease = undefined;
         task.availableAt = Math.min(task.availableAt, now);
@@ -345,8 +382,10 @@ export class JsonTaskQueue implements TaskQueueAdapter {
       .map((entry) => entry.value.task)
       .filter((task) => queue === undefined || task.queue === queue);
     return {
-      queued: tasks.filter((task) => !task.lease && task.availableAt <= now).length,
-      leased: tasks.filter((task) => task.lease && task.lease.expiresAt > now).length,
+      queued: tasks.filter((task) => !task.lease && task.availableAt <= now)
+        .length,
+      leased: tasks.filter((task) => task.lease && task.lease.expiresAt > now)
+        .length,
       expiredLeases: tasks.filter(
         (task) => task.lease !== undefined && task.lease.expiresAt <= now,
       ).length,
@@ -372,7 +411,11 @@ export class JsonTaskQueue implements TaskQueueAdapter {
   }
 
   private async withQueueLock<T>(operation: () => Promise<T>): Promise<T> {
-    const lock = await this.locks.acquireLock("task-queue", this.lockTtlMs, this.holderId);
+    const lock = await this.locks.acquireLock(
+      "task-queue",
+      this.lockTtlMs,
+      this.holderId,
+    );
     if (!lock) {
       throw new Error("Could not acquire task queue lock");
     }
@@ -406,9 +449,11 @@ function stableSerialize(value: unknown): string {
 }
 
 function assertPositiveInteger(value: number, name: string): void {
-  if (!Number.isInteger(value) || value < 1) throw new RangeError(`${name} must be a positive integer`);
+  if (!Number.isInteger(value) || value < 1)
+    throw new RangeError(`${name} must be a positive integer`);
 }
 
 function assertNonNegativeInteger(value: number, name: string): void {
-  if (!Number.isInteger(value) || value < 0) throw new RangeError(`${name} must be a non-negative integer`);
+  if (!Number.isInteger(value) || value < 0)
+    throw new RangeError(`${name} must be a non-negative integer`);
 }

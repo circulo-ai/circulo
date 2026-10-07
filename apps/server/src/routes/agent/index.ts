@@ -4,7 +4,11 @@ import { agent, knowledgeBase } from "@/db/schema";
 import { requireProviderCredential } from "@/lib/ai/provider-registry";
 import { enforceOrganizationFeatureLimit } from "@/lib/billing/limits";
 import { createRouter } from "@/lib/create-app";
-import { hasPermissionForUser, isMemberOf } from "@/lib/permissions";
+import {
+  hasPermissionForUser,
+  isMemberOf,
+  type ApiKeyPermissions,
+} from "@/lib/permissions";
 import { requireAuth } from "@/middleware/auth";
 import { NotFoundError } from "@circulo-ai/core";
 import {
@@ -77,6 +81,7 @@ router.post(
         organizationId,
         "agents",
         "create",
+        c.var.apiKeyPermissions,
       ))
     ) {
       throw new ForbiddenError(
@@ -155,12 +160,14 @@ async function assertCanManageAgent(
   agentCreatorId: string,
   userId: string,
   organizationId: string,
+  apiKeyPermissions?: ApiKeyPermissions,
 ) {
   const canManage = await hasPermissionForUser(
     userId,
     organizationId,
     "agents",
     "update",
+    apiKeyPermissions,
   );
   if (agentCreatorId !== userId && !canManage) {
     throw new ForbiddenError("You don't have permission to modify this agent");
@@ -190,6 +197,7 @@ router.patch(
       existingAgent.createdBy,
       user!.id,
       organizationId,
+      c.var.apiKeyPermissions,
     );
 
     const { id, ...updates } = body;
@@ -287,6 +295,7 @@ router.delete(
       existingAgent.createdBy,
       user!.id,
       organizationId,
+      c.var.apiKeyPermissions,
     );
 
     const deletedAgent = query.hard

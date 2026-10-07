@@ -21,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useArtifact } from "@/hooks/api/chats/use-artifact";
 import { getFetcher } from "@/lib/swr";
+import { getSafeNavigationUrl } from "@/lib/urls/safe";
 import { Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { formatDistanceToNow } from "date-fns";
@@ -293,6 +294,7 @@ function ResourceRow({
   resource: ChatResource;
   onOpenArtifact: (resource: ChatResource) => void;
 }) {
+  const safeUrl = getSafeNavigationUrl(resource.url);
   const Icon = resourceIcon(resource.type);
   const meta = [
     resource.sender.name,
@@ -326,7 +328,7 @@ function ResourceRow({
           )}
         </div>
       </div>
-      {(resource.type === "artifact" || resource.url) && (
+      {(resource.type === "artifact" || safeUrl) && (
         <ArrowUpRight className="size-4 shrink-0 text-muted-foreground" />
       )}
     </>
@@ -345,12 +347,12 @@ function ResourceRow({
     );
   }
 
-  if (resource.url) {
+  if (safeUrl) {
     return (
       <a
         aria-label={`Open ${resource.name}`}
         className="group flex min-w-0 items-center gap-3 rounded-2xl border p-3 text-left transition-colors hover:bg-muted"
-        href={resource.url}
+        href={safeUrl}
         rel="noreferrer"
         target="_blank"
       >

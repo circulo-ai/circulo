@@ -362,17 +362,21 @@ export function buildRootProvider(): ServiceProvider {
     return new SetVote(votes, uow);
   });
 
-  services.addSingleton(DI_TOKENS.RateLimiter, (resolver) => {
-    const redis = resolver.resolve(DI_TOKENS.Redis);
-    const db = resolver.resolve(DI_TOKENS.Db);
-    const dbStore = new DatabaseRateLimitStore(db);
-    const redisStore = redis ? new RedisRateLimitStore(redis) : null;
-    const store = new CompositeRateLimitStore(redisStore, dbStore);
+  services.addSingleton(
+    DI_TOKENS.RateLimiter,
+    (resolver) => {
+      const redis = resolver.resolve(DI_TOKENS.Redis);
+      const db = resolver.resolve(DI_TOKENS.Db);
+      const dbStore = new DatabaseRateLimitStore(db);
+      const redisStore = redis ? new RedisRateLimitStore(redis) : null;
+      const store = new CompositeRateLimitStore(redisStore, dbStore);
 
-    return new RateLimiter(store, redis);
-  }, {
-    dependencies: [DI_TOKENS.Redis, DI_TOKENS.Db],
-  });
+      return new RateLimiter(store, redis);
+    },
+    {
+      dependencies: [DI_TOKENS.Redis, DI_TOKENS.Db],
+    },
+  );
 
   rootProvider = services.buildServiceProvider({ validateOnBuild: true });
   return rootProvider;

@@ -54,10 +54,10 @@ class FakeBroker {
 
 function createAdapter(broker: FakeBroker) {
   const raw = new FakeRedis(broker);
-  return new RedisWorkflowPubSubAdapter(
-    { raw } as never,
-    { warn: () => {}, error: () => {} },
-  );
+  return new RedisWorkflowPubSubAdapter({ raw } as never, {
+    warn: () => {},
+    error: () => {},
+  });
 }
 
 describe("RedisWorkflowPubSubAdapter", () => {

@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { resolve } from "node:path";
+import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 
 const execFileAsync = promisify(execFile);

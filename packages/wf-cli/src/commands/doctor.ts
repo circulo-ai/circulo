@@ -1,15 +1,19 @@
 import { loadWfProject } from "../config/load-config";
-import { isJsonOutput, optionString } from "./definition-utils";
-import type { CliArguments } from "./command-runner";
-import type { CliCommandContext, CliCommandResult } from "../types";
 import { renderOutput } from "../output/printer";
+import type { CliCommandContext, CliCommandResult } from "../types";
+import type { CliArguments } from "./command-runner";
+import { isJsonOutput, optionString } from "./definition-utils";
 
 export async function executeDoctorCommand(
   args: CliArguments,
   context: CliCommandContext,
 ): Promise<CliCommandResult> {
-  const project = await loadWfProject(context.cwd, optionString(args, "config"));
-  const profile = optionString(args, "profile") ?? project.config.defaultProfile;
+  const project = await loadWfProject(
+    context.cwd,
+    optionString(args, "config"),
+  );
+  const profile =
+    optionString(args, "profile") ?? project.config.defaultProfile;
   if (!project.config.profiles.includes(profile)) {
     throw new Error(
       `Profile "${profile}" is not configured. Available profiles: ${project.config.profiles.join(", ")}.`,
@@ -25,7 +29,11 @@ export async function executeDoctorCommand(
     registryKeys,
     runtimeConstruction: "not invoked by doctor",
   } as const;
-  if (isJsonOutput(args)) return { exitCode: 0, output: renderOutput({ type: "json", value: result }) };
+  if (isJsonOutput(args))
+    return {
+      exitCode: 0,
+      output: renderOutput({ type: "json", value: result }),
+    };
   return {
     exitCode: 0,
     output: `WF project is ready.\n${renderOutput({

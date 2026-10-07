@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
-  InMemoryActivityRegistry,
-  InMemoryTaskQueue,
-  InMemoryWorkflowHistoryStore,
-  ReplayWorkflowRunner,
-  MapWorkflowLockStore,
   ActivityWorker,
   defineActivity,
   defineDurableWorkflow,
   formatDuration,
+  InMemoryActivityRegistry,
+  InMemoryTaskQueue,
+  InMemoryWorkflowHistoryStore,
+  MapWorkflowLockStore,
   parseDuration,
+  ReplayWorkflowRunner,
 } from "../src";
 
 describe("durable duration utilities", () => {
@@ -83,17 +83,26 @@ describe("durable workflow sleep", () => {
     });
     await activityWorker.start();
     await waitUntil(async () =>
-      (await history.read({ workflowId: started.workflowId, runId: started.runId }))
-        .some((event) => event.eventType === "timer.started"),
+      (
+        await history.read({
+          workflowId: started.workflowId,
+          runId: started.runId,
+        })
+      ).some((event) => event.eventType === "timer.started"),
     );
     await activityWorker.stop();
 
     expect(beforeSleepCalls).toBe(1);
-    const timerStarted = (await history.read({
-      workflowId: started.workflowId,
-      runId: started.runId,
-    })).find((event) => event.eventType === "timer.started")!;
-    const timerPayload = timerStarted.payload as { timerId: string; fireAt: number };
+    const timerStarted = (
+      await history.read({
+        workflowId: started.workflowId,
+        runId: started.runId,
+      })
+    ).find((event) => event.eventType === "timer.started")!;
+    const timerPayload = timerStarted.payload as {
+      timerId: string;
+      fireAt: number;
+    };
     expect(timerPayload.fireAt - timerStarted.timestamp).toBeGreaterThanOrEqual(
       30 * 86_400_000 - 1,
     );
@@ -123,7 +132,10 @@ describe("durable workflow sleep", () => {
       started.workflowId,
       started.runId,
     );
-    expect(completed).toMatchObject({ status: "completed", output: "READY:continued" });
+    expect(completed).toMatchObject({
+      status: "completed",
+      output: "READY:continued",
+    });
     expect(beforeSleepCalls).toBe(1);
   });
 
@@ -141,8 +153,12 @@ describe("durable workflow sleep", () => {
       },
     });
     const started = await runner.start(workflow, undefined);
-    const timer = (await history.read({ workflowId: started.workflowId, runId: started.runId }))
-      .find((event) => event.eventType === "timer.started")!;
+    const timer = (
+      await history.read({
+        workflowId: started.workflowId,
+        runId: started.runId,
+      })
+    ).find((event) => event.eventType === "timer.started")!;
     const payload = timer.payload as { timerId: string; fireAt: number };
     expect(payload.fireAt).toBe(fireAt);
 
@@ -166,7 +182,9 @@ describe("durable workflow sleep", () => {
       },
       await history.nextSequence(started.workflowId, started.runId),
     );
-    await expect(runner.run(workflow, started.workflowId, started.runId)).resolves.toMatchObject({
+    await expect(
+      runner.run(workflow, started.workflowId, started.runId),
+    ).resolves.toMatchObject({
       status: "completed",
       output: "continued",
     });
@@ -232,8 +250,12 @@ describe("durable workflow sleep", () => {
       },
     });
     const started = await runner.start(workflow, undefined);
-    const timer = (await history.read({ workflowId: started.workflowId, runId: started.runId }))
-      .find((event) => event.eventType === "timer.started")!;
+    const timer = (
+      await history.read({
+        workflowId: started.workflowId,
+        runId: started.runId,
+      })
+    ).find((event) => event.eventType === "timer.started")!;
     const payload = timer.payload as { timerId: string; fireAt: number };
     await history.append(
       {
@@ -248,15 +270,24 @@ describe("durable workflow sleep", () => {
 
     const first = runner.run(workflow, started.workflowId, started.runId);
     await waitUntil(() => continuationCalls === 1);
-    const duplicate = await runner.run(workflow, started.workflowId, started.runId);
+    const duplicate = await runner.run(
+      workflow,
+      started.workflowId,
+      started.runId,
+    );
     expect(duplicate.status).toBe("waiting");
     releaseContinuation();
-    await expect(first).resolves.toMatchObject({ status: "completed", output: "done" });
+    await expect(first).resolves.toMatchObject({
+      status: "completed",
+      output: "done",
+    });
     expect(continuationCalls).toBe(1);
   });
 });
 
-async function waitUntil(predicate: () => boolean | Promise<boolean>): Promise<void> {
+async function waitUntil(
+  predicate: () => boolean | Promise<boolean>,
+): Promise<void> {
   const deadline = Date.now() + 2_000;
   while (!(await predicate()) && Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, 5));

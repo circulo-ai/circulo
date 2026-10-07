@@ -57,10 +57,10 @@ import { useMergedRefs } from "@/hooks/use-merged-refs";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useUploadTaskManager } from "@/hooks/use-upload-task-manager";
 import { useVoiceRecorder } from "@/hooks/use-voice-recorder";
+import { defaultModelForProvider } from "@/lib/ai-providers";
 import { ApiRequestError } from "@/lib/api/client";
 import { attachmentFromUploadTask } from "@/lib/attachments";
 import { deepReplace } from "@/lib/deep-replace";
-import { defaultModelForProvider } from "@/lib/ai-providers";
 import {
   clearCachePattern,
   fetchWithErrorHandlers,
@@ -1011,8 +1011,7 @@ function AgentFormContent({
       (
         modelCatalog?.models ?? [
           {
-            id:
-              defaultModelForProvider(providerId),
+            id: defaultModelForProvider(providerId),
             name:
               providerId === "openrouter"
                 ? "OpenRouter Free Router"

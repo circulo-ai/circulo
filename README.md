@@ -75,3 +75,15 @@ All organization data routes require authentication and organization membership.
 ## Architecture direction
 
 New application behavior belongs in use cases and repository ports, with Drizzle adapters at the infrastructure boundary. Routes validate requests, authorize the actor, call a use case, and translate the result into HTTP/stream responses. Durable workflows receive only serializable actor identity (`userId` and `organizationId`), never a live authentication session or secret.
+
+## Self-hosting
+
+The repository includes a deployment-independent self-hosted stack in
+`docker-compose.self-hosted.yml`. It runs the web app, API, PostgreSQL, Redis,
+and MinIO without requiring Autumn or cloud billing. See
+[`docs/self-hosting.md`](docs/self-hosting.md) for setup, provider configuration,
+local runtime mode, and backup guidance.
+
+Self-hosted mode has unlimited platform entitlements by default. The cloud
+distribution may add billing and managed model credits through adapters, but
+those services are not required by the open-source runtime.

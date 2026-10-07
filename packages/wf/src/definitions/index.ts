@@ -5,14 +5,11 @@ export {
   createClassWorkflowPlan,
   normalizeResult,
 } from "./class-builder";
-export {
-  WorkflowDefinitionLoader,
-  loadWorkflowDefinition,
-} from "./loader";
+export { WorkflowDefinitionLoader, loadWorkflowDefinition } from "./loader";
+export type * from "./models";
+export { WorkflowErrorHandling } from "./models";
 export { InMemoryWorkflowStepRegistry } from "./registry";
 export {
   compileClassReplayWorkflow,
   compileClassReplayWorkflowPlan,
 } from "./replay-compiler";
-export type * from "./models";
-export { WorkflowErrorHandling } from "./models";

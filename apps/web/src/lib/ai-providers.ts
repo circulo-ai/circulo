@@ -9,6 +9,8 @@ export function defaultModelForProvider(providerId: AiProviderId | string) {
       return "claude-sonnet-4-5";
     case "google":
       return "gemini-2.5-flash";
+    case "ollama":
+      return "llama3.2";
     default:
       return "openrouter/free";
   }

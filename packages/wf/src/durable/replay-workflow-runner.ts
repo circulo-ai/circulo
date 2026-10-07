@@ -1,12 +1,12 @@
 import type {
-  ActivityTaskPayload,
   ActivityOptions,
+  ActivityTaskPayload,
   BatchOptions,
   BatchResult,
   ReplayWorkflowContext,
   ReplayWorkflowDefinition,
-  ReplayWorkflowRunnerDependencies,
   ReplayWorkflowResult,
+  ReplayWorkflowRunnerDependencies,
   ReplayWorkflowRunnerOptions,
   SagaScope,
   TaskEnvelope,
@@ -22,8 +22,8 @@ import {
   WorkflowReplayError,
 } from "../replay/replay-cursor";
 import { generateId } from "../utils/id";
-import { appendHistoryEvent as appendHistoryEventInternal } from "./history-append";
 import { parseDuration, type DurationInput } from "./duration";
+import { appendHistoryEvent as appendHistoryEventInternal } from "./history-append";
 
 class WorkflowSuspended extends Error {
   constructor(readonly reason: "activity" | "timer" | "event") {
@@ -189,14 +189,20 @@ export class ReplayWorkflowRunner {
       timestamp: number | Date,
       durationMs?: number,
     ): Promise<void> => {
-      if (!id.trim()) throw new RangeError("Workflow sleep id must not be empty");
+      if (!id.trim())
+        throw new RangeError("Workflow sleep id must not be empty");
       if (usedSleepIds.has(id)) {
-        throw new WorkflowReplayError(`Workflow sleep id ${id} was used more than once`);
+        throw new WorkflowReplayError(
+          `Workflow sleep id ${id} was used more than once`,
+        );
       }
       usedSleepIds.add(id);
-      const fireAt = timestamp instanceof Date ? timestamp.getTime() : timestamp;
+      const fireAt =
+        timestamp instanceof Date ? timestamp.getTime() : timestamp;
       if (!Number.isSafeInteger(fireAt) || fireAt < 0) {
-        throw new RangeError("Workflow sleep timestamp must be a non-negative safe integer");
+        throw new RangeError(
+          "Workflow sleep timestamp must be a non-negative safe integer",
+        );
       }
       const timerId = `${workflowId}:${runId}:timer:${encodeURIComponent(id)}`;
       const startedTimer = cursor.find<TimerTaskPayload>(
@@ -441,7 +447,9 @@ export class ReplayWorkflowRunner {
         const durationMs = parseDuration(duration);
         const fireAt = Date.now() + durationMs;
         if (!Number.isSafeInteger(fireAt)) {
-          throw new RangeError("Workflow sleep timestamp exceeds the safe integer limit");
+          throw new RangeError(
+            "Workflow sleep timestamp exceeds the safe integer limit",
+          );
         }
         await scheduleSleep(id, fireAt, durationMs);
       },

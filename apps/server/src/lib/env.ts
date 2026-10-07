@@ -19,18 +19,33 @@ export const env = createEnv({
   server: {
     // Core app/auth
     DATABASE_URL: z.url(),
+    CIRCULO_DATABASE_DRIVER: z
+      .enum(["postgres", "pglite"])
+      .optional()
+      .default("postgres"),
+    PGLITE_DATA_DIR: z.string().optional(),
+    CIRCULO_MIGRATIONS_PATH: z.string().optional(),
     BETTER_AUTH_URL: z.url(),
     BETTER_AUTH_SECRET: z.string().min(32),
     // Encryption helpers derive a 32-byte AES key from exactly 64 hex chars.
     ENCRYPTION_KEY: z.string().regex(/^[0-9a-fA-F]{64}$/),
     INTERNAL_API_SECRET: z.string().min(32),
+    CIRCULO_DEPLOYMENT_MODE: z
+      .enum(["local", "server"])
+      .optional()
+      .default("server"),
+    // Distinguishes the product identity boundary from the infrastructure
+    // mode. `local` deployment mode is retained for compatibility and maps to
+    // the desktop runtime when this value is omitted.
+    CIRCULO_RUNTIME_KIND: z
+      .enum(["cloud", "self-hosted", "desktop"])
+      .optional(),
     AUTUMN_SECRET_KEY: z.string().optional(),
     // Local development should exercise collaboration and automation limits
     // by default. Production never reads this override (see autumn.ts).
     BILLING_LOCAL_DEV_PLAN: z
       .enum(["free", "pro", "team", "enterprise"])
-      .optional()
-      .default("team"),
+      .optional(),
     E2B_API_KEY: z.string().optional(),
 
     // OAuth credentials
@@ -119,7 +134,11 @@ export const env = createEnv({
     // explicitly configured proxy addresses.
     TRUSTED_PROXY_IPS: z.string().optional(),
     GOOGLE_GENERATIVE_AI_API_KEY: z.string().optional(),
-    OLLAMA_URL: z.string().optional(),
+    OPENAI_API_KEY: z.string().min(1).optional(),
+    ANTHROPIC_API_KEY: z.string().min(1).optional(),
+    OLLAMA_API_KEY: z.string().min(1).optional(),
+    OLLAMA_URL: z.url().optional().default("http://127.0.0.1:11434"),
+    CIRCULO_MODEL_PRICING_JSON: z.string().optional(),
 
     // Logging
     LOG_LEVEL: z.enum(["DEBUG", "INFO", "WARN", "ERROR"]).optional(),
@@ -145,6 +164,7 @@ export const env = createEnv({
     NEXT_PUBLIC_APP_URL: z.url(),
     NEXT_PUBLIC_BILLING_ENABLED: booleanFromEnv.optional(),
     NEXT_PUBLIC_BETTER_AUTH_URL: z.string().optional(),
+    NEXT_PUBLIC_CIRCULO_CLOUD_SYNC_URL: z.url().optional(),
   },
   shared: {
     NODE_ENV: z.enum(["development", "test", "production"]).optional(),
@@ -154,6 +174,8 @@ export const env = createEnv({
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     NEXT_PUBLIC_BILLING_ENABLED: process.env.NEXT_PUBLIC_BILLING_ENABLED,
     NEXT_PUBLIC_BETTER_AUTH_URL: process.env.NEXT_PUBLIC_BETTER_AUTH_URL,
+    NEXT_PUBLIC_CIRCULO_CLOUD_SYNC_URL:
+      process.env.NEXT_PUBLIC_CIRCULO_CLOUD_SYNC_URL,
     NODE_ENV: process.env.NODE_ENV,
     NEXT_TELEMETRY_DISABLED: process.env.NEXT_TELEMETRY_DISABLED,
   },

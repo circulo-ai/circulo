@@ -13,14 +13,12 @@ import {
 } from "@/components/ui/dialog";
 import { SubscriptionUsageIndicator } from "@/components/usage-indicator";
 import { authClient } from "@/lib/auth-client";
-import { env, isTruthy } from "@/lib/env";
+import { isBillingEnabled } from "@/lib/environment";
 import { createLogger } from "@/lib/logs/console/logger";
 import { useGeneralStore } from "@/stores/settings/general/store";
 import { useEffect, useState } from "react";
 
 const logger = createLogger("SettingsModal");
-
-const isBillingEnabled = isTruthy(env.NEXT_PUBLIC_BILLING_ENABLED);
 
 interface SettingsModalProps {
   open: boolean;

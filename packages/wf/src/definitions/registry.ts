@@ -18,7 +18,10 @@ interface Registration<TData> {
  */
 export class InMemoryWorkflowStepRegistry implements WorkflowStepRegistryPort {
   private readonly registrations = new Map<string, Registration<unknown>>();
-  private readonly classKeys = new WeakMap<WorkflowStepClass<unknown>, string>();
+  private readonly classKeys = new WeakMap<
+    WorkflowStepClass<unknown>,
+    string
+  >();
 
   register<TData>(key: string, factory: WorkflowStepFactory<TData>): void;
   register<TData>(
@@ -35,19 +38,19 @@ export class InMemoryWorkflowStepRegistry implements WorkflowStepRegistryPort {
       typeof keyOrToken === "string"
         ? keyOrToken
         : (explicitKey ?? keyOrToken.name);
-    if (!key.trim()) throw new Error("Workflow step registry key must not be empty");
+    if (!key.trim())
+      throw new Error("Workflow step registry key must not be empty");
     if (this.registrations.has(key)) {
-      throw new Error(`Workflow step registry key ${key} is already registered`);
+      throw new Error(
+        `Workflow step registry key ${key} is already registered`,
+      );
     }
     this.registrations.set(key, {
       key,
       factory: factory as WorkflowStepFactory<unknown>,
     });
     if (typeof keyOrToken !== "string") {
-      this.classKeys.set(
-        keyOrToken as WorkflowStepClass<unknown>,
-        key,
-      );
+      this.classKeys.set(keyOrToken as WorkflowStepClass<unknown>, key);
     }
   }
 
@@ -69,7 +72,9 @@ export class InMemoryWorkflowStepRegistry implements WorkflowStepRegistryPort {
     }
     const instance = registration.factory(context);
     if (!instance || typeof instance.execute !== "function") {
-      throw new Error(`Workflow step factory ${registration.key} returned an invalid step`);
+      throw new Error(
+        `Workflow step factory ${registration.key} returned an invalid step`,
+      );
     }
     return instance;
   }
@@ -80,7 +85,9 @@ export class InMemoryWorkflowStepRegistry implements WorkflowStepRegistryPort {
 
   key(token: WorkflowStepToken<unknown>): string {
     if (typeof token === "string") return token;
-    return this.classKeys.get(token as WorkflowStepClass<unknown>) ?? token.name;
+    return (
+      this.classKeys.get(token as WorkflowStepClass<unknown>) ?? token.name
+    );
   }
 
   list(): readonly string[] {

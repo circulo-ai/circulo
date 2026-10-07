@@ -47,6 +47,8 @@
     "postgres": "^3.4.7"
   },
   "dependencies": {
-    "@circulo-ai/types": "workspace:*"
+    "@circulo-ai/types": "workspace:*",
+    "@electric-sql/pglite": "^0.5.8",
+    "@electric-sql/pglite-pgvector": "^0.0.9"
   }
 }

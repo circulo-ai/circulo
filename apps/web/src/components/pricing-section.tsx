@@ -1,4 +1,5 @@
 import { generateRandomPath, Step } from "@/lib/border-walk";
+import { isBillingEnabled } from "@/lib/environment";
 import { Icon } from "@/types/icon";
 import { BILLING_PLANS, formatBillingLimit } from "@circulo-ai/types";
 import {
@@ -36,6 +37,8 @@ const paths = starts.map((start, index) =>
 );
 
 export function PricingSection() {
+  if (!isBillingEnabled) return null;
+
   return (
     <section id="pricing" className="main-section relative">
       <PricingBackground paths={paths} />

@@ -1,6 +1,9 @@
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { executeCliCommand, parseCliArguments } from "../src/commands/command-runner";
+import {
+  executeCliCommand,
+  parseCliArguments,
+} from "../src/commands/command-runner";
 import type { CliCommandContext } from "../src/types";
 
 const projectDirectory = resolve(import.meta.dirname, "fixtures/real-project");
@@ -38,12 +41,14 @@ describe("real project integration", () => {
       parseCliArguments(["graph", "workflows/hello-world.yaml"]),
       commandContext,
     );
-    expect(graph.output).toBe([
-      "flowchart TD",
-      "  step_Hello[Hello]",
-      "  step_Hello --> step_Goodbye",
-      "  step_Goodbye[Goodbye]",
-    ].join("\n"));
+    expect(graph.output).toBe(
+      [
+        "flowchart TD",
+        "  step_Hello[Hello]",
+        "  step_Hello --> step_Goodbye",
+        "  step_Goodbye[Goodbye]",
+      ].join("\n"),
+    );
   });
 
   it("lists only allowlisted registry keys", async () => {
@@ -58,7 +63,12 @@ describe("real project integration", () => {
   it("rejects an unknown profile before reading runtime resources", async () => {
     await expect(
       executeCliCommand(
-        parseCliArguments(["validate", "workflows/hello-world.json", "--profile", "production"]),
+        parseCliArguments([
+          "validate",
+          "workflows/hello-world.json",
+          "--profile",
+          "production",
+        ]),
         commandContext,
       ),
     ).rejects.toThrow('Profile "production" is not configured');

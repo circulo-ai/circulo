@@ -1,5 +1,6 @@
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { env, isTruthy } from "@/lib/env";
+import { env } from "@/lib/env";
+import { isBillingEnabled } from "@/lib/environment";
 import { cn } from "@/lib/utils";
 import { AuthClientProvider } from "@/providers/auth-client-provider";
 import { PointerProvider } from "@/providers/pointer-provider";
@@ -26,8 +27,6 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
-  const isBillingEnabled = isTruthy(env.NEXT_PUBLIC_BILLING_ENABLED);
-
   const content = (
     <SWRProvider>
       <PointerProvider>

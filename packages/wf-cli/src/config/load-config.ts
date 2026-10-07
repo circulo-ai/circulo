@@ -1,11 +1,17 @@
+import type { WfConfig, WorkflowStepRegistryPort } from "@circulo-ai/wf";
+import { createJiti } from "jiti";
 import { existsSync } from "node:fs";
 import { dirname, extname, resolve } from "node:path";
-import { createJiti } from "jiti";
-import type { WfConfig, WorkflowStepRegistryPort } from "@circulo-ai/wf";
 import type { LoadedWfProject } from "../types";
 
 const CONFIG_FILE = "wf.config.ts";
-const SUPPORTED_CONFIG_EXTENSIONS = new Set([".ts", ".mts", ".cts", ".js", ".mjs"]);
+const SUPPORTED_CONFIG_EXTENSIONS = new Set([
+  ".ts",
+  ".mts",
+  ".cts",
+  ".js",
+  ".mjs",
+]);
 
 export function resolveConfigPath(cwd: string, requestedPath?: string): string {
   const candidate = resolve(cwd, requestedPath ?? CONFIG_FILE);
@@ -13,7 +19,10 @@ export function resolveConfigPath(cwd: string, requestedPath?: string): string {
   if (requestedPath) return candidate;
 
   for (const extension of SUPPORTED_CONFIG_EXTENSIONS) {
-    const withExtension = resolve(cwd, `${CONFIG_FILE.slice(0, -3)}${extension}`);
+    const withExtension = resolve(
+      cwd,
+      `${CONFIG_FILE.slice(0, -3)}${extension}`,
+    );
     if (existsSync(withExtension)) return withExtension;
   }
   return candidate;
@@ -71,7 +80,9 @@ function findNearestTsconfig(configPath: string): string | false {
   }
 }
 
-function isWfConfig(value: unknown): value is WfConfig<unknown, unknown, unknown> {
+function isWfConfig(
+  value: unknown,
+): value is WfConfig<unknown, unknown, unknown> {
   if (!isRecord(value)) return false;
   const profiles = value["profiles"];
   const defaultProfile = value["defaultProfile"];

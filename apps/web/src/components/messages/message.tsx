@@ -6,6 +6,7 @@ import { SparklesIcon } from "@/components/icons/icons";
 import { PreviewAttachment } from "@/components/preview-attachment";
 import { useArtifact } from "@/hooks/api/chats/use-artifact";
 import type { ChatMessage } from "@/lib/types";
+import { getSafeNavigationUrl } from "@/lib/urls/safe";
 import { cn, sanitizeText } from "@/lib/utils";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import type { Vote } from "@circulo-ai/db/schema";
@@ -210,11 +211,12 @@ const PurePreviewMessage = ({
                 source.url ??
                 source.sourceId ??
                 "Source";
+              const safeUrl = getSafeNavigationUrl(source.url);
 
-              return source.url ? (
+              return safeUrl ? (
                 <a
                   className="inline-flex max-w-full min-w-0 items-center gap-1.5 self-start rounded-full border bg-background/60 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  href={source.url}
+                  href={safeUrl}
                   key={key}
                   rel="noreferrer"
                   target="_blank"

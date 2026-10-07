@@ -30,6 +30,16 @@ import {
   shouldEngageAgents,
   shouldUseControllerDirectly,
 } from "./agent-engagement";
+import {
+  addAgentTasks,
+  type AgentTaskDescriptor,
+  type AgentTaskLedgerEntry,
+  loadDurableAgentLoopSnapshots,
+  markAgentTasksRunning,
+  markUnfinishedAgentTasksBlocked,
+  persistDurableAgentLoopSnapshot,
+  recordAgentTaskResults,
+} from "./agent-loop-state";
 import type { OrchestrationAgentProfile } from "./orchestration-agent-profile";
 import type { RequestClassification } from "./steps/classify-request-step";
 import { classifyRequestStep } from "./steps/classify-request-step";
@@ -61,6 +71,8 @@ export interface OrchestrationWorkflowState {
   agentLoopStatus?: "completed" | "blocked";
   agentLoopDecision?: string;
   agentLoopPlanSteps?: WorkflowPlanStepTrace[];
+  /** Durable ledger of every planned dynamic task and its observed outcome. */
+  agentTaskLedger?: AgentTaskLedgerEntry[];
   finalResult?: Awaited<ReturnType<typeof aggregateResultsStep>>;
   failureReason?: string;
   /** A human-only conversation turn completed without an agent response. */
@@ -90,6 +102,7 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
               input.chatId,
               input.actor.userId,
               getTextFromMessages(input.messages),
+              input.actor.apiKeyPermissions,
             );
             return complete({ input, context, startedAt: Date.now() });
           } catch (error) {
@@ -274,11 +287,47 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
           state.context.agents.length === 0 ||
           state.plan.selectedAgents.length === 0
         ) {
-          const directResult = await executeDirectResponseStep({
-            actor: state.input.actor,
-            context: state.context,
-            inputMessages: state.input.messages,
-            workflowId: workflowContext.workflow.id,
+          const directPlan = createDirectCheckpointPlan(state);
+          const directTaskDescriptors = toTaskDescriptors([directPlan], 1);
+          let directTaskLedger = markAgentTasksRunning(
+            addAgentTasks([], directTaskDescriptors),
+            directTaskDescriptors,
+          );
+          await persistDurableAgentLoopSnapshot(workflowContext.workflow.id, {
+            iteration: 1,
+            phase: "executing",
+            resultCount: 0,
+            ledger: directTaskLedger,
+          });
+          const durableAgentResults = await loadDurableAgentResults(
+            workflowContext.workflow.id,
+          );
+          const directKey = getAgentExecutionKey(directPlan);
+          let directResult = durableAgentResults.get(directKey);
+          if (!directResult) {
+            directResult = await executeDirectResponseStep({
+              actor: state.input.actor,
+              context: state.context,
+              inputMessages: state.input.messages,
+              workflowId: workflowContext.workflow.id,
+            });
+            await flushDurableUIChunks(workflowContext.workflow.id);
+            await persistDurableAgentResult(
+              workflowContext.workflow.id,
+              directKey,
+              directResult,
+            );
+          }
+          directTaskLedger = recordAgentTaskResults(directTaskLedger, [
+            directResult,
+          ]);
+          await persistDurableAgentLoopSnapshot(workflowContext.workflow.id, {
+            iteration: 1,
+            phase: "completed",
+            resultCount: 1,
+            status: directResult.success ? "completed" : "blocked",
+            reason: directResult.error,
+            ledger: directTaskLedger,
           });
           await flushDurableUIChunks(workflowContext.workflow.id);
           return complete({
@@ -287,6 +336,7 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
             workflowRunId: workflowContext.workflow.id,
             agentLoopIteration: 1,
             agentLoopStatus: "completed",
+            agentTaskLedger: directTaskLedger,
           });
         }
 
@@ -321,18 +371,33 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
         await flushDurableUIChunks(workflowContext.workflow.id);
 
         let finalAgentResults = loopResult.results;
+        let finalTaskLedger = loopResult.taskLedger;
         if (
           state.plan.fallbackAgentId &&
-          finalAgentResults.every((result) => !result.success)
+          finalAgentResults.length > 0 &&
+          finalAgentResults.every((result) => !result.success) &&
+          !finalAgentResults.some(
+            (result) => result.agentId === state.plan?.fallbackAgentId,
+          )
         ) {
-          const fallbackAgent = state.plan.selectedAgents.find(
+          const fallbackAgent = state.context.agents.find(
             (agent) => agent.agentId === state.plan?.fallbackAgentId,
           );
 
           if (fallbackAgent) {
+            const fallbackPlan: ExecutionPlan["selectedAgents"][number] = {
+              agentId: fallbackAgent.agentId,
+              order: finalAgentResults.length,
+              parallelGroup: null,
+              dependsOn: null,
+              reason: "Reserve agent invoked after primary execution failed.",
+              task: `Retry the original request using the reserve agent.\n\n${getTextFromMessages(state.input.messages)}`,
+              estimatedDuration: null,
+              priority: "high",
+            };
             const fallbackResult = await executeCheckpointedAgent({
               actor: state.input.actor,
-              agentPlan: fallbackAgent,
+              agentPlan: fallbackPlan,
               context: state.context,
               previousResults: finalAgentResults,
               webhookPayload: state.input.webhookPayload,
@@ -341,6 +406,25 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
               plan: state.plan,
             });
             finalAgentResults = [...finalAgentResults, fallbackResult];
+            const fallbackDescriptors = toTaskDescriptors(
+              [fallbackPlan],
+              loopResult.iterations + 1,
+            );
+            finalTaskLedger = recordAgentTaskResults(
+              markAgentTasksRunning(
+                addAgentTasks(finalTaskLedger, fallbackDescriptors),
+                fallbackDescriptors,
+              ),
+              [fallbackResult],
+            );
+            await persistDurableAgentLoopSnapshot(workflowContext.workflow.id, {
+              iteration: loopResult.iterations + 1,
+              phase: "completed",
+              resultCount: finalAgentResults.length,
+              status: fallbackResult.success ? "completed" : "blocked",
+              reason: fallbackResult.error,
+              ledger: finalTaskLedger,
+            });
           }
         }
 
@@ -356,6 +440,7 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
           agentLoopStatus: loopResult.status,
           agentLoopDecision: loopResult.reason,
           agentLoopPlanSteps: loopResult.planSteps,
+          agentTaskLedger: finalTaskLedger,
         });
       },
     })
@@ -637,17 +722,18 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
         if (!state.pendingApprovalId) return complete(state);
 
         const pendingApproval = await db.query.humanApproval.findFirst({
-          where: and(
-            eq(humanApproval.id, state.pendingApprovalId),
-            eq(humanApproval.status, "pending"),
-          ),
+          where: eq(humanApproval.id, state.pendingApprovalId),
         });
 
         if (!pendingApproval) {
           // The approval was decided or expired between the agent step and
           // this durable checkpoint. Continue to aggregation, which reads the
           // final decision from the database.
-          return complete(state);
+          return complete({ ...state, pendingApprovalId: undefined });
+        }
+
+        if (pendingApproval.status === "pending") {
+          return waitForAndRetry(5_000, state);
         }
 
         if (
@@ -667,9 +753,10 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
           });
         }
 
-        // Persist a workflow wait and rerun this checkpoint on approval or on
-        // the short polling interval, so agent execution is never repeated.
-        return waitForAndRetry(5_000, state);
+        // An approved non-MCP request is already complete. MCP requests were
+        // executed above; all other terminal decisions should be projected to
+        // aggregation instead of polling forever.
+        return complete({ ...state, pendingApprovalId: undefined });
       },
     })
     .step<
@@ -859,6 +946,21 @@ function createDirectPlan(reason: string): ExecutionPlan {
   };
 }
 
+function createDirectCheckpointPlan(
+  state: OrchestrationWorkflowState,
+): ExecutionPlan["selectedAgents"][number] {
+  return {
+    agentId: `controller:${state.context?.orchestrationAgent?.id ?? "default"}`,
+    order: 0,
+    parallelGroup: null,
+    dependsOn: null,
+    reason: "Direct controller response checkpoint",
+    task: getTextFromMessages(state.input.messages),
+    estimatedDuration: null,
+    priority: "high",
+  };
+}
+
 function createSilentResult() {
   return {
     summary: "No agent response was requested.",
@@ -923,10 +1025,12 @@ function detectCircularDependencies(
 
 const MAX_AGENTIC_ITERATIONS = 4;
 const MAX_AGENTIC_AGENT_STEPS = 12;
+const MAX_AGENTIC_RUNTIME_MS = 25 * 60 * 1000;
 
 type AgenticLoopResult = {
   results: AgentExecutionResult[];
   planSteps: WorkflowPlanStepTrace[];
+  taskLedger: AgentTaskLedgerEntry[];
   iterations: number;
   status: "completed" | "blocked";
   reason: string;
@@ -952,6 +1056,12 @@ async function executeAgenticLoop(params: {
   >[0];
   const writeLoopEvent = (chunk: WorkflowStreamChunk) =>
     dataStream.write(chunk);
+  const loopDeadline =
+    Date.now() +
+    Math.min(
+      MAX_AGENTIC_RUNTIME_MS,
+      Math.max(60_000, params.plan.timeoutMinutes * 60_000),
+    );
 
   writeLoopEvent({
     type: "data-workflowLoopStarted",
@@ -962,9 +1072,41 @@ async function executeAgenticLoop(params: {
     },
   });
 
+  const initialTaskDescriptors = toTaskDescriptors(
+    params.plan.selectedAgents,
+    1,
+  );
+  const durableSnapshots = await loadDurableAgentLoopSnapshots(
+    params.workflowId,
+  );
+  const latestDurableSnapshot = [...durableSnapshots]
+    .sort(
+      (a, b) =>
+        a.iteration - b.iteration ||
+        agentLoopPhaseRank(a.phase) - agentLoopPhaseRank(b.phase),
+    )
+    .at(-1);
+  let taskLedger = addAgentTasks(
+    latestDurableSnapshot?.ledger ?? [],
+    initialTaskDescriptors,
+  );
+  taskLedger = markAgentTasksRunning(taskLedger, initialTaskDescriptors);
+  await persistDurableAgentLoopSnapshot(params.workflowId, {
+    iteration: 1,
+    phase: "executing",
+    resultCount: 0,
+    ledger: taskLedger,
+  });
   let results = await executeAgentsAccordingToStrategy({
     ...params,
     previousResults: [],
+  });
+  taskLedger = recordAgentTaskResults(taskLedger, results);
+  await persistDurableAgentLoopSnapshot(params.workflowId, {
+    iteration: 1,
+    phase: "observing",
+    resultCount: results.length,
+    ledger: taskLedger,
   });
   let iterations = 1;
   const durableDecisions = await loadDurableAgentProgressDecisions(
@@ -974,7 +1116,7 @@ async function executeAgenticLoop(params: {
   let status: AgenticLoopResult["status"] = "completed";
   let reason = "The initial execution plan completed.";
 
-  while (iterations < MAX_AGENTIC_ITERATIONS) {
+  while (iterations < MAX_AGENTIC_ITERATIONS && Date.now() < loopDeadline) {
     writeLoopEvent({
       type: "data-workflowLoopIteration",
       data: {
@@ -983,6 +1125,12 @@ async function executeAgenticLoop(params: {
         status: "evaluating",
         completedStepCount: results.length,
       },
+    });
+    await persistDurableAgentLoopSnapshot(params.workflowId, {
+      iteration: iterations,
+      phase: "evaluating",
+      resultCount: results.length,
+      ledger: taskLedger,
     });
 
     let decision = durableDecisions.get(iterations);
@@ -1010,13 +1158,21 @@ async function executeAgenticLoop(params: {
           nextSteps: [],
         };
       }
-      await persistDurableAgentProgressDecision(
+      decision = await persistDurableAgentProgressDecision(
         params.workflowId,
         iterations,
         decision,
       );
       durableDecisions.set(iterations, decision);
     }
+
+    await persistDurableAgentLoopSnapshot(params.workflowId, {
+      iteration: iterations,
+      phase: "decided",
+      resultCount: results.length,
+      decision: decision.decision,
+      ledger: taskLedger,
+    });
 
     reason = decision.reasoning;
     writeLoopEvent({
@@ -1057,6 +1213,18 @@ async function executeAgenticLoop(params: {
         priority: step.priority,
       })),
     };
+    const nextTaskDescriptors = toTaskDescriptors(
+      nextPlan.selectedAgents,
+      iterations + 1,
+    );
+    taskLedger = addAgentTasks(taskLedger, nextTaskDescriptors);
+    taskLedger = markAgentTasksRunning(taskLedger, nextTaskDescriptors);
+    await persistDurableAgentLoopSnapshot(params.workflowId, {
+      iteration: iterations + 1,
+      phase: "executing",
+      resultCount: results.length,
+      ledger: taskLedger,
+    });
     executedPlans.push(nextPlan);
     writeLoopEvent({
       type: "data-workflowLoopIteration",
@@ -1074,11 +1242,25 @@ async function executeAgenticLoop(params: {
       previousResults: results,
     });
     results = [...results, ...nextResults];
+    taskLedger = recordAgentTaskResults(taskLedger, nextResults);
+    await persistDurableAgentLoopSnapshot(params.workflowId, {
+      iteration: iterations + 1,
+      phase: "observing",
+      resultCount: results.length,
+      ledger: taskLedger,
+    });
     iterations += 1;
   }
 
   if (iterations >= MAX_AGENTIC_ITERATIONS && status === "completed") {
     reason = "The maximum agentic iteration budget was reached.";
+  }
+  if (Date.now() >= loopDeadline && iterations < MAX_AGENTIC_ITERATIONS) {
+    status = "blocked";
+    reason = "The agentic execution time budget was reached.";
+  }
+  if (status === "blocked") {
+    taskLedger = markUnfinishedAgentTasksBlocked(taskLedger, reason);
   }
   writeLoopEvent({
     type: "data-workflowLoopCompleted",
@@ -1089,13 +1271,55 @@ async function executeAgenticLoop(params: {
       reason,
     },
   });
+  await persistDurableAgentLoopSnapshot(params.workflowId, {
+    iteration: iterations,
+    phase: "completed",
+    resultCount: results.length,
+    status,
+    reason,
+    ledger: taskLedger,
+  });
   return {
     results,
     planSteps: buildAgenticPlanSteps(params.workflowId, executedPlans, results),
+    taskLedger,
     iterations,
     status,
     reason,
   };
+}
+
+function toTaskDescriptors(
+  agents: ExecutionPlan["selectedAgents"],
+  iteration: number,
+): AgentTaskDescriptor[] {
+  return agents.map((agent) => ({
+    agentId: agent.agentId,
+    task: agent.task,
+    order: agent.order,
+    iteration,
+    priority: agent.priority,
+    dependsOn: agent.dependsOn ?? [],
+  }));
+}
+
+function agentLoopPhaseRank(
+  phase:
+    | "planned"
+    | "executing"
+    | "observing"
+    | "evaluating"
+    | "decided"
+    | "completed",
+): number {
+  return {
+    planned: 0,
+    executing: 1,
+    observing: 2,
+    evaluating: 3,
+    decided: 4,
+    completed: 5,
+  }[phase];
 }
 
 function buildAgenticPlanSteps(
@@ -1303,7 +1527,11 @@ async function executeParallel(
     if (plan.stopOnError && groupResults.some((result) => !result.success)) {
       for (const skippedAgent of plan.selectedAgents.filter(
         (candidate) =>
-          !results.some((result) => result.agentId === candidate.agentId),
+          !results.some(
+            (result) =>
+              result.agentId === candidate.agentId &&
+              result.task === candidate.task,
+          ),
       )) {
         const skipped = createSkippedResult(
           skippedAgent,
@@ -1318,6 +1546,7 @@ async function executeParallel(
           context,
           skipped,
         );
+        results.push(skipped);
       }
       break;
     }
@@ -1335,23 +1564,35 @@ async function executeConditional(
   previousResults: AgentExecutionResult[] = [],
 ): Promise<AgentExecutionResult[]> {
   const results: AgentExecutionResult[] = [];
-  const executed = new Set(previousResults.map((result) => result.agentId));
-  const resultMap = new Map(
-    previousResults.map((result) => [result.agentId, result]),
-  );
+  const executed = new Set<string>();
+  const resultMap = new Map<string, AgentExecutionResult>();
+  for (const agentPlan of plan.selectedAgents) {
+    const previousResult = previousResults.find(
+      (result) =>
+        result.agentId === agentPlan.agentId && result.task === agentPlan.task,
+    );
+    if (!previousResult) continue;
+    const taskKey = getPlanTaskKey(agentPlan);
+    executed.add(taskKey);
+    resultMap.set(taskKey, previousResult);
+  }
 
   while (executed.size < plan.selectedAgents.length) {
     const ready = plan.selectedAgents.filter((agent) => {
-      if (executed.has(agent.agentId)) return false;
-      return (agent.dependsOn ?? []).every(
-        (dependencyId) =>
-          executed.has(dependencyId) && resultMap.get(dependencyId)?.success,
+      if (executed.has(getPlanTaskKey(agent))) return false;
+      return (agent.dependsOn ?? []).every((dependencyId) =>
+        plan.selectedAgents.some(
+          (dependency) =>
+            dependency.agentId === dependencyId &&
+            executed.has(getPlanTaskKey(dependency)) &&
+            resultMap.get(getPlanTaskKey(dependency))?.success,
+        ),
       );
     });
 
     if (ready.length === 0) {
       for (const agent of plan.selectedAgents.filter(
-        (candidate) => !executed.has(candidate.agentId),
+        (candidate) => !executed.has(getPlanTaskKey(candidate)),
       )) {
         const failed = createSkippedResult(
           agent,
@@ -1367,8 +1608,9 @@ async function executeConditional(
           failed,
         );
         results.push(failed);
-        resultMap.set(agent.agentId, failed);
-        executed.add(agent.agentId);
+        const taskKey = getPlanTaskKey(agent);
+        resultMap.set(taskKey, failed);
+        executed.add(taskKey);
       }
       break;
     }
@@ -1390,13 +1632,21 @@ async function executeConditional(
 
     for (const result of batchResults) {
       results.push(result);
-      resultMap.set(result.agentId, result);
-      executed.add(result.agentId);
+      const agentPlan = ready.find(
+        (candidate) =>
+          candidate.agentId === result.agentId &&
+          candidate.task === result.task,
+      );
+      if (agentPlan) {
+        const taskKey = getPlanTaskKey(agentPlan);
+        resultMap.set(taskKey, result);
+        executed.add(taskKey);
+      }
     }
 
     if (plan.stopOnError && batchResults.some((result) => !result.success)) {
       for (const agent of plan.selectedAgents.filter(
-        (candidate) => !executed.has(candidate.agentId),
+        (candidate) => !executed.has(getPlanTaskKey(candidate)),
       )) {
         const skipped = createSkippedResult(
           agent,
@@ -1412,14 +1662,21 @@ async function executeConditional(
           skipped,
         );
         results.push(skipped);
-        resultMap.set(agent.agentId, skipped);
-        executed.add(agent.agentId);
+        const taskKey = getPlanTaskKey(agent);
+        resultMap.set(taskKey, skipped);
+        executed.add(taskKey);
       }
       break;
     }
   }
 
   return results;
+}
+
+function getPlanTaskKey(
+  agentPlan: ExecutionPlan["selectedAgents"][number],
+): string {
+  return `${agentPlan.agentId}\u001f${agentPlan.order}\u001f${agentPlan.task}`;
 }
 
 async function executeSingle(

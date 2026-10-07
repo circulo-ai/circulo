@@ -1,5 +1,8 @@
 #!/usr/bin/env node
-import { executeCliCommand, parseCliArguments } from "./commands/command-runner";
+import {
+  executeCliCommand,
+  parseCliArguments,
+} from "./commands/command-runner";
 
 const context = {
   cwd: process.cwd(),
@@ -8,10 +11,17 @@ const context = {
 };
 
 try {
-  const result = await executeCliCommand(parseCliArguments(process.argv.slice(2)), context);
+  const result = await executeCliCommand(
+    parseCliArguments(process.argv.slice(2)),
+    context,
+  );
   context.stdout(result.output);
   process.exitCode = result.exitCode;
 } catch (error) {
-  context.stderr(error instanceof Error ? `Error: ${error.message}` : "Error: Unknown failure");
+  context.stderr(
+    error instanceof Error
+      ? `Error: ${error.message}`
+      : "Error: Unknown failure",
+  );
   process.exitCode = 1;
 }

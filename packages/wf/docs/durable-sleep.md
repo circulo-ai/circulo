@@ -25,7 +25,11 @@ replay:      workflow starts -> recorded activity -> fired sleep -> next line
 ```
 
 ```ts
-import { defineActivity, defineDurableWorkflow, InMemoryActivityRegistry } from "@circulo-ai/wf";
+import {
+  defineActivity,
+  defineDurableWorkflow,
+  InMemoryActivityRegistry,
+} from "@circulo-ai/wf";
 
 const activities = new InMemoryActivityRegistry();
 activities.register(
@@ -103,11 +107,9 @@ import { ReplayWorkflowRunner } from "@circulo-ai/wf/durable";
 
 const adapters = createRedisDurableAdapters({ client: redis });
 await adapters.initialize();
-const runner = new ReplayWorkflowRunner(
-  adapters.history,
-  adapters.queue,
-  { resumeLock: adapters.lockStore },
-);
+const runner = new ReplayWorkflowRunner(adapters.history, adapters.queue, {
+  resumeLock: adapters.lockStore,
+});
 ```
 
 Call `await adapters.close()` during process shutdown. The composition does

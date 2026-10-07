@@ -40,7 +40,9 @@ export function parseDuration(value: DurationInput): number {
   }
 
   if (typeof value !== "string" || value.trim() === "") {
-    throw new RangeError("Duration must be a finite number or a non-empty string");
+    throw new RangeError(
+      "Duration must be a finite number or a non-empty string",
+    );
   }
 
   const source = value.trim();
@@ -74,7 +76,9 @@ export function parseDuration(value: DurationInput): number {
     seenUnits.add(multiplier);
     total += amount * multiplier;
     if (!Number.isSafeInteger(total)) {
-      throw new RangeError(`Duration "${value}" exceeds the safe integer limit`);
+      throw new RangeError(
+        `Duration "${value}" exceeds the safe integer limit`,
+      );
     }
     matched = true;
     cursor = COMPONENT.lastIndex;
@@ -112,6 +116,8 @@ export function formatDuration(milliseconds: number): string {
 
 export function assertDuration(value: number): void {
   if (!Number.isFinite(value) || value < 0 || !Number.isSafeInteger(value)) {
-    throw new RangeError("Duration must be a finite, non-negative safe integer in milliseconds");
+    throw new RangeError(
+      "Duration must be a finite, non-negative safe integer in milliseconds",
+    );
   }
 }

@@ -9,6 +9,7 @@ import {
 import { OrganizationPeople } from "@/components/auth/organization/organization-people";
 import { OrganizationTeams } from "@/components/auth/organization/organization-teams";
 import { RequireSession } from "@/components/auth/require-session";
+import { AIProviders } from "@/components/sidebar/settings-modal/components/ai-providers/ai-providers";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -25,6 +26,7 @@ import {
 } from "@/components/workspace/workspace-shell";
 import { WorkspaceTools } from "@/components/workspace/workspace-tools";
 import { authClient } from "@/lib/auth-client";
+import { isBillingEnabled } from "@/lib/environment";
 import {
   ArrowRight01Icon,
   Building01Icon,
@@ -82,6 +84,11 @@ const sectionCopy: Record<
     title: "Automation",
     description: "Schedule work, review approvals, and coordinate handoffs.",
   },
+  providers: {
+    title: "AI providers",
+    description:
+      "Connect your own API keys or a local and OpenAI-compatible endpoint for chat, tools, embeddings, and other model features.",
+  },
   plugins: {
     title: "Plugins",
     description:
@@ -102,7 +109,11 @@ function WorkspacePageContent() {
   const searchParams = useSearchParams();
   const requested = searchParams.get("section") as WorkspaceSection | null;
   const activeSection =
-    requested && requested in sectionCopy ? requested : "overview";
+    requested === "billing" && !isBillingEnabled
+      ? "overview"
+      : requested && requested in sectionCopy
+        ? requested
+        : "overview";
   const { data: organization, isPending: isOrganizationPending } =
     useActiveOrganization(authClient);
   const { data: organizations, isPending: isOrganizationsPending } =
@@ -150,10 +161,14 @@ function WorkspacePageContent() {
       <WorkspaceTools organization={organization} />
     ) : activeSection === "account" ? (
       <WorkspaceAccount />
+    ) : activeSection === "providers" ? (
+      <AIProviders variant="workspace" />
     ) : activeSection === "overview" ? (
       <Overview organization={organization} session={session} />
-    ) : (
+    ) : activeSection === "billing" && isBillingEnabled ? (
       <RedirectCard section={activeSection} />
+    ) : (
+      <RedirectCard section="overview" />
     );
 
   return (

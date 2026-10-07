@@ -30,6 +30,7 @@ bun-debug.log*
 **/dist-final-*/
 **/.well-known/workflow/
 **/standalone/
+apps/desktop/runtime-build/
 sim-standalone.tar.gz
 
 # misc

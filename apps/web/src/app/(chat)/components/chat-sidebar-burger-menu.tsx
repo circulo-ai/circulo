@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { authClient, useSession } from "@/lib/auth-client";
+import { isBillingEnabled } from "@/lib/environment";
 import {
   Bot,
   Brain,
@@ -124,10 +125,12 @@ export function ChatSidebarBurgerMenu() {
             <Settings />
             Tools & MCP
           </CustomDropdownMenuItem>
-          <CustomDropdownMenuItem onClick={() => navigate("/pricing")}>
-            <CreditCard />
-            Billing
-          </CustomDropdownMenuItem>
+          {isBillingEnabled && (
+            <CustomDropdownMenuItem onClick={() => navigate("/pricing")}>
+              <CreditCard />
+              Billing
+            </CustomDropdownMenuItem>
+          )}
           <CustomDropdownMenuItem
             onClick={() => navigate("/workspace?section=account")}
           >

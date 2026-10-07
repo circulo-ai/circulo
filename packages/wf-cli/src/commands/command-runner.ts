@@ -1,10 +1,10 @@
+import type { CliCommandContext, CliCommandResult } from "../types";
+import { executeDoctorCommand } from "./doctor";
 import { executeGraphCommand } from "./graph";
 import { executeInitCommand } from "./init";
 import { executeInspectCommand } from "./inspect";
 import { executeRegistryCommand } from "./registry";
 import { executeValidateCommand } from "./validate";
-import { executeDoctorCommand } from "./doctor";
-import type { CliCommandContext, CliCommandResult } from "../types";
 
 export interface CliArguments {
   readonly command: string;
@@ -13,11 +13,18 @@ export interface CliArguments {
 }
 
 export function parseCliArguments(argv: readonly string[]): CliArguments {
-  if (argv[0] === "-h" || argv[0] === "--help") return { command: "help", positional: [], options: {} };
+  if (argv[0] === "-h" || argv[0] === "--help")
+    return { command: "help", positional: [], options: {} };
   const [command = "help", ...rest] = argv;
   const positional: string[] = [];
   const options: Record<string, string | boolean> = {};
-  const supportedOptions = new Set(["config", "profile", "json", "force", "format"]);
+  const supportedOptions = new Set([
+    "config",
+    "profile",
+    "json",
+    "force",
+    "format",
+  ]);
   for (let index = 0; index < rest.length; index += 1) {
     const argument = rest[index];
     if (!argument) continue;
@@ -28,7 +35,8 @@ export function parseCliArguments(argv: readonly string[]): CliArguments {
     const [rawKey, inlineValue] = argument.slice(2).split("=", 2);
     const key = rawKey ?? "";
     if (!key) throw new Error("Option names must not be empty.");
-    if (!supportedOptions.has(key)) throw new Error(`Unknown option "--${key}".`);
+    if (!supportedOptions.has(key))
+      throw new Error(`Unknown option "--${key}".`);
     if (inlineValue !== undefined) {
       options[key] = inlineValue;
       continue;
@@ -64,7 +72,9 @@ export async function executeCliCommand(
     case "doctor":
       return executeDoctorCommand(args, context);
     default:
-      throw new Error(`Unknown command "${args.command}". Run "wf help" for usage.`);
+      throw new Error(
+        `Unknown command "${args.command}". Run "wf help" for usage.`,
+      );
   }
 }
 

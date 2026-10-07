@@ -22,8 +22,6 @@
     "paths": {
       "@/*": ["./src/*"],
       "#/*": ["./public/*"],
-      "@/db": ["../../packages/db/index.ts"], // TODO replace with @circulo-ai/db
-      "@/db/*": ["../../packages/db/*"], // replace with @circulo-ai/db/*
       "@circulo-ai/db": ["../../packages/db"],
       "@circulo-ai/db/*": ["../../packages/db/*"],
       "@circulo-ai/types": ["../../packages/types/src"],

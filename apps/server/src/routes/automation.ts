@@ -14,7 +14,11 @@ import {
 import { createRouter } from "@/lib/create-app";
 import { McpClient } from "@/lib/mcp/client";
 import { validateMcpEndpoint } from "@/lib/mcp/endpoint";
-import { hasPermissionForUser, isMemberOf } from "@/lib/permissions";
+import {
+  hasPermissionForUser,
+  isMemberOf,
+  type ApiKeyPermissions,
+} from "@/lib/permissions";
 import { requireAuth } from "@/middleware/auth";
 import { calculateNextRun, validateSchedule } from "@/services/scheduling";
 import { workflowRunService } from "@/workflows/runtime/workflow-run-service";
@@ -64,7 +68,11 @@ function requireActiveOrganization(
   }
 }
 
-async function requireWorkspaceManager(userId: string, organizationId: string) {
+async function requireWorkspaceManager(
+  userId: string,
+  organizationId: string,
+  apiKeyPermissions?: ApiKeyPermissions,
+) {
   await requireOrganization(userId, organizationId);
   if (
     !(await hasPermissionForUser(
@@ -72,6 +80,7 @@ async function requireWorkspaceManager(userId: string, organizationId: string) {
       organizationId,
       "automation",
       "manage",
+      apiKeyPermissions,
     ))
   ) {
     throw new ForbiddenError("Only workspace managers can access this data");
@@ -118,6 +127,7 @@ router.get("/automation/tasks", requireAuth, async (c) => {
     organizationId,
     "automation",
     "manage",
+    c.var.apiKeyPermissions,
   );
   const tasks = await db.query.scheduledTask.findMany({
     where: isManager
@@ -179,6 +189,7 @@ router.patch(
       current.organizationId,
       "automation",
       "manage",
+      c.var.apiKeyPermissions,
     );
     if (current.createdBy !== c.var.user!.id && !isOrganizationManager)
       throw new ForbiddenError("You don't have permission to update this task");
@@ -243,6 +254,7 @@ router.delete(
         current.organizationId,
         "automation",
         "manage",
+        c.var.apiKeyPermissions,
       ))
     )
       throw new ForbiddenError("You don't have permission to delete this task");
@@ -275,6 +287,7 @@ router.get("/automation/handoffs", requireAuth, async (c) => {
     organizationId,
     "automation",
     "manage",
+    c.var.apiKeyPermissions,
   );
   const rows = await db.query.taskHandoff.findMany({
     where: isManager
@@ -359,6 +372,7 @@ router.patch(
       chat.organizationId,
       "automation",
       "manage",
+      c.var.apiKeyPermissions,
     );
     const isTarget = current.toUserId === c.var.user!.id;
     if (!isTarget && !canManageOrganization)
@@ -554,6 +568,7 @@ router.patch(
       chat.organizationId,
       "automation",
       "manage",
+      c.var.apiKeyPermissions,
     );
     if (current.approverUserId && current.approverUserId !== c.var.user!.id)
       throw new ForbiddenError("This approval is assigned to another user");
@@ -618,7 +633,11 @@ const linkSchema = z
 router.get("/automation/mcp", requireAuth, async (c) => {
   const organizationId = c.get("activeOrgId");
   if (!organizationId) throw new BadRequestError("No active organization");
-  await requireWorkspaceManager(c.var.user!.id, organizationId);
+  await requireWorkspaceManager(
+    c.var.user!.id,
+    organizationId,
+    c.var.apiKeyPermissions,
+  );
   return c.json(
     await db.query.mcpIntegration.findMany({
       where: eq(mcpIntegration.organizationId, organizationId),
@@ -642,6 +661,7 @@ router.post(
         body.organizationId,
         "mcp",
         "manage",
+        c.var.apiKeyPermissions,
       ))
     )
       throw new ForbiddenError(
@@ -679,7 +699,11 @@ router.post(
     });
     if (!current) throw new NotFoundError("MCP integration not found");
     requireActiveOrganization(c, current.organizationId);
-    await requireWorkspaceManager(c.var.user!.id, current.organizationId);
+    await requireWorkspaceManager(
+      c.var.user!.id,
+      current.organizationId,
+      c.var.apiKeyPermissions,
+    );
     try {
       const tools = await new McpClient(current).listTools();
       return c.json({
@@ -714,7 +738,11 @@ router.post(
     });
     if (!current) throw new NotFoundError("MCP integration not found");
     requireActiveOrganization(c, current.organizationId);
-    await requireWorkspaceManager(c.var.user!.id, current.organizationId);
+    await requireWorkspaceManager(
+      c.var.user!.id,
+      current.organizationId,
+      c.var.apiKeyPermissions,
+    );
     try {
       const remoteTools = await new McpClient(current).listTools();
       await db.transaction(async (tx) => {
@@ -789,7 +817,11 @@ router.patch(
     });
     if (!current) throw new NotFoundError("MCP integration not found");
     requireActiveOrganization(c, current.organizationId);
-    await requireWorkspaceManager(c.var.user!.id, current.organizationId);
+    await requireWorkspaceManager(
+      c.var.user!.id,
+      current.organizationId,
+      c.var.apiKeyPermissions,
+    );
     const [updated] = await db
       .update(mcpTool)
       .set({ ...c.req.valid("json"), updatedAt: new Date() })
@@ -829,6 +861,7 @@ router.patch(
         current.organizationId,
         "mcp",
         "manage",
+        c.var.apiKeyPermissions,
       ))
     )
       throw new ForbiddenError(
@@ -882,6 +915,7 @@ router.delete(
         current.organizationId,
         "mcp",
         "manage",
+        c.var.apiKeyPermissions,
       ))
     )
       throw new ForbiddenError(
@@ -912,6 +946,7 @@ router.post(
         integration.organizationId,
         "mcp",
         "manage",
+        c.var.apiKeyPermissions,
       ))
     )
       throw new ForbiddenError(
@@ -967,6 +1002,7 @@ router.delete(
         link.integration.organizationId,
         "mcp",
         "manage",
+        c.var.apiKeyPermissions,
       ))
     )
       throw new ForbiddenError(

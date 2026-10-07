@@ -1,11 +1,13 @@
 import { db } from "@/db";
 import { messageRepo } from "@/db/repositories";
-import { chat as chatTable, message as messageTable } from "@/db/schema";
+import { chat as chatTable } from "@/db/schema";
 import type { RequestServices } from "@/di/di-context";
 import { getActiveOrganizationId, getSession } from "@/lib/auth";
 import { enforceOrganizationFeatureLimit } from "@/lib/billing/limits";
+import { consumeQuota, reserveQuota } from "@/lib/billing/quota";
 import { createRouter } from "@/lib/create-app";
 import { hasPermission, isMemberOf } from "@/lib/permissions";
+import { isSafeMessageUrl } from "@/lib/security/message-url";
 import { type ChatMessage } from "@/lib/types";
 import {
   convertToUIMessages,
@@ -22,7 +24,7 @@ import {
 } from "@circulo-ai/types";
 import { zValidator } from "@hono/zod-validator";
 import { createUIMessageStreamResponse } from "ai";
-import { and, count, eq, gte } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { z } from "zod";
 
 const promptMentionSchema = z.object({
@@ -61,10 +63,17 @@ const messagePartSchema = z
     ]),
     text: z.string().optional(),
     reasoning: z.string().optional(),
-    url: z.string().optional(),
+    url: z
+      .string()
+      .refine(isSafeMessageUrl, "URL scheme is not allowed")
+      .optional(),
     name: z.string().optional(),
     filename: z.string().optional(),
-    downloadUrl: z.string().url().optional(),
+    downloadUrl: z
+      .string()
+      .url()
+      .refine(isSafeMessageUrl, "URL scheme is not allowed")
+      .optional(),
     mediaType: z.string().optional(),
     contentType: z.string().optional(),
     size: z.number().int().nonnegative().optional(),
@@ -240,29 +249,11 @@ router.post(
         }
       }
 
-      const startOfUtcDay = new Date();
-      startOfUtcDay.setUTCHours(0, 0, 0, 0);
-      await enforceOrganizationFeatureLimit({
+      const messageQuota = await reserveQuota({
         organizationId: activeOrganizationId,
         feature: "max_messages_per_day",
-        current: Number(
-          (
-            await db
-              .select({ current: count() })
-              .from(messageTable)
-              .innerJoin(chatTable, eq(messageTable.chatId, chatTable.id))
-              .where(
-                and(
-                  eq(chatTable.organizationId, activeOrganizationId),
-                  eq(chatTable.isDeleted, false),
-                  eq(messageTable.role, "user"),
-                  eq(messageTable.isDeleted, false),
-                  gte(messageTable.createdAt, startOfUtcDay),
-                ),
-              )
-          )[0]?.current ?? 0,
-        ),
-        resourceName: "Daily message",
+        userId: user!.id,
+        idempotencyKey: `${id}:message-quota:${message.id}`,
       });
 
       if (existingChat) {
@@ -354,6 +345,8 @@ router.post(
         }
       }
 
+      await consumeQuota(messageQuota);
+
       const run = await workflowRunService.start({
         chatId: id,
         messageId: message.id,
@@ -363,6 +356,7 @@ router.post(
         actor: {
           userId: user!.id,
           organizationId: activeOrganizationId,
+          apiKeyPermissions: c.var.apiKeyPermissions,
         },
       });
 

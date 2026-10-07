@@ -8,7 +8,18 @@ import type {
   WorkflowFilter,
   WorkflowStore,
 } from "@circulo-ai/wf";
-import { and, asc, count, eq, gte, isNull, lt, lte, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  eq,
+  gte,
+  isNull,
+  lt,
+  lte,
+  or,
+  sql,
+} from "drizzle-orm";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -95,10 +106,14 @@ export class DurableWorkflowStore<
     const conditions = [];
     if (filter?.state) conditions.push(eq(workflowRun.state, filter.state));
     if (filter?.createdAfter !== undefined) {
-      conditions.push(gte(workflowRun.createdAt, new Date(filter.createdAfter)));
+      conditions.push(
+        gte(workflowRun.createdAt, new Date(filter.createdAfter)),
+      );
     }
     if (filter?.createdBefore !== undefined) {
-      conditions.push(lte(workflowRun.createdAt, new Date(filter.createdBefore)));
+      conditions.push(
+        lte(workflowRun.createdAt, new Date(filter.createdBefore)),
+      );
     }
     if (filter?.resumeBefore !== undefined) {
       conditions.push(lte(workflowRun.resumeAt, new Date(filter.resumeBefore)));
@@ -293,13 +308,13 @@ export class DurableWorkflowEventStore<TOutput> implements EventStore<TOutput> {
       )
       .orderBy(asc(workflowRunEvent.sequence), asc(workflowRunEvent.timestamp));
     return rows.map((row) => ({
-        id: row.id,
-        workflowId: row.workflowId,
-        timestamp: row.timestamp,
-        eventType: row.eventType as WorkflowEvent<TOutput>["eventType"],
-        payload: fromJson(row.payload) as WorkflowEvent<TOutput>["payload"],
-        correlationId: row.correlationId ?? undefined,
-      }));
+      id: row.id,
+      workflowId: row.workflowId,
+      timestamp: row.timestamp,
+      eventType: row.eventType as WorkflowEvent<TOutput>["eventType"],
+      payload: fromJson(row.payload) as WorkflowEvent<TOutput>["payload"],
+      correlationId: row.correlationId ?? undefined,
+    }));
   }
 
   async clear(workflowId: string): Promise<void> {

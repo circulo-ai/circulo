@@ -12,3 +12,6 @@ export * from "./skills";
 export * from "./workspace-roles";
 
 export * from "./types";
+export * from "./usage";
+export * from "./sync";
+export * from "./quota";

@@ -1,3 +1,4 @@
+import { isBillingEnabled } from "@/lib/environment";
 import Link from "next/link";
 import useSWR from "swr";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
@@ -8,7 +9,7 @@ export function SubscriptionUsageIndicator() {
   const { state } = useSidebar();
 
   const { data: subscriptionRes } = useSWR(
-    "/api/billing/subscriptions/current",
+    isBillingEnabled ? "/api/billing/subscriptions/current" : null,
     async (url) => {
       const res = await fetch(url);
       if (!res.ok) return null;
@@ -17,7 +18,7 @@ export function SubscriptionUsageIndicator() {
   );
 
   const { data: usageRes } = useSWR(
-    "/api/billing/usage/current",
+    isBillingEnabled ? "/api/billing/usage/current" : null,
     async (url) => {
       const res = await fetch(url);
       if (!res.ok) return null;
@@ -41,6 +42,8 @@ export function SubscriptionUsageIndicator() {
         rateLimitPerMinute: number | null;
       }
     | undefined;
+
+  if (!isBillingEnabled) return null;
 
   const planName: string | undefined = subscription?.plan?.name;
   const features = subscription?.features as

@@ -24,7 +24,10 @@ export const isTest = env.NODE_ENV === "test";
 // This module is imported by client components. Use the public billing flag
 // here instead of the server-only BILLING_ENABLED field; reading a server
 // field through @t3-oss/env-nextjs throws during production hydration.
-export const isBillingEnabled = isTruthy(env.NEXT_PUBLIC_BILLING_ENABLED);
+export const runtimeKind = env.NEXT_PUBLIC_CIRCULO_RUNTIME_KIND ?? "cloud";
+
+export const isBillingEnabled =
+  runtimeKind === "cloud" && isTruthy(env.NEXT_PUBLIC_BILLING_ENABLED);
 
 /**
  * Is this the hosted version of the application

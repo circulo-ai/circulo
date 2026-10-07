@@ -16,10 +16,7 @@
     "types": ["node"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"],
-      "@/db": ["./index.ts"], // TODO replace with @circulo-ai/db
-      "@/db/*": ["./*"], // replace with @circulo-ai/db/*
-      "@/lib/types": ["./lib/types.ts"]
+      "@/*": ["./*"]
     }
   },
   "include": ["./**/*.ts"],

@@ -16,7 +16,11 @@ import {
   getKnowledgeImageFileName,
   refreshKnowledgeImageDocument,
 } from "@/lib/knowledge/vision";
-import { hasPermissionForUser, isMemberOf } from "@/lib/permissions";
+import {
+  hasPermissionForUser,
+  isMemberOf,
+  type ApiKeyPermissions,
+} from "@/lib/permissions";
 import { storageManager } from "@/lib/storage/config";
 import { requireAuth } from "@/middleware/auth";
 import { parseBuffer } from "@circulo-ai/file-parsers";
@@ -60,9 +64,16 @@ async function getActiveOrganization(c: Context<AppEnv>) {
 async function requireOrganizationManager(
   userId: string,
   organizationId: string,
+  apiKeyPermissions?: ApiKeyPermissions,
 ) {
   if (
-    !(await hasPermissionForUser(userId, organizationId, "knowledge", "manage"))
+    !(await hasPermissionForUser(
+      userId,
+      organizationId,
+      "knowledge",
+      "manage",
+      apiKeyPermissions,
+    ))
   ) {
     throw new ForbiddenError(
       "Only workspace owners and admins can manage knowledge bases",
@@ -103,7 +114,11 @@ router.post(
   zValidator("json", baseSchema),
   async (c) => {
     const organizationId = await getActiveOrganization(c);
-    await requireOrganizationManager(c.var.user!.id, organizationId);
+    await requireOrganizationManager(
+      c.var.user!.id,
+      organizationId,
+      c.var.apiKeyPermissions,
+    );
     const body = c.req.valid("json");
     const [baseCount] = await db
       .select({ current: count() })
@@ -140,7 +155,11 @@ router.patch(
   zValidator("json", baseSchema.partial()),
   async (c) => {
     const organizationId = await getActiveOrganization(c);
-    await requireOrganizationManager(c.var.user!.id, organizationId);
+    await requireOrganizationManager(
+      c.var.user!.id,
+      organizationId,
+      c.var.apiKeyPermissions,
+    );
     const { id } = c.req.valid("param");
     await getBase(id, organizationId);
     const [updated] = await db
@@ -163,7 +182,11 @@ router.delete(
   zValidator("param", idParams),
   async (c) => {
     const organizationId = await getActiveOrganization(c);
-    await requireOrganizationManager(c.var.user!.id, organizationId);
+    await requireOrganizationManager(
+      c.var.user!.id,
+      organizationId,
+      c.var.apiKeyPermissions,
+    );
     const { id } = c.req.valid("param");
     await getBase(id, organizationId);
     await db
@@ -254,7 +277,11 @@ router.post(
   zValidator("json", documentSchema),
   async (c) => {
     const organizationId = await getActiveOrganization(c);
-    await requireOrganizationManager(c.var.user!.id, organizationId);
+    await requireOrganizationManager(
+      c.var.user!.id,
+      organizationId,
+      c.var.apiKeyPermissions,
+    );
     const { id } = c.req.valid("param");
     await getBase(id, organizationId);
     const body = c.req.valid("json");
@@ -294,7 +321,11 @@ router.post(
   zValidator("param", idParams),
   async (c) => {
     const organizationId = await getActiveOrganization(c);
-    await requireOrganizationManager(c.var.user!.id, organizationId);
+    await requireOrganizationManager(
+      c.var.user!.id,
+      organizationId,
+      c.var.apiKeyPermissions,
+    );
     const { id } = c.req.valid("param");
     await getBase(id, organizationId);
 
@@ -436,7 +467,11 @@ router.post(
   zValidator("param", idParams),
   async (c) => {
     const organizationId = await getActiveOrganization(c);
-    await requireOrganizationManager(c.var.user!.id, organizationId);
+    await requireOrganizationManager(
+      c.var.user!.id,
+      organizationId,
+      c.var.apiKeyPermissions,
+    );
     const { id } = c.req.valid("param");
     await getBase(id, organizationId);
     const documents = await db.query.knowledgeDocument.findMany({
@@ -498,7 +533,11 @@ router.patch(
   zValidator("json", documentSchema.partial()),
   async (c) => {
     const organizationId = await getActiveOrganization(c);
-    await requireOrganizationManager(c.var.user!.id, organizationId);
+    await requireOrganizationManager(
+      c.var.user!.id,
+      organizationId,
+      c.var.apiKeyPermissions,
+    );
     const { id, documentId } = c.req.valid("param");
     await getBase(id, organizationId);
     const existing = await db.query.knowledgeDocument.findFirst({
@@ -524,7 +563,11 @@ router.delete(
   zValidator("param", documentParams),
   async (c) => {
     const organizationId = await getActiveOrganization(c as never);
-    await requireOrganizationManager(c.var.user!.id, organizationId);
+    await requireOrganizationManager(
+      c.var.user!.id,
+      organizationId,
+      c.var.apiKeyPermissions,
+    );
     const { id, documentId } = c.req.valid("param");
     await getBase(id, organizationId);
     const existing = await db.query.knowledgeDocument.findFirst({

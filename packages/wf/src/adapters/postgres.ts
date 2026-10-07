@@ -9,7 +9,7 @@ import type {
   WorkflowEvent,
   WorkflowRunReference,
 } from "../models";
-import type { JsonKeyValueStore, WorkflowLockStore } from "./json-store";
+import { generateId } from "../utils/id";
 import {
   JsonTaskQueue,
   JsonWorkflowHistoryStore,
@@ -17,8 +17,8 @@ import {
   type JsonWorkflowHistoryStoreOptions,
 } from "./durable";
 import { AdapterEventBus, type PubSubAdapter } from "./event-bus";
+import type { JsonKeyValueStore, WorkflowLockStore } from "./json-store";
 import { JsonEventStore, JsonWorkflowStore } from "./json-store";
-import { generateId } from "../utils/id";
 
 export type PostgresRow = Record<string, unknown>;
 
@@ -122,7 +122,12 @@ export class PostgresJsonKeyValueStore implements JsonKeyValueStore {
         WHERE key = $1 AND version = $4
         RETURNING key
       `,
-      [key, stringifyJson(value, key), versionOf(value, expectedVersion + 1), expectedVersion],
+      [
+        key,
+        stringifyJson(value, key),
+        versionOf(value, expectedVersion + 1),
+        expectedVersion,
+      ],
     );
     return result.rowCount > 0;
   }
@@ -161,8 +166,14 @@ export class PostgresWorkflowHistoryStore extends JsonWorkflowHistoryStore {
     } = {},
   ) {
     super(
-      options.keyValueStore ?? new PostgresJsonKeyValueStore(client, options.table),
-      options.lockStore ?? new PostgresWorkflowLockStore(client, options.lockTable, options.holderId),
+      options.keyValueStore ??
+        new PostgresJsonKeyValueStore(client, options.table),
+      options.lockStore ??
+        new PostgresWorkflowLockStore(
+          client,
+          options.lockTable,
+          options.holderId,
+        ),
       options,
     );
   }
@@ -181,8 +192,14 @@ export class PostgresTaskQueue extends JsonTaskQueue {
     } = {},
   ) {
     super(
-      options.keyValueStore ?? new PostgresJsonKeyValueStore(client, options.table),
-      options.lockStore ?? new PostgresWorkflowLockStore(client, options.lockTable, options.holderId),
+      options.keyValueStore ??
+        new PostgresJsonKeyValueStore(client, options.table),
+      options.lockStore ??
+        new PostgresWorkflowLockStore(
+          client,
+          options.lockTable,
+          options.holderId,
+        ),
       options,
     );
   }
@@ -283,15 +300,13 @@ export interface PostgresNotificationTransport {
 }
 
 /** LISTEN/NOTIFY transport for AdapterEventBus. */
-export class PostgresNotificationAdapter<TOutput>
-  implements PubSubAdapter<TOutput>
-{
+export class PostgresNotificationAdapter<
+  TOutput,
+> implements PubSubAdapter<TOutput> {
   private readonly callbacks = new Map<string, Set<EventCallback<TOutput>>>();
   private readonly localDeliveries = new Set<string>();
 
-  constructor(
-    private readonly transport: PostgresNotificationTransport,
-  ) {}
+  constructor(private readonly transport: PostgresNotificationTransport) {}
 
   async publish(topic: string, event: WorkflowEvent<TOutput>): Promise<void> {
     const deliveryKey = `${topic}:${event.id}`;
@@ -315,16 +330,19 @@ export class PostgresNotificationAdapter<TOutput>
     callbacks.add(callback);
     this.callbacks.set(topic, callbacks);
     if (callbacks.size === 1) {
-      const unsubscribeTransport = this.transport.subscribe(topic, (payload) => {
-        let event: WorkflowEvent<TOutput>;
-        try {
-          event = JSON.parse(payload) as WorkflowEvent<TOutput>;
-        } catch {
-          return;
-        }
-        if (this.localDeliveries.delete(`${topic}:${event.id}`)) return;
-        void this.dispatch(topic, event);
-      });
+      const unsubscribeTransport = this.transport.subscribe(
+        topic,
+        (payload) => {
+          let event: WorkflowEvent<TOutput>;
+          try {
+            event = JSON.parse(payload) as WorkflowEvent<TOutput>;
+          } catch {
+            return;
+          }
+          if (this.localDeliveries.delete(`${topic}:${event.id}`)) return;
+          void this.dispatch(topic, event);
+        },
+      );
       this.transportUnsubscribers.set(topic, unsubscribeTransport);
     }
     return () => {
@@ -339,7 +357,8 @@ export class PostgresNotificationAdapter<TOutput>
   }
 
   async close(): Promise<void> {
-    for (const unsubscribe of this.transportUnsubscribers.values()) unsubscribe();
+    for (const unsubscribe of this.transportUnsubscribers.values())
+      unsubscribe();
     this.transportUnsubscribers.clear();
     this.callbacks.clear();
     this.localDeliveries.clear();
@@ -348,7 +367,10 @@ export class PostgresNotificationAdapter<TOutput>
 
   private readonly transportUnsubscribers = new Map<string, Unsubscribe>();
 
-  private async dispatch(topic: string, event: WorkflowEvent<TOutput>): Promise<void> {
+  private async dispatch(
+    topic: string,
+    event: WorkflowEvent<TOutput>,
+  ): Promise<void> {
     const callbacks = [...(this.callbacks.get(topic) ?? [])];
     await Promise.allSettled(
       callbacks.map((callback) => callback(structuredClone(event))),
@@ -445,7 +467,10 @@ export class PostgresIdempotencyStore implements IdempotencyStore {
     };
   }
 
-  async release(key: string, reference: WorkflowRunReference): Promise<boolean> {
+  async release(
+    key: string,
+    reference: WorkflowRunReference,
+  ): Promise<boolean> {
     const result = await this.client.query(
       `
         DELETE FROM ${this.table}
@@ -467,8 +492,11 @@ export class PostgresIdempotencyStore implements IdempotencyStore {
   }
 }
 
-export interface PostgresWorkflowAdaptersOptions<TContext, TInput, TOutput>
-  extends PostgresAdapterSchema {
+export interface PostgresWorkflowAdaptersOptions<
+  TContext,
+  TInput,
+  TOutput,
+> extends PostgresAdapterSchema {
   client: PostgresQueryClient;
   notifications: PostgresNotificationTransport;
   stepsFactory: () => Workflow<TContext, TInput, TOutput>["steps"];
@@ -526,17 +554,29 @@ export function createPostgresDurableAdapters(
     history: new PostgresWorkflowHistoryStore(options.client, {
       keyValueStore,
       lockStore,
-      ...(options.historyKeyPrefix === undefined ? {} : { keyPrefix: options.historyKeyPrefix }),
-      ...(options.jsonValuesTable === undefined ? {} : { table: options.jsonValuesTable }),
-      ...(options.locksTable === undefined ? {} : { lockTable: options.locksTable }),
+      ...(options.historyKeyPrefix === undefined
+        ? {}
+        : { keyPrefix: options.historyKeyPrefix }),
+      ...(options.jsonValuesTable === undefined
+        ? {}
+        : { table: options.jsonValuesTable }),
+      ...(options.locksTable === undefined
+        ? {}
+        : { lockTable: options.locksTable }),
       ...(options.holderId === undefined ? {} : { holderId: options.holderId }),
     }),
     queue: new PostgresTaskQueue(options.client, {
       keyValueStore,
       lockStore,
-      ...(options.taskKeyPrefix === undefined ? {} : { keyPrefix: options.taskKeyPrefix }),
-      ...(options.jsonValuesTable === undefined ? {} : { table: options.jsonValuesTable }),
-      ...(options.locksTable === undefined ? {} : { lockTable: options.locksTable }),
+      ...(options.taskKeyPrefix === undefined
+        ? {}
+        : { keyPrefix: options.taskKeyPrefix }),
+      ...(options.jsonValuesTable === undefined
+        ? {}
+        : { table: options.jsonValuesTable }),
+      ...(options.locksTable === undefined
+        ? {}
+        : { lockTable: options.locksTable }),
       ...(options.holderId === undefined ? {} : { holderId: options.holderId }),
     }),
     initialize: async () => {
@@ -620,12 +660,16 @@ function unquote(identifier: string): string {
 
 function stringifyJson(value: unknown, key: string): string {
   const result = JSON.stringify(value);
-  if (result === undefined) throw new TypeError(`Value for ${key} is not JSON serializable`);
+  if (result === undefined)
+    throw new TypeError(`Value for ${key} is not JSON serializable`);
   return result;
 }
 
 function escapeLikePrefix(value: string): string {
-  return value.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_");
+  return value
+    .replaceAll("\\", "\\\\")
+    .replaceAll("%", "\\%")
+    .replaceAll("_", "\\_");
 }
 
 function cloneJson<T>(value: unknown): T {
@@ -654,9 +698,11 @@ function versionOf(value: unknown, fallback: number): number {
 }
 
 function assertVersion(value: number, name: string): void {
-  if (!Number.isInteger(value) || value < 0) throw new RangeError(`${name} must be a non-negative integer`);
+  if (!Number.isInteger(value) || value < 0)
+    throw new RangeError(`${name} must be a non-negative integer`);
 }
 
 function assertPositiveInteger(value: number, name: string): void {
-  if (!Number.isInteger(value) || value < 1) throw new RangeError(`${name} must be a positive integer`);
+  if (!Number.isInteger(value) || value < 1)
+    throw new RangeError(`${name} must be a positive integer`);
 }

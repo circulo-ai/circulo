@@ -23,10 +23,22 @@ describe("JSON durable replay adapters", () => {
 
     const restarted = new JsonWorkflowHistoryStore(values, locks);
     expect(await restarted.nextSequence("workflow-1", "run-1")).toBe(1);
-    expect(await restarted.read({ workflowId: "workflow-1", runId: "run-1" })).toMatchObject([
+    expect(
+      await restarted.read({ workflowId: "workflow-1", runId: "run-1" }),
+    ).toMatchObject([
       { eventId: "started", sequence: 0, payload: { input: "hello" } },
     ]);
-    expect(await restarted.append({ ...event, eventId: "second", eventType: "workflow.completed", payload: {} }, 0)).toBeNull();
+    expect(
+      await restarted.append(
+        {
+          ...event,
+          eventId: "second",
+          eventType: "workflow.completed",
+          payload: {},
+        },
+        0,
+      ),
+    ).toBeNull();
     await expect(
       restarted.append({ ...event, payload: { input: "different" } }, 1),
     ).rejects.toThrow("reused with different content");
@@ -51,12 +63,14 @@ describe("JSON durable replay adapters", () => {
     };
     await queue.enqueue(task);
     const restarted = new JsonTaskQueue(values, locks);
-    expect(await restarted.claim({
-      queue: "timer",
-      workerId: "worker-1",
-      leaseDurationMs: 10,
-      now: 99,
-    })).toBeNull();
+    expect(
+      await restarted.claim({
+        queue: "timer",
+        workerId: "worker-1",
+        leaseDurationMs: 10,
+        now: 99,
+      }),
+    ).toBeNull();
     const claimed = await restarted.claim({
       queue: "timer",
       workerId: "worker-1",

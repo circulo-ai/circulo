@@ -1,5 +1,9 @@
 import type { CirculoRedis } from "@circulo-ai/redis";
-import type { EventCallback, PubSubAdapter, WorkflowEvent } from "@circulo-ai/wf";
+import type {
+  EventCallback,
+  PubSubAdapter,
+  WorkflowEvent,
+} from "@circulo-ai/wf";
 import type Redis from "ioredis";
 
 type TopicCallback<TOutput> = EventCallback<TOutput>;
@@ -11,9 +15,9 @@ type TopicCallback<TOutput> = EventCallback<TOutput>;
  * after a successful publish (so a just-created subscription cannot miss the
  * first event), and de-duplicates the Redis loopback delivery of that event.
  */
-export class RedisWorkflowPubSubAdapter<TOutput>
-  implements PubSubAdapter<TOutput>
-{
+export class RedisWorkflowPubSubAdapter<
+  TOutput,
+> implements PubSubAdapter<TOutput> {
   private readonly subscriber: Redis;
   private readonly callbacks = new Map<string, Set<TopicCallback<TOutput>>>();
   private readonly locallyPublished = new Set<string>();
@@ -23,7 +27,11 @@ export class RedisWorkflowPubSubAdapter<TOutput>
     private readonly redis: CirculoRedis,
     private readonly logger: {
       warn(message: string, context?: Record<string, unknown>): void;
-      error(message: string, error?: Error, context?: Record<string, unknown>): void;
+      error(
+        message: string,
+        error?: Error,
+        context?: Record<string, unknown>,
+      ): void;
     },
   ) {
     this.subscriber = redis.raw.duplicate();
@@ -61,9 +69,13 @@ export class RedisWorkflowPubSubAdapter<TOutput>
     this.callbacks.set(topic, callbacks);
     if (callbacks.size === 1) {
       void this.subscriber.subscribe(topic).catch((error: unknown) => {
-        this.logger.error("Workflow Redis subscription failed", toError(error), {
-          topic,
-        });
+        this.logger.error(
+          "Workflow Redis subscription failed",
+          toError(error),
+          {
+            topic,
+          },
+        );
       });
     }
 

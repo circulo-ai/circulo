@@ -22,7 +22,10 @@ import {
   toKnowledgeImageDataUrl,
 } from "@/lib/knowledge/assets";
 import { createKnowledgeEmbedding } from "@/lib/knowledge/embeddings";
-import { hasPermissionForUser } from "@/lib/permissions";
+import {
+  hasPermissionForUser,
+  type ApiKeyPermissions,
+} from "@/lib/permissions";
 import { ensureInitialSkillCatalog } from "@/lib/skills/initial-catalog";
 import { storageManager } from "@/lib/storage/config";
 import { ensureWorkspaceRoleCatalog } from "@/lib/workspace-role-catalog";
@@ -72,6 +75,7 @@ export async function loadChatContextStep(
   chatId: string,
   userId: string,
   queryText?: string,
+  apiKeyPermissions?: ApiKeyPermissions,
 ): Promise<ChatContext> {
   const chat = await chatRepo.findById(chatId);
   if (!chat) {
@@ -176,6 +180,7 @@ export async function loadChatContextStep(
     chat.organizationId,
     "memory",
     "read",
+    apiKeyPermissions,
   );
   const currentMember = members.find((member) => member.userId === userId);
   const canReadChatMemory = Boolean(

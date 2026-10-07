@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { isBillingEnabled } from "@/lib/environment";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft01Icon,
@@ -42,6 +43,7 @@ export type WorkspaceSection =
   | "tools"
   | "plugins"
   | "automation"
+  | "providers"
   | "account"
   | "billing";
 
@@ -111,6 +113,12 @@ const navigation: Array<{ label: string; items: NavigationItem[] }> = [
         href: "/automation",
         icon: CalendarClockIcon,
       },
+      {
+        id: "providers",
+        label: "AI providers",
+        href: "/workspace?section=providers",
+        icon: ServerStack01Icon,
+      },
     ],
   },
   {
@@ -146,6 +154,14 @@ export function WorkspaceShell({
   children: ReactNode;
 }) {
   const router = useRouter();
+  const visibleNavigation = navigation
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (item) => item.id !== "billing" || isBillingEnabled,
+      ),
+    }))
+    .filter((group) => group.items.length > 0);
 
   return (
     <main className="flex h-dvh min-h-0 flex-col overflow-hidden bg-background text-foreground">
@@ -168,7 +184,7 @@ export function WorkspaceShell({
         </header>
         <Separator />
         <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] items-stretch gap-4 py-4 lg:grid-cols-[220px_minmax(0,1fr)] lg:grid-rows-none lg:items-start lg:gap-8 lg:py-8">
-          <aside className="min-h-0 lg:sticky lg:top-6">
+          <aside className="min-h-0 overflow-y-auto lg:sticky lg:top-6">
             <div className="lg:hidden">
               <label
                 className="mb-2 block text-xs font-medium text-muted-foreground"
@@ -179,7 +195,7 @@ export function WorkspaceShell({
               <Select
                 value={activeSection}
                 onValueChange={(section) => {
-                  const item = navigation
+                  const item = visibleNavigation
                     .flatMap((group) => group.items)
                     .find((navigationItem) => navigationItem.id === section);
 
@@ -196,7 +212,7 @@ export function WorkspaceShell({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {navigation.map((group) => (
+                  {visibleNavigation.map((group) => (
                     <SelectGroup key={group.label}>
                       <SelectLabel>{group.label}</SelectLabel>
                       {group.items.map((item) => (
@@ -213,7 +229,7 @@ export function WorkspaceShell({
               aria-label="Workspace navigation"
               className="hidden gap-1 lg:flex lg:flex-col"
             >
-              {navigation.map((group) => (
+              {visibleNavigation.map((group) => (
                 <div
                   className="flex shrink-0 flex-col gap-1 lg:mb-4"
                   key={group.label}
@@ -248,7 +264,7 @@ export function WorkspaceShell({
               ))}
             </nav>
           </aside>
-          <section className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-1">
+          <section className="min-h-0 min-w-0 overflow-y-auto overscroll-contain pr-1 pb-8">
             <div className="flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-end sm:justify-between">
               <div className="min-w-0">
                 <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
@@ -263,7 +279,7 @@ export function WorkspaceShell({
               </div>
               {actions}
             </div>
-            <div className="pt-6">{children}</div>
+            <div className="min-h-0 pt-6">{children}</div>
           </section>
         </div>
       </div>
