@@ -113,7 +113,7 @@ const CURVE_FUNCTIONS: Record<string, (p: number) => number> = {
 const mergeConfigs = (
   ...configs: Partial<GradualBlurProps>[]
 ): Partial<GradualBlurProps> => {
-  return configs.reduce((acc, config) => ({ ...acc, ...config }), {});
+  return Object.assign({}, ...configs);
 };
 
 const getGradientDirection = (position: string): string => {
@@ -146,12 +146,12 @@ const useResponsiveDimension = (
       let v: any = config[key];
       const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
       const k = cap(key as string);
-      if (w <= 480 && (config as any)["mobile" + k])
-        v = (config as any)["mobile" + k];
-      else if (w <= 768 && (config as any)["tablet" + k])
-        v = (config as any)["tablet" + k];
-      else if (w <= 1024 && (config as any)["desktop" + k])
-        v = (config as any)["desktop" + k];
+      if (w <= 480 && (config as any)[`mobile${k}`])
+        v = (config as any)[`mobile${k}`];
+      else if (w <= 768 && (config as any)[`tablet${k}`])
+        v = (config as any)[`tablet${k}`];
+      else if (w <= 1024 && (config as any)[`desktop${k}`])
+        v = (config as any)[`desktop${k}`];
       setVal(v);
     };
     const deb = debounce(calc, 100);
@@ -311,6 +311,10 @@ const GradualBlur: React.FC<GradualBlurProps> = (props) => {
   }, [isVisible, animated, onAnimationComplete, duration]);
 
   return (
+    // Decorative blur overlay. The hover handlers only adjust blur intensity;
+    // there is nothing here to activate, so it takes no role and needs no
+    // keyboard equivalent.
+    // biome-ignore lint/a11y/noStaticElementInteractions: see above
     <div
       ref={containerRef}
       className={`gradual-blur relative isolate ${config.target === "page" ? "gradual-blur-page" : "gradual-blur-parent"} ${config.className}`}

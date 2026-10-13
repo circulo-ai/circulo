@@ -45,7 +45,7 @@ const getSubjectByType = (
 
 export const OTPVerificationEmail = ({
   otp,
-  email = "",
+  email: _email = "",
   type = "email-verification",
   chatTitle,
 }: OTPVerificationEmailProps) => {

@@ -80,7 +80,7 @@ export function FileInput({
       setIsDragOver(false);
       setIsLoaded(false);
       setIsLoading(false);
-      uploadTasks.map((task) => {
+      uploadTasks.forEach((task) => {
         removeUploadTask(task.id);
         cancelUploadTask(task.id);
       });
@@ -167,14 +167,21 @@ export function FileInput({
 
 function DefaultComponent({
   url,
-  isDragOver,
-  disabled,
+  isDragOver: _isDragOver,
+  disabled: _disabled,
   isLoading,
   isLoaded,
   setIsLoaded,
   reset,
 }: CustomComponentProps) {
   return (
+    // The accessible control is the <input type="file"> that the enclosing
+    // <label htmlFor> points at, which already handles focus and keyboard
+    // activation. This click handler only adds "clear the current image", and
+    // turning this into a <button> would swallow the label click that opens
+    // the file picker.
+    // biome-ignore lint/a11y/noStaticElementInteractions: see above
+    // biome-ignore lint/a11y/useKeyWithClickEvents: see above
     <div
       className={cn("relative size-32 overflow-hidden rounded-full")}
       onClick={(e) => {

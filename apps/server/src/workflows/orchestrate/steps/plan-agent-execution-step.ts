@@ -3,6 +3,7 @@ import {
   orchestrationFallbackModel,
   withModelFallback,
 } from "@/lib/ai/providers";
+import { createLogger } from "@/lib/logs/console/logger";
 import type { ChatMessage } from "@/lib/types";
 import { getTextFromMessages } from "@/lib/utils";
 import type { OrchestrationInput } from "@/workflows/orchestrate/types";
@@ -12,6 +13,8 @@ import { getExplicitlyMentionedAgentIds } from "../agent-engagement";
 import type { OrchestrationAgentProfile } from "../orchestration-agent-profile";
 import { formatOrchestrationAgentProfile } from "../orchestration-agent-profile";
 import type { RequestClassification } from "./classify-request-step";
+
+const logger = createLogger("PlanAgentExecutionStep");
 
 const executionPlanSchema = z.object({
   strategy: z.enum(["sequential", "parallel", "conditional", "single"]),
@@ -200,7 +203,7 @@ Classification reasoning: ${classification.reasoning}
   const validatedAgents = output.selectedAgents
     .filter((sa) => {
       if (!validAgentIds.has(sa.agentId)) {
-        console.warn(`Agent ${sa.agentId} not found or disabled, skipping`);
+        logger.warn(`Agent ${sa.agentId} not found or disabled, skipping`);
         return false;
       }
       const task = sa.task.trim();

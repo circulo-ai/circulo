@@ -116,7 +116,9 @@ export async function clearUserData(): Promise<void> {
     const keysToRemove = Object.keys(localStorage).filter(
       (key) => !keysToKeep.includes(key),
     );
-    keysToRemove.forEach((key) => localStorage.removeItem(key));
+    keysToRemove.forEach((key) => {
+      localStorage.removeItem(key);
+    });
 
     // Reset application initialization state
     appFullyInitialized = false;

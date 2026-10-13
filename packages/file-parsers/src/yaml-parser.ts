@@ -2,7 +2,7 @@ import * as yaml from "js-yaml";
 import type { FileParseResult } from "./types.js";
 
 export async function parseYAML(filePath: string): Promise<FileParseResult> {
-  const fs = await import("fs/promises");
+  const fs = await import("node:fs/promises");
   const fileContents = await fs.readFile(filePath, "utf8");
   const parsed = yaml.load(fileContents);
   return {

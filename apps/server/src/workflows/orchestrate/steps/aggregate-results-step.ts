@@ -3,6 +3,7 @@ import {
   getDefaultModelForProvider,
   resolveLanguageModel,
 } from "@/lib/ai/provider-registry";
+import { createLogger } from "@/lib/logs/console/logger";
 import type { ChatMessage } from "@/lib/types";
 import { getTextFromMessages } from "@/lib/utils";
 import { Output, streamText, type UIMessageStreamWriter } from "ai";
@@ -11,6 +12,8 @@ import { z } from "zod";
 import type { RequestClassification } from "./classify-request-step";
 import type { AgentExecutionResult } from "./execute-agent-task-step";
 import type { ExecutionPlan } from "./plan-agent-execution-step";
+
+const logger = createLogger("AggregateResultsStep");
 
 const aggregatedResultSchema = z.object({
   summary: z.string().describe("Concise summary of what was accomplished"),
@@ -176,7 +179,7 @@ Synthesize these results into a final response.`,
 
     return output;
   } catch (error) {
-    console.error("Failed to aggregate agent results", error);
+    logger.error("Failed to aggregate agent results", error);
     return {
       summary: "Agent execution completed",
       detailedResponse: agentResults

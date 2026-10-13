@@ -1,6 +1,7 @@
 import createApp from "@/lib/create-app";
 import { isCloudRuntime } from "@/lib/deployment/instance-auth";
 import { env } from "@/lib/env";
+import { createLogger } from "@/lib/logs/console/logger";
 import { getBaseUrl } from "@/lib/urls/utils";
 import { auditRequest } from "@/middleware/audit";
 import { loadAuthContext } from "@/middleware/auth";
@@ -53,6 +54,7 @@ import { prettyJSON } from "hono/pretty-json";
 import { requestId } from "hono/request-id";
 
 const app = createApp();
+const appLogger = createLogger("Api");
 const IS_DEVELOPMENT = env.NODE_ENV === "development";
 const SHOULD_APPLY_RATE_LIMITING =
   env.NODE_ENV === "production" && isCloudRuntime();
@@ -170,7 +172,7 @@ if (IS_DEVELOPMENT) {
 export type AppType = (typeof routes)[number];
 
 app.onError((err, c) => {
-  console.error("[API Error]", {
+  appLogger.error("[API Error]", {
     method: c.req.method,
     path: c.req.path,
     error: err instanceof Error ? (err.stack ?? err.message) : err,

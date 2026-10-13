@@ -23,7 +23,9 @@ export function NavUlDot({ ulId }: NavUlDotProps) {
     if (!navUl) return;
 
     const navUlItems = navUl.querySelectorAll("li a");
-    navUlItems.forEach((ulItem) => ulItem.removeAttribute("data-active"));
+    navUlItems.forEach((ulItem) => {
+      ulItem.removeAttribute("data-active");
+    });
 
     const activeItem = navUlItems[currentIndex] as HTMLElement | undefined;
     if (activeItem) {

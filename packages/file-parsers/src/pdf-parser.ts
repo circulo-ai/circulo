@@ -1,4 +1,4 @@
-import { readFile } from "fs/promises";
+import { readFile } from "node:fs/promises";
 import { createLogger, type Logger } from "./logger.js";
 import type { FileParseResult, FileParser } from "./types.js";
 import { sanitizeTextForUTF8 } from "./utils.js";

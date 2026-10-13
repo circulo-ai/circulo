@@ -37,7 +37,7 @@ const getSubjectByType = (type: string, brandName: string) => {
 
 export const MagicLinkEmail = ({
   magicLink,
-  email = "",
+  email: _email = "",
   type = "sign-in",
 }: MagicLinkEmailProps) => {
   const brand = getBrandConfig();
@@ -96,7 +96,7 @@ export const MagicLinkEmail = ({
           <Section style={baseStyles.content}>
             <Text style={baseStyles.paragraph}>
               {type === "email-verification"
-                ? "Welcome to " + brand.name + "!"
+                ? `Welcome to ${brand.name}!`
                 : "Hello,"}
             </Text>
             <Text style={baseStyles.paragraph}>{getMessage()}</Text>

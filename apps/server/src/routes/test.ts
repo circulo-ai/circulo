@@ -113,7 +113,10 @@ router.get("/test", async (c) => {
 
   const unsubscribe = engine.events.subscribe(workflowId, (event) => {
     eventLog.push(event);
-    console.log("Event:", event.eventType, event.payload);
+    logger.debug("Event", {
+      eventType: event.eventType,
+      payload: event.payload,
+    });
   });
 
   await engine.run(workflowId);

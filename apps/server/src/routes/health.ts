@@ -142,7 +142,7 @@ function hasStorageProvider(): boolean {
     );
   }
 
-  return Boolean(env.S3_BUCKET_NAME || process.env.S3_BUCKET);
+  return Boolean(env.S3_BUCKET_NAME || env.S3_BUCKET);
 }
 
 async function checkStorageProvider(): Promise<ReadinessState> {
@@ -153,14 +153,14 @@ async function checkStorageProvider(): Promise<ReadinessState> {
   if (driver === "azure") return checkAzureStorageProvider();
 
   const buckets = [
-    env.S3_BUCKET_NAME || process.env.S3_BUCKET,
+    env.S3_BUCKET_NAME || env.S3_BUCKET,
     env.S3_KB_BUCKET_NAME,
     env.S3_EXECUTION_FILES_BUCKET_NAME,
     env.S3_CHAT_BUCKET_NAME,
     env.S3_PROFILE_PICTURES_BUCKET_NAME,
   ].filter((bucket): bucket is string => Boolean(bucket?.trim()));
   const client = new S3Client({
-    region: env.S3_REGION || process.env.AWS_REGION || "us-east-1",
+    region: env.S3_REGION || env.AWS_REGION || "us-east-1",
     endpoint: env.S3_ENDPOINT,
     forcePathStyle: isTruthy(env.S3_FORCE_PATH_STYLE),
     credentials:

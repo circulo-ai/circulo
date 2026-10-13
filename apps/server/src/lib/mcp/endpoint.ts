@@ -8,6 +8,8 @@ export async function validateMcpEndpoint(endpoint: string): Promise<string> {
     throw new Error("MCP endpoint must use HTTP or HTTPS");
   }
 
+  // Read NODE_ENV directly: `@/lib/env` snapshots at import, and this guard
+  // must reflect the live environment.
   if (process.env.NODE_ENV !== "production") return url.toString();
 
   const hostname = url.hostname.toLowerCase().replace(/\.$/, "");

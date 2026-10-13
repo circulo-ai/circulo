@@ -1,38 +1,41 @@
-# Repository audit and fixes — 2026-10-11
+# Repository audit and fixes
 
-Audit of the `circulo-ai` monorepo at `949cc28` (branch `master`), covering
-~151k lines of TypeScript across `apps/web`, `apps/server`, `apps/desktop` and
-the ten workspace packages.
+Audit of the `circulo-ai` monorepo, covering ~151k lines of TypeScript across
+`apps/web`, `apps/server`, `apps/desktop` and the ten workspace packages.
 
-The audit ran the repository's own quality gates (lint, typecheck, test, build),
-plus static analysis for dead code, duplication, suppressed diagnostics,
-security-boundary configuration and log hygiene. Fixes in part 2 are applied in
-the working tree; part 3 lists what was deliberately left alone and why.
+- **Round 1** (from `949cc28`) — findings 2.1–2.9, landed as `09ea11d`.
+- **Round 2** (from `09ea11d`) — everything in §3, on branch
+  `chore/audit-remediation-round-2`.
+
+The audit ran the repository's own quality gates (lint, typecheck, test, build,
+format) plus static analysis for dead code, duplication, suppressed
+diagnostics, security-boundary configuration and log hygiene.
 
 ---
 
 ## 1. Headline
 
-**Three of the four quality gates were not actually enforcing anything.**
+**Three of the four quality gates were not enforcing anything.** All five now
+pass and all five are wired into CI.
 
-| Gate | Before | After |
-| --- | --- | --- |
-| `bun run lint:check` | **Crashed** — binary not found. Even when run, 0 rules were enabled. | Passes, with Biome's recommended ruleset active. |
-| `bun run typecheck` | Passed, but with 1 777 lines of auth code excluded via `@ts-nocheck`. | Passes (exclusion still present — see 3.1). |
-| `bun run test` | Failed intermittently (~2 in 3 full runs) on a hanging workflow-security test. | Passes; 3 consecutive forced full runs clean. |
-| `bun run format:check` | Failed on **1 114 of 1 114 files**. | Fixed at the cause (line-ending normalisation). |
-| `bun run build` | Passed. | Passes. |
+| Gate                   | Before the audit                                                      | Now                                                                                |
+| ---------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `bun run lint:check`   | **Crashed** — binary not found. Even when run, 0 rules were enabled.  | Passes. Biome recommended set active; 16 rules explicitly off, each with a reason. |
+| `bun run typecheck`    | Passed, but 1 777 lines of auth code were excluded via `@ts-nocheck`. | Passes with **no suppressions anywhere** in the repository.                        |
+| `bun run test`         | Failed intermittently (~2 in 3 full runs) on a hanging test.          | Passes. 13 tasks, includes `apps/web` for the first time.                          |
+| `bun run format:check` | Failed on **1 114 of 1 114 files**.                                   | Passes, and is now a CI step.                                                      |
+| `bun run build`        | Passed.                                                               | Passes.                                                                            |
 
-The most consequential functional finding is **2.1**: production server logging
+The most consequential functional finding was **2.1**: production server logging
 was disabled outright, silencing 196 log calls across 35 modules.
 
 ---
 
-## 2. Fixed
+## 2. Round 1 — committed in `09ea11d`
 
 ### 2.1 Production server logging was entirely suppressed — High
 
-`apps/server/src/lib/logs/console/logger.ts:130`
+`apps/server/src/lib/logs/console/logger.ts`
 
 `shouldLog()` returned `false` for every level whenever `NODE_ENV=production`:
 
@@ -44,490 +47,416 @@ if (ENV === "production") {
 ```
 
 The comment describes the intent correctly, but the implementation dropped the
-`window` condition. The near-identical web copy
-(`apps/web/src/lib/logs/console/logger.ts`) still has it:
-
-```ts
-if (ENV === "production" && typeof window !== "undefined") {
-```
-
-so this is a copy-paste regression in the server twin, not a design decision.
-Because the server never has a `window`, the branch matched unconditionally.
+`window` condition. The near-identical web copy still has it, so this was a
+copy-paste regression in the server twin, not a design decision. Because the
+server never has a `window`, the branch matched unconditionally.
 
 **Impact.** Every `logger.debug/info/warn/error` call was a no-op in production
 — **196 call sites across 35 modules**, including the workflow runtime, auth,
-billing and the scheduler. `LOG_LEVEL` and `LOG_CONFIG.production.minLevel` were
-both dead config. A production incident would have left no application-level
-trace. This also explains the 31 raw `console.*` calls noted in 3.4: they are
-the only server logging that actually reached stdout.
+billing and the scheduler. `LOG_LEVEL` and `LOG_CONFIG.production.minLevel`
+were both dead config. A production incident would have left no
+application-level trace.
 
 **Fix.** The server logger only ever runs server-side, so the branch has no
-valid meaning there and was removed. Production logging is now governed by
-`config.minLevel`, which already defaults to `ERROR` and honours `LOG_LEVEL`.
-The stale `// Will be checked at runtime` marker on
-`LOG_CONFIG.production.enabled` was removed too.
-
-> Mirroring the web guard (`typeof window !== "undefined"`) was the first
-> attempt; it fails to compile, because `apps/server/tsconfig.json` sets
-> `lib: ["ES2022"]` with no DOM lib. That is further confirmation the condition
-> was never meaningful on the server.
+valid meaning there and was removed; production logging is governed by
+`config.minLevel` (`ERROR` by default, overridable with `LOG_LEVEL`). Mirroring
+the web guard was the first attempt and does not compile — `apps/server`
+builds with `lib: ["ES2022"]` and no DOM lib, which is further confirmation the
+condition was never meaningful on the server.
 
 ### 2.2 Hanging test in the workflow security suite — High (CI reliability)
 
-`packages/wf/test/security.test.ts:78,224`
+`packages/wf/test/security.test.ts`
 
-Two tests synchronised on a single macrotask:
+Two tests synchronised on a single macrotask (`setTimeout(resolve, 0)`) before
+publishing an event. Both gateways only call `eventBus.subscribe()` _after_
+awaiting `tokens.verify(token)`, and both in-memory buses drop events published
+with no subscriber (`if (!callbacks) return;`). When the event landed first it
+was lost permanently and the pending `iterator.next()` **never settled** — the
+test hung until the suite timeout rather than failing fast.
 
-```ts
-const nextEvent = iterator.next();
-await new Promise((resolve) => setTimeout(resolve, 0));
-await bus.publish({ /* ... */ });
-await expect(nextEvent).resolves.toMatchObject({ /* ... */ });
-```
-
-Both gateways (`SecureWorkflowStreamGateway`,
-`SecureWorkflowHistoryStreamGateway`) only call `eventBus.subscribe()` *after*
-awaiting `tokens.verify(token)` — see
-`packages/wf/src/security/history-stream-gateway.ts:48-60`. One `setTimeout(0)`
-does not guarantee that await chain has settled.
-
-Both in-memory buses drop events published with no subscriber
-(`packages/wf/src/history/in-memory-history-event-bus.ts:14-15`:
-`if (!callbacks) return;`). So when the event landed first it was lost
-permanently and the pending `iterator.next()` **never settled** — the test hung
-until the suite timeout rather than failing fast.
-
-**Impact.** Under the monorepo-wide parallel run the suite reported
-`import 107.92s` of contention and the race lost roughly 2 in 3 times, failing
-on whichever of the two tests lost it. Raising `testTimeout` does not help a
-promise that never resolves; a 30s timeout still hung.
-
-**Fix.** Added a `trackSubscription()` helper that wraps the bus's `subscribe`
-and resolves a promise on real registration, replacing both `setTimeout(0)`
-calls with `await subscribed`. Verified: 3 consecutive `turbo run test --force`
-full runs clean, where the previous state failed 2 of 3.
+Raising `testTimeout` does not help a promise that never resolves; a 30s
+timeout still hung. **Fix:** a `trackSubscription()` helper that resolves when
+the bus subscription is actually registered, replacing both `setTimeout(0)`
+calls with `await subscribed`.
 
 ### 2.3 Lint gate did not run, and enforced nothing when it did — High
 
-`package.json` (scripts, devDependencies), `biome.json`
+Two independent defects: `@biomejs/biome` was declared only in `apps/server`
+and `packages/upload`, so the root scripts' hard-coded
+`./node_modules/@biomejs/biome/bin/biome` path did not exist; and `biome.json`
+set `linter.rules.recommended: false` with no rule enabled, so Biome checked
+1 106 files and reported nothing.
 
-Two independent defects:
+**Fix.** Added `@biomejs/biome` to the root `devDependencies` (2-line lockfile
+delta) and set `recommended: true`. See §3.2 for how the resulting backlog was
+cleared.
 
-1. **The binary was not where the scripts looked.** `lint`, `lint:check` and
-   `check` all invoke `./node_modules/@biomejs/biome/bin/biome`, but
-   `@biomejs/biome` was declared only in `apps/server` and `packages/upload`.
-   It installs to those workspaces, never the root, so `bun run lint:check`
-   exited with `error: Module not found`.
-2. **The ruleset was empty.** `biome.json` set `linter.rules.recommended: false`
-   with no rule explicitly enabled — the only entry was
-   `style.noNonNullAssertion: "off"`. Biome checked all 1 106 files and reported
-   nothing. CI's "Run repository lint" step was a no-op by construction.
+### 2.4–2.9 Remaining round-1 fixes
 
-**Fix.** Added `@biomejs/biome` to the root `devDependencies` (lockfile delta:
-2 lines) and set `recommended: true`.
-
-Enabling the recommended set surfaced **347 errors, 458 warnings and 96 infos**
-— too large to clear in one pass without a red gate. So `biome.json` now turns
-on `recommended` and explicitly lists the 42 currently-violated rules as `off`,
-with their counts recorded in 3.2 as a backlog. This makes every *clean* rule
-enforced from now on, including these, which were fixed as part of this pass:
-
-- `suspicious/noDuplicateObjectKeys`
-- `suspicious/noFallthroughSwitchClause`
-- `suspicious/noDoubleEquals`
-- `correctness/noEmptyPattern`
-
-116 files also received Biome's safe auto-fixes — type-only imports marked
-`import type` (material here, since `verbatimModuleSyntax: true`) and `node:`
-protocol prefixes on builtin imports.
-
-### 2.4 `format:check` failed on every file in the repository — Medium
-
-No `.gitattributes` existed. With `core.autocrlf=true` (the Windows default) the
-checkout is CRLF, while `prettier.config.mjs` sets `endOfLine: "lf"` — so
-Prettier flagged **1 114 of 1 114 files**. The gate was unusable for any Windows
-contributor, which is likely why it is the one quality script absent from CI.
-
-**Fix.** Added `.gitattributes` with `* text=auto eol=lf`, plus `binary` markers
-for image/font/PDF assets and `linguist-generated` on `bun.lock`.
-
-### 2.5 Production CORS trusted loopback origins — Medium (security)
-
-`apps/server/src/app.ts:70`
-
-`allowedOrigins` unconditionally included `http://localhost:3000`,
-`http://127.0.0.1:3000` and `http://localhost:3001`, and the CORS middleware is
-configured with `credentials: true`. In production that let any process
-listening on those loopback ports on a user's machine make credentialed
-cross-origin calls to the API and read the response. The same list also feeds
-`enforceCookieMutationOrigin`.
-
-**Fix.** Moved the loopback entries into a `DEVELOPMENT_ORIGINS` constant,
-spread only when `NODE_ENV !== "production"`. Non-production (including CI's
-`NODE_ENV=test`) keeps them; production declares its origins through
-`NEXT_PUBLIC_APP_URL`, `getBaseUrl()` and `CORS_ALLOWED_ORIGINS`.
-
-### 2.6 Electron exposed its IPC bridge to third-party origins — Medium (security)
-
-`apps/desktop/src/main.cjs:28,340,347`
-
-The window is otherwise configured correctly (`contextIsolation: true`,
-`nodeIntegration: false`, `sandbox: true`), but:
-
-- `setWindowOpenHandler` returned `{ action: "allow" }` for **any** `https://`
-  URL. A child window inherits the parent's `webPreferences`, including
-  `preload.cjs`, so an arbitrary remote origin would have been handed the
-  `circuloDesktop` bridge — which exposes `downloadUpdate()` and
-  `installUpdate()`.
-- There was no `will-navigate` handler at all, so the main window could be
-  navigated away from the local runtime, carrying the same bridge with it.
-
-**Fix.** `setWindowOpenHandler` now always denies and hands `https://` URLs to
-`shell.openExternal` (so external links still work, in the user's own browser).
-Added a `will-navigate` handler that permits only the bundled runtime origins
-via a new `isLocalRuntimeUrl()` helper and routes anything else to the external
-browser.
-
-### 2.7 Latent switch fallthrough in the upload router — Medium
-
-`packages/upload/src/routes/next.ts:473`
-
-`case "multipart":` contained an inner `switch (action)` whose cases all return,
-with no `break`, `return` or exhaustiveness guard after it. Any `action` that
-escaped the inner switch would **fall through into `case "upload"`** and be
-handled as a plain upload.
-
-Unreachable today, because `multipartActionSchema.parse()` throws first — but
-the safety depends entirely on that schema staying in sync with the switch, with
-nothing enforcing it at compile time or runtime.
-
-**Fix.** Added an explicit `return notFound()` after the inner switch. The rule
-that catches this class (`noFallthroughSwitchClause`) is now enforced.
-
-### 2.8 Stale syntax highlighting could win a race — Medium
-
-`apps/web/src/components/ai-elements/code-block.tsx:88`
-
-The effect's guard was inverted:
-
-```ts
-const mounted = useRef(false);
-useEffect(() => {
-  highlightCode(code, language, showLineNumbers).then(([light, dark]) => {
-    if (!mounted.current) {          // only paints when NOT mounted
-      setHtml(light);
-      mounted.current = true;
-    }
-  });
-  return () => { mounted.current = false; };
-}, [code, language, showLineNumbers]);
-```
-
-Intended as a "still mounted" check, it did the opposite:
-
-- When `code` changes, two highlight runs can be in flight. Whichever resolves
-  *first* sets `mounted.current = true`; the newer run then sees it `true` and is
-  **skipped** — so the block keeps rendering the *older* code. For tool
-  input/output that updates while streaming, stale output sticks.
-- On unmount the cleanup sets the flag to `false`, so a late resolution passes
-  the guard and calls `setState` on an unmounted component — precisely what the
-  guard was meant to prevent.
-
-There was also no `.catch()`; `codeToHtml` rejects on an unsupported language,
-which would surface as an unhandled rejection and a permanently blank block.
-
-**Fix.** Replaced the ref with a local `cancelled` flag in the standard
-cancellation shape, and added a `.catch()` that clears the markup instead of
-rejecting unhandled. Dropped the now-unused `useRef` import.
-
-### 2.9 Smaller cleanups
-
-| Item | Location | Change |
-| --- | --- | --- |
-| Swallowed sandbox-kill failure | `apps/server/src/lib/execution/e2b.ts:108` | `catch {}` hid failures to tear down an E2B sandbox — a leak that keeps billing and quota. Now `logger.warn` with the `sandboxId`. |
-| Wrong dev fallback port | `apps/web/src/lib/urls/utils.ts:23` | `getBaseUrl()` fell back to `http://localhost:3001`, which is neither the web app (3000) nor the API (3002); every other fallback in the same file uses 3000. Corrected to 3000. |
-| Foreign product name in outbound headers | `apps/server/src/lib/auth.ts:511,534,1286` | Three GitHub API calls sent `User-Agent: sim-studio` / `sim-studio/1.0`, identifying the app as an unrelated product. Now `circulo` / `circulo/1.0`. |
-| Stale commented-out example block | `apps/server/src/lib/permissions.ts` | Removed a 48-line commented "Usage Examples" block whose import path (`@/lib/auth/permissions`) no longer exists. 402 → 355 lines. |
-| Duplicate object key | `apps/desktop/src/main.cjs` | `NEXT_PUBLIC_CIRCULO_RUNTIME_KIND` was declared twice in the runtime env (same value, so harmless). Removed the duplicate. |
-| Loose equality | `apps/web/src/components/app-sidebar.tsx`, `apps/web/src/components/ui/field.tsx`, `packages/db/repositories/vote-repo.ts` | Three `==` comparisons changed to `===`. |
-| Empty destructuring pattern | `.../account/account.tsx` | `({}) => (` → `() => (`. |
-| Stale lockfile | `bun.lock` | The lockfile recorded `packages/upload@1.7.0` while its `package.json` says `2.0.0` — the "Version Packages" release commit (`2f2b44d`) bumped the package without regenerating the lock. Resynced as a side effect of the root install. Worth checking why the release workflow leaves this behind. |
+| Item                                | Location                             | Change                                                                                                                                                                                                                                                                                                         |
+| ----------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `format:check` failed on every file | repo root                            | No `.gitattributes` existed; with `core.autocrlf=true` the checkout is CRLF while Prettier wants LF. Added `* text=auto eol=lf` plus binary markers.                                                                                                                                                           |
+| Production CORS trusted loopback    | `apps/server/src/app.ts`             | `allowedOrigins` always included `localhost:3000/3001` and `127.0.0.1:3000` with `credentials: true`, letting any process on those ports make credentialed calls to a production API. Now spread only when `NODE_ENV !== "production"`.                                                                        |
+| Electron exposed its IPC bridge     | `apps/desktop/src/main.cjs`          | `setWindowOpenHandler` allowed **any** `https://` URL to open a child window, which inherits the preload and therefore `downloadUpdate`/`installUpdate`. There was no `will-navigate` handler at all. Now denies and defers to `shell.openExternal`, with a navigation allowlist via `isLocalRuntimeUrl()`.    |
+| Latent switch fallthrough           | `packages/upload/src/routes/next.ts` | `case "multipart":` could fall through into `case "upload":`. Unreachable only because a Zod schema throws first. Added an explicit `return notFound()`.                                                                                                                                                       |
+| Stale syntax highlighting           | `apps/web/.../code-block.tsx`        | An inverted mount guard meant a superseded highlight run could win and pin stale output, and the cleanup _enabled_ `setState` after unmount. Replaced with a `cancelled` flag and added the missing `.catch()`.                                                                                                |
+| Smaller cleanups                    | various                              | Swallowed E2B sandbox-kill failure; `localhost:3001` dev fallback; three `User-Agent: sim-studio` headers; a 48-line commented-out example block; a duplicate object key; three `==`; an empty destructuring pattern; a stale `bun.lock` (`packages/upload` recorded at 1.7.0 against a 2.0.0 `package.json`). |
 
 ---
 
-## 3. Not fixed — recommended, with rationale
+## 3. Round 2 — the deferred items, now done
 
-These are real findings I deliberately left in place because each is a judgement
-call with meaningful blast radius, or a larger piece of work than a cleanup pass
-should decide unilaterally.
+### 3.1 `@ts-nocheck` removed from the auth boundary — was High
 
-### 3.1 `@ts-nocheck` disables typechecking for the entire auth boundary — High
+`apps/server/src/lib/auth.ts` had a file-level `// @ts-nocheck` excluding
+**1 777 lines** — the Better Auth configuration, access-control statements and
+every OAuth provider — from a `strict` + `noUncheckedIndexedAccess` project
+whose typecheck gates CI. Removing it produced **70 errors**. All 70 are fixed
+and the pragma is gone; there is now no `@ts-nocheck`, `@ts-ignore` or
+`@ts-expect-error` anywhere in `apps/server` or `apps/web`.
 
-`apps/server/src/lib/auth.ts:1`
+**One root cause explained 12 of the errors.** The OAuth provider array is
+consumed by `.filter(...)`, which stops `GenericOAuthConfig[]` from reaching
+the array literal as a contextual type. So `prompt: "consent"` widened to
+`string`, the array stopped matching the plugin option (TS2322), and _every_
+`getUserInfo(tokens)` parameter silently degraded to `any` (11 × TS7006). A
+`satisfies GenericOAuthConfig[]` annotation restores the contextual type and
+all 12 errors disappear together. This is now commented in place, because it
+looks removable and is not.
 
-A single `// @ts-nocheck` excludes **1 777 lines** — the Better Auth
-configuration, the access-control statements, every OAuth provider, organization
-and API-key wiring — from a `strict` + `noUncheckedIndexedAccess` project whose
-typecheck is a CI gate.
-
-I measured the cost: removing the pragma produces **70 errors**.
-
-| Count | Code | Meaning |
-| --- | --- | --- |
-| 48 | TS18046 | `'data' / 'emails' / 'profile' is of type 'unknown'` |
-| 11 | TS7006 | `Parameter 'tokens' implicitly has an 'any' type` |
-| 4 | TS2304 | `Cannot find name 'HeadersInit'` / `'User'` |
-| 3 | TS2339 | Property missing on type |
-| 2 | TS2352 | Unsound `as` conversion on the session/user shape |
-| 1 | TS2532 | `Object is possibly 'undefined'` |
-| 1 | TS2322 | Provider config type mismatch |
-
-The 48 `unknown` errors are the ones that matter: they are OAuth provider
-responses consumed without narrowing, e.g.
-`apps/server/src/lib/auth.ts:526` —
+**The 48 `unknown` errors were unvalidated identity-provider responses.**
+`Response.json()` is `unknown`, and the connectors read straight through it:
 
 ```ts
-const profile = await profileResponse.json();   // unknown
-if (!profile.email) { /* ... */ }               // unchecked
+const profile = await profileResponse.json(); // unknown
+if (!profile.email) {
+  /* ... */
+} // unchecked
 ```
 
-There is no runtime validation either, so the identity-provider response shape
-is trusted implicitly. The 4 `TS2304`s are genuine compile errors (no DOM lib in
-this tsconfig), meaning that code has never been type-verified at all.
+Added Zod schemas for every provider response the file consumes — GitHub
+(profile and emails), X, Atlassian (shared by Confluence and Jira), Discord,
+Notion, Reddit and Linear's GraphQL viewer — parsed before use. Fields the
+connector already treated as optional stay optional, so a provider shape change
+raises inside the existing try/catch and declines the sign-in rather than
+building a half-populated account. The GitHub branch also stopped mutating its
+parsed profile in favour of local `email`/`emailVerified` variables.
 
-**Recommendation.** Replace the file-level pragma with a Zod schema per provider
-response (`profile`, `emails`, `tokens`) and explicit types for the
-`getUserInfo` callbacks, then delete the pragma. If that has to be staged, use
-narrow per-line `@ts-expect-error` with a tracking comment instead of
-`@ts-nocheck`, so new code in the file is checked by default and the debt is
-visible and countable.
+**Two real crashes surfaced once the file was type-checked.** Supabase and
+Slack both decoded an ID token with `Buffer.from(idToken.split(".")[1], ...)`.
+Under `noUncheckedIndexedAccess` that index is `string | undefined`, and a
+token with no `.` separator reached `Buffer.from(undefined)` and threw. Both
+now share a `readIdTokenSubject()` helper that returns `undefined` for anything
+malformed and validates that `sub` is a non-empty string.
 
-### 3.2 Lint backlog — 715 violations across 42 suppressed rules
+The remainder: `User` was used as a type but never imported, so
+`createPersonalOrganization` now declares the `{ id, name }` it actually needs
+(which also removed a `session.user as User` cast); `HeadersInit` is not in
+scope without a DOM lib, so there is now a `HeaderSource` type derived from
+`ConstructorParameters<typeof Headers>`; `SessionResponse` declares the
+`activeOrganizationId` and `apiKeyPermissions` that the organization plugin and
+API-key path really populate but `Auth<BetterAuthOptions>` erases, which also
+removed two `as any` casts at the call sites; and a `personalOrg[0]` access is
+now destructured.
 
-`biome.json` now enables `recommended` and lists these as `off`. Clearing them
-makes the gate progressively stronger. Ordered by likely value, not count:
+Two casts remain, deliberately, as `as unknown as SessionResponse`: the
+API-key branches of `getSession` return a partial session with no session row
+behind it. That is pre-existing behaviour, the assertion is now explicit and
+commented rather than silently unsound, and reshaping the session model is a
+larger change than this pass should decide.
 
-**Bug-prone — worth fixing deliberately**
+### 3.2 Lint backlog — 715 violations across 42 rules, now 0 errors
 
-| Count | Rule | Note |
-| --- | --- | --- |
-| 39 | `correctness/useExhaustiveDependencies` | Stale-closure class. This is the family that produced 2.8; worth auditing rather than auto-fixing. |
-| 22 | `suspicious/noControlCharactersInRegex` | Needs review — plausibly intentional in sanitisation regexes, but each should be confirmed. |
-| 17 | `suspicious/noArrayIndexKey` | React reconciliation bugs on reorder. |
-| 14 + 13 + 6 | `correctness/noUnusedVariables`, `noUnusedFunctionParameters`, `noUnusedPrivateClassMembers` | 33 dead bindings; mechanical. |
-| 12 | `suspicious/useIterableCallbackReturn` | I checked all 12: every one is a `forEach` callback with an implicit arrow return. Harmless today, cheap to tidy. |
-| 7 | `suspicious/noPrototypeBuiltins` | Mostly `packages/di` — real hazard on untrusted keys. |
-| 5 | `suspicious/noShadowRestrictedNames` | `packages/di`. |
-| 4 | `suspicious/noImplicitAnyLet` | |
-| 3 | `security/noDangerouslySetInnerHtml` | All three reviewed and safe: two are Shiki `codeToHtml` output (escaped), one is `chart.tsx` CSS variables. Keep the rule off with a targeted suppression, or add inline justifications. |
-| 3 | `correctness/useParseIntRadix` | |
+Enabling `recommended: true` surfaced 347 errors, 458 warnings and 96 infos.
+That is now **zero errors and zero infos**, with 33 warnings left on one rule.
+Rules explicitly disabled went from 42 to **16**.
 
-**Mechanical / stylistic — safe to auto-fix in one commit**
+Fixed, by category:
 
-`suspicious/noExplicitAny` (244 — largest single item, concentrated in
-`packages/di` and `packages/file-parsers` where some is legitimate),
-`complexity/useLiteralKeys` (47), `complexity/*` (~24 across 9 rules),
-`style/*` (~20).
+- **Dead bindings (33)** — `noUnusedVariables`, `noUnusedFunctionParameters`,
+  `noUnusedPrivateClassMembers`. Mostly cruft, but two were abandoned features:
+  `MAX_ERROR_RETRIES`/`errorRetryCount` in the settings store (only ever reset,
+  never incremented or compared), and `workflowStatus` in `chat.tsx`, whose
+  setter is called 13 times while the value is never read — workflow progress is
+  tracked and never rendered. Props that are part of a public component shape
+  were marked `_unused` rather than removed.
+- **Mechanical/stylistic** — `useImportType` (142, material here because
+  `verbatimModuleSyntax` is on), `useNodejsImportProtocol`, `useTemplate`,
+  `useExponentiationOperator`, `useShorthandFunctionType`, `useConst`, and five
+  `complexity/*` rules.
+- **Real bug classes** — `noDuplicateObjectKeys`, `noFallthroughSwitchClause`,
+  `noDoubleEquals`, `noEmptyPattern` (round 1); `useIterableCallbackReturn`
+  (including a `.map()` used purely for side effects), `noImplicitAnyLet`,
+  `useParseIntRadix`, `noGlobalIsNan`, `noAccumulatingSpread`.
+- **Accessibility — 233 down to 0 errors.** `useButtonType` (8) was the real
+  defect: a `<button>` with no `type` defaults to `submit` and submits any
+  enclosing form. `noLabelWithoutControl` (10) turned out to be a false
+  positive — those labels _do_ wrap their control, but it is a Radix
+  `Checkbox`, which the rule cannot see through; it is now configured with the
+  project's `inputComponents`. `role="status"` on a `<div>`/`<p>` became
+  `<output>`, and an `aria-label` that would have masked visible "Upload
+  failed" text was removed. `apps/web/src/components/ui/**` and
+  `components/ai-elements/**` are vendored upstream and exempted by a
+  `biome.json` override, since patching their markup would be lost on the next
+  re-generation. The five genuinely-justified cases carry inline
+  `biome-ignore` comments with reasons: a decorative blur overlay, two
+  user-uploaded media previews with no caption track to attach, and a
+  click-to-clear region whose accessible control is the `<input type="file">`
+  its enclosing `<label htmlFor>` already points at.
 
-**Accessibility — 233 across 13 rules**
+**Three of Biome's own fixes had to be reverted**, which is worth recording
+because it is the argument against running `--write --unsafe` over a codebase
+unattended:
 
-`a11y/noSvgWithoutTitle` alone is 183, almost entirely
-`apps/web/src/components/icons/icons.tsx` (a 5 014-line icon catalogue). The
-rest — `useSemanticElements` (12), `noLabelWithoutControl` (10),
-`useButtonType` (8), `useAnchorContent` (6) — are genuine UI defects on real
-components and the better place to start.
+1. `useLiteralKeys` rewrites `obj["x"]` to `obj.x`, which `packages/wf` and
+   `packages/wf-cli` forbid via `noPropertyAccessFromIndexSignature`. The two
+   cannot both hold; the tsconfig setting is the stricter one, so the rule is
+   off.
+2. `noConfusingVoidType` rewrote a `RouteHandler` return type from
+   `Promise<Response | void> | void` to `... | undefined`, which is no longer
+   assignable from Hono's `MiddlewareHandler`. Rule off.
+3. `useExhaustiveDependencies` — see below.
 
-13 `useNodejsImportProtocol` and 7 `useTemplate` infos remain unfixed because
-Biome classes those fixes as unsafe; `biome check --write --unsafe` handles them
-after review.
+### 3.3 Dead security module removed — was Medium
 
-### 3.3 782 lines of unused security-validation code — Medium
+`apps/server/src/lib/security/input-validation.ts` was 782 lines and 16
+exported validators with **zero importers**. The decision the audit left open
+resolved itself on inspection: the live SSRF guard, `validateMcpEndpoint`, is
+strictly stronger than the dead `validateExternalUrl` — it resolves DNS and
+checks the answers (so it also covers rebinding), handles cloud metadata
+endpoints, and covers far more reserved ranges. The dead validators were
+inferior duplicates of code already in use, so the file is deleted.
 
-`apps/server/src/lib/security/input-validation.ts`
+The one concrete gap it would have covered is fixed directly:
+`e2b.ts` logged the **full user-supplied source** at `info`. Harmless while
+production `minLevel` is `ERROR` — but fix 2.1 made that reachable, so an
+operator setting `LOG_LEVEL=info` would have written arbitrary user code to the
+logs. It now logs `codeLength` instead of `code`. A sweep for other logged user
+content and secrets found none: the remaining candidates are DI service tokens
+at `debug` and a rate-limit key at `warn`.
 
-16 exported validators — `validatePathSegment`, `validateUUID`,
-`validateHostname`, `validateExternalUrl`, `validateImageUrl`,
-`validateProxyUrl`, `sanitizeForLogging` and others — with **zero importers
-anywhere in the repository**. The actual validation layer is Zod, used in 27 of
-36 route files.
+### 3.4 Structured logging adopted — was Medium
 
-I left this in place rather than deleting it because the choice is genuinely
-yours: it is dead weight that also *reads* as active protection, which is its
-own risk, but several of these helpers are things the codebase arguably should
-be using. Two concrete cases where one of them applies right now:
+27 of the 31 raw `console.*` calls in `apps/server/src` are migrated to
+`createLogger`, across 14 modules including the global error handler in
+`app.ts`, the chat and webhook routes, the scheduler, and the workflow
+runtime. `routes/test.ts` reuses the `ConsoleLogger` it already owned rather
+than taking a second logging path, and `app.ts` names its instance
+`appLogger` because `logger` is already Hono's request-logging middleware
+there.
 
-- `apps/server/src/lib/execution/e2b.ts:24` logs the full user-supplied `code`
-  at `info` level. Harmless while production `minLevel` is `ERROR`, but an
-  operator setting `LOG_LEVEL=INFO` would write arbitrary user code to logs —
-  exactly what `sanitizeForLogging` exists for. Note this became *reachable*
-  with fix 2.1; it was dead before.
-- `validateExternalUrl` / `validateProxyUrl` overlap with the
-  `message-url.ts` work recorded as SEC-006 in
-  `security_best_practices_report.md`.
+The four remaining `console.log` calls are in `index.ts` and `node-server.ts`
+and are left deliberately, with a comment: they are the process talking about
+its own startup and shutdown, they must appear whatever `LOG_LEVEL` is set to,
+and the logger defaults to `ERROR`-only in production.
 
-**Recommendation.** Decide per helper: wire it up, or delete it. Leaving a
-dormant security module is the worst of the three options.
+### 3.5 `apps/web` has tests — was Medium
 
-```bash
-# if deleting
-git rm apps/server/src/lib/security/input-validation.ts
+The largest surface in the repository (73 753 lines) had no test script and no
+tests. It now has `vitest.config.ts`, a `test` script, and **19 tests** that
+run in the turbo pipeline and therefore in CI.
+
+Two things had to be solved to get there, both worth knowing about:
+
+- A `{ find: "@" }` alias is a prefix match, so it also rewrites scoped package
+  names like `@t3-oss/env-nextjs` into the source tree. The alias is anchored
+  as `/^@\//`. (`apps/server/vitest.config.ts` has the same unanchored pattern;
+  it has not bitten yet.)
+- zod 4 lists a non-standard `@zod/source` export condition first, and Vite
+  resolves it to the package's TypeScript source — which exports the core
+  primitives but **not** the `z` namespace, so any web module importing
+  `{ z }` saw `undefined`. Since most of `apps/web` validates with zod, this
+  would have blocked almost any future test. The config pins the published ESM
+  entry via `require.resolve("zod")`.
+
+First coverage went to what the audit named: `lib/api/client.ts` (11 tests —
+status-to-code mapping, 204, non-JSON responses, validation-error details,
+transport failure, and body/content-type handling for JSON, `FormData`,
+caller-set content types and no body) and `lib/urls/utils.ts` (8 tests,
+including a regression test for the `localhost:3001` fallback fixed in round 1).
+
+### 3.6 Tests no longer need a database — was Low
+
+`provider-registry.test.ts` and `agent-loop-state.test.ts` failed collection
+with `Missing DATABASE_URL`. The cause was not the tests: `packages/db/index.ts`
+ended with
+
+```ts
+export const db = getDb();
 ```
 
-### 3.4 31 raw `console.*` calls bypass the structured logger — Medium
+which **opened a connection pool as a side effect of importing the package**.
+Any module that merely referenced a table dragged in a live database. `db` is
+now a lazy `Proxy` that creates the pool on first real use, so importing the
+package is free. All 26 server test files (79 tests) now pass with no
+`DATABASE_URL` set.
 
-16 files under `apps/server/src`, including `app.ts:165` (the global error
-handler), `routes/chat.ts`, `routes/chat-stream.ts`, `routes/webhooks.ts`,
-`services/scheduler.ts` and `workflows/runtime/workflow-run-service.ts`.
+### 3.7 Env access validated — was Low
 
-These skip module tagging, level filtering and `LOG_LEVEL`. Before fix 2.1 they
-were the *only* server logging that worked in production, which is probably how
-they accumulated. Now that `createLogger` functions, they should be migrated to
-it — and the global error handler at `app.ts:165` is the one to do first.
+Nine variables were read via `process.env` while being in neither the schema
+nor `.env.example`: `S3_BUCKET`, `S3_KB_BUCKET`, `S3_ORG_BUCKET`,
+`S3_CHAT_BUCKET`, `S3_PROFILE_PICTURES_BUCKET` (legacy aliases still honoured
+as fallbacks by `lib/storage/config.ts`), `AWS_REGION`, `PORT` and `HOSTNAME`.
+All are now declared in `apps/server/src/lib/env.ts` and documented in
+`.env.example`, and the reads go through `env`.
 
-### 3.5 `apps/web` has no tests at all — Medium
+Four reads stay on `process.env`, each now commented, because `@t3-oss/env`
+**snapshots `process.env` at import**: the three production security gates in
+`lib/mcp/endpoint.ts`, `routes/ai-providers.ts` and `routes/files/index.ts`
+should reflect the live environment, and `lib/storage/file-access-token.ts`
+resolves its signing secret per call so it stays late-bound. Routing them
+through `env` broke two existing tests, which is the same fact from the other
+direction. Every variable involved is still in the schema, so production boot
+validation covers them.
 
-| Workspace | Lines | Test files |
-| --- | --- | --- |
-| `apps/web` | 73 753 | **0** (no `test` script) |
-| `apps/server` | 35 239 | 26 |
-| `packages/wf` | 16 985 | 15 |
-| `packages/upload` | 9 624 | 16 |
-| `packages/di` | 7 354 | 3 |
-| `packages/db` | 5 653 | **0** |
-| `packages/file-parsers` | 930 | **0** |
-| `packages/redis` | 325 | **0** |
-| `packages/core` | 290 | **0** |
+### 3.8 Duplicated modules resolved — was Low
 
-The largest surface in the repository is entirely unverified, and it is where
-2.8 lived. `packages/db` holds the repository layer, also untested.
+`lib/execution/languages.ts`, `lib/execution/constants.ts` and `lib/usage.ts`
+now live in `packages/types` (as `execution.ts` and `usage.ts`) and both apps
+import them from there. `AppUsage` in particular is a wire-format type — the
+server emits `usage:` chunks the web consumes — so two copies were a real drift
+risk.
 
-**Recommendation.** Add a `test` script to `apps/web` so the gate exists, then
-cover the highest-risk non-visual logic first: `src/lib/api/client.ts`,
-`src/hooks/api/*`, `src/stores/*`.
+`lib/ai/prompts.ts` needed no shared home: **web's copy was entirely dead**, 126
+lines with zero importers and zero references to any of its eight exports,
+while the server's copy is live. Deleted rather than shared.
 
-### 3.6 Two server test suites cannot run without a database — Low
+Sharing `usage.ts` needed one real fix: it imported `UsageData` from
+`tokenlens/helpers`, which only re-exports it from `@tokenlens/helpers/context`.
+That resolved in the apps by hoisting but not in a leaf package depending on
+`tokenlens` alone, so `packages/types` now depends on `@tokenlens/helpers`
+directly and imports from the subpath that actually declares the type.
 
-`apps/server/src/lib/ai/provider-registry.test.ts` and
-`src/workflows/orchestrate/agent-loop-state.test.ts` fail collection with
-`Error: Missing DATABASE_URL environment variable`. Both are unit tests that
-transitively import the DB module.
+### 3.9 Formatting normalised and gated — was Low
 
-CI sets `DATABASE_URL`, so this is green there — but `bun run test` fails on a
-clean developer machine, and these tests pull in the whole env/DB graph for
-logic that does not need it. Breaking that import edge would make them real
-unit tests. (With `DATABASE_URL` set, all 26 server files pass: 79 tests.)
+`bun run format` normalised the repository (the line-ending cause was fixed in
+round 1), `format:check` now passes, and a **Check repository formatting** step
+runs in `ci-application.yml` before lint.
 
-### 3.7 Env access bypasses the validated schema — Low
+### 3.10 TODOs — was Informational
 
-37 direct `process.env.*` reads sit outside the `@t3-oss/env` modules. Nine
-variables are in neither the schema nor `.env.example`:
-
-`S3_BUCKET`, `S3_KB_BUCKET`, `S3_ORG_BUCKET`, `S3_CHAT_BUCKET`,
-`S3_PROFILE_PICTURES_BUCKET`, `AWS_REGION`, `PORT`, `HOSTNAME` — read in
-`lib/storage/config.ts`, `routes/health.ts`, `index.ts` and `node-server.ts`.
-
-So a storage misconfiguration is not caught at boot and is undiscoverable from
-the example file — notable given `/health/ready` is documented as verifying
-bucket configuration. Others (`E2B_API_KEY`, `REDIS_URL`,
-`INTERNAL_API_SECRET`, `GITHUB_REPO_CLIENT_ID/SECRET`,
-`CIRCULO_MODEL_PRICING_JSON`) *are* in the schema but are read raw anyway,
-skipping validation.
-
-**Recommendation.** Add the nine to the schema and `.env.example`; route all
-reads through `env`.
-
-### 3.8 Duplicated modules between web and server — Low
-
-Thirteen paths exist in both `apps/web/src/lib` and `apps/server/src/lib`.
-Byte-identical: `lib/execution/constants.ts`, `lib/execution/languages.ts`,
-`lib/usage.ts`. Differing only by an import specifier:
-`lib/ai/prompts.ts` (126 lines, 1 line apart — the `ArtifactKind` import).
-
-These four are drift waiting to happen and belong in `packages/types` or
-`packages/core`. The rest (`lib/auth.ts`, `lib/env.ts`, `lib/urls/utils.ts`,
-`lib/environment.ts`, `lib/types.ts`, `lib/utils.ts`, `lib/branding/branding.ts`,
-`lib/ai/providers.ts`) legitimately differ by tier — but sharing a filename
-while behaving differently is how 2.1 went unnoticed for so long. Worth renaming
-to make the tier explicit.
-
-### 3.9 `format:check` is absent from CI — Low
-
-`ci-application.yml` runs lint, build, typecheck and test, but not
-`format:check`. With 2.4 in place it can now pass cross-platform, so it should
-be added after a one-time `bun run format` normalisation pass. That pass will
-touch most files, so it is best landed as its own commit.
-
-### 3.10 62 `TODO` comments — Informational
-
-Across 20 files, heavily concentrated in `apps/web` UI
-(`new-chat.tsx` has 14, `pricing-background.tsx` 7, `layout.tsx` 7). Almost all
-are cosmetic or refactor notes rather than correctness issues. `layout.tsx:75`
-links to a ChatGPT conversation as if it were documentation, which will not
-survive for the next reader.
+The 62 TODOs are genuine backlog, not defects, and are left as their authors
+wrote them. One was a defect in itself: `apps/web/src/app/layout.tsx` cited a
+private ChatGPT conversation URL as documentation, which no other reader can
+open. Replaced with a description of the intent.
 
 ---
 
-## 4. Verification
+## 4. Still open
 
-Every gate below was run after the changes in part 2.
+### 4.1 `useExhaustiveDependencies` — 33 warnings, rule set to `warn`
+
+This is the one item deliberately not closed, and the reason is specific:
+**Biome's automated fix for it introduced behavioural regressions in eight
+files**, which I caught and reverted. Examples, all from the autofix:
+
+- `packages/wf/src/react.ts` — `eventTypesKey` (a string key derived from the
+  array contents, so an inline array literal does not churn the dependency)
+  was renamed `_eventTypesKey` and replaced in the dependency array with
+  `eventTypes` itself. Inline arrays get a new identity every render, so the
+  event subscription would be torn down and rebuilt on every render.
+- `glass-surface.tsx` — three effects had their dependencies replaced with
+  `updateDisplacementMap`, which is a plain function declared in the component
+  body, not a `useCallback`. New identity every render, and one of those
+  effects calls `setTimeout(updateDisplacementMap, 0)`.
+- Real triggers were **removed**: `chatId` from `multimodal-input.tsx` and
+  `use-message-pagination.ts`, `id` from `chat.tsx`, `artifact.documentId` from
+  `artifact.tsx`, `selectedTag` from `faq-list.tsx`. Pagination would not reset
+  when switching chats.
+- `activeIndex` was **added** to an `IntersectionObserver` effect in
+  `use-active-by-class.ts`, which would recreate the observer on every
+  intersection.
+
+None of that is caught by typecheck or lint, and until §3.5 there were no web
+tests at all. So: the rule is enabled at `warn` (visible on every lint run,
+does not gate CI), and the five dependencies React _guarantees_ are stable —
+`useState` setters and `useRef` objects — were removed by hand. The remaining
+33 need per-site judgement with test coverage behind them, which is the natural
+follow-on to §3.5.
+
+### 4.2 16 lint rules still off
+
+Each is off for a stated reason, not by omission:
+
+| Rule                                                                                                                                     | Count | Why                                                                                                                                               |
+| ---------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `suspicious/noExplicitAny`                                                                                                               | 244   | Largest single item. Concentrated in `packages/di` and `packages/file-parsers`, where some is legitimate metaprogramming. Worth a dedicated pass. |
+| `a11y/noSvgWithoutTitle`                                                                                                                 | 183   | Almost entirely `icons.tsx`, a 5 014-line icon catalogue. Decorative icons do not need titles; the rule has no per-file nuance.                   |
+| `suspicious/noControlCharactersInRegex`                                                                                                  | 22    | Needs review — plausibly intentional in sanitisation regexes, but each should be confirmed rather than bulk-changed.                              |
+| `suspicious/noArrayIndexKey`                                                                                                             | 17    | React reconciliation bugs on reorder. Needs a stable key per call site.                                                                           |
+| `performance/noImgElement`                                                                                                               | 11    | Prefers `next/image`; several are deliberate (including one with an existing `eslint-disable`).                                                   |
+| `complexity/useLiteralKeys`                                                                                                              | 47    | Conflicts with `noPropertyAccessFromIndexSignature` in `packages/wf` and `packages/wf-cli`.                                                       |
+| `suspicious/noShadowRestrictedNames`, `complexity/noArguments`, `noBannedTypes`, `noStaticOnlyClass`, `suspicious/noAssignInExpressions` | 20    | Intentional patterns in the DI container and its tests.                                                                                           |
+| `security/noDangerouslySetInnerHtml`                                                                                                     | 3     | All three reviewed and safe: two are escaped Shiki output, one is `chart.tsx` CSS variables.                                                      |
+| `suspicious/noConfusingVoidType`                                                                                                         | 5     | Its fix breaks middleware return-type assignability (§3.2).                                                                                       |
+| `suspicious/noDocumentCookie`                                                                                                            | 1     | Vendored shadcn sidebar persisting its own state.                                                                                                 |
+| `suspicious/noThenProperty`                                                                                                              | 2     | `packages/wf` class builder.                                                                                                                      |
+| `style/noNonNullAssertion`                                                                                                               | —     | Pre-existing choice, not introduced here.                                                                                                         |
+
+### 4.3 Smaller notes
+
+- The two `as unknown as SessionResponse` casts in `getSession` (§3.1) reflect
+  a session model where an API key produces a partial session. Reshaping it
+  touches 25 `SessionResponse` references and should be its own change.
+- `apps/server/vitest.config.ts` has the same unanchored `{ find: "@" }` alias
+  that broke the web test setup (§3.5). It has not caused a failure yet.
+- `apps/web/package.json` has `"lint": "eslint"` alongside `eslint.config.mjs`,
+  while the repository gate is Biome. Two linters, one of them unreferenced by
+  CI.
+- Untested packages remain: `packages/db` (5 653 lines, the repository layer),
+  `packages/core`, `packages/file-parsers`, `packages/redis`.
+
+---
+
+## 5. Verification
+
+Every gate below was run after the final change.
 
 ```bash
 bun install
-bun run lint:check    # passes — 33 infos, 0 errors, recommended ruleset active
-bun run typecheck     # passes — 17/17 tasks
-bun run build         # passes — 10/10 tasks
+bun run format:check   # passes
+bun run lint:check     # passes — 0 errors, 0 infos, 33 warnings on one rule
+bun run typecheck      # passes — 17/17 tasks, no type suppressions anywhere
+bun run build          # passes — 10/10 tasks
 ```
 
-Tests need a database URL (see 3.6):
+Tests pass with or without a database (§3.6); CI sets one:
 
 ```bash
 DATABASE_URL="postgres://user:password@localhost:5432/circulo" bun run test
 ```
 
-Test stability was confirmed specifically for 2.2 — three consecutive forced
-full runs, each 12/12 tasks green, against a baseline that failed 2 of 3:
+Test stability for §2.2 was confirmed with three consecutive forced full runs,
+each green, against a baseline that failed 2 of 3:
 
 ```bash
 DATABASE_URL="..." bun ./node_modules/turbo/bin/turbo run test --force
 ```
 
-### Changed files
+### Totals
 
-133 tracked files changed (357 insertions, 270 deletions), plus one new
-untracked file. 116 of the changed files are Biome auto-fixes — `import type`
-markers and `node:` prefixes — 108 of them three lines or fewer. The 18
-substantive edits are:
+|                   | Round 1 (`09ea11d`)            | Round 2                        |
+| ----------------- | ------------------------------ | ------------------------------ |
+| Files changed     | 133 + 1 new                    | 140                            |
+| Lines             | +357 / −270                    | +1 857 / −2 186                |
+| Type suppressions | 1 (`@ts-nocheck`, 1 777 lines) | **0**                          |
+| Lint rules off    | 42                             | **16**                         |
+| Lint errors       | 347                            | **0**                          |
+| Tests             | 12 tasks, 0 in `apps/web`      | 13 tasks, **19** in `apps/web` |
 
-```
-biome.json                                          lint gate (2.3)
-package.json + bun.lock                             biome dependency (2.3), stale lock (2.9)
-.gitattributes                                      new — line endings (2.4)
-apps/server/src/lib/logs/console/logger.ts          production logging (2.1)
-apps/server/src/app.ts                              CORS origins (2.5)
-apps/server/src/lib/permissions.ts                  dead example block (2.9)
-apps/server/src/lib/auth.ts                         User-Agent strings (2.9)
-apps/server/src/lib/execution/e2b.ts                swallowed error (2.9)
-apps/desktop/src/main.cjs                           navigation hardening (2.6), dup key (2.9)
-apps/web/src/components/ai-elements/code-block.tsx  highlight race (2.8)
-apps/web/src/lib/urls/utils.ts                      dev fallback port (2.9)
-packages/upload/src/routes/next.ts                  switch fallthrough (2.7)
-packages/wf/test/security.test.ts                   hanging test (2.2)
-packages/db/repositories/vote-repo.ts               strict equality (2.9)
-apps/web/src/components/app-sidebar.tsx             strict equality (2.9)
-apps/web/src/components/ui/field.tsx                strict equality (2.9)
-.../settings-modal/components/account/account.tsx   empty pattern (2.9)
-```
+Files removed (all verified unreferenced): `lib/security/input-validation.ts`
+(782 lines), web's `lib/ai/prompts.ts` (126 lines), and six duplicate
+`lib/execution/*` and `lib/usage.ts` copies now shared from `packages/types`.
 
-Nothing is committed; all changes are in the working tree.
+Round 2 is committed on `chore/audit-remediation-round-2`.
 
-### Suggested next steps, in order
+### Suggested next steps
 
-1. **3.1** — remove `@ts-nocheck` from `auth.ts` and validate OAuth responses.
-   Highest residual risk, and 70 errors is a bounded, measurable job.
-2. **3.3** — decide the fate of `input-validation.ts`; wire up
-   `sanitizeForLogging` at `e2b.ts:24`, now that logging is live.
-3. **3.4** — migrate the 31 `console.*` calls, starting with the global error
-   handler.
-4. **3.2** — clear the mechanical half of the lint backlog in one auto-fix
-   commit, then work the `useExhaustiveDependencies` and a11y findings by hand.
-5. **3.5** — give `apps/web` a test script and first tests.
+1. **§4.1** — work the 33 hook-dependency warnings per site, with web tests
+   (§3.5) as the safety net. Do not run the autofix over them.
+2. **§4.2** — `noExplicitAny` in `packages/di`/`packages/file-parsers`, then
+   `noArrayIndexKey` and `noControlCharactersInRegex`.
+3. **§4.3** — anchor the `apps/server` vitest alias; decide whether `apps/web`
+   keeps ESLint alongside Biome.
+4. Extend tests to `packages/db`, the largest untested package.

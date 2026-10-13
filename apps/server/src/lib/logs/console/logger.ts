@@ -175,7 +175,7 @@ export class Logger {
 
     // Color configuration
     if (config.colorize) {
-      let levelColor;
+      let levelColor: typeof chalk.blue | undefined;
       const moduleColor = chalk.cyan;
       const timestampColor = chalk.gray;
 

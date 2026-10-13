@@ -3,8 +3,8 @@ import { settings, user } from "@/db/schema";
 import type { EmailType } from "@/lib/email/mailer";
 import { env } from "@/lib/env";
 import { createLogger } from "@/lib/logs/console/logger";
-import { createHash, randomBytes } from "crypto";
 import { eq } from "drizzle-orm";
+import { createHash, randomBytes } from "node:crypto";
 
 const logger = createLogger("Unsubscribe");
 

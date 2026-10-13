@@ -23,10 +23,9 @@ export function VoiceRecordingIndicator({
   onStop: () => void;
 }) {
   return (
-    <div
+    <output
       aria-live="polite"
       className="flex min-h-11 w-full min-w-0 items-center gap-2 rounded-2xl border border-destructive/20 bg-destructive/5 px-2 py-1.5"
-      role="status"
     >
       <Button
         aria-label="Cancel voice recording"
@@ -73,6 +72,6 @@ export function VoiceRecordingIndicator({
       >
         <Square className="size-3.5 fill-current" />
       </Button>
-    </div>
+    </output>
   );
 }

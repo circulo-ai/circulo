@@ -76,7 +76,7 @@ export function AppSidebar({ user }: { user: User }) {
     ? paginatedConversations.some((p) => p.hasMore === false)
     : false;
 
-  const loaderRef = useState<HTMLDivElement | null>(null)[0];
+  const _loaderRef = useState<HTMLDivElement | null>(null)[0];
 
   const formatTimestamp = (iso: string) => {
     const d = new Date(iso);
@@ -102,7 +102,7 @@ export function AppSidebar({ user }: { user: User }) {
     const onScroll = () => setScrollTop(el.scrollTop);
     el.addEventListener("scroll", onScroll);
     return () => el.removeEventListener("scroll", onScroll);
-  }, [scrollRef]);
+  }, []);
 
   const collapsed = state === "collapsed";
   const itemHeight = collapsed ? 48 : 56;
@@ -158,7 +158,7 @@ export function AppSidebar({ user }: { user: User }) {
               if (isLoading) {
                 return (
                   <div className="flex flex-col gap-2 p-2">
-                    {[44, 32, 28, 64, 52].map((w, i) => (
+                    {[44, 32, 28, 64, 52].map((_w, i) => (
                       <div
                         key={i}
                         className="h-8 rounded-md bg-sidebar-accent-foreground/10"

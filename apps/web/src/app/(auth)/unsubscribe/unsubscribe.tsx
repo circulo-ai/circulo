@@ -130,7 +130,7 @@ function UnsubscribeContent() {
       } else {
         setError(result.error || "Failed to unsubscribe");
       }
-    } catch (error) {
+    } catch (_error) {
       setError("Failed to process unsubscribe request");
     } finally {
       setProcessing(false);

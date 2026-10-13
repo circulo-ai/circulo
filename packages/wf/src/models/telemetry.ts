@@ -51,12 +51,12 @@ export interface OpenTelemetrySpan {
   setAttribute(
     name: string,
     value: TelemetryAttribute,
-  ): OpenTelemetrySpan | void;
-  recordException(error: Error): OpenTelemetrySpan | void;
+  ): OpenTelemetrySpan | undefined;
+  recordException(error: Error): OpenTelemetrySpan | undefined;
   setStatus(status: {
     code: "OK" | "ERROR";
     message?: string;
-  }): OpenTelemetrySpan | void;
+  }): OpenTelemetrySpan | undefined;
   end(): void;
 }
 

@@ -186,6 +186,8 @@ function normalizeBaseUrl(
   return url.toString().replace(/\/$/, "");
 }
 
+// Live NODE_ENV read: `@/lib/env` snapshots at import, and a production
+// security gate should reflect the running environment.
 function envProduction() {
   return process.env.NODE_ENV === "production";
 }

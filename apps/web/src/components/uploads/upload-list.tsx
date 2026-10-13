@@ -102,6 +102,7 @@ export function UploadList({
           if (item.status === "uploading" || item.status === "preparing") {
             return (
               <button
+                type="button"
                 className={clsx(buttonBase, "border-muted-foreground/40")}
                 onClick={() => onCancel?.(item.id)}
               >
@@ -113,6 +114,7 @@ export function UploadList({
             return (
               <div className="flex gap-2">
                 <button
+                  type="button"
                   className={clsx(
                     buttonBase,
                     "border-primary/50 text-primary hover:bg-primary/10",
@@ -122,6 +124,7 @@ export function UploadList({
                   Retry
                 </button>
                 <button
+                  type="button"
                   className={clsx(
                     buttonBase,
                     "border-muted-foreground/40 text-muted-foreground hover:bg-muted/50",
@@ -136,6 +139,7 @@ export function UploadList({
           if (item.status === "success") {
             return (
               <button
+                type="button"
                 className={clsx(
                   buttonBase,
                   "border-muted-foreground/40 text-muted-foreground hover:bg-muted/50",

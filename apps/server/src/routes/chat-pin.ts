@@ -33,7 +33,7 @@ router.post("/chat/:id/pin", requireAuth, async (c) => {
   const { id: chatId } = parseParams.data;
   const { user } = c.var;
 
-  let body: z.infer<typeof pinBodySchema> = undefined;
+  let body: z.infer<typeof pinBodySchema>;
   try {
     body = pinBodySchema.parse(await c.req.json());
   } catch {

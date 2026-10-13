@@ -13,10 +13,10 @@ import { useUploadTaskManager } from "@/hooks/use-upload-task-manager";
 import { useVoiceRecorder } from "@/hooks/use-voice-recorder";
 import { attachmentFromUploadTask } from "@/lib/attachments";
 import type { Attachment, ChatMessage } from "@/lib/types";
-import type { AppUsage } from "@/lib/usage";
 import { cn } from "@/lib/utils";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import type { Agent, ChatAgent } from "@circulo-ai/db";
+import type { AppUsage } from "@circulo-ai/types";
 import type { UIMessage } from "ai";
 import equal from "fast-deep-equal";
 import { Bot, Mic, Square, Wrench } from "lucide-react";
@@ -53,7 +53,7 @@ function PureMultimodalInput({
   clearError,
   className,
   selectedVisibilityType,
-  usage,
+  usage: _usage,
 }: {
   chatId: string;
   input: string;

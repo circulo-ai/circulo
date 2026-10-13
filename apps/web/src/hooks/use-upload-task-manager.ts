@@ -243,9 +243,9 @@ export function useUploadTaskManager({
         xhr.open("PUT", presignData.presignedUrl, true);
 
         if (presignData.uploadHeaders) {
-          Object.entries(presignData.uploadHeaders).forEach(([key, value]) =>
-            xhr.setRequestHeader(key, value),
-          );
+          Object.entries(presignData.uploadHeaders).forEach(([key, value]) => {
+            xhr.setRequestHeader(key, value);
+          });
         }
 
         xhr.setRequestHeader(
@@ -496,9 +496,9 @@ export function useUploadTaskManager({
   );
 
   const resetAllUploadTasks = useCallback(() => {
-    Object.keys(abortHandlersRef.current).forEach((taskId) =>
-      abortHandlersRef.current[taskId]?.(),
-    );
+    Object.keys(abortHandlersRef.current).forEach((taskId) => {
+      abortHandlersRef.current[taskId]?.();
+    });
     pendingTaskIdsRef.current = [];
     inFlightTaskIdsRef.current.clear();
     abortHandlersRef.current = {};

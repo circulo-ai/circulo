@@ -167,7 +167,7 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
                 }
               : classification,
           });
-        } catch (error) {
+        } catch (_error) {
           return complete({
             ...state,
             classification: createDirectClassification(

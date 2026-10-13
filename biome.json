@@ -12,40 +12,34 @@
         "noNonNullAssertion": "off"
       },
       "a11y": {
-        "noLabelWithoutControl": "off",
-        "noRedundantRoles": "off",
-        "noStaticElementInteractions": "off",
         "noSvgWithoutTitle": "off",
-        "useAltText": "off",
-        "useAnchorContent": "off",
-        "useAriaPropsForRole": "off",
-        "useAriaPropsSupportedByRole": "off",
-        "useButtonType": "off",
-        "useFocusableInteractive": "off",
-        "useKeyWithClickEvents": "off",
-        "useMediaCaption": "off",
-        "useSemanticElements": "off"
+        "noLabelWithoutControl": {
+          "level": "error",
+          "options": {
+            "inputComponents": [
+              "Checkbox",
+              "Switch",
+              "Input",
+              "Textarea",
+              "Slider",
+              "RadioGroupItem",
+              "Select",
+              "SelectTrigger",
+              "InputOTP"
+            ]
+          }
+        }
       },
       "complexity": {
+        "useLiteralKeys": "off",
         "noArguments": "off",
         "noBannedTypes": "off",
-        "noStaticOnlyClass": "off",
-        "noUselessEscapeInRegex": "off",
-        "noUselessSwitchCase": "off",
-        "noUselessTernary": "off",
-        "noUselessUndefinedInitialization": "off",
-        "useLiteralKeys": "off",
-        "useOptionalChain": "off"
+        "noStaticOnlyClass": "off"
       },
       "correctness": {
-        "noUnusedFunctionParameters": "off",
-        "noUnusedPrivateClassMembers": "off",
-        "noUnusedVariables": "off",
-        "useExhaustiveDependencies": "off",
-        "useParseIntRadix": "off"
+        "useExhaustiveDependencies": "warn"
       },
       "performance": {
-        "noAccumulatingSpread": "off",
         "noImgElement": "off"
       },
       "security": {
@@ -53,17 +47,13 @@
       },
       "suspicious": {
         "noArrayIndexKey": "off",
-        "noAssignInExpressions": "off",
-        "noConfusingVoidType": "off",
         "noControlCharactersInRegex": "off",
-        "noDocumentCookie": "off",
         "noExplicitAny": "off",
-        "noGlobalIsNan": "off",
-        "noImplicitAnyLet": "off",
-        "noPrototypeBuiltins": "off",
-        "noShadowRestrictedNames": "off",
         "noThenProperty": "off",
-        "useIterableCallbackReturn": "off"
+        "noShadowRestrictedNames": "off",
+        "noAssignInExpressions": "off",
+        "noDocumentCookie": "off",
+        "noConfusingVoidType": "off"
       }
     }
   },
@@ -83,5 +73,21 @@
     "parser": {
       "tailwindDirectives": true
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "apps/web/src/components/ui/**",
+        "apps/web/src/components/ai-elements/**"
+      ],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "recommended": false,
+            "noLabelWithoutControl": "off"
+          }
+        }
+      }
+    }
+  ]
 }

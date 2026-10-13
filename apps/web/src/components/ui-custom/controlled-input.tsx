@@ -179,7 +179,7 @@ const FormInputAdapter = <
   // TODO convert to a utility
   const extractNumberFromInput = useCallback(
     (event: ChangeEvent<HTMLInputElement>) =>
-      parseInt(extractDigitsOnly(event)),
+      parseInt(extractDigitsOnly(event), 10),
     [extractDigitsOnly],
   );
 
@@ -196,7 +196,7 @@ const FormInputAdapter = <
           // TODO make this more readable
           inputProps?.type === "number"
             ? saveAsNumber
-              ? isNaN(extractNumberFromInput(e))
+              ? Number.isNaN(extractNumberFromInput(e))
                 ? 0
                 : extractNumberFromInput(e)
               : extractDigitsOnly(e)

@@ -207,4 +207,25 @@ export async function closeDbPool(): Promise<void> {
   }
 }
 
-export const db = getDb();
+/**
+ * Drizzle instance for the configured driver.
+ *
+ * Deliberately a lazy proxy rather than `getDb()` evaluated at module load.
+ * The eager call opened a connection pool as a side effect of *importing* this
+ * package, so any module that merely referenced a table dragged in a live
+ * database — and unit tests that never touch one failed to collect with
+ * "Missing DATABASE_URL". The pool is now created on first real use.
+ */
+export const db: DbInstance = new Proxy({} as DbInstance, {
+  get(_target, property) {
+    const instance = getPool().db as unknown as Record<
+      string | symbol,
+      unknown
+    >;
+    const value = instance[property];
+    return typeof value === "function" ? value.bind(instance) : value;
+  },
+  has(_target, property) {
+    return property in (getPool().db as object);
+  },
+});

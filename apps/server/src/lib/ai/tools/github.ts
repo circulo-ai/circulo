@@ -9,7 +9,7 @@ import { z } from "zod";
 import { createGithubClient, repositorySummary } from "./github-client";
 
 const GITHUB_PROVIDER_ID = "github-repo";
-const GITHUB_API = "https://api.github.com";
+const _GITHUB_API = "https://api.github.com";
 
 type GithubAccount = {
   id: string;

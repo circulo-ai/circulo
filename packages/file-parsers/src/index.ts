@@ -1,5 +1,5 @@
-import { existsSync } from "fs";
-import path from "path";
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { createLogger, type Logger } from "./logger.js";
 import type {
   FileParseResult,

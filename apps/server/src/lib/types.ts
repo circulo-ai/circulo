@@ -1,7 +1,7 @@
 import type { ArtifactKind, Suggestion } from "@/db/schema";
+import type { AppUsage } from "@circulo-ai/types";
 import type { UIMessage, UIMessageChunk } from "ai";
 import { z } from "zod";
-import type { AppUsage } from "./usage";
 
 type RequestClassification = Record<string, unknown>;
 type ExecutionPlan = Record<string, unknown>;

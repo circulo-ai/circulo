@@ -24,6 +24,7 @@ import {
   toKnowledgeImageDataUrl,
 } from "@/lib/knowledge/assets";
 import { createKnowledgeEmbeddingWithMetadata } from "@/lib/knowledge/embeddings";
+import { createLogger } from "@/lib/logs/console/logger";
 import { retrieveMemories } from "@/lib/memory/retrieval";
 import {
   hasPermissionForUser,
@@ -33,6 +34,8 @@ import { ensureInitialSkillCatalog } from "@/lib/skills/initial-catalog";
 import { storageManager } from "@/lib/storage/config";
 import { ensureWorkspaceRoleCatalog } from "@/lib/workspace-role-catalog";
 import { and, asc, desc, eq, inArray, isNull, not, or, sql } from "drizzle-orm";
+
+const logger = createLogger("LoadChatStep");
 
 export interface ChatContext {
   chat: Chat;
@@ -342,7 +345,7 @@ export async function loadChatContextStep(
   });
 
   if (!chatAgents || chatAgents.length === 0) {
-    console.warn(`No active agents found in chat ${chatId}`);
+    logger.warn(`No active agents found in chat ${chatId}`);
   }
 
   const knowledgeDocumentsWithImages = await Promise.all(

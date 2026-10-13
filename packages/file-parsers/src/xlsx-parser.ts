@@ -1,11 +1,11 @@
-import { existsSync } from "fs";
+import { existsSync } from "node:fs";
 import * as XLSX from "xlsx";
 import { createLogger, type Logger } from "./logger.js";
 import type { FileParseResult, FileParser } from "./types.js";
 import { sanitizeTextArray, sanitizeTextForUTF8 } from "./utils.js";
 
 export class XlsxParser implements FileParser {
-  constructor(private readonly logger: Logger = createLogger("XlsxParser")) {}
+  constructor(readonly _logger: Logger = createLogger("XlsxParser")) {}
 
   async parseFile(filePath: string): Promise<FileParseResult> {
     if (!filePath) {

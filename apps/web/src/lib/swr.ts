@@ -95,7 +95,7 @@ export const swrConfig: SWRConfiguration = {
     });
   },
 
-  onSuccess: (data, key) => {
+  onSuccess: (_data, key) => {
     if (shouldIgnoreKey(key)) return;
   },
 

@@ -1,6 +1,6 @@
 import { parse, type Options } from "csv-parse";
-import { createReadStream, existsSync } from "fs";
-import { Readable } from "stream";
+import { createReadStream, existsSync } from "node:fs";
+import { Readable } from "node:stream";
 import { createLogger, type Logger } from "./logger.js";
 import type { FileParseResult, FileParser } from "./types.js";
 import { sanitizeTextForUTF8 } from "./utils.js";
@@ -70,7 +70,7 @@ export class CsvParser implements FileParser {
       const parser = parse(parserOptions);
 
       parser.on("readable", () => {
-        let record;
+        let record: Record<string, unknown> | null;
         while ((record = parser.read()) !== null && !aborted) {
           rowCount++;
 

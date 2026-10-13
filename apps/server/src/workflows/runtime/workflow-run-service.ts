@@ -1,5 +1,6 @@
 import { db, humanApproval, taskHandoff, workflowRun } from "@/db";
 import { messageRepo } from "@/db/repositories";
+import { createLogger } from "@/lib/logs/console/logger";
 import type {
   CustomUIMessageChunk,
   WorkflowPlanStepTrace,
@@ -23,6 +24,8 @@ import {
   getWorkflowRuntime,
   type WorkflowApplicationEngine,
 } from "./wf-config";
+
+const logger = createLogger("WorkflowRunService");
 
 type WorkflowOutput = OrchestrationWorkflowState;
 
@@ -270,7 +273,7 @@ export class WorkflowRunService {
       this.recoveryStarted = true;
       void this.runtimePromise.then(({ runtime }) =>
         this.recoverInterruptedRuns(runtime.engine).catch((error: unknown) => {
-          console.warn("[Workflow Recovery Deferred]", error);
+          logger.warn("[Workflow Recovery Deferred]", error);
         }),
       );
     }
@@ -774,7 +777,7 @@ export class WorkflowRunService {
         })
         .where(eq(workflowRun.id, runId));
     } catch (error) {
-      console.error("[Workflow Status Sync Error]", { runId, status, error });
+      logger.error("[Workflow Status Sync Error]", { runId, status, error });
     }
   }
 
@@ -811,7 +814,7 @@ export class WorkflowRunService {
     this.subscriptions.set(runId, unsubscribe);
     const poller = setInterval(() => {
       void this.pollPersistedEvents(runId, input, stepNames).catch((error) => {
-        console.error("[Workflow Event Poll Error]", { runId, error });
+        logger.error("[Workflow Event Poll Error]", { runId, error });
       });
     }, 1_000);
     const nodePoller = poller as ReturnType<typeof setInterval> & {
@@ -855,14 +858,14 @@ export class WorkflowRunService {
         await this.replayPersistedEvents(run.id, input);
         if (run.state === "running") {
           void engine.run(run.id).catch((error: unknown) => {
-            console.error("[Workflow Recovery Error]", error);
+            logger.error("[Workflow Recovery Error]", error);
           });
         }
       }
     } catch (error) {
       // Local development may start before PostgreSQL. The normal scheduler
       // already retries; a later process restart will retry recovery too.
-      console.warn("[Workflow Recovery Deferred]", error);
+      logger.warn("[Workflow Recovery Deferred]", error);
     }
   }
 

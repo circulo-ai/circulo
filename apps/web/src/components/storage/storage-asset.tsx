@@ -68,7 +68,7 @@ export function StorageAsset({
 
   if (forceImage || isImage) {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={src} onError={onError} {...imgProps} />;
+    return <img src={src} alt="" onError={onError} {...imgProps} />;
   }
 
   return (

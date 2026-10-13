@@ -16,6 +16,7 @@ import {
   getKnowledgeImageFileName,
   refreshKnowledgeImageDocument,
 } from "@/lib/knowledge/vision";
+import { createLogger } from "@/lib/logs/console/logger";
 import {
   hasPermissionForUser,
   isMemberOf,
@@ -34,6 +35,8 @@ import { and, asc, count, desc, eq, inArray, or, sql } from "drizzle-orm";
 import type { Context } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../lib/create-app";
+
+const logger = createLogger("KnowledgeRoute");
 
 const router = createRouter();
 const idParams = z.object({ id: z.uuid() });
@@ -306,7 +309,7 @@ router.post(
       content: created.content,
       userId: c.var.user!.id,
     }).catch((error) => {
-      console.warn("[Knowledge Embedding] document indexing skipped", {
+      logger.warn("[Knowledge Embedding] document indexing skipped", {
         documentId: created.id,
         error: error instanceof Error ? error.message : "unknown error",
       });
@@ -395,7 +398,7 @@ router.post(
           buffer,
           existingMetadata: created.metadata,
         }).catch((error) => {
-          console.warn("[Knowledge Vision] image indexing skipped", {
+          logger.warn("[Knowledge Vision] image indexing skipped", {
             documentId: created.id,
             error: error instanceof Error ? error.message : "unknown error",
           });
@@ -452,7 +455,7 @@ router.post(
       content: created.content,
       userId: c.var.user!.id,
     }).catch((error) => {
-      console.warn("[Knowledge Embedding] document indexing skipped", {
+      logger.warn("[Knowledge Embedding] document indexing skipped", {
         documentId: created.id,
         error: error instanceof Error ? error.message : "unknown error",
       });
@@ -504,7 +507,7 @@ router.post(
           if (result.visionIndexed) visionIndexed += 1;
           if (result.embeddingIndexed) indexed += 1;
         } catch (error) {
-          console.warn("[Knowledge Vision] image reindex skipped", {
+          logger.warn("[Knowledge Vision] image reindex skipped", {
             documentId: document.id,
             error: error instanceof Error ? error.message : "unknown error",
           });

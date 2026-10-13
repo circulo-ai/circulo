@@ -27,9 +27,9 @@ export function SliderInput({ onChange, value, ...props }: SliderInputProps) {
 }
 
 function normalizeValue(value: SliderInputProps["value"]) {
-  if (typeof value === "string") return [parseInt(value) || 0];
+  if (typeof value === "string") return [parseInt(value, 10) || 0];
   else if (typeof value === "number") return [value];
   else if (Array.isArray(value))
-    return value.map((item) => parseInt(item) || 0);
+    return value.map((item) => parseInt(item, 10) || 0);
   else return [];
 }

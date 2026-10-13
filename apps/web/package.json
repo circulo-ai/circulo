@@ -10,6 +10,7 @@
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "db:dbml": "npx tsx dbml.ts",
+    "test": "bun ./node_modules/vitest/vitest.mjs run --passWithNoTests",
     "typecheck": "bun ./node_modules/typescript/bin/tsc --noEmit"
   },
   "dependencies": {

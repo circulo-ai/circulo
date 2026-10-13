@@ -120,8 +120,7 @@ function WorkspacePageContent() {
     useListOrganizations(authClient);
   const { mutate: setActiveOrganization } =
     useSetActiveOrganization(authClient);
-  const { data: session, isPending: isSessionPending } =
-    authClient.useSession();
+  const { data: session } = authClient.useSession();
   const [selectingOrganizationId, setSelectingOrganizationId] =
     useState<string>();
   const copy = sectionCopy[activeSection];

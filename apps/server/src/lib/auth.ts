@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { renderMagicLinkEmail, renderOTPEmail } from "@/components/emails";
 import { renderInvitationEmail } from "@/components/emails/render-email";
 import { db } from "@/db";
@@ -25,6 +24,7 @@ import {
 } from "better-auth/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
 import { adminAc, userAc } from "better-auth/plugins/admin/access";
+import type { GenericOAuthConfig } from "better-auth/plugins/generic-oauth";
 import {
   defaultStatements,
   memberAc,
@@ -34,6 +34,7 @@ import {
 import { and, eq, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { createHash } from "node:crypto";
+import { z } from "zod";
 import {
   authorizeUserProvisioning,
   finalizeBootstrap,
@@ -45,6 +46,127 @@ import { getValidTrustedProxyIps } from "./trusted-proxies";
 const logger = createLogger("Auth");
 const isProduction = env.NODE_ENV === "production";
 const trustedProxyIps = getValidTrustedProxyIps(env.TRUSTED_PROXY_IPS);
+
+/**
+ * Reads the `sub` claim from an ID token without verifying its signature.
+ *
+ * Providers that expose no user-info endpoint hand us an ID token next to the
+ * access token, and these connectors use `sub` only to derive a stable local
+ * identifier for the linked account — never as an authentication assertion.
+ *
+ * Returns `undefined` for anything malformed. A token with no `.` separator
+ * previously reached `Buffer.from(undefined)` and threw.
+ */
+/**
+ * Shapes for the OAuth provider responses the connectors below consume.
+ *
+ * `Response.json()` is `unknown`, and these payloads come from a third party,
+ * so each one is parsed before use. Fields the connector already treats as
+ * optional stay optional here; a response that no longer matches raises inside
+ * the surrounding try/catch, which logs and declines the sign-in rather than
+ * building a half-populated account.
+ */
+const githubProfileSchema = z.object({
+  id: z.union([z.number(), z.string()]),
+  login: z.string().optional(),
+  name: z.string().nullish(),
+  email: z.string().nullish(),
+  avatar_url: z.string().nullish(),
+});
+
+const githubEmailsSchema = z.array(
+  z.object({
+    email: z.string(),
+    primary: z.boolean().optional(),
+    verified: z.boolean().optional(),
+  }),
+);
+
+const xProfileSchema = z.object({
+  data: z
+    .object({
+      id: z.string(),
+      name: z.string().nullish(),
+      username: z.string().nullish(),
+      profile_image_url: z.string().nullish(),
+      verified: z.boolean().nullish(),
+    })
+    .optional(),
+});
+
+/** Shared by the Confluence and Jira connectors (both read api.atlassian.com/me). */
+const atlassianProfileSchema = z.object({
+  account_id: z.string(),
+  name: z.string().nullish(),
+  display_name: z.string().nullish(),
+  email: z.string().nullish(),
+  picture: z.string().nullish(),
+});
+
+const discordProfileSchema = z.object({
+  id: z.string(),
+  username: z.string().nullish(),
+  email: z.string().nullish(),
+  avatar: z.string().nullish(),
+  verified: z.boolean().nullish(),
+});
+
+const notionProfileSchema = z.object({
+  id: z.string(),
+  name: z.string().nullish(),
+  person: z.object({ email: z.string().nullish() }).nullish(),
+  bot: z
+    .object({
+      owner: z
+        .object({
+          user: z
+            .object({ id: z.string().nullish(), name: z.string().nullish() })
+            .nullish(),
+        })
+        .nullish(),
+    })
+    .nullish(),
+});
+
+const redditProfileSchema = z.object({
+  id: z.string(),
+  name: z.string().nullish(),
+  icon_img: z.string().nullish(),
+});
+
+const linearViewerSchema = z.object({
+  data: z
+    .object({
+      viewer: z
+        .object({
+          id: z.string(),
+          email: z.string(),
+          name: z.string().nullish(),
+          avatarUrl: z.string().nullish(),
+        })
+        .nullish(),
+    })
+    .nullish(),
+  errors: z.array(z.unknown()).nullish(),
+});
+
+function readIdTokenSubject(idToken: string): string | undefined {
+  const payloadSegment = idToken.split(".")[1];
+  if (!payloadSegment) return undefined;
+
+  try {
+    const payload: unknown = JSON.parse(
+      Buffer.from(payloadSegment, "base64").toString(),
+    );
+    if (payload === null || typeof payload !== "object") return undefined;
+    const subject = (payload as { sub?: unknown }).sub;
+    return typeof subject === "string" && subject.length > 0
+      ? subject
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 export const statement = {
   ...defaultStatements,
@@ -108,7 +230,10 @@ const memberRole = ac.newRole({
 // never maintain a second, drifting permission matrix.
 export { adminRole, memberRole, ac as organizationAccessControl, ownerRole };
 
-const createPersonalOrganization = async (user: User) => {
+const createPersonalOrganization = async (user: {
+  id: string;
+  name: string;
+}) => {
   const memberships = await db
     .select({
       organizationId: schema.organization.id,
@@ -434,7 +559,7 @@ const authOptions: BetterAuthOptions = {
     ]),
     openAPI(),
     magicLink({
-      sendMagicLink: async ({ email, token, url }, request) => {
+      sendMagicLink: async ({ email, url }, _request) => {
         await sendEmail({
           from: getFromEmailAddress(),
           to: email,
@@ -487,47 +612,30 @@ const authOptions: BetterAuthOptions = {
     })),
     nextCookies(),
     genericOAuth({
-      config: [
-        {
-          providerId: "github-repo",
-          clientId: env.GITHUB_REPO_CLIENT_ID as string,
-          clientSecret: env.GITHUB_REPO_CLIENT_SECRET as string,
-          authorizationUrl: "https://github.com/login/oauth/authorize",
-          accessType: "offline",
-          prompt: "consent",
-          tokenUrl: "https://github.com/login/oauth/access_token",
-          userInfoUrl: "https://api.github.com/user",
-          // The connector only exposes read-only repository operations. Keep
-          // workflow access out of this integration's OAuth grant.
-          scopes: ["user:email", "repo", "read:user"],
-          redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/github-repo`,
-          getUserInfo: async (tokens) => {
-            try {
-              const profileResponse = await fetch(
-                "https://api.github.com/user",
-                {
-                  headers: {
-                    Authorization: `Bearer ${tokens.accessToken}`,
-                    "User-Agent": "circulo",
-                  },
-                },
-              );
-
-              if (!profileResponse.ok) {
-                logger.error("Failed to fetch GitHub profile", {
-                  status: profileResponse.status,
-                  statusText: profileResponse.statusText,
-                });
-                throw new Error(
-                  `Failed to fetch GitHub profile: ${profileResponse.statusText}`,
-                );
-              }
-
-              const profile = await profileResponse.json();
-
-              if (!profile.email) {
-                const emailsResponse = await fetch(
-                  "https://api.github.com/user/emails",
+      // `satisfies` is load-bearing: the array is consumed by `.filter()`
+      // below, which stops `GenericOAuthConfig[]` from reaching the literal as
+      // a contextual type. Without it `prompt: "consent"` widens to `string`,
+      // the whole array stops matching the plugin option, and every
+      // `getUserInfo(tokens)` parameter silently degrades to `any`.
+      config: (
+        [
+          {
+            providerId: "github-repo",
+            clientId: env.GITHUB_REPO_CLIENT_ID as string,
+            clientSecret: env.GITHUB_REPO_CLIENT_SECRET as string,
+            authorizationUrl: "https://github.com/login/oauth/authorize",
+            accessType: "offline",
+            prompt: "consent",
+            tokenUrl: "https://github.com/login/oauth/access_token",
+            userInfoUrl: "https://api.github.com/user",
+            // The connector only exposes read-only repository operations. Keep
+            // workflow access out of this integration's OAuth grant.
+            scopes: ["user:email", "repo", "read:user"],
+            redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/github-repo`,
+            getUserInfo: async (tokens) => {
+              try {
+                const profileResponse = await fetch(
+                  "https://api.github.com/user",
                   {
                     headers: {
                       Authorization: `Bearer ${tokens.accessToken}`,
@@ -536,807 +644,845 @@ const authOptions: BetterAuthOptions = {
                   },
                 );
 
-                if (emailsResponse.ok) {
-                  const emails = await emailsResponse.json();
-
-                  const primaryEmail =
-                    emails.find(
-                      (email: {
-                        primary: boolean;
-                        email: string;
-                        verified: boolean;
-                      }) => email.primary,
-                    ) || emails[0];
-                  if (primaryEmail) {
-                    profile.email = primaryEmail.email;
-                    profile.emailVerified = primaryEmail.verified || false;
-                  }
-                } else {
-                  logger.warn("Failed to fetch GitHub emails", {
-                    status: emailsResponse.status,
-                    statusText: emailsResponse.statusText,
+                if (!profileResponse.ok) {
+                  logger.error("Failed to fetch GitHub profile", {
+                    status: profileResponse.status,
+                    statusText: profileResponse.statusText,
                   });
-                }
-              }
-
-              const now = new Date();
-
-              return {
-                id: profile.id.toString(),
-                name: profile.name || profile.login,
-                email: profile.email,
-                image: profile.avatar_url,
-                emailVerified: profile.emailVerified || false,
-                createdAt: now,
-                updatedAt: now,
-              };
-            } catch (error) {
-              logger.error("Error in GitHub getUserInfo", { error });
-              throw error;
-            }
-          },
-        },
-
-        // Google providers
-        {
-          providerId: "google-email",
-          clientId: env.GOOGLE_CLIENT_ID as string,
-          clientSecret: env.GOOGLE_CLIENT_SECRET as string,
-          discoveryUrl:
-            "https://accounts.google.com/.well-known/openid-configuration",
-          accessType: "offline",
-          scopes: [
-            "https://www.googleapis.com/auth/userinfo.email",
-            "https://www.googleapis.com/auth/userinfo.profile",
-            "https://www.googleapis.com/auth/gmail.send",
-            "https://www.googleapis.com/auth/gmail.modify",
-            "https://www.googleapis.com/auth/gmail.labels",
-          ],
-          prompt: "consent",
-          redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/google-email`,
-        },
-        {
-          providerId: "google-calendar",
-          clientId: env.GOOGLE_CLIENT_ID as string,
-          clientSecret: env.GOOGLE_CLIENT_SECRET as string,
-          discoveryUrl:
-            "https://accounts.google.com/.well-known/openid-configuration",
-          accessType: "offline",
-          scopes: [
-            "https://www.googleapis.com/auth/userinfo.email",
-            "https://www.googleapis.com/auth/userinfo.profile",
-            "https://www.googleapis.com/auth/calendar",
-          ],
-          prompt: "consent",
-          redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/google-calendar`,
-        },
-        {
-          providerId: "google-drive",
-          clientId: env.GOOGLE_CLIENT_ID as string,
-          clientSecret: env.GOOGLE_CLIENT_SECRET as string,
-          discoveryUrl:
-            "https://accounts.google.com/.well-known/openid-configuration",
-          accessType: "offline",
-          scopes: [
-            "https://www.googleapis.com/auth/userinfo.email",
-            "https://www.googleapis.com/auth/userinfo.profile",
-            "https://www.googleapis.com/auth/drive.file",
-          ],
-          prompt: "consent",
-          redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/google-drive`,
-        },
-        {
-          providerId: "google-docs",
-          clientId: env.GOOGLE_CLIENT_ID as string,
-          clientSecret: env.GOOGLE_CLIENT_SECRET as string,
-          discoveryUrl:
-            "https://accounts.google.com/.well-known/openid-configuration",
-          accessType: "offline",
-          scopes: [
-            "https://www.googleapis.com/auth/userinfo.email",
-            "https://www.googleapis.com/auth/userinfo.profile",
-            "https://www.googleapis.com/auth/drive.file",
-          ],
-          prompt: "consent",
-          redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/google-docs`,
-        },
-        {
-          providerId: "google-sheets",
-          clientId: env.GOOGLE_CLIENT_ID as string,
-          clientSecret: env.GOOGLE_CLIENT_SECRET as string,
-          discoveryUrl:
-            "https://accounts.google.com/.well-known/openid-configuration",
-          accessType: "offline",
-          scopes: [
-            "https://www.googleapis.com/auth/userinfo.email",
-            "https://www.googleapis.com/auth/userinfo.profile",
-            "https://www.googleapis.com/auth/drive.file",
-          ],
-          prompt: "consent",
-          redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/google-sheets`,
-        },
-
-        {
-          providerId: "google-forms",
-          clientId: env.GOOGLE_CLIENT_ID as string,
-          clientSecret: env.GOOGLE_CLIENT_SECRET as string,
-          discoveryUrl:
-            "https://accounts.google.com/.well-known/openid-configuration",
-          accessType: "offline",
-          scopes: [
-            "https://www.googleapis.com/auth/userinfo.email",
-            "https://www.googleapis.com/auth/userinfo.profile",
-            "https://www.googleapis.com/auth/forms.responses.readonly",
-          ],
-          prompt: "consent",
-          redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/google-forms`,
-        },
-
-        {
-          providerId: "google-vault",
-          clientId: env.GOOGLE_CLIENT_ID as string,
-          clientSecret: env.GOOGLE_CLIENT_SECRET as string,
-          discoveryUrl:
-            "https://accounts.google.com/.well-known/openid-configuration",
-          accessType: "offline",
-          scopes: [
-            "https://www.googleapis.com/auth/userinfo.email",
-            "https://www.googleapis.com/auth/userinfo.profile",
-            "https://www.googleapis.com/auth/ediscovery",
-            "https://www.googleapis.com/auth/devstorage.read_only",
-          ],
-          prompt: "consent",
-          redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/google-vault`,
-        },
-
-        {
-          providerId: "microsoft-teams",
-          clientId: env.MICROSOFT_CLIENT_ID as string,
-          clientSecret: env.MICROSOFT_CLIENT_SECRET as string,
-          authorizationUrl:
-            "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-          tokenUrl:
-            "https://login.microsoftonline.com/common/oauth2/v2.0/token",
-          userInfoUrl: "https://graph.microsoft.com/v1.0/me",
-          scopes: [
-            "openid",
-            "profile",
-            "email",
-            "User.Read",
-            "Chat.Read",
-            "Chat.ReadWrite",
-            "Chat.ReadBasic",
-            "Channel.ReadBasic.All",
-            "ChannelMessage.Send",
-            "ChannelMessage.Read.All",
-            "Group.Read.All",
-            "Group.ReadWrite.All",
-            "Team.ReadBasic.All",
-            "offline_access",
-          ],
-          responseType: "code",
-          accessType: "offline",
-          authentication: "basic",
-          pkce: true,
-          redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/microsoft-teams`,
-        },
-
-        {
-          providerId: "microsoft-excel",
-          clientId: env.MICROSOFT_CLIENT_ID as string,
-          clientSecret: env.MICROSOFT_CLIENT_SECRET as string,
-          authorizationUrl:
-            "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-          tokenUrl:
-            "https://login.microsoftonline.com/common/oauth2/v2.0/token",
-          userInfoUrl: "https://graph.microsoft.com/v1.0/me",
-          scopes: [
-            "openid",
-            "profile",
-            "email",
-            "Files.Read",
-            "Files.ReadWrite",
-            "offline_access",
-          ],
-          responseType: "code",
-          accessType: "offline",
-          authentication: "basic",
-          pkce: true,
-          redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/microsoft-excel`,
-        },
-        {
-          providerId: "microsoft-planner",
-          clientId: env.MICROSOFT_CLIENT_ID as string,
-          clientSecret: env.MICROSOFT_CLIENT_SECRET as string,
-          authorizationUrl:
-            "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-          tokenUrl:
-            "https://login.microsoftonline.com/common/oauth2/v2.0/token",
-          userInfoUrl: "https://graph.microsoft.com/v1.0/me",
-          scopes: [
-            "openid",
-            "profile",
-            "email",
-            "Group.ReadWrite.All",
-            "Group.Read.All",
-            "Tasks.ReadWrite",
-            "offline_access",
-          ],
-          responseType: "code",
-          accessType: "offline",
-          authentication: "basic",
-          pkce: true,
-          redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/microsoft-planner`,
-        },
-
-        {
-          providerId: "outlook",
-          clientId: env.MICROSOFT_CLIENT_ID as string,
-          clientSecret: env.MICROSOFT_CLIENT_SECRET as string,
-          authorizationUrl:
-            "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-          tokenUrl:
-            "https://login.microsoftonline.com/common/oauth2/v2.0/token",
-          userInfoUrl: "https://graph.microsoft.com/v1.0/me",
-          scopes: [
-            "openid",
-            "profile",
-            "email",
-            "Mail.ReadWrite",
-            "Mail.ReadBasic",
-            "Mail.Read",
-            "Mail.Send",
-            "offline_access",
-          ],
-          responseType: "code",
-          accessType: "offline",
-          authentication: "basic",
-          pkce: true,
-          redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/outlook`,
-        },
-
-        {
-          providerId: "onedrive",
-          clientId: env.MICROSOFT_CLIENT_ID as string,
-          clientSecret: env.MICROSOFT_CLIENT_SECRET as string,
-          authorizationUrl:
-            "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-          tokenUrl:
-            "https://login.microsoftonline.com/common/oauth2/v2.0/token",
-          userInfoUrl: "https://graph.microsoft.com/v1.0/me",
-          scopes: [
-            "openid",
-            "profile",
-            "email",
-            "Files.Read",
-            "Files.ReadWrite",
-            "offline_access",
-          ],
-          responseType: "code",
-          accessType: "offline",
-          authentication: "basic",
-          pkce: true,
-          redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/onedrive`,
-        },
-
-        {
-          providerId: "sharepoint",
-          clientId: env.MICROSOFT_CLIENT_ID as string,
-          clientSecret: env.MICROSOFT_CLIENT_SECRET as string,
-          authorizationUrl:
-            "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-          tokenUrl:
-            "https://login.microsoftonline.com/common/oauth2/v2.0/token",
-          userInfoUrl: "https://graph.microsoft.com/v1.0/me",
-          scopes: [
-            "openid",
-            "profile",
-            "email",
-            "Sites.Read.All",
-            "Sites.ReadWrite.All",
-            "Sites.Manage.All",
-            "offline_access",
-          ],
-          responseType: "code",
-          accessType: "offline",
-          authentication: "basic",
-          pkce: true,
-          redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/sharepoint`,
-        },
-
-        {
-          providerId: "wealthbox",
-          clientId: env.WEALTHBOX_CLIENT_ID as string,
-          clientSecret: env.WEALTHBOX_CLIENT_SECRET as string,
-          authorizationUrl: "https://app.crmworkspace.com/oauth/authorize",
-          tokenUrl: "https://app.crmworkspace.com/oauth/token",
-          userInfoUrl: "https://dummy-not-used.wealthbox.com", // Dummy URL since no user info endpoint exists
-          scopes: ["login", "data"],
-          responseType: "code",
-          redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/wealthbox`,
-          getUserInfo: async (tokens) => {
-            try {
-              logger.info("Creating Wealthbox user profile from token data");
-
-              const uniqueId = `wealthbox-${Date.now()}`;
-              const now = new Date();
-
-              return {
-                id: uniqueId,
-                name: "Wealthbox User",
-                email: `${uniqueId.replace(
-                  /[^a-zA-Z0-9]/g,
-                  "",
-                )}@wealthbox.user`,
-                emailVerified: false,
-                createdAt: now,
-                updatedAt: now,
-              };
-            } catch (error) {
-              logger.error("Error creating Wealthbox user profile:", { error });
-              return null;
-            }
-          },
-        },
-
-        // Supabase provider
-        {
-          providerId: "supabase",
-          clientId: env.SUPABASE_CLIENT_ID as string,
-          clientSecret: env.SUPABASE_CLIENT_SECRET as string,
-          authorizationUrl: "https://api.supabase.com/v1/oauth/authorize",
-          tokenUrl: "https://api.supabase.com/v1/oauth/token",
-          userInfoUrl: "https://dummy-not-used.supabase.co",
-          scopes: ["database.read", "database.write", "projects.read"],
-          responseType: "code",
-          pkce: true,
-          redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/supabase`,
-          getUserInfo: async (tokens) => {
-            try {
-              logger.info("Creating Supabase user profile from token data");
-
-              let userId = "supabase-user";
-              if (tokens.idToken) {
-                try {
-                  const decodedToken = JSON.parse(
-                    Buffer.from(
-                      tokens.idToken.split(".")[1],
-                      "base64",
-                    ).toString(),
+                  throw new Error(
+                    `Failed to fetch GitHub profile: ${profileResponse.statusText}`,
                   );
-                  if (decodedToken.sub) {
-                    userId = decodedToken.sub;
-                  }
-                } catch (e) {
-                  logger.warn("Failed to decode Supabase ID token", {
-                    error: e,
-                  });
                 }
+
+                const profile = githubProfileSchema.parse(
+                  await profileResponse.json(),
+                );
+
+                // The profile endpoint omits the email when the account keeps it
+                // private, so fall back to the dedicated emails endpoint.
+                let email = profile.email ?? undefined;
+                let emailVerified = false;
+
+                if (!email) {
+                  const emailsResponse = await fetch(
+                    "https://api.github.com/user/emails",
+                    {
+                      headers: {
+                        Authorization: `Bearer ${tokens.accessToken}`,
+                        "User-Agent": "circulo",
+                      },
+                    },
+                  );
+
+                  if (emailsResponse.ok) {
+                    const emails = githubEmailsSchema.parse(
+                      await emailsResponse.json(),
+                    );
+                    const primaryEmail =
+                      emails.find((candidate) => candidate.primary) ??
+                      emails[0];
+
+                    if (primaryEmail) {
+                      email = primaryEmail.email;
+                      emailVerified = primaryEmail.verified ?? false;
+                    }
+                  } else {
+                    logger.warn("Failed to fetch GitHub emails", {
+                      status: emailsResponse.status,
+                      statusText: emailsResponse.statusText,
+                    });
+                  }
+                }
+
+                const now = new Date();
+
+                return {
+                  id: profile.id.toString(),
+                  name: profile.name ?? profile.login ?? "GitHub User",
+                  email,
+                  image: profile.avatar_url ?? undefined,
+                  emailVerified,
+                  createdAt: now,
+                  updatedAt: now,
+                };
+              } catch (error) {
+                logger.error("Error in GitHub getUserInfo", { error });
+                throw error;
               }
-
-              const uniqueId = `${userId}-${Date.now()}`;
-              const now = new Date();
-
-              return {
-                id: uniqueId,
-                name: "Supabase User",
-                email: `${uniqueId.replace(/[^a-zA-Z0-9]/g, "")}@supabase.user`,
-                emailVerified: false,
-                createdAt: now,
-                updatedAt: now,
-              };
-            } catch (error) {
-              logger.error("Error creating Supabase user profile:", { error });
-              return null;
-            }
+            },
           },
-        },
 
-        // X provider
-        {
-          providerId: "x",
-          clientId: env.X_CLIENT_ID as string,
-          clientSecret: env.X_CLIENT_SECRET as string,
-          authorizationUrl: "https://x.com/i/oauth2/authorize",
-          tokenUrl: "https://api.x.com/2/oauth2/token",
-          userInfoUrl: "https://api.x.com/2/users/me",
-          accessType: "offline",
-          scopes: ["tweet.read", "tweet.write", "users.read", "offline.access"],
-          pkce: true,
-          responseType: "code",
-          prompt: "consent",
-          authentication: "basic",
-          redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/x`,
-          getUserInfo: async (tokens) => {
-            try {
-              const response = await fetch(
-                "https://api.x.com/2/users/me?user.fields=profile_image_url,username,name,verified",
-                {
+          // Google providers
+          {
+            providerId: "google-email",
+            clientId: env.GOOGLE_CLIENT_ID as string,
+            clientSecret: env.GOOGLE_CLIENT_SECRET as string,
+            discoveryUrl:
+              "https://accounts.google.com/.well-known/openid-configuration",
+            accessType: "offline",
+            scopes: [
+              "https://www.googleapis.com/auth/userinfo.email",
+              "https://www.googleapis.com/auth/userinfo.profile",
+              "https://www.googleapis.com/auth/gmail.send",
+              "https://www.googleapis.com/auth/gmail.modify",
+              "https://www.googleapis.com/auth/gmail.labels",
+            ],
+            prompt: "consent",
+            redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/google-email`,
+          },
+          {
+            providerId: "google-calendar",
+            clientId: env.GOOGLE_CLIENT_ID as string,
+            clientSecret: env.GOOGLE_CLIENT_SECRET as string,
+            discoveryUrl:
+              "https://accounts.google.com/.well-known/openid-configuration",
+            accessType: "offline",
+            scopes: [
+              "https://www.googleapis.com/auth/userinfo.email",
+              "https://www.googleapis.com/auth/userinfo.profile",
+              "https://www.googleapis.com/auth/calendar",
+            ],
+            prompt: "consent",
+            redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/google-calendar`,
+          },
+          {
+            providerId: "google-drive",
+            clientId: env.GOOGLE_CLIENT_ID as string,
+            clientSecret: env.GOOGLE_CLIENT_SECRET as string,
+            discoveryUrl:
+              "https://accounts.google.com/.well-known/openid-configuration",
+            accessType: "offline",
+            scopes: [
+              "https://www.googleapis.com/auth/userinfo.email",
+              "https://www.googleapis.com/auth/userinfo.profile",
+              "https://www.googleapis.com/auth/drive.file",
+            ],
+            prompt: "consent",
+            redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/google-drive`,
+          },
+          {
+            providerId: "google-docs",
+            clientId: env.GOOGLE_CLIENT_ID as string,
+            clientSecret: env.GOOGLE_CLIENT_SECRET as string,
+            discoveryUrl:
+              "https://accounts.google.com/.well-known/openid-configuration",
+            accessType: "offline",
+            scopes: [
+              "https://www.googleapis.com/auth/userinfo.email",
+              "https://www.googleapis.com/auth/userinfo.profile",
+              "https://www.googleapis.com/auth/drive.file",
+            ],
+            prompt: "consent",
+            redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/google-docs`,
+          },
+          {
+            providerId: "google-sheets",
+            clientId: env.GOOGLE_CLIENT_ID as string,
+            clientSecret: env.GOOGLE_CLIENT_SECRET as string,
+            discoveryUrl:
+              "https://accounts.google.com/.well-known/openid-configuration",
+            accessType: "offline",
+            scopes: [
+              "https://www.googleapis.com/auth/userinfo.email",
+              "https://www.googleapis.com/auth/userinfo.profile",
+              "https://www.googleapis.com/auth/drive.file",
+            ],
+            prompt: "consent",
+            redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/google-sheets`,
+          },
+
+          {
+            providerId: "google-forms",
+            clientId: env.GOOGLE_CLIENT_ID as string,
+            clientSecret: env.GOOGLE_CLIENT_SECRET as string,
+            discoveryUrl:
+              "https://accounts.google.com/.well-known/openid-configuration",
+            accessType: "offline",
+            scopes: [
+              "https://www.googleapis.com/auth/userinfo.email",
+              "https://www.googleapis.com/auth/userinfo.profile",
+              "https://www.googleapis.com/auth/forms.responses.readonly",
+            ],
+            prompt: "consent",
+            redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/google-forms`,
+          },
+
+          {
+            providerId: "google-vault",
+            clientId: env.GOOGLE_CLIENT_ID as string,
+            clientSecret: env.GOOGLE_CLIENT_SECRET as string,
+            discoveryUrl:
+              "https://accounts.google.com/.well-known/openid-configuration",
+            accessType: "offline",
+            scopes: [
+              "https://www.googleapis.com/auth/userinfo.email",
+              "https://www.googleapis.com/auth/userinfo.profile",
+              "https://www.googleapis.com/auth/ediscovery",
+              "https://www.googleapis.com/auth/devstorage.read_only",
+            ],
+            prompt: "consent",
+            redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/google-vault`,
+          },
+
+          {
+            providerId: "microsoft-teams",
+            clientId: env.MICROSOFT_CLIENT_ID as string,
+            clientSecret: env.MICROSOFT_CLIENT_SECRET as string,
+            authorizationUrl:
+              "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+            tokenUrl:
+              "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+            userInfoUrl: "https://graph.microsoft.com/v1.0/me",
+            scopes: [
+              "openid",
+              "profile",
+              "email",
+              "User.Read",
+              "Chat.Read",
+              "Chat.ReadWrite",
+              "Chat.ReadBasic",
+              "Channel.ReadBasic.All",
+              "ChannelMessage.Send",
+              "ChannelMessage.Read.All",
+              "Group.Read.All",
+              "Group.ReadWrite.All",
+              "Team.ReadBasic.All",
+              "offline_access",
+            ],
+            responseType: "code",
+            accessType: "offline",
+            authentication: "basic",
+            pkce: true,
+            redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/microsoft-teams`,
+          },
+
+          {
+            providerId: "microsoft-excel",
+            clientId: env.MICROSOFT_CLIENT_ID as string,
+            clientSecret: env.MICROSOFT_CLIENT_SECRET as string,
+            authorizationUrl:
+              "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+            tokenUrl:
+              "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+            userInfoUrl: "https://graph.microsoft.com/v1.0/me",
+            scopes: [
+              "openid",
+              "profile",
+              "email",
+              "Files.Read",
+              "Files.ReadWrite",
+              "offline_access",
+            ],
+            responseType: "code",
+            accessType: "offline",
+            authentication: "basic",
+            pkce: true,
+            redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/microsoft-excel`,
+          },
+          {
+            providerId: "microsoft-planner",
+            clientId: env.MICROSOFT_CLIENT_ID as string,
+            clientSecret: env.MICROSOFT_CLIENT_SECRET as string,
+            authorizationUrl:
+              "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+            tokenUrl:
+              "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+            userInfoUrl: "https://graph.microsoft.com/v1.0/me",
+            scopes: [
+              "openid",
+              "profile",
+              "email",
+              "Group.ReadWrite.All",
+              "Group.Read.All",
+              "Tasks.ReadWrite",
+              "offline_access",
+            ],
+            responseType: "code",
+            accessType: "offline",
+            authentication: "basic",
+            pkce: true,
+            redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/microsoft-planner`,
+          },
+
+          {
+            providerId: "outlook",
+            clientId: env.MICROSOFT_CLIENT_ID as string,
+            clientSecret: env.MICROSOFT_CLIENT_SECRET as string,
+            authorizationUrl:
+              "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+            tokenUrl:
+              "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+            userInfoUrl: "https://graph.microsoft.com/v1.0/me",
+            scopes: [
+              "openid",
+              "profile",
+              "email",
+              "Mail.ReadWrite",
+              "Mail.ReadBasic",
+              "Mail.Read",
+              "Mail.Send",
+              "offline_access",
+            ],
+            responseType: "code",
+            accessType: "offline",
+            authentication: "basic",
+            pkce: true,
+            redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/outlook`,
+          },
+
+          {
+            providerId: "onedrive",
+            clientId: env.MICROSOFT_CLIENT_ID as string,
+            clientSecret: env.MICROSOFT_CLIENT_SECRET as string,
+            authorizationUrl:
+              "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+            tokenUrl:
+              "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+            userInfoUrl: "https://graph.microsoft.com/v1.0/me",
+            scopes: [
+              "openid",
+              "profile",
+              "email",
+              "Files.Read",
+              "Files.ReadWrite",
+              "offline_access",
+            ],
+            responseType: "code",
+            accessType: "offline",
+            authentication: "basic",
+            pkce: true,
+            redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/onedrive`,
+          },
+
+          {
+            providerId: "sharepoint",
+            clientId: env.MICROSOFT_CLIENT_ID as string,
+            clientSecret: env.MICROSOFT_CLIENT_SECRET as string,
+            authorizationUrl:
+              "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+            tokenUrl:
+              "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+            userInfoUrl: "https://graph.microsoft.com/v1.0/me",
+            scopes: [
+              "openid",
+              "profile",
+              "email",
+              "Sites.Read.All",
+              "Sites.ReadWrite.All",
+              "Sites.Manage.All",
+              "offline_access",
+            ],
+            responseType: "code",
+            accessType: "offline",
+            authentication: "basic",
+            pkce: true,
+            redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/sharepoint`,
+          },
+
+          {
+            providerId: "wealthbox",
+            clientId: env.WEALTHBOX_CLIENT_ID as string,
+            clientSecret: env.WEALTHBOX_CLIENT_SECRET as string,
+            authorizationUrl: "https://app.crmworkspace.com/oauth/authorize",
+            tokenUrl: "https://app.crmworkspace.com/oauth/token",
+            userInfoUrl: "https://dummy-not-used.wealthbox.com", // Dummy URL since no user info endpoint exists
+            scopes: ["login", "data"],
+            responseType: "code",
+            redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/wealthbox`,
+            getUserInfo: async (_tokens) => {
+              try {
+                logger.info("Creating Wealthbox user profile from token data");
+
+                const uniqueId = `wealthbox-${Date.now()}`;
+                const now = new Date();
+
+                return {
+                  id: uniqueId,
+                  name: "Wealthbox User",
+                  email: `${uniqueId.replace(
+                    /[^a-zA-Z0-9]/g,
+                    "",
+                  )}@wealthbox.user`,
+                  emailVerified: false,
+                  createdAt: now,
+                  updatedAt: now,
+                };
+              } catch (error) {
+                logger.error("Error creating Wealthbox user profile:", {
+                  error,
+                });
+                return null;
+              }
+            },
+          },
+
+          // Supabase provider
+          {
+            providerId: "supabase",
+            clientId: env.SUPABASE_CLIENT_ID as string,
+            clientSecret: env.SUPABASE_CLIENT_SECRET as string,
+            authorizationUrl: "https://api.supabase.com/v1/oauth/authorize",
+            tokenUrl: "https://api.supabase.com/v1/oauth/token",
+            userInfoUrl: "https://dummy-not-used.supabase.co",
+            scopes: ["database.read", "database.write", "projects.read"],
+            responseType: "code",
+            pkce: true,
+            redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/supabase`,
+            getUserInfo: async (tokens) => {
+              try {
+                logger.info("Creating Supabase user profile from token data");
+
+                let userId = "supabase-user";
+                if (tokens.idToken) {
+                  const subject = readIdTokenSubject(tokens.idToken);
+                  if (subject) {
+                    userId = subject;
+                  } else {
+                    logger.warn(
+                      "Could not read a subject from the Supabase ID token",
+                    );
+                  }
+                }
+
+                const uniqueId = `${userId}-${Date.now()}`;
+                const now = new Date();
+
+                return {
+                  id: uniqueId,
+                  name: "Supabase User",
+                  email: `${uniqueId.replace(/[^a-zA-Z0-9]/g, "")}@supabase.user`,
+                  emailVerified: false,
+                  createdAt: now,
+                  updatedAt: now,
+                };
+              } catch (error) {
+                logger.error("Error creating Supabase user profile:", {
+                  error,
+                });
+                return null;
+              }
+            },
+          },
+
+          // X provider
+          {
+            providerId: "x",
+            clientId: env.X_CLIENT_ID as string,
+            clientSecret: env.X_CLIENT_SECRET as string,
+            authorizationUrl: "https://x.com/i/oauth2/authorize",
+            tokenUrl: "https://api.x.com/2/oauth2/token",
+            userInfoUrl: "https://api.x.com/2/users/me",
+            accessType: "offline",
+            scopes: [
+              "tweet.read",
+              "tweet.write",
+              "users.read",
+              "offline.access",
+            ],
+            pkce: true,
+            responseType: "code",
+            prompt: "consent",
+            authentication: "basic",
+            redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/x`,
+            getUserInfo: async (tokens) => {
+              try {
+                const response = await fetch(
+                  "https://api.x.com/2/users/me?user.fields=profile_image_url,username,name,verified",
+                  {
+                    headers: {
+                      Authorization: `Bearer ${tokens.accessToken}`,
+                    },
+                  },
+                );
+
+                if (!response.ok) {
+                  logger.error("Error fetching X user info:", {
+                    status: response.status,
+                    statusText: response.statusText,
+                  });
+                  return null;
+                }
+
+                const profile = xProfileSchema.parse(await response.json());
+
+                if (!profile.data) {
+                  logger.error("Invalid X profile response:", profile);
+                  return null;
+                }
+
+                const now = new Date();
+
+                return {
+                  id: profile.data.id,
+                  name: profile.data.name ?? "X User",
+                  email: `${profile.data.username}@x.com`,
+                  image: profile.data.profile_image_url ?? undefined,
+                  emailVerified: profile.data.verified ?? false,
+                  createdAt: now,
+                  updatedAt: now,
+                };
+              } catch (error) {
+                logger.error("Error in X getUserInfo:", { error });
+                return null;
+              }
+            },
+          },
+
+          // Confluence provider
+          {
+            providerId: "confluence",
+            clientId: env.CONFLUENCE_CLIENT_ID as string,
+            clientSecret: env.CONFLUENCE_CLIENT_SECRET as string,
+            authorizationUrl: "https://auth.atlassian.com/authorize",
+            tokenUrl: "https://auth.atlassian.com/oauth/token",
+            userInfoUrl: "https://api.atlassian.com/me",
+            scopes: [
+              "read:page:confluence",
+              "write:page:confluence",
+              "read:me",
+              "offline_access",
+            ],
+            responseType: "code",
+            pkce: true,
+            accessType: "offline",
+            authentication: "basic",
+            prompt: "consent",
+            redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/confluence`,
+            getUserInfo: async (tokens) => {
+              try {
+                const response = await fetch("https://api.atlassian.com/me", {
                   headers: {
                     Authorization: `Bearer ${tokens.accessToken}`,
                   },
-                },
-              );
-
-              if (!response.ok) {
-                logger.error("Error fetching X user info:", {
-                  status: response.status,
-                  statusText: response.statusText,
                 });
+
+                if (!response.ok) {
+                  logger.error("Error fetching Confluence user info:", {
+                    status: response.status,
+                    statusText: response.statusText,
+                  });
+                  return null;
+                }
+
+                const profile = atlassianProfileSchema.parse(
+                  await response.json(),
+                );
+
+                const now = new Date();
+
+                return {
+                  id: profile.account_id,
+                  name:
+                    profile.name ?? profile.display_name ?? "Confluence User",
+                  email: profile.email ?? `${profile.account_id}@atlassian.com`,
+                  image: profile.picture ?? undefined,
+                  emailVerified: true,
+                  createdAt: now,
+                  updatedAt: now,
+                };
+              } catch (error) {
+                logger.error("Error in Confluence getUserInfo:", { error });
                 return null;
               }
-
-              const profile = await response.json();
-
-              if (!profile.data) {
-                logger.error("Invalid X profile response:", profile);
-                return null;
-              }
-
-              const now = new Date();
-
-              return {
-                id: profile.data.id,
-                name: profile.data.name || "X User",
-                email: `${profile.data.username}@x.com`,
-                image: profile.data.profile_image_url,
-                emailVerified: profile.data.verified || false,
-                createdAt: now,
-                updatedAt: now,
-              };
-            } catch (error) {
-              logger.error("Error in X getUserInfo:", { error });
-              return null;
-            }
+            },
           },
-        },
 
-        // Confluence provider
-        {
-          providerId: "confluence",
-          clientId: env.CONFLUENCE_CLIENT_ID as string,
-          clientSecret: env.CONFLUENCE_CLIENT_SECRET as string,
-          authorizationUrl: "https://auth.atlassian.com/authorize",
-          tokenUrl: "https://auth.atlassian.com/oauth/token",
-          userInfoUrl: "https://api.atlassian.com/me",
-          scopes: [
-            "read:page:confluence",
-            "write:page:confluence",
-            "read:me",
-            "offline_access",
-          ],
-          responseType: "code",
-          pkce: true,
-          accessType: "offline",
-          authentication: "basic",
-          prompt: "consent",
-          redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/confluence`,
-          getUserInfo: async (tokens) => {
-            try {
-              const response = await fetch("https://api.atlassian.com/me", {
-                headers: {
-                  Authorization: `Bearer ${tokens.accessToken}`,
-                },
-              });
+          // Discord provider
+          {
+            providerId: "discord",
+            clientId: env.DISCORD_CLIENT_ID as string,
+            clientSecret: env.DISCORD_CLIENT_SECRET as string,
+            authorizationUrl: "https://discord.com/api/oauth2/authorize",
+            tokenUrl: "https://discord.com/api/oauth2/token",
+            userInfoUrl: "https://discord.com/api/users/@me",
+            scopes: [
+              "identify",
+              "bot",
+              "messages.read",
+              "guilds",
+              "guilds.members.read",
+            ],
+            responseType: "code",
+            accessType: "offline",
+            authentication: "basic",
+            prompt: "consent",
+            redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/discord`,
+            getUserInfo: async (tokens) => {
+              try {
+                const response = await fetch(
+                  "https://discord.com/api/users/@me",
+                  {
+                    headers: {
+                      Authorization: `Bearer ${tokens.accessToken}`,
+                    },
+                  },
+                );
 
-              if (!response.ok) {
-                logger.error("Error fetching Confluence user info:", {
-                  status: response.status,
-                  statusText: response.statusText,
-                });
+                if (!response.ok) {
+                  logger.error("Error fetching Discord user info:", {
+                    status: response.status,
+                    statusText: response.statusText,
+                  });
+                  return null;
+                }
+
+                const profile = discordProfileSchema.parse(
+                  await response.json(),
+                );
+                const now = new Date();
+
+                return {
+                  id: profile.id,
+                  name: profile.username ?? "Discord User",
+                  email: profile.email ?? `${profile.id}@discord.user`,
+                  image: profile.avatar
+                    ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png`
+                    : undefined,
+                  emailVerified: profile.verified ?? false,
+                  createdAt: now,
+                  updatedAt: now,
+                };
+              } catch (error) {
+                logger.error("Error in Discord getUserInfo:", { error });
                 return null;
               }
-
-              const profile = await response.json();
-
-              const now = new Date();
-
-              return {
-                id: profile.account_id,
-                name: profile.name || profile.display_name || "Confluence User",
-                email: profile.email || `${profile.account_id}@atlassian.com`,
-                image: profile.picture || undefined,
-                emailVerified: true,
-                createdAt: now,
-                updatedAt: now,
-              };
-            } catch (error) {
-              logger.error("Error in Confluence getUserInfo:", { error });
-              return null;
-            }
+            },
           },
-        },
 
-        // Discord provider
-        {
-          providerId: "discord",
-          clientId: env.DISCORD_CLIENT_ID as string,
-          clientSecret: env.DISCORD_CLIENT_SECRET as string,
-          authorizationUrl: "https://discord.com/api/oauth2/authorize",
-          tokenUrl: "https://discord.com/api/oauth2/token",
-          userInfoUrl: "https://discord.com/api/users/@me",
-          scopes: [
-            "identify",
-            "bot",
-            "messages.read",
-            "guilds",
-            "guilds.members.read",
-          ],
-          responseType: "code",
-          accessType: "offline",
-          authentication: "basic",
-          prompt: "consent",
-          redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/discord`,
-          getUserInfo: async (tokens) => {
-            try {
-              const response = await fetch(
-                "https://discord.com/api/users/@me",
-                {
+          // Jira provider
+          {
+            providerId: "jira",
+            clientId: env.JIRA_CLIENT_ID as string,
+            clientSecret: env.JIRA_CLIENT_SECRET as string,
+            authorizationUrl: "https://auth.atlassian.com/authorize",
+            tokenUrl: "https://auth.atlassian.com/oauth/token",
+            userInfoUrl: "https://api.atlassian.com/me",
+            scopes: [
+              "read:jira-user",
+              "read:jira-work",
+              "write:jira-work",
+              "write:issue:jira",
+              "read:project:jira",
+              "read:issue-type:jira",
+              "read:me",
+              "offline_access",
+              "read:issue-meta:jira",
+              "read:issue-security-level:jira",
+              "read:issue.vote:jira",
+              "read:issue.changelog:jira",
+              "read:avatar:jira",
+              "read:issue:jira",
+              "read:status:jira",
+              "read:user:jira",
+              "read:field-configuration:jira",
+              "read:issue-details:jira",
+            ],
+            responseType: "code",
+            pkce: true,
+            accessType: "offline",
+            authentication: "basic",
+            prompt: "consent",
+            redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/jira`,
+            getUserInfo: async (tokens) => {
+              try {
+                const response = await fetch("https://api.atlassian.com/me", {
                   headers: {
                     Authorization: `Bearer ${tokens.accessToken}`,
                   },
-                },
-              );
-
-              if (!response.ok) {
-                logger.error("Error fetching Discord user info:", {
-                  status: response.status,
-                  statusText: response.statusText,
                 });
+
+                if (!response.ok) {
+                  logger.error("Error fetching Jira user info:", {
+                    status: response.status,
+                    statusText: response.statusText,
+                  });
+                  return null;
+                }
+
+                const profile = atlassianProfileSchema.parse(
+                  await response.json(),
+                );
+
+                const now = new Date();
+
+                return {
+                  id: profile.account_id,
+                  name: profile.name ?? profile.display_name ?? "Jira User",
+                  email: profile.email ?? `${profile.account_id}@atlassian.com`,
+                  image: profile.picture ?? undefined,
+                  emailVerified: true,
+                  createdAt: now,
+                  updatedAt: now,
+                };
+              } catch (error) {
+                logger.error("Error in Jira getUserInfo:", { error });
                 return null;
               }
-
-              const profile = await response.json();
-              const now = new Date();
-
-              return {
-                id: profile.id,
-                name: profile.username || "Discord User",
-                email: profile.email || `${profile.id}@discord.user`,
-                image: profile.avatar
-                  ? `https://cdn.discordapp.com/avatars/${profile.id}/${profile.avatar}.png`
-                  : undefined,
-                emailVerified: profile.verified || false,
-                createdAt: now,
-                updatedAt: now,
-              };
-            } catch (error) {
-              logger.error("Error in Discord getUserInfo:", { error });
-              return null;
-            }
+            },
           },
-        },
 
-        // Jira provider
-        {
-          providerId: "jira",
-          clientId: env.JIRA_CLIENT_ID as string,
-          clientSecret: env.JIRA_CLIENT_SECRET as string,
-          authorizationUrl: "https://auth.atlassian.com/authorize",
-          tokenUrl: "https://auth.atlassian.com/oauth/token",
-          userInfoUrl: "https://api.atlassian.com/me",
-          scopes: [
-            "read:jira-user",
-            "read:jira-work",
-            "write:jira-work",
-            "write:issue:jira",
-            "read:project:jira",
-            "read:issue-type:jira",
-            "read:me",
-            "offline_access",
-            "read:issue-meta:jira",
-            "read:issue-security-level:jira",
-            "read:issue.vote:jira",
-            "read:issue.changelog:jira",
-            "read:avatar:jira",
-            "read:issue:jira",
-            "read:status:jira",
-            "read:user:jira",
-            "read:field-configuration:jira",
-            "read:issue-details:jira",
-          ],
-          responseType: "code",
-          pkce: true,
-          accessType: "offline",
-          authentication: "basic",
-          prompt: "consent",
-          redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/jira`,
-          getUserInfo: async (tokens) => {
-            try {
-              const response = await fetch("https://api.atlassian.com/me", {
-                headers: {
-                  Authorization: `Bearer ${tokens.accessToken}`,
-                },
-              });
-
-              if (!response.ok) {
-                logger.error("Error fetching Jira user info:", {
-                  status: response.status,
-                  statusText: response.statusText,
-                });
-                return null;
-              }
-
-              const profile = await response.json();
-
-              const now = new Date();
-
-              return {
-                id: profile.account_id,
-                name: profile.name || profile.display_name || "Jira User",
-                email: profile.email || `${profile.account_id}@atlassian.com`,
-                image: profile.picture || undefined,
-                emailVerified: true,
-                createdAt: now,
-                updatedAt: now,
-              };
-            } catch (error) {
-              logger.error("Error in Jira getUserInfo:", { error });
-              return null;
-            }
+          // Airtable provider
+          {
+            providerId: "airtable",
+            clientId: env.AIRTABLE_CLIENT_ID as string,
+            clientSecret: env.AIRTABLE_CLIENT_SECRET as string,
+            authorizationUrl: "https://airtable.com/oauth2/v1/authorize",
+            tokenUrl: "https://airtable.com/oauth2/v1/token",
+            userInfoUrl: "https://api.airtable.com/v0/meta/whoami",
+            scopes: [
+              "data.records:read",
+              "data.records:write",
+              "user.email:read",
+              "webhook:manage",
+            ],
+            responseType: "code",
+            pkce: true,
+            accessType: "offline",
+            authentication: "basic",
+            prompt: "consent",
+            redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/airtable`,
           },
-        },
 
-        // Airtable provider
-        {
-          providerId: "airtable",
-          clientId: env.AIRTABLE_CLIENT_ID as string,
-          clientSecret: env.AIRTABLE_CLIENT_SECRET as string,
-          authorizationUrl: "https://airtable.com/oauth2/v1/authorize",
-          tokenUrl: "https://airtable.com/oauth2/v1/token",
-          userInfoUrl: "https://api.airtable.com/v0/meta/whoami",
-          scopes: [
-            "data.records:read",
-            "data.records:write",
-            "user.email:read",
-            "webhook:manage",
-          ],
-          responseType: "code",
-          pkce: true,
-          accessType: "offline",
-          authentication: "basic",
-          prompt: "consent",
-          redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/airtable`,
-        },
-
-        // Notion provider
-        {
-          providerId: "notion",
-          clientId: env.NOTION_CLIENT_ID as string,
-          clientSecret: env.NOTION_CLIENT_SECRET as string,
-          authorizationUrl: "https://api.notion.com/v1/oauth/authorize",
-          tokenUrl: "https://api.notion.com/v1/oauth/token",
-          userInfoUrl: "https://api.notion.com/v1/users/me",
-          scopes: [
-            "workspace.content",
-            "workspace.name",
-            "page.read",
-            "page.write",
-          ],
-          responseType: "code",
-          pkce: false,
-          accessType: "offline",
-          authentication: "basic",
-          prompt: "consent",
-          redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/notion`,
-          getUserInfo: async (tokens) => {
-            try {
-              const response = await fetch(
-                "https://api.notion.com/v1/users/me",
-                {
-                  headers: {
-                    Authorization: `Bearer ${tokens.accessToken}`,
-                    "Notion-Version": "2022-06-28",
+          // Notion provider
+          {
+            providerId: "notion",
+            clientId: env.NOTION_CLIENT_ID as string,
+            clientSecret: env.NOTION_CLIENT_SECRET as string,
+            authorizationUrl: "https://api.notion.com/v1/oauth/authorize",
+            tokenUrl: "https://api.notion.com/v1/oauth/token",
+            userInfoUrl: "https://api.notion.com/v1/users/me",
+            scopes: [
+              "workspace.content",
+              "workspace.name",
+              "page.read",
+              "page.write",
+            ],
+            responseType: "code",
+            pkce: false,
+            accessType: "offline",
+            authentication: "basic",
+            prompt: "consent",
+            redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/notion`,
+            getUserInfo: async (tokens) => {
+              try {
+                const response = await fetch(
+                  "https://api.notion.com/v1/users/me",
+                  {
+                    headers: {
+                      Authorization: `Bearer ${tokens.accessToken}`,
+                      "Notion-Version": "2022-06-28",
+                    },
                   },
-                },
-              );
+                );
 
-              if (!response.ok) {
-                logger.error("Error fetching Notion user info:", {
-                  status: response.status,
-                  statusText: response.statusText,
-                });
+                if (!response.ok) {
+                  logger.error("Error fetching Notion user info:", {
+                    status: response.status,
+                    statusText: response.statusText,
+                  });
+                  return null;
+                }
+
+                const profile = notionProfileSchema.parse(
+                  await response.json(),
+                );
+                const now = new Date();
+
+                return {
+                  id: profile.bot?.owner?.user?.id ?? profile.id,
+                  name:
+                    profile.name ??
+                    profile.bot?.owner?.user?.name ??
+                    "Notion User",
+                  email: profile.person?.email ?? `${profile.id}@notion.user`,
+                  emailVerified: Boolean(profile.person?.email),
+                  createdAt: now,
+                  updatedAt: now,
+                };
+              } catch (error) {
+                logger.error("Error in Notion getUserInfo:", { error });
                 return null;
               }
-
-              const profile = await response.json();
-              const now = new Date();
-
-              return {
-                id: profile.bot?.owner?.user?.id || profile.id,
-                name:
-                  profile.name ||
-                  profile.bot?.owner?.user?.name ||
-                  "Notion User",
-                email: profile.person?.email || `${profile.id}@notion.user`,
-                emailVerified: !!profile.person?.email,
-                createdAt: now,
-                updatedAt: now,
-              };
-            } catch (error) {
-              logger.error("Error in Notion getUserInfo:", { error });
-              return null;
-            }
+            },
           },
-        },
 
-        // Reddit provider
-        {
-          providerId: "reddit",
-          clientId: env.REDDIT_CLIENT_ID as string,
-          clientSecret: env.REDDIT_CLIENT_SECRET as string,
-          authorizationUrl:
-            "https://www.reddit.com/api/v1/authorize?duration=permanent",
-          tokenUrl: "https://www.reddit.com/api/v1/access_token",
-          userInfoUrl: "https://oauth.reddit.com/api/v1/me",
-          scopes: ["identity", "read"],
-          responseType: "code",
-          pkce: false,
-          accessType: "offline",
-          authentication: "basic",
-          prompt: "consent",
-          redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/reddit`,
-          getUserInfo: async (tokens) => {
-            try {
-              const response = await fetch(
-                "https://oauth.reddit.com/api/v1/me",
-                {
-                  headers: {
-                    Authorization: `Bearer ${tokens.accessToken}`,
-                    "User-Agent": "circulo/1.0",
+          // Reddit provider
+          {
+            providerId: "reddit",
+            clientId: env.REDDIT_CLIENT_ID as string,
+            clientSecret: env.REDDIT_CLIENT_SECRET as string,
+            authorizationUrl:
+              "https://www.reddit.com/api/v1/authorize?duration=permanent",
+            tokenUrl: "https://www.reddit.com/api/v1/access_token",
+            userInfoUrl: "https://oauth.reddit.com/api/v1/me",
+            scopes: ["identity", "read"],
+            responseType: "code",
+            pkce: false,
+            accessType: "offline",
+            authentication: "basic",
+            prompt: "consent",
+            redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/reddit`,
+            getUserInfo: async (tokens) => {
+              try {
+                const response = await fetch(
+                  "https://oauth.reddit.com/api/v1/me",
+                  {
+                    headers: {
+                      Authorization: `Bearer ${tokens.accessToken}`,
+                      "User-Agent": "circulo/1.0",
+                    },
                   },
-                },
-              );
+                );
 
-              if (!response.ok) {
-                logger.error("Error fetching Reddit user info:", {
-                  status: response.status,
-                  statusText: response.statusText,
-                });
+                if (!response.ok) {
+                  logger.error("Error fetching Reddit user info:", {
+                    status: response.status,
+                    statusText: response.statusText,
+                  });
+                  return null;
+                }
+
+                const data = redditProfileSchema.parse(await response.json());
+                const now = new Date();
+
+                return {
+                  id: data.id,
+                  name: data.name ?? "Reddit User",
+                  email: `${data.name}@reddit.user`,
+                  image: data.icon_img ?? undefined,
+                  emailVerified: false,
+                  createdAt: now,
+                  updatedAt: now,
+                };
+              } catch (error) {
+                logger.error("Error in Reddit getUserInfo:", { error });
                 return null;
               }
-
-              const data = await response.json();
-              const now = new Date();
-
-              return {
-                id: data.id,
-                name: data.name || "Reddit User",
-                email: `${data.name}@reddit.user`,
-                image: data.icon_img || undefined,
-                emailVerified: false,
-                createdAt: now,
-                updatedAt: now,
-              };
-            } catch (error) {
-              logger.error("Error in Reddit getUserInfo:", { error });
-              return null;
-            }
+            },
           },
-        },
 
-        {
-          providerId: "linear",
-          clientId: env.LINEAR_CLIENT_ID as string,
-          clientSecret: env.LINEAR_CLIENT_SECRET as string,
-          authorizationUrl: "https://linear.app/oauth/authorize",
-          tokenUrl: "https://api.linear.app/oauth/token",
-          scopes: ["read", "write"],
-          responseType: "code",
-          redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/linear`,
-          pkce: true,
-          prompt: "consent",
-          accessType: "offline",
-          getUserInfo: async (tokens) => {
-            try {
-              const response = await fetch("https://api.linear.app/graphql", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${tokens.accessToken}`,
-                },
-                body: JSON.stringify({
-                  query: `{
+          {
+            providerId: "linear",
+            clientId: env.LINEAR_CLIENT_ID as string,
+            clientSecret: env.LINEAR_CLIENT_SECRET as string,
+            authorizationUrl: "https://linear.app/oauth/authorize",
+            tokenUrl: "https://api.linear.app/oauth/token",
+            scopes: ["read", "write"],
+            responseType: "code",
+            redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/linear`,
+            pkce: true,
+            prompt: "consent",
+            accessType: "offline",
+            getUserInfo: async (tokens) => {
+              try {
+                const response = await fetch("https://api.linear.app/graphql", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${tokens.accessToken}`,
+                  },
+                  body: JSON.stringify({
+                    query: `{
                     viewer {
                       id
                       email
@@ -1344,115 +1490,113 @@ const authOptions: BetterAuthOptions = {
                       avatarUrl
                     }
                   }`,
-                }),
-              });
-
-              if (!response.ok) {
-                const errorText = await response.text();
-                logger.error("Linear API error:", {
-                  status: response.status,
-                  statusText: response.statusText,
-                  body: errorText,
+                  }),
                 });
-                throw new Error(
-                  `Linear API error: ${response.status} ${response.statusText}`,
-                );
-              }
 
-              const { data, errors } = await response.json();
-
-              if (errors) {
-                logger.error("GraphQL errors:", errors);
-                throw new Error(`GraphQL errors: ${JSON.stringify(errors)}`);
-              }
-
-              if (!data?.viewer) {
-                logger.error("No viewer data in response:", data);
-                throw new Error("No viewer data in response");
-              }
-
-              const viewer = data.viewer;
-
-              return {
-                id: viewer.id,
-                email: viewer.email,
-                name: viewer.name,
-                emailVerified: true,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-                image: viewer.avatarUrl || undefined,
-              };
-            } catch (error) {
-              logger.error("Error in getUserInfo:", error);
-              throw error;
-            }
-          },
-        },
-
-        // Slack provider
-        {
-          providerId: "slack",
-          clientId: env.SLACK_CLIENT_ID as string,
-          clientSecret: env.SLACK_CLIENT_SECRET as string,
-          authorizationUrl: "https://slack.com/oauth/v2/authorize",
-          tokenUrl: "https://slack.com/api/oauth.v2.access",
-          userInfoUrl: "https://slack.com/api/users.identity",
-          scopes: [
-            // Bot token scopes only - app acts as a bot user
-            "channels:read",
-            "channels:history",
-            "groups:read",
-            "groups:history",
-            "chat:write",
-            "chat:write.public",
-            "users:read",
-            "files:write",
-            "canvases:write",
-          ],
-          responseType: "code",
-          accessType: "offline",
-          prompt: "consent",
-          redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/slack`,
-          getUserInfo: async (tokens) => {
-            try {
-              logger.info("Creating Slack bot profile from token data");
-
-              // Extract user identifier from tokens if possible
-              let userId = "slack-bot";
-              if (tokens.idToken) {
-                try {
-                  const decodedToken = JSON.parse(
-                    Buffer.from(
-                      tokens.idToken.split(".")[1],
-                      "base64",
-                    ).toString(),
+                if (!response.ok) {
+                  const errorText = await response.text();
+                  logger.error("Linear API error:", {
+                    status: response.status,
+                    statusText: response.statusText,
+                    body: errorText,
+                  });
+                  throw new Error(
+                    `Linear API error: ${response.status} ${response.statusText}`,
                   );
-                  if (decodedToken.sub) {
-                    userId = decodedToken.sub;
-                  }
-                } catch (e) {
-                  logger.warn("Failed to decode Slack ID token", { error: e });
                 }
+
+                const { data, errors } = linearViewerSchema.parse(
+                  await response.json(),
+                );
+
+                if (errors && errors.length > 0) {
+                  logger.error("GraphQL errors:", errors);
+                  throw new Error(`GraphQL errors: ${JSON.stringify(errors)}`);
+                }
+
+                if (!data?.viewer) {
+                  logger.error("No viewer data in response:", data);
+                  throw new Error("No viewer data in response");
+                }
+
+                const viewer = data.viewer;
+
+                return {
+                  id: viewer.id,
+                  email: viewer.email,
+                  name: viewer.name ?? "Linear User",
+                  emailVerified: true,
+                  createdAt: new Date(),
+                  updatedAt: new Date(),
+                  image: viewer.avatarUrl ?? undefined,
+                };
+              } catch (error) {
+                logger.error("Error in getUserInfo:", error);
+                throw error;
               }
-
-              const uniqueId = `${userId}-${Date.now()}`;
-              const now = new Date();
-
-              return {
-                id: uniqueId,
-                name: "Slack Bot",
-                email: `${uniqueId.replace(/[^a-zA-Z0-9]/g, "")}@slack.bot`,
-                emailVerified: false,
-                createdAt: now,
-                updatedAt: now,
-              };
-            } catch (error) {
-              logger.error("Error creating Slack bot profile:", { error });
-              return null;
-            }
+            },
           },
-        },
-      ].filter(
+
+          // Slack provider
+          {
+            providerId: "slack",
+            clientId: env.SLACK_CLIENT_ID as string,
+            clientSecret: env.SLACK_CLIENT_SECRET as string,
+            authorizationUrl: "https://slack.com/oauth/v2/authorize",
+            tokenUrl: "https://slack.com/api/oauth.v2.access",
+            userInfoUrl: "https://slack.com/api/users.identity",
+            scopes: [
+              // Bot token scopes only - app acts as a bot user
+              "channels:read",
+              "channels:history",
+              "groups:read",
+              "groups:history",
+              "chat:write",
+              "chat:write.public",
+              "users:read",
+              "files:write",
+              "canvases:write",
+            ],
+            responseType: "code",
+            accessType: "offline",
+            prompt: "consent",
+            redirectURI: `${env.NEXT_PUBLIC_APP_URL}/api/auth/oauth2/callback/slack`,
+            getUserInfo: async (tokens) => {
+              try {
+                logger.info("Creating Slack bot profile from token data");
+
+                // Extract user identifier from tokens if possible
+                let userId = "slack-bot";
+                if (tokens.idToken) {
+                  const subject = readIdTokenSubject(tokens.idToken);
+                  if (subject) {
+                    userId = subject;
+                  } else {
+                    logger.warn(
+                      "Could not read a subject from the Slack ID token",
+                    );
+                  }
+                }
+
+                const uniqueId = `${userId}-${Date.now()}`;
+                const now = new Date();
+
+                return {
+                  id: uniqueId,
+                  name: "Slack Bot",
+                  email: `${uniqueId.replace(/[^a-zA-Z0-9]/g, "")}@slack.bot`,
+                  emailVerified: false,
+                  createdAt: now,
+                  updatedAt: now,
+                };
+              } catch (error) {
+                logger.error("Error creating Slack bot profile:", { error });
+                return null;
+              }
+            },
+          },
+        ] satisfies GenericOAuthConfig[]
+      ).filter(
         (provider) =>
           typeof provider.clientId === "string" &&
           provider.clientId.length > 0 &&
@@ -1532,7 +1676,9 @@ const authOptions: BetterAuthOptions = {
             return false;
           }
 
-          const orgId = personalOrg[0].organization.id;
+          const [personalOrgRow] = personalOrg;
+          if (!personalOrgRow) return false;
+          const orgId = personalOrgRow.organization.id;
 
           // Check if user's personal org has pro+ subscription
           const canCreate = await canCreateTeamOrg(orgId);
@@ -1553,7 +1699,7 @@ const authOptions: BetterAuthOptions = {
         }
       },
       organizationHooks: {
-        beforeCreateOrganization: async ({ organization, user }) => {
+        beforeCreateOrganization: async ({ organization }) => {
           // Mark new orgs as "team" type (personal orgs are created separately)
           const rawMetadata = (organization as any).metadata;
           let existingMetadata: Record<string, unknown> = {};
@@ -1648,7 +1794,33 @@ export type AuthType = {
   apiKeyPermissions?: Record<string, string[]> | null;
 };
 
-export type SessionResponse = Awaited<ReturnType<typeof auth.api.getSession>>;
+/**
+ * What `new Headers(...)` accepts. This tsconfig builds with `lib: ["ES2022"]`
+ * and no DOM lib, so the global `HeadersInit` is not in scope; deriving the
+ * type from the runtime constructor keeps it accurate without pulling in DOM.
+ */
+export type HeaderSource = NonNullable<
+  ConstructorParameters<typeof Headers>[0]
+>;
+
+/**
+ * `auth` is annotated `Auth<BetterAuthOptions>`, which erases plugin type
+ * inference, so the organization plugin's `activeOrganizationId` and the
+ * API-key path's `apiKeyPermissions` are absent from the inferred session even
+ * though both are populated at runtime and read across the app. Declaring them
+ * here keeps the call sites free of `as any`.
+ */
+export type SessionResponse =
+  Awaited<ReturnType<typeof auth.api.getSession>> extends infer Resolved
+    ? Resolved extends { session: infer SessionData }
+      ? Omit<Resolved, "session"> & {
+          session: SessionData & {
+            activeOrganizationId?: string | null | undefined;
+            apiKeyPermissions?: Record<string, string[]> | null | undefined;
+          };
+        }
+      : Resolved
+    : never;
 export type Session = NonNullable<SessionResponse>;
 
 async function hydrateSessionOrganization(session: SessionResponse) {
@@ -1663,7 +1835,7 @@ async function hydrateSessionOrganization(session: SessionResponse) {
   if (membership.length === 0) {
     // This also repairs sessions created during the small window between a
     // Better Auth user insert and the queued personal-workspace hook.
-    await createPersonalOrganization(session.user as User);
+    await createPersonalOrganization(session.user);
     membership = await db
       .select({ organizationId: schema.member.organizationId })
       .from(schema.member)
@@ -1696,7 +1868,7 @@ async function hydrateSessionOrganization(session: SessionResponse) {
 
 // Helpers to read session/organization in the non-Next runtime
 export async function getSession(
-  headersOrRequest?: HeadersInit | Request,
+  headersOrRequest?: HeaderSource | Request,
 ): Promise<SessionResponse> {
   const headers =
     headersOrRequest instanceof Request
@@ -1719,13 +1891,17 @@ export async function getSession(
 
   const isOrganizationKey = verified.key.configId === "organization";
   if (isOrganizationKey) {
+    // An API key is not a login: there is no session row behind it, so this
+    // carries only the fields the authorization layer reads. The double
+    // assertion is deliberate — the object is a partial session by design, and
+    // `requireAuth` rejects organization keys from user-scoped handlers.
     return {
       user: null,
       session: {
         activeOrganizationId: verified.key.referenceId,
         apiKeyPermissions: verified.key.permissions ?? null,
       },
-    } as SessionResponse;
+    } as unknown as SessionResponse;
   }
 
   const user = await db.query.user.findFirst({
@@ -1757,11 +1933,12 @@ export async function getSession(
           : undefined,
       apiKeyPermissions: verified.key.permissions ?? null,
     },
-  } as SessionResponse;
+    // Same partial-session caveat as the organization-key branch above.
+  } as unknown as SessionResponse;
 }
 
 export async function getActiveOrganizationId(
-  sessionOrHeaders?: SessionResponse | HeadersInit | Request,
+  sessionOrHeaders?: SessionResponse | HeaderSource | Request,
 ): Promise<string> {
   const session =
     sessionOrHeaders && "session" in (sessionOrHeaders as any)
@@ -1769,7 +1946,7 @@ export async function getActiveOrganizationId(
       : await getSession(sessionOrHeaders as any);
 
   const hydratedSession = await hydrateSessionOrganization(session);
-  const activeOrgId = (hydratedSession?.session as any)?.activeOrganizationId;
+  const activeOrgId = hydratedSession?.session?.activeOrganizationId;
   if (!activeOrgId) {
     throw new Error("No organization id provided");
   }

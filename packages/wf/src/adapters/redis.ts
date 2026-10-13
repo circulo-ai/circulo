@@ -594,7 +594,7 @@ function stringifyJson(value: unknown, key: string): string {
 }
 
 function escapeRedisPattern(value: string): string {
-  return value.replace(/[\\*?\[\]]/g, "\\$&");
+  return value.replace(/[\\*?[\]]/g, "\\$&");
 }
 
 function parseJson<T>(value: string, key: string): T {

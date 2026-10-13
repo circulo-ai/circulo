@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { mcpIntegration } from "@/db/schema";
 import { createHumanApprovalRequest } from "@/lib/ai/tools/request-human-approval";
+import { createLogger } from "@/lib/logs/console/logger";
 import { validateMcpEndpoint } from "@/lib/mcp/endpoint";
 import { parseRpcResponse, parseSseEvents } from "@/lib/mcp/protocol";
 import type { ActorContext, ChatMessage } from "@/lib/types";
@@ -11,6 +12,8 @@ import {
   type UIMessageStreamWriter,
 } from "ai";
 import { and, eq } from "drizzle-orm";
+
+const logger = createLogger("McpClient");
 
 const MCP_PROTOCOL_VERSION = "2025-06-18";
 const MCP_CREDENTIAL_REF = /^MCP_CREDENTIAL_[A-Z0-9_]+$/;
@@ -234,7 +237,7 @@ export async function getMcpToolsForAgent(params: {
           approvalMode: "prompt" as const,
         }));
       } catch (error) {
-        console.error("[MCP] unable to list tools", {
+        logger.error("[MCP] unable to list tools", {
           integrationId: integration.id,
           error,
         });

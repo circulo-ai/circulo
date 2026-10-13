@@ -3,7 +3,7 @@ import crypto, {
   createDecipheriv,
   createHmac,
   randomBytes,
-} from "crypto";
+} from "node:crypto";
 import { env } from "./env";
 import { createLogger } from "./logs/console/logger";
 

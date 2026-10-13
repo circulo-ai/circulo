@@ -14,7 +14,7 @@ export type AppStorageContext =
   | "chat"
   | "profile-pictures";
 
-const region = env.S3_REGION || process.env.AWS_REGION || "us-east-1";
+const region = env.S3_REGION || env.AWS_REGION || "us-east-1";
 const endpoint = env.S3_ENDPOINT;
 const forcePathStyle =
   env.S3_FORCE_PATH_STYLE !== undefined
@@ -28,19 +28,18 @@ const credentials =
       }
     : undefined;
 
-const defaultBucket = env.S3_BUCKET_NAME || process.env.S3_BUCKET;
-const kbBucket =
-  env.S3_KB_BUCKET_NAME || process.env.S3_KB_BUCKET || defaultBucket;
+const defaultBucket = env.S3_BUCKET_NAME || env.S3_BUCKET;
+const kbBucket = env.S3_KB_BUCKET_NAME || env.S3_KB_BUCKET || defaultBucket;
 const orgBucket =
   env.S3_EXECUTION_FILES_BUCKET_NAME ||
   env.S3_BUCKET_NAME ||
-  process.env.S3_ORG_BUCKET ||
+  env.S3_ORG_BUCKET ||
   defaultBucket;
 const chatBucket =
-  env.S3_CHAT_BUCKET_NAME || process.env.S3_CHAT_BUCKET || defaultBucket;
+  env.S3_CHAT_BUCKET_NAME || env.S3_CHAT_BUCKET || defaultBucket;
 const profilePicturesBucket =
   env.S3_PROFILE_PICTURES_BUCKET_NAME ||
-  process.env.S3_PROFILE_PICTURES_BUCKET ||
+  env.S3_PROFILE_PICTURES_BUCKET ||
   defaultBucket;
 
 const defaultContainer = env.AZURE_STORAGE_CONTAINER_NAME;

@@ -1,10 +1,10 @@
-import { readFile } from "fs/promises";
+import { readFile } from "node:fs/promises";
 import { createLogger, type Logger } from "./logger.js";
 import type { FileParseResult, FileParser } from "./types.js";
 import { sanitizeTextForUTF8 } from "./utils.js";
 
 export class MdParser implements FileParser {
-  constructor(private readonly logger: Logger = createLogger("MdParser")) {}
+  constructor(readonly _logger: Logger = createLogger("MdParser")) {}
 
   async parseFile(filePath: string): Promise<FileParseResult> {
     const buffer = await readFile(filePath);

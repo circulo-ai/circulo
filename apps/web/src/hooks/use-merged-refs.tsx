@@ -20,7 +20,9 @@ function useMergedRefs<T>(...refs: PossibleRef<T>[]): MergedRef<T> {
     const fn = ((node: T | null) => {
       innerRef.current = node;
       fn.current = node;
-      refsRef.current.forEach((ref) => assignRef(ref, node));
+      refsRef.current.forEach((ref) => {
+        assignRef(ref, node);
+      });
     }) as MergedRef<T>;
 
     fn.current = innerRef.current;

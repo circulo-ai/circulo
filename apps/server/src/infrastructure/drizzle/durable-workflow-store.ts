@@ -208,7 +208,7 @@ export class DurableWorkflowStore<
       status: toStatus(wf.state),
       state: wf.state,
       version: wf.version,
-      idempotencyKey: wf.tags["idempotencyKey"] ?? null,
+      idempotencyKey: wf.tags.idempotencyKey ?? null,
       currentStep: wf.currentStep,
       retryCount: wf.retryCount,
       maxExecutionTime: wf.maxExecutionTime ?? null,

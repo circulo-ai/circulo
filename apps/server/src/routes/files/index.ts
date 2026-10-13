@@ -69,6 +69,8 @@ const fileRoutes = createHonoFileRoutes<AppEnv>(
             }
             const context = c.req.query("context") ?? "general";
             const token = c.req.query("token");
+            // Live NODE_ENV read: `@/lib/env` snapshots at import, and a
+            // production security gate should reflect the running environment.
             if (
               process.env.NODE_ENV === "production" &&
               !verifyFileAccessToken(key, context, token)

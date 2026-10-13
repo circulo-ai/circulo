@@ -1,10 +1,13 @@
 import type { RequestServices } from "@/di/di-context";
 import { getActiveOrganizationId } from "@/lib/auth";
 import { createRouter } from "@/lib/create-app";
+import { createLogger } from "@/lib/logs/console/logger";
 import { requireAuth } from "@/middleware/auth";
 import { workflowRunService } from "@/workflows/runtime/workflow-run-service";
 import { BadRequestError, ForbiddenError } from "@circulo-ai/types";
 import { createUIMessageStreamResponse } from "ai";
+
+const logger = createLogger("ChatStreamRoute");
 
 const router = createRouter();
 
@@ -42,7 +45,7 @@ router.get("/chat/:id/stream", requireAuth, async (c) => {
   try {
     stream = await workflowRunService.getReadable(id, startIndex);
   } catch (error) {
-    console.error("[Chat Stream Error]", { workflowRunId: id, error });
+    logger.error("[Chat Stream Error]", { workflowRunId: id, error });
     throw error;
   }
 

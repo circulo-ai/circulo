@@ -22,10 +22,10 @@ import {
   globalMutate,
 } from "@/lib/swr";
 import type { Attachment, ChatMessage } from "@/lib/types";
-import type { AppUsage } from "@/lib/usage";
 import { generateUUID } from "@/lib/utils";
 import { useChat } from "@ai-sdk/react";
 import type { Vote } from "@circulo-ai/db/schema";
+import type { AppUsage } from "@circulo-ai/types";
 import { DefaultChatTransport } from "ai";
 import { TextAlignJustify } from "lucide-react";
 import { useSearchParams } from "next/navigation";
@@ -99,7 +99,7 @@ export function Chat({
   });
 
   // Workflow orchestration state
-  const [workflowStatus, setWorkflowStatus] = useState<{
+  const [_workflowStatus, setWorkflowStatus] = useState<{
     isRunning: boolean;
     currentPhase?: string;
     progress?: number;

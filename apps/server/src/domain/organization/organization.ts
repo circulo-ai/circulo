@@ -1,4 +1,8 @@
-import { AggregateRoot, type Identifier, ValidationError } from "@circulo-ai/core";
+import {
+  AggregateRoot,
+  type Identifier,
+  ValidationError,
+} from "@circulo-ai/core";
 
 export type OrganizationProps = {
   id: Identifier;

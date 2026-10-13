@@ -85,9 +85,15 @@ export const env = createEnv({
     // Billing toggle
     BILLING_ENABLED: booleanFromEnv.optional(),
 
+    // Process binding. Read by the Bun and Node entrypoints.
+    PORT: z.coerce.number().int().positive().optional(),
+    HOSTNAME: z.string().optional(),
+
     // Storage (S3/Azure)
     S3_ENDPOINT: z.string().optional(),
     S3_REGION: z.string().optional(),
+    // AWS SDK convention, used when S3_REGION is unset.
+    AWS_REGION: z.string().optional(),
     S3_ACCESS_KEY_ID: z.string().optional(),
     S3_SECRET_ACCESS_KEY: z.string().optional(),
     S3_FORCE_PATH_STYLE: booleanFromEnv.optional(),
@@ -96,6 +102,14 @@ export const env = createEnv({
     S3_KB_BUCKET_NAME: z.string().optional(),
     S3_CHAT_BUCKET_NAME: z.string().optional(),
     S3_PROFILE_PICTURES_BUCKET_NAME: z.string().optional(),
+    // Legacy bucket aliases. `lib/storage/config.ts` still falls back to
+    // these, so they are declared here to be validated and discoverable
+    // rather than read straight off process.env.
+    S3_BUCKET: z.string().optional(),
+    S3_KB_BUCKET: z.string().optional(),
+    S3_ORG_BUCKET: z.string().optional(),
+    S3_CHAT_BUCKET: z.string().optional(),
+    S3_PROFILE_PICTURES_BUCKET: z.string().optional(),
     CIRCULO_STORAGE_DRIVER: z.enum(["local", "s3", "azure"]).optional(),
     CIRCULO_LOCAL_STORAGE_PATH: z.string().optional(),
     AZURE_ACCOUNT_NAME: z.string().optional(),

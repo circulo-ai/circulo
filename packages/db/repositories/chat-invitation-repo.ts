@@ -1,5 +1,5 @@
-import { randomBytes } from "crypto";
 import { and, eq, gt, sql } from "drizzle-orm";
+import { randomBytes } from "node:crypto";
 import type { DbInstance } from "../index";
 import { chatInvitation, chatMember } from "../schema";
 

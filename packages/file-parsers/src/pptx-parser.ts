@@ -1,11 +1,11 @@
-import { existsSync } from "fs";
-import { readFile } from "fs/promises";
+import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { createLogger, type Logger } from "./logger.js";
 import type { FileParseResult, FileParser } from "./types.js";
 import { sanitizeTextForUTF8 } from "./utils.js";
 
 export class PptxParser implements FileParser {
-  constructor(private readonly logger: Logger = createLogger("PptxParser")) {}
+  constructor(readonly _logger: Logger = createLogger("PptxParser")) {}
 
   async parseFile(filePath: string): Promise<FileParseResult> {
     if (!filePath) {

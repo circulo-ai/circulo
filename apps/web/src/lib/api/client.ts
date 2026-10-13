@@ -40,7 +40,7 @@ export async function request<T>(
 
     // Check if response is JSON before parsing
     const contentType = response.headers.get("content-type");
-    const isJson = contentType && contentType.includes("application/json");
+    const isJson = contentType?.includes("application/json");
     const data = isJson ? await response.json() : null;
 
     if (!response.ok) {

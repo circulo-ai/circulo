@@ -7,6 +7,7 @@ import {
 } from "@/db";
 import { chatMemberRepo, chatRepo } from "@/db/repositories";
 import { createRouter } from "@/lib/create-app";
+import { createLogger } from "@/lib/logs/console/logger";
 import {
   hasPermissionForUser,
   isMemberOf,
@@ -32,6 +33,8 @@ import { zValidator } from "@hono/zod-validator";
 import { and, desc, eq, isNull, lte } from "drizzle-orm";
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
+
+const logger = createLogger("WebhooksRoute");
 
 const router = createRouter();
 const webhookIdParams = z.object({ id: z.uuid() });
@@ -456,7 +459,7 @@ router.post("/automation/webhooks/:id/events", async (c) => {
       })
       .where(eq(workflowWebhook.id, webhook.id));
     void workflowRunService.run(run.runId).catch((error: unknown) => {
-      console.error("[Webhook Workflow Error]", { runId: run.runId, error });
+      logger.error("[Webhook Workflow Error]", { runId: run.runId, error });
     });
     return c.json(
       {

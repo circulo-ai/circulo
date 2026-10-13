@@ -6,6 +6,7 @@ import { getActiveOrganizationId, getSession } from "@/lib/auth";
 import { enforceOrganizationFeatureLimit } from "@/lib/billing/limits";
 import { consumeQuota, reserveQuota } from "@/lib/billing/quota";
 import { createRouter } from "@/lib/create-app";
+import { createLogger } from "@/lib/logs/console/logger";
 import { hasPermission, isMemberOf } from "@/lib/permissions";
 import { isSafeMessageUrl } from "@/lib/security/message-url";
 import type { ChatMessage } from "@/lib/types";
@@ -26,6 +27,8 @@ import { zValidator } from "@hono/zod-validator";
 import { createUIMessageStreamResponse } from "ai";
 import { and, count, eq } from "drizzle-orm";
 import { z } from "zod";
+
+const logger = createLogger("ChatRoute");
 
 const promptMentionSchema = z.object({
   kind: z.enum(["agent", "tool"]),
@@ -403,7 +406,7 @@ router.post(
       });
 
       void workflowRunService.run(run.runId).catch((error: unknown) => {
-        console.error("[Chat Workflow Error]", error);
+        logger.error("[Chat Workflow Error]", error);
       });
 
       const response = createUIMessageStreamResponse({
@@ -422,7 +425,7 @@ router.post(
         throw error;
       }
 
-      console.error("[Chat Error]", error);
+      logger.error("[Chat Error]", error);
       return c.json({ message: "Internal server error" }, 500);
     }
   },

@@ -298,7 +298,7 @@ function AutomationPageContent() {
       );
       return;
     }
-    let schedule;
+    let schedule: ReturnType<typeof scheduleFor> | undefined;
     try {
       schedule = scheduleFor(form);
     } catch {

@@ -101,21 +101,20 @@ export function ChatSidebarBurgerMenu() {
               )}
             </div>
           </DropdownMenuLabel>
-          {organizations &&
-            organizations
-              .filter((e: { id: string }) => e.id !== activeOrganization?.id)
-              .map((e: { id: string; name?: string | null }) => (
-                <CustomDropdownMenuItem
-                  key={`org-${e.id}`}
-                  onClick={async () => {
-                    await authClient.organization.setActive({
-                      organizationId: e.id,
-                    });
-                  }}
-                >
-                  {e?.name}
-                </CustomDropdownMenuItem>
-              ))}
+          {organizations
+            ?.filter((e: { id: string }) => e.id !== activeOrganization?.id)
+            .map((e: { id: string; name?: string | null }) => (
+              <CustomDropdownMenuItem
+                key={`org-${e.id}`}
+                onClick={async () => {
+                  await authClient.organization.setActive({
+                    organizationId: e.id,
+                  });
+                }}
+              >
+                {e?.name}
+              </CustomDropdownMenuItem>
+            ))}
           <CustomDropdownMenuItem
             onClick={() => {
               setOpen(true);

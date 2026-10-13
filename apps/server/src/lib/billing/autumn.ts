@@ -2,7 +2,10 @@ import { isCloudRuntime } from "@/lib/deployment/instance-auth";
 import { env, isTruthy } from "@/lib/env";
 import { BILLING_FEATURES, getBillingPlan } from "@circulo-ai/types";
 
+import { createLogger } from "@/lib/logs/console/logger";
 import { Autumn } from "autumn-js";
+
+const logger = createLogger("Autumn");
 
 /**
  * Compatibility shape used by the application billing layer.
@@ -200,7 +203,7 @@ export async function getSubscriptionForOrg(
       features,
     };
   } catch (error) {
-    console.error("Failed to get subscription for org:", organizationId, error);
+    logger.error("Failed to get subscription for org:", organizationId, error);
     return null;
   }
 }

@@ -1,8 +1,11 @@
 import { db, humanApproval, message, scheduledTask, workflowRun } from "@/db";
 import { chatMemberRepo } from "@/db/repositories";
+import { createLogger } from "@/lib/logs/console/logger";
 import { calculateNextRun } from "@/services/scheduling";
 import { workflowRunService } from "@/workflows/runtime/workflow-run-service";
 import { and, eq, lte } from "drizzle-orm";
+
+const logger = createLogger("Scheduler");
 
 const SCHEDULER_KEY = Symbol.for("circulo.scheduler");
 const schedulerState = globalThis as unknown as {
@@ -80,7 +83,7 @@ async function runTask(task: typeof scheduledTask.$inferSelect) {
     organizationId: task.organizationId,
   });
   void workflowRunService.run(run.runId).catch((error: unknown) => {
-    console.error("[Scheduler] workflow failed", { runId: run.runId, error });
+    logger.error("[Scheduler] workflow failed", { runId: run.runId, error });
   });
 }
 
@@ -100,7 +103,7 @@ async function tick() {
     databaseRetryAt = 0;
   } catch (error) {
     databaseRetryAt = Date.now() + 30_000;
-    console.error(
+    logger.error(
       "[Scheduler] database unavailable; retrying in 30 seconds",
       error instanceof Error ? error.message : String(error),
     );
@@ -109,7 +112,7 @@ async function tick() {
   for (const task of due) {
     if (!task.chatId) continue;
     await runTask(task).catch(async (error) => {
-      console.error("[Scheduler] task failed", { taskId: task.id, error });
+      logger.error("[Scheduler] task failed", { taskId: task.id, error });
       await db
         .update(scheduledTask)
         .set({ status: "failed", updatedAt: new Date() })
@@ -139,7 +142,7 @@ async function expirePendingApprovals(): Promise<void> {
       )
       .map((workflowRunId) =>
         workflowRunService.resume(workflowRunId).catch((error: unknown) => {
-          console.error("[Scheduler] failed to resume expired approval", {
+          logger.error("[Scheduler] failed to resume expired approval", {
             workflowRunId,
             error,
           });
@@ -153,11 +156,11 @@ export function startScheduler(): () => void {
     return () => stopScheduler();
   }
   void tick().catch((error) =>
-    console.error("[Scheduler] initial tick failed", error),
+    logger.error("[Scheduler] initial tick failed", error),
   );
   schedulerState[SCHEDULER_KEY] = setInterval(() => {
     void tick().catch((error) =>
-      console.error("[Scheduler] tick failed", error),
+      logger.error("[Scheduler] tick failed", error),
     );
   }, 15_000);
   return () => stopScheduler();

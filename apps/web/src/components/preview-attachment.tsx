@@ -162,9 +162,7 @@ export const PreviewAttachment = ({
       >
         {error ? (
           <div className="flex size-full flex-col items-center justify-center gap-1 px-1 text-center text-[10px] text-destructive">
-            <span aria-label={error} title={error}>
-              Upload failed
-            </span>
+            <span title={error}>Upload failed</span>
             {onRetry && (
               <Button
                 aria-label="Retry upload"
@@ -238,9 +236,13 @@ export const PreviewAttachment = ({
               />
             ) : isAudio && previewUrl ? (
               <div className="flex min-h-32 items-center justify-center">
+                {/* User-uploaded media: no caption track exists to attach. */}
+                {/* biome-ignore lint/a11y/useMediaCaption: see above */}
                 <audio className="w-full max-w-xl" controls src={previewUrl} />
               </div>
             ) : isVideo && previewUrl ? (
+              // User-uploaded media: no caption track exists to attach.
+              // biome-ignore lint/a11y/useMediaCaption: see above
               <video
                 className="mx-auto max-h-[72dvh] max-w-full"
                 controls

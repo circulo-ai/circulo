@@ -1,8 +1,8 @@
 import {
   AggregateRoot,
-  type Identifier,
   ValidationError,
   type DomainEvent,
+  type Identifier,
 } from "@circulo-ai/core";
 import { CHAT_EVENTS } from "./events";
 

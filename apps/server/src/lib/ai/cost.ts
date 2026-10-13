@@ -1,3 +1,4 @@
+import { env } from "@/lib/env";
 import type { AiProviderId } from "@circulo-ai/types";
 
 export type ModelPricing = {
@@ -19,7 +20,7 @@ const BUILTIN_PRICING: Record<string, ModelPricing> = {
 };
 
 function configuredPricing(): Record<string, ModelPricing> {
-  const raw = process.env.CIRCULO_MODEL_PRICING_JSON;
+  const raw = env.CIRCULO_MODEL_PRICING_JSON;
   if (!raw) return {};
   try {
     const parsed = JSON.parse(raw) as unknown;

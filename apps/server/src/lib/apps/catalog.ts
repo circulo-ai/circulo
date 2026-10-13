@@ -1,3 +1,5 @@
+import { env } from "@/lib/env";
+
 export type ConnectedAppDefinition = {
   providerId: string;
   name: string;
@@ -27,8 +29,8 @@ export const CONNECTED_APP_CATALOG: readonly ConnectedAppDefinition[] = [
     setup:
       "Authorize GitHub from the app connector panel. The connector exposes read-only operations.",
     readyToConnect: Boolean(
-      process.env.GITHUB_REPO_CLIENT_ID?.trim() &&
-      process.env.GITHUB_REPO_CLIENT_SECRET?.trim(),
+      env.GITHUB_REPO_CLIENT_ID?.trim() &&
+      env.GITHUB_REPO_CLIENT_SECRET?.trim(),
     ),
   },
 ];

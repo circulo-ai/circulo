@@ -18,6 +18,7 @@ import { searchKnowledge } from "@/lib/ai/tools/search-knowledge";
 import { searchMemory } from "@/lib/ai/tools/search-memory";
 import { updateDocument } from "@/lib/ai/tools/update-document";
 import { consumeQuota, reserveQuota } from "@/lib/billing/quota";
+import { createLogger } from "@/lib/logs/console/logger";
 import { getMcpToolsForAgent } from "@/lib/mcp/client";
 import type {
   ChatMessage,
@@ -44,6 +45,8 @@ import {
   hasAgentToolAccess,
 } from "../tool-access";
 import type { ExecutionPlan } from "./plan-agent-execution-step";
+
+const logger = createLogger("ExecuteAgentTaskStep");
 
 const durableUIWrites = new Map<string, Promise<void>>();
 const AGENT_EXECUTION_EVENT = "agent.execution.completed";
@@ -126,7 +129,7 @@ function persistDurableUIChunk(
   });
   durableUIWrites.set(workflowId, next);
   void next.catch((error: unknown) => {
-    console.error("[Workflow UI Chunk Persistence Error]", {
+    logger.error("[Workflow UI Chunk Persistence Error]", {
       workflowId,
       type: chunk.type,
       error,

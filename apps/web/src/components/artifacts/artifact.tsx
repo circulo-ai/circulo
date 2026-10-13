@@ -64,7 +64,7 @@ function PureArtifact({
   sendMessage,
   messages,
   setMessages,
-  regenerate,
+  regenerate: _regenerate,
   votes,
   isReadonly,
   selectedVisibilityType,
@@ -131,7 +131,7 @@ function PureArtifact({
     mutateDocuments();
   }, [mutateDocuments]);
 
-  const { mutate } = useSWRConfig();
+  useSWRConfig();
   const saveQueueRef = useRef(Promise.resolve());
   const latestContentRef = useRef("");
 

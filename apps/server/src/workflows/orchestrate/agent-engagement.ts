@@ -51,7 +51,7 @@ export function hasExplicitToolDirective(
   const text = getTextFromMessages(messages);
   return (
     /(^|\s)@(?:tool|mcp)(?:\b|$)/i.test(text) ||
-    /(^|\s)@(?:tool|mcp)(?::|[\/_-])[a-z0-9][a-z0-9_.:/-]*/i.test(text)
+    /(^|\s)@(?:tool|mcp)(?::|[/_-])[a-z0-9][a-z0-9_.:/-]*/i.test(text)
   );
 }
 

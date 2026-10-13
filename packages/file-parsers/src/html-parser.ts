@@ -1,11 +1,11 @@
 import * as cheerio from "cheerio";
-import { readFile } from "fs/promises";
+import { readFile } from "node:fs/promises";
 import { createLogger, type Logger } from "./logger.js";
 import type { FileParseResult, FileParser } from "./types.js";
 import { sanitizeTextForUTF8 } from "./utils.js";
 
 export class HtmlParser implements FileParser {
-  constructor(private readonly logger: Logger = createLogger("HtmlParser")) {}
+  constructor(readonly _logger: Logger = createLogger("HtmlParser")) {}
 
   async parseFile(filePath: string): Promise<FileParseResult> {
     const html = await readFile(filePath, "utf8");

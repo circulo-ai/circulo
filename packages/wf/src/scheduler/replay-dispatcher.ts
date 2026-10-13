@@ -7,7 +7,8 @@ import type {
 } from "../models";
 
 export type ReplayScheduleDefinitionResolver = (
-    workflowName: string,) => ReplayWorkflowDefinition<unknown, unknown> | undefined
+  workflowName: string,
+) => ReplayWorkflowDefinition<unknown, unknown> | undefined;
 
 export interface ReplayScheduleDispatcherOptions {
   runner: ReplayWorkflowRunner;

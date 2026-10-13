@@ -164,13 +164,13 @@ export function useScrollToBottom({
       container.scrollTo(scrollOptions);
       setScrollBehavior(false);
     }
-  }, [scrollBehavior, setScrollBehavior]);
+  }, [scrollBehavior]);
 
   const scrollToBottom = useCallback(
     (currentScrollBehavior: ScrollBehavior = "smooth") => {
       setScrollBehavior(currentScrollBehavior);
     },
-    [setScrollBehavior],
+    [],
   );
 
   function onViewportEnter() {

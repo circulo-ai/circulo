@@ -1,10 +1,10 @@
 import {
   ActivityWorker,
-  type InMemoryActivityRegistry,
   InMemoryTaskQueue,
   InMemoryWorkflowHistoryStore,
   ReplayWorkflowRunner,
   TimerWorker,
+  type InMemoryActivityRegistry,
   type ReplayWorkflowDefinition,
   type WorkflowHistoryEvent,
 } from "@circulo-ai/wf";

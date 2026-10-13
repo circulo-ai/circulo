@@ -94,7 +94,9 @@ export function useActiveByClass<T extends Element = HTMLElement>(
       { root: null, rootMargin, threshold: thresholds },
     );
 
-    els.forEach((el) => io.observe(el));
+    els.forEach((el) => {
+      io.observe(el);
+    });
     observerRef.current = io;
 
     // initial fire

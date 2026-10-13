@@ -1,5 +1,10 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+// Read straight from process.env rather than `@/lib/env`, which snapshots at
+// import time. The secret is resolved per call so it stays late-bound (the
+// value can be rotated in the process environment, and tests can stub it).
+// INTERNAL_API_SECRET is declared in the env schema, so production boot still
+// fails fast when it is missing.
 function getSigningSecret(): string {
   const secret = process.env.INTERNAL_API_SECRET?.trim();
   if (!secret) throw new Error("INTERNAL_API_SECRET is not configured");

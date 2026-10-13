@@ -1,5 +1,6 @@
-import { CodeLanguage } from "@/lib/execution/languages";
+import { env } from "@/lib/env";
 import { createLogger } from "@/lib/logs/console/logger";
+import { CodeLanguage } from "@circulo-ai/types";
 import { Sandbox } from "@e2b/code-interpreter";
 
 export interface E2BExecutionRequest {
@@ -22,13 +23,13 @@ export async function executeInE2B(
 ): Promise<E2BExecutionResult> {
   const { code, language, timeoutMs } = req;
 
-  logger.info(`Executing code in E2B`, {
-    code,
+  logger.info("Executing code in E2B", {
     language,
     timeoutMs,
+    codeLength: code.length,
   });
 
-  const apiKey = process.env.E2B_API_KEY;
+  const apiKey = env.E2B_API_KEY;
   if (!apiKey) {
     throw new Error("E2B_API_KEY is required when E2B is enabled");
   }

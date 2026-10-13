@@ -6,7 +6,7 @@ import { Progress } from "./ui/progress";
 import { useSidebar } from "./ui/sidebar";
 
 export function SubscriptionUsageIndicator() {
-  const { state } = useSidebar();
+  useSidebar();
 
   const { data: subscriptionRes } = useSWR(
     isBillingEnabled ? "/api/billing/subscriptions/current" : null,
@@ -87,6 +87,7 @@ export function SubscriptionUsageIndicator() {
 
   const compact = (
     <button
+      type="button"
       className="flex w-full items-center justify-between rounded-md px-2 py-1 text-xs hover:bg-sidebar-accent"
       aria-label="Usage details"
     >

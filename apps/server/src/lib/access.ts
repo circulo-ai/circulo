@@ -119,7 +119,7 @@ export async function canUserCreateTeamOrg(userId: string): Promise<boolean> {
   if (!subscription) return false;
 
   // Check for the boolean feature directly
-  const hasFeature = subscription.features["create_team_org"];
+  const hasFeature = subscription.features.create_team_org;
   if (
     hasFeature &&
     hasFeature.included_usage !== undefined &&
@@ -165,10 +165,10 @@ export async function getOrgLimits(
     };
   }
 
-  const maxAgents = subscription.features["max_agents"];
-  const apiCalls = subscription.features["api_calls"];
-  const createTeamOrg = subscription.features["create_team_org"];
-  const prioritySupport = subscription.features["priority_support"];
+  const maxAgents = subscription.features.max_agents;
+  const apiCalls = subscription.features.api_calls;
+  const createTeamOrg = subscription.features.create_team_org;
+  const prioritySupport = subscription.features.priority_support;
 
   return {
     maxAgents: maxAgents?.unlimited

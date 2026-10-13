@@ -1,3 +1,4 @@
+import { env } from "@/lib/env";
 import { createLogger } from "@/lib/logs/console/logger";
 import { createRedis, type CirculoRedis } from "@circulo-ai/redis";
 
@@ -35,7 +36,7 @@ export function getRedisClient(): CirculoRedis | null {
     return cachedClient;
   }
 
-  const url = process.env.REDIS_URL;
+  const url = env.REDIS_URL;
   if (!url) {
     cachedClient = null;
     return null;

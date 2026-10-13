@@ -23,7 +23,7 @@ export type DeepReplace<T, From, To, Depth extends number = 50> = T extends From
   : Depth extends 0
     ? T
     : // Arrays / tuples
-      T extends readonly (infer U)[]
+      T extends readonly unknown[]
       ? { [K in keyof T]: DeepReplace<T[K], From, To, Dec<Depth>> }
       : T extends (infer U)[]
         ? DeepReplace<U, From, To, Dec<Depth>>[]

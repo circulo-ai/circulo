@@ -9,7 +9,7 @@ import {
   type UnitOfWork,
   type UseCase,
 } from "@circulo-ai/core";
-import { randomUUID } from "crypto";
+import { randomUUID } from "node:crypto";
 
 export type InviteToChatInput = {
   chatId: string;
