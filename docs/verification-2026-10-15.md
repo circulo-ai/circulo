@@ -12,7 +12,7 @@
 
 - Published Context7 resolved Better Auth, requested and received both configured human approvals, queried documentation, and returned two facts with source links. The panel advanced to its second approval without a reload and produced one final response. Its completed trace survived a reload.
 - A saved report was read by exact title, returning the actual ID, three exact release requirements and fictional-source label. Its artifact preview displayed the saved Markdown.
-- A UI-created one-time schedule delivered its response to an already-open chat without a reload. A chat tool also created a real one-time task. Pause preserved Asia/Tehran; rescheduling while paused changed the due time; the saved task survived desktop restart and resumed at its revised time.
+- A UI-created one-time schedule delivered its response to an already-open chat without a reload. A chat tool also created a real one-time task. A fresh creation on the final build reported success, and its scheduled FINAL AUTOMATION VERIFIED response arrived in the open chat. The manageScheduledTasks tool returned the authoritative revised schedule. Pause preserved Asia/Tehran; rescheduling while paused changed the due time; the saved task survived desktop restart and resumed at its revised time.
 - A signed webhook accepted a fixture event (202), returned the same delivery and workflow for its duplicate (202), and rejected a changed event ID using the old signature (401). The result appeared in its chat. Secret copying/rotation, pause/resume, delivery history and deletion-dialog cancellation were checked. The temporary secret file was removed, and the test webhook was left paused.
 - Chat Copy ID copied the actual chat UUID. Separate chat tabs retained separate compose drafts.
 
