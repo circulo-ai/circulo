@@ -193,6 +193,12 @@ export function WorkspaceShell({
                 Workspace section
               </label>
               <Select
+                items={visibleNavigation.flatMap((group) =>
+                  group.items.map((item) => ({
+                    value: item.id,
+                    label: item.label,
+                  })),
+                )}
                 value={activeSection}
                 onValueChange={(section) => {
                   const item = visibleNavigation
@@ -267,10 +273,7 @@ export function WorkspaceShell({
           <section className="min-h-0 min-w-0 overflow-auto overscroll-contain pr-1 pb-8">
             <div className="flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-end sm:justify-between">
               <div className="min-w-0">
-                <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-                  Workspace settings
-                </p>
-                <h1 className="mt-2 text-2xl font-semibold tracking-tight">
+                <h1 className="text-2xl font-semibold tracking-tight">
                   {title}
                 </h1>
                 <p className="mt-2 max-w-2xl text-sm text-muted-foreground">

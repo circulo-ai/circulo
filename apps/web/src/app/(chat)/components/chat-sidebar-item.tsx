@@ -18,6 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";
 import { useOptimisticSWRMutation } from "@/hooks/use-optimistic-swr-mutation";
+import { writeTextToClipboard } from "@/lib/clipboard";
 import { formatDate } from "@/lib/format-date";
 import { getFetcher } from "@/lib/swr";
 import { cn } from "@/lib/utils";
@@ -42,12 +43,12 @@ function getChatAvatarInitials(title: string) {
 }
 
 const CHAT_AVATAR_GRADIENTS = [
-  "from-indigo-500 via-violet-500 to-fuchsia-500",
-  "from-cyan-500 via-sky-500 to-blue-600",
-  "from-emerald-500 via-teal-500 to-cyan-600",
-  "from-amber-400 via-orange-500 to-rose-500",
-  "from-pink-500 via-rose-500 to-red-600",
-  "from-purple-500 via-fuchsia-500 to-pink-500",
+  "from-amber-800 to-orange-700",
+  "from-emerald-800 to-green-700",
+  "from-slate-800 to-slate-600",
+  "from-rose-900 to-red-700",
+  "from-stone-800 to-yellow-800",
+  "from-teal-900 to-emerald-700",
 ] as const;
 
 function getChatAvatarGradient(title: string) {
@@ -199,6 +200,12 @@ export const ChatSidebarItem = forwardRef<HTMLLIElement, ChatSidebarItemProps>(
       <>
         <SidebarMenuItem ref={ref}>
           <CustomSidebarContextMenu
+            onCopyId={() => {
+              void writeTextToClipboard(item.id).then(
+                () => toast.success("Chat ID copied"),
+                () => toast.error("Could not copy the chat ID. Try again."),
+              );
+            }}
             isPinned={item.isPinned}
             onPinChange={handlePinChange}
             isArchived={item.isArchived}

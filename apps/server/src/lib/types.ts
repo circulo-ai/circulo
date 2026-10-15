@@ -18,12 +18,13 @@ export type WorkflowToolTrace = {
 };
 
 export type WorkflowAgentTrace = {
+  harness?: import("@circulo-ai/types").HarnessSnapshot;
   agentId: string;
   agentName: string;
   model?: string;
   avatarUrl?: string | null;
   task: string;
-  status: "running" | "completed" | "failed" | "skipped";
+  status: "running" | "paused" | "completed" | "failed" | "skipped";
   startedAt?: string;
   completedAt?: string;
   durationMs?: number;
@@ -98,9 +99,13 @@ export type ActorContext = {
   chatId?: string;
   providerId?: import("@circulo-ai/types").AiProviderId;
   modelId?: string;
+  apiKeyPermissions?: import("@/lib/permissions").ApiKeyPermissions;
+  apiKeyId?: string;
+  timeZone?: string;
 };
 
 export type CustomUIDataTypes = {
+  workflowHarnessProgress: import("@circulo-ai/types").HarnessSnapshot;
   textDelta: string;
   imageDelta: string;
   sheetDelta: string;

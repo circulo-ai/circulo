@@ -12,7 +12,9 @@ import {
 } from "@/workflows/orchestrate/orchestrate";
 import type { OrchestrationInput } from "@/workflows/orchestrate/types";
 import type { Workflow, WorkflowEvent } from "@circulo-ai/wf";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import { getHandledEventIds } from "./handled-event-ids";
+import { workflowAssistantMessageId } from "./message-identity";
 import {
   closeWorkflowOutputChannel,
   createWorkflowOutputChannel,
@@ -219,6 +221,7 @@ export class WorkflowRunService {
     if (trace) {
       publishWorkflowChunk(runId, {
         type: "data-workflowTrace",
+        id: `trace:${runId}`,
         data: trace,
       });
     }
@@ -286,7 +289,7 @@ export class WorkflowRunService {
     stepNames: Map<string, string>,
     event: WorkflowEvent<WorkflowOutput>,
   ): Promise<void> {
-    const handled = this.handledEventIds.get(runId) ?? new Set<string>();
+    const handled = getHandledEventIds(this.handledEventIds, runId);
     if (handled.has(event.id)) return;
 
     const inFlight = this.processingEvents.get(event.id);
@@ -320,6 +323,7 @@ export class WorkflowRunService {
       publishWorkflowChunk(
         runId,
         event.payload as unknown as CustomUIMessageChunk,
+        event.id,
       );
       return;
     }
@@ -433,6 +437,7 @@ export class WorkflowRunService {
             );
             publishWorkflowChunk(runId, {
               type: "data-workflowTrace",
+              id: `trace:${runId}`,
               data: trace,
             });
           }
@@ -476,6 +481,7 @@ export class WorkflowRunService {
           );
           publishWorkflowChunk(runId, {
             type: "data-workflowTrace",
+            id: `trace:${runId}`,
             data: trace,
           });
         }
@@ -528,6 +534,7 @@ export class WorkflowRunService {
         );
         publishWorkflowChunk(runId, {
           type: "data-workflowTrace",
+          id: `trace:${runId}`,
           data: trace,
         });
         publishWorkflowChunk(runId, {
@@ -541,6 +548,19 @@ export class WorkflowRunService {
 
       case "workflow.failed": {
         await this.syncRunStatus(runId, "failed");
+        await db
+          .update(humanApproval)
+          .set({
+            status: "cancelled",
+            decidedAt: new Date(),
+            decisionNote: "The workflow ended before this action was approved.",
+          })
+          .where(
+            and(
+              eq(humanApproval.workflowRunId, runId),
+              eq(humanApproval.status, "pending"),
+            ),
+          );
         const message = toWorkflowErrorMessage(
           (event.payload as { error?: unknown }).error,
         );
@@ -565,6 +585,7 @@ export class WorkflowRunService {
         );
         publishWorkflowChunk(runId, {
           type: "data-workflowTrace",
+          id: `trace:${runId}`,
           data: trace,
         });
         publishWorkflowChunk(runId, {
@@ -613,17 +634,21 @@ export class WorkflowRunService {
         model: result.model,
         avatarUrl: result.avatarUrl,
         task: result.task,
-        status: result.success
-          ? "completed"
-          : result.error?.startsWith("Skipped")
-            ? "skipped"
-            : "failed",
+        status:
+          result.approvalId && status === "paused"
+            ? "paused"
+            : result.success
+              ? "completed"
+              : result.error?.startsWith("Skipped")
+                ? "skipped"
+                : "failed",
         startedAt: result.startTime.toISOString(),
         completedAt: result.endTime.toISOString(),
         durationMs: result.durationMs,
         output: result.output,
         error: result.error,
         toolCalls: result.toolCalls,
+        harness: result.harness,
       })),
       aggregated: Boolean(state.finalResult),
       error: state.failureReason,
@@ -806,7 +831,13 @@ export class WorkflowRunService {
     const stepNames = new Map(
       definition.steps.map((step) => [step.id, step.name]),
     );
-    this.assistantMessageIds.set(runId, crypto.randomUUID());
+    const storedMessage = await messageRepo.findWorkflowMessage(
+      input.chatId,
+      runId,
+    );
+    const assistantId = storedMessage?.id ?? workflowAssistantMessageId(runId);
+    this.assistantMessageIds.set(runId, assistantId);
+    publishWorkflowChunk(runId, { type: "start", messageId: assistantId });
     this.startedAt.set(runId, startedAt);
     const unsubscribe = engine.subscribe(runId, (event) =>
       this.handleEvent(runId, input, stepNames, event),
@@ -889,7 +920,7 @@ export class WorkflowRunService {
     const events = await (await this.getEngine()).getEvents(runId);
 
     for (const event of events) {
-      const handled = this.handledEventIds.get(runId) ?? new Set<string>();
+      const handled = getHandledEventIds(this.handledEventIds, runId);
       if (handled.has(event.id)) continue;
       const inFlight = this.processingEvents.get(event.id);
       if (inFlight) {
@@ -901,6 +932,7 @@ export class WorkflowRunService {
         publishWorkflowChunk(
           runId,
           event.payload as unknown as CustomUIMessageChunk,
+          event.id,
         );
         handled.add(event.id);
         this.handledEventIds.set(runId, handled);

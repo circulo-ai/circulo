@@ -4,6 +4,7 @@ import {
 } from "@/lib/artifacts/server";
 import type { ActorContext, ChatMessage } from "@/lib/types";
 import { generateUUID } from "@/lib/utils";
+import { artifactRepo } from "@/db/repositories";
 import { tool, type Tool, type UIMessageStreamWriter } from "ai";
 import { z } from "zod";
 
@@ -16,7 +17,11 @@ export const createDocument = ({
   session,
   dataStream,
 }: CreateDocumentProps): Tool<
-  { title: string; kind: (typeof artifactKinds)[number] },
+  {
+    title: string;
+    kind: (typeof artifactKinds)[number];
+    content?: string | null;
+  },
   {
     id: string;
     title: string;
@@ -26,12 +31,13 @@ export const createDocument = ({
 > =>
   tool({
     description:
-      "Create a document for a writing or content creation activities. This tool will call other functions that will generate the contents of the document based on the title and kind.",
+      "Create a saved document. Supply content to preserve the exact researched draft (Markdown for text, source for code, CSV for sheets); otherwise a draft is generated from the title. Read the saved document afterward to verify its contents.",
     inputSchema: z.object({
       title: z.string(),
       kind: z.enum(artifactKinds),
+      content: z.string().trim().min(1).max(200000).nullable().optional(),
     }),
-    execute: async ({ title, kind }) => {
+    execute: async ({ title, kind, content }) => {
       const id = generateUUID();
 
       dataStream.write({
@@ -67,12 +73,33 @@ export const createDocument = ({
         throw new Error(`No document handler found for kind: ${kind}`);
       }
 
-      await documentHandler.onCreateDocument({
-        id,
-        title,
-        dataStream,
-        session,
-      });
+      if (content) {
+        await artifactRepo.save({
+          id,
+          title,
+          kind,
+          content,
+          userId: session.userId,
+          chatId: session.chatId,
+        });
+        dataStream.write({
+          type:
+            kind === "code"
+              ? "data-codeDelta"
+              : kind === "sheet"
+                ? "data-sheetDelta"
+                : "data-textDelta",
+          data: content,
+          transient: true,
+        });
+      } else {
+        await documentHandler.onCreateDocument({
+          id,
+          title,
+          dataStream,
+          session,
+        });
+      }
 
       dataStream.write({ type: "data-finish", data: null, transient: true });
 

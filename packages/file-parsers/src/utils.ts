@@ -13,8 +13,7 @@ export function sanitizeTextForUTF8(text: string): string {
   return text
     .replace(/\0/g, "")
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
-    .replace(/\uFFFD/g, "")
-    .replace(/[\uD800-\uDFFF]/g, "");
+    .replace(/[\uD800-\uDFFF]/gu, "");
 }
 
 /**
@@ -34,7 +33,40 @@ export function hasInvalidUTF8Characters(text: string): boolean {
 
   return (
     /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(text) ||
-    /\uFFFD/.test(text) ||
-    /[\uD800-\uDFFF]/.test(text)
+    /[\uD800-\uDFFF]/u.test(text)
   );
+}
+
+/** Bound expanded JSON metadata, including YAML aliases, before database serialization. */
+export function validateStructuredData(value: unknown) {
+  const ancestors = new WeakSet<object>();
+  const stack = [{ value, depth: 0, exit: false }];
+  let nodes = 0;
+  let characters = 0;
+  while (stack.length) {
+    const entry = stack.pop()!;
+    if (entry.exit && entry.value && typeof entry.value === "object") {
+      ancestors.delete(entry.value);
+      continue;
+    }
+    if (++nodes > 100000 || entry.depth > 100)
+      throw new Error(
+        "Structured document is too complex; split or flatten it",
+      );
+    if (typeof entry.value === "string") characters += entry.value.length;
+    if (characters > 2000000)
+      throw new Error(
+        "Expanded document metadata is too large; flatten aliases or split it",
+      );
+    if (entry.value && typeof entry.value === "object") {
+      if (ancestors.has(entry.value))
+        throw new Error(
+          "Cyclic document aliases cannot be stored; flatten them first",
+        );
+      ancestors.add(entry.value);
+      stack.push({ ...entry, exit: true });
+      for (const child of Object.values(entry.value))
+        stack.push({ value: child, depth: entry.depth + 1, exit: false });
+    }
+  }
 }

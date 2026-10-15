@@ -4,7 +4,14 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { cn } from "@/lib/utils";
-import { Archive, ArchiveRestore, Pin, PinOff, Trash2 } from "lucide-react";
+import {
+  Archive,
+  ArchiveRestore,
+  Copy,
+  Pin,
+  PinOff,
+  Trash2,
+} from "lucide-react";
 import { type ComponentProps, forwardRef } from "react";
 import {
   Sidebar,
@@ -182,6 +189,7 @@ interface CustomSidebarContextMenuProps extends ComponentProps<
   isArchived?: boolean;
   onArchiveChange?: (isArchived: boolean) => void;
   onDelete?: () => void;
+  onCopyId?: () => void;
 }
 
 export function CustomSidebarContextMenu({
@@ -190,6 +198,7 @@ export function CustomSidebarContextMenu({
   isArchived = false,
   onArchiveChange,
   onDelete,
+  onCopyId,
   children,
   ...props
 }: CustomSidebarContextMenuProps) {
@@ -226,10 +235,14 @@ export function CustomSidebarContextMenu({
             </CustomContextMenuItem>
           </>
         )}
-        <ContextMenuSeparator />
-        <CustomContextMenuItem disabled inset>
-          More features soon...
-        </CustomContextMenuItem>
+        {onCopyId && (
+          <>
+            <ContextMenuSeparator />
+            <CustomContextMenuItem onClick={onCopyId}>
+              <Copy /> Copy ID
+            </CustomContextMenuItem>
+          </>
+        )}
       </CustomContextMenuContent>
     </ContextMenu>
   );

@@ -75,6 +75,7 @@ const displayName = (type: string) => {
   if (type === "dynamic-tool") return "Tool";
   return type
     .replace(/^tool-/, "")
+    .replace(/^mcp_[a-f0-9_]{36}_/, "")
     .replace(/[-_]/g, " ")
     .replace(/([a-z])([A-Z])/g, "$1 $2");
 };
@@ -210,7 +211,13 @@ export function ToolCallPart({
   part: ToolPart;
 }) {
   const name = part.type.replace(/^tool-/, "");
-  const state = toolState(part.state);
+  const value = unwrapToolOutput(part.output) as
+    | { status?: unknown; approvalId?: unknown }
+    | undefined;
+  const state =
+    value?.status === "pending" && value.approvalId
+      ? "approval-requested"
+      : toolState(part.state);
   const failure = getErrorText(part);
   const resolvedState =
     failure && state !== "approval-requested" && state !== "output-denied"
@@ -243,7 +250,12 @@ export function ToolCallPart({
     <Tool
       className={cn("bg-background/60", failure && "border-destructive/40")}
       defaultOpen={
-        resolvedState === "output-error" || resolvedState === "output-denied"
+        ![
+          "updateExecutionPlan",
+          "reportTaskProgress",
+          "readExecutionEvidence",
+        ].includes(name) &&
+        (resolvedState === "output-error" || resolvedState === "output-denied")
       }
     >
       <ToolHeader

@@ -1,5 +1,11 @@
 import type { ChatMessage } from "@/lib/types";
-import { parseBuffer } from "@circulo-ai/file-parsers";
+import { createLogger } from "@/lib/logs/console/logger";
+import {
+  parseBuffer,
+  SUPPORTED_FILE_EXTENSIONS,
+  TEXT_FILE_EXTENSIONS,
+} from "@circulo-ai/file-parsers";
+import { expandComposerCommand } from "@circulo-ai/types";
 
 const MAX_ATTACHMENT_BYTES_TO_PARSE = 16 * 1024 * 1024;
 const MAX_ATTACHMENT_CONTEXT_CHARACTERS = 40_000;
@@ -9,34 +15,9 @@ const MAX_INLINE_IMAGES = 4;
 
 type MessagePart = Record<string, unknown> & { type?: unknown };
 
-const PARSABLE_EXTENSIONS = new Set([
-  "pdf",
-  "csv",
-  "doc",
-  "docx",
-  "txt",
-  "md",
-  "xlsx",
-  "xls",
-  "html",
-  "htm",
-  "pptx",
-  "ppt",
-  "json",
-  "yaml",
-  "yml",
-]);
-
-const TEXT_EXTENSIONS = new Set([
-  "csv",
-  "html",
-  "htm",
-  "json",
-  "md",
-  "txt",
-  "yaml",
-  "yml",
-]);
+const PARSABLE_EXTENSIONS = new Set<string>(SUPPORTED_FILE_EXTENSIONS);
+const TEXT_EXTENSIONS = new Set<string>(TEXT_FILE_EXTENSIONS);
+const logger = createLogger("AttachmentContext");
 
 function stringValue(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
@@ -60,9 +41,9 @@ function getExtension(fileName: string, mediaType: string): string | undefined {
 
   const mediaTypeExtension: Record<string, string> = {
     "application/pdf": "pdf",
-    "application/rtf": "doc",
+
     "application/vnd.ms-excel": "xls",
-    "application/vnd.ms-powerpoint": "ppt",
+
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation":
       "pptx",
@@ -117,8 +98,9 @@ async function getChatStorageKey(value: string): Promise<string | undefined> {
       const token = parsed.searchParams.get("token");
       if (!token) return undefined;
 
-      const { verifyFileAccessToken } =
-        await import("@/lib/storage/file-access-token");
+      const { verifyFileAccessToken } = await import(
+        "@/lib/storage/file-access-token"
+      );
       const context = parsed.searchParams.get("context") ?? "general";
       if (context !== "chat") return undefined;
       return verifyFileAccessToken(key, context, token) ? key : undefined;
@@ -156,6 +138,17 @@ async function loadAttachmentBuffer(
   return undefined;
 }
 
+/** Full extracted text for paginated reads of an already authorized chat file.
+ * Remote URLs are never fetched here; only inline data or signed local storage. */
+export async function readAttachmentText(part: MessagePart): Promise<string> {
+  const buffer = await loadAttachmentBuffer(part);
+  if (!buffer) throw new Error("This attachment is not available from local authorized storage.");
+  if (buffer.length > MAX_ATTACHMENT_BYTES_TO_PARSE) throw new Error("This attachment exceeds the text extraction limit.");
+  const extension = getExtension(getFileName(part), getMediaType(part));
+  if (!extension || !PARSABLE_EXTENSIONS.has(extension)) throw new Error("This format does not support text extraction. Use its media content or a transcript.");
+  return (await parseBuffer(buffer, extension)).content;
+}
+
 function toDataUrl(mediaType: string, buffer: Buffer): string {
   return `data:${mediaType};base64,${buffer.toString("base64")}`;
 }
@@ -171,10 +164,12 @@ function asTextAttachment(
     type: "text",
     text: [
       `[Attached file: ${fileName}]`,
+      "Extracted text (this file has already been read; use the supplied text below):",
       boundedContent,
       ...(truncated
         ? ["[Attachment content truncated for context limits]"]
         : []),
+      "[End of extracted file text]",
     ].join("\n"),
   };
 }
@@ -222,6 +217,10 @@ async function normalizeFilePart(
   if (extension && PARSABLE_EXTENSIONS.has(extension)) {
     try {
       const parsed = await parseBuffer(buffer, extension);
+      logger.debug("Document extraction completed", {
+        extension,
+        characters: parsed.content.length,
+      });
       if (parsed.content.trim()) {
         const maxCharacters = Math.min(
           MAX_ATTACHMENT_CONTEXT_CHARACTERS,
@@ -239,8 +238,18 @@ async function normalizeFilePart(
         );
         return asTextAttachment(fileName, parsed.content, maxCharacters);
       }
-    } catch {
-      // Preserve the file as a data URL when a parser is unavailable or fails.
+    } catch (error) {
+      logger.warn("Document extraction failed", {
+        extension,
+        error:
+          error instanceof Error
+            ? error.message
+            : "unsupported or invalid file",
+      });
+      return {
+        type: "text",
+        text: `[Attached file: ${fileName} could not be parsed: ${error instanceof Error ? error.message : "unsupported or invalid file"}. Do not infer its contents.]`,
+      };
     }
   }
 
@@ -307,12 +316,53 @@ export async function normalizeAttachmentContext(
     const normalizedParts: MessagePart[] = [];
     for (const part of parts) {
       normalizedParts.push(
-        part.type === "file" ? await normalizeFilePart(part, budget) : part,
+        part.type === "file"
+          ? await normalizeFilePart(part, budget)
+          : part.type === "text" &&
+              typeof part.text === "string" &&
+              message.role === "user"
+            ? { ...part, text: expandComposerCommand(part.text) }
+            : part,
+      );
+    }
+    if (
+      message.role === "user" &&
+      normalizedParts.every((part) => part.type === "text")
+    ) {
+      // Put the user's request before supplied source text so instructions are
+      // clearly separate from the attachment's extracted data.
+      const sourceParts = normalizedParts.filter(
+        (part) =>
+          typeof part.text === "string" &&
+          part.text.startsWith("[Attached file:"),
+      );
+      const requestParts = normalizedParts.filter(
+        (part) => !sourceParts.includes(part),
+      );
+      normalizedParts.splice(
+        0,
+        normalizedParts.length,
+        ...requestParts,
+        ...sourceParts,
       );
     }
     normalizedMessages.push({
       ...message,
-      parts: normalizedParts as unknown as ChatMessage["parts"],
+      // Keep extracted passages and the request in one text block when there
+      // is no binary content, using the simplest text-only provider payload.
+      parts: (normalizedParts.every(
+        (part) =>
+          part.type === "text" &&
+          typeof part.text === "string" &&
+          !part.providerOptions,
+      )
+        ? [
+            {
+              type: "text",
+              text: normalizedParts.map((part) => part.text).join("\n\n"),
+            },
+          ]
+        : normalizedParts) as unknown as ChatMessage["parts"],
     });
   }
 

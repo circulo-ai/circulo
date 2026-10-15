@@ -1,30 +1,27 @@
+"use client";
+
+import { latestWorkflowTrace } from "@/lib/chat-streaming";
+
 import {
   Conversation,
   ConversationContent,
+  ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
-import { useDataStream } from "@/components/data-stream-provider";
 import { Greeting } from "@/components/greeting";
-import type { ChatMessagePagination } from "@/hooks/api/chats/use-message-pagination";
-import { useMessagePagination } from "@/hooks/api/chats/use-message-pagination";
-import { useMessages } from "@/hooks/api/chats/use-messages";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  useMessagePagination,
+  type ChatMessagePagination,
+} from "@/hooks/api/chats/use-message-pagination";
 import type { ChatMessage } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import type { UseChatHelpers } from "@ai-sdk/react";
 import type { Vote } from "@circulo-ai/db/schema";
-import equal from "fast-deep-equal";
-import { AnimatePresence } from "framer-motion";
-import { ArrowDownIcon, Loader2 } from "lucide-react";
-import { memo, useCallback, useEffect } from "react";
+import { useReducedMotion } from "framer-motion";
+import { memo, useEffect, useMemo } from "react";
+import { useStickToBottomContext } from "use-stick-to-bottom";
 import { PreviewMessage, ThinkingMessage } from "./message";
-
-function ActivityDots() {
-  return (
-    <span aria-hidden="true" className="flex items-end gap-0.5">
-      <span className="size-1.5 rounded-full bg-current [animation-delay:-0.2s] motion-safe:animate-pulse" />
-      <span className="size-1.5 rounded-full bg-current [animation-delay:-0.1s] motion-safe:animate-pulse" />
-      <span className="size-1.5 rounded-full bg-current motion-safe:animate-pulse" />
-    </span>
-  );
-}
 
 type MessagesProps = {
   chatId: string;
@@ -37,7 +34,60 @@ type MessagesProps = {
   isReadonly: boolean;
   isArtifactVisible: boolean;
   canEditMessages: boolean;
+  compact?: boolean;
 };
+
+function TranscriptControls({
+  status,
+  hasMore,
+  isLoadingOlder,
+  loadOlderMessages,
+  reducedMotion,
+}: {
+  status: MessagesProps["status"];
+  hasMore: boolean;
+  isLoadingOlder: boolean;
+  loadOlderMessages: (container: HTMLDivElement | null) => Promise<void>;
+  reducedMotion: boolean;
+}) {
+  const { scrollRef, scrollToBottom } = useStickToBottomContext();
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!(container instanceof HTMLDivElement)) return;
+    const loadAtTop = () => {
+      if (
+        container.scrollHeight > container.clientHeight &&
+        container.scrollTop <= 64
+      ) {
+        void loadOlderMessages(container);
+      }
+    };
+    container.addEventListener("scroll", loadAtTop, { passive: true });
+    return () => container.removeEventListener("scroll", loadAtTop);
+  }, [scrollRef, loadOlderMessages]);
+
+  useEffect(() => {
+    if (status === "submitted")
+      void scrollToBottom({ animation: reducedMotion ? "instant" : "smooth" });
+  }, [status, reducedMotion, scrollToBottom]);
+
+  if (!hasMore) return null;
+  return (
+    <div className="flex justify-center">
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled={isLoadingOlder}
+        onClick={() =>
+          void loadOlderMessages(scrollRef.current as HTMLDivElement | null)
+        }
+      >
+        {isLoadingOlder && <Spinner data-icon="inline-start" />}
+        {isLoadingOlder ? "Loading older messages…" : "Load older messages"}
+      </Button>
+    </div>
+  );
+}
 
 function PureMessages({
   chatId,
@@ -49,137 +99,76 @@ function PureMessages({
   sendMessage,
   isReadonly,
   canEditMessages,
+  compact = false,
 }: MessagesProps) {
-  const {
-    containerRef: messagesContainerRef,
-    endRef: messagesEndRef,
-    isAtBottom,
-    scrollToBottom,
-    hasSentMessage,
-  } = useMessages({
-    initialScrollToBottom: true,
-    storageKey: `chat-scroll:${chatId}:main`,
-    status,
-  });
-
-  const { isLoadingOlder, loadOlderMessages } = useMessagePagination({
+  const reducedMotion = Boolean(useReducedMotion());
+  const { hasMore, isLoadingOlder, loadOlderMessages } = useMessagePagination({
     chatId,
     initialPagination: initialMessagePagination,
     setMessages,
   });
-  const isActivityInProgress = status === "submitted" || status === "streaming";
-
-  const handleMessagesScroll = useCallback(
-    (event: React.UIEvent<HTMLDivElement>) => {
-      const container = event.currentTarget;
-      if (container.scrollTop <= 64) {
-        void loadOlderMessages(container);
-      }
-    },
-    [loadOlderMessages],
+  const votesByMessage = useMemo(
+    () => new Map(votes?.map((vote) => [vote.messageId, vote])),
+    [votes],
   );
 
-  useDataStream();
-
-  useEffect(() => {
-    if (status === "submitted") {
-      requestAnimationFrame(() => scrollToBottom("smooth"));
-    }
-  }, [scrollToBottom, status]);
-
+  const awaitingApproval =
+    latestWorkflowTrace(messages.at(-1)?.parts ?? [])?.status === "paused";
   return (
-    <div className="relative min-h-0 flex-1">
-      <div
-        className="overscroll-behavior-contain chat-scrollbar size-full touch-pan-y overflow-x-hidden overflow-y-auto [-webkit-overflow-scrolling:touch]"
-        onScroll={handleMessagesScroll}
-        ref={messagesContainerRef}
-        style={{ overflowAnchor: "none" }}
-      >
-        {isLoadingOlder && (
-          <div className="pointer-events-none absolute top-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full border bg-background/90 px-3 py-1.5 text-xs text-muted-foreground shadow-sm">
-            <Loader2 className="size-3.5 animate-spin" />
-            <span>Loading older messages</span>
-          </div>
+    <Conversation
+      key={chatId}
+      className="h-full min-h-0 [&>div]:chat-scrollbar [&>div]:overflow-x-hidden [&>div]:overflow-y-auto [&>div]:overscroll-contain"
+      initial="instant"
+      resize={reducedMotion ? "instant" : "smooth"}
+      aria-label="Chat messages"
+    >
+      <ConversationContent
+        className={cn(
+          "mx-auto max-w-4xl min-w-0 gap-4 px-2 pt-16 pb-4 md:gap-6 md:px-4 md:pt-20",
+          compact && "gap-4 px-3 pt-4 md:gap-4 md:pt-4",
         )}
-
-        <Conversation className="mx-auto flex max-w-4xl min-w-0 flex-col gap-4 md:gap-6">
-          <ConversationContent className="flex flex-col gap-4 px-2 pt-16 pb-4 md:gap-6 md:px-4 md:pt-20">
-            {messages.length === 0 && <Greeting />}
-
-            {messages.map((message, index) => (
-              <PreviewMessage
-                key={message.id + index}
-                chatId={chatId}
-                canEdit={canEditMessages}
-                isLoading={
-                  status === "streaming" && messages.length - 1 === index
-                }
-                isReadonly={isReadonly}
-                message={message}
-                sendMessage={sendMessage}
-                requiresScrollPadding={
-                  hasSentMessage && index === messages.length - 1
-                }
-                setMessages={setMessages}
-                vote={
-                  votes
-                    ? votes.find((vote) => vote.messageId === message.id)
-                    : undefined
-                }
-              />
-            ))}
-
-            <AnimatePresence mode="wait">
-              {status === "submitted" && <ThinkingMessage key="thinking" />}
-            </AnimatePresence>
-
-            <div className="min-h-6 min-w-6 shrink-0" ref={messagesEndRef} />
-          </ConversationContent>
-        </Conversation>
-      </div>
-
-      {!isAtBottom && (
-        <button
-          aria-label={
-            isActivityInProgress
-              ? "Scroll to latest activity"
-              : "Scroll to bottom"
-          }
-          className="absolute bottom-4 left-1/2 z-20 flex size-9 -translate-x-1/2 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-lg transition-colors hover:bg-muted"
-          onClick={() => scrollToBottom("smooth")}
-          type="button"
-        >
-          {isActivityInProgress ? (
-            <ActivityDots />
-          ) : (
-            <ArrowDownIcon className="size-4" />
-          )}
-        </button>
-      )}
-    </div>
+      >
+        <TranscriptControls
+          status={status}
+          hasMore={hasMore}
+          isLoadingOlder={isLoadingOlder}
+          loadOlderMessages={loadOlderMessages}
+          reducedMotion={reducedMotion}
+        />
+        {messages.length === 0 && <Greeting />}
+        {messages.map((message, index) => (
+          <PreviewMessage
+            key={message.id}
+            chatId={chatId}
+            canEdit={canEditMessages}
+            isLoading={
+              !awaitingApproval &&
+              status === "streaming" &&
+              index === messages.length - 1
+            }
+            isReadonly={isReadonly}
+            message={message}
+            sendMessage={sendMessage}
+            requiresScrollPadding={false}
+            setMessages={setMessages}
+            vote={votesByMessage.get(message.id)}
+          />
+        ))}
+        {status === "submitted" && <ThinkingMessage />}
+        {status === "streaming" && (
+          <output className="flex items-center gap-2 text-xs text-muted-foreground">
+            {!awaitingApproval && <Spinner />}
+            {awaitingApproval ? "Waiting for approval" : "Responding…"}
+          </output>
+        )}
+      </ConversationContent>
+      <ConversationScrollButton
+        aria-label="Jump to latest message"
+        title="Jump to latest message"
+      />
+    </Conversation>
   );
 }
 
-export const Messages = memo(PureMessages, (prevProps, nextProps) => {
-  if (prevProps.status !== nextProps.status) {
-    return false;
-  }
-  if (prevProps.chatId !== nextProps.chatId) {
-    return false;
-  }
-  if (prevProps.messages.length !== nextProps.messages.length) {
-    return false;
-  }
-  if (!equal(prevProps.messages, nextProps.messages)) {
-    return false;
-  }
-  if (!equal(prevProps.votes, nextProps.votes)) {
-    return false;
-  }
-
-  return (
-    prevProps.isReadonly === nextProps.isReadonly &&
-    prevProps.canEditMessages === nextProps.canEditMessages &&
-    prevProps.isArtifactVisible === nextProps.isArtifactVisible
-  );
-});
+// Message snapshots are immutable SDK updates. Avoid traversing the whole transcript on every token.
+export const Messages = memo(PureMessages);

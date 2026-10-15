@@ -204,8 +204,11 @@ router.get(
       return parts.flatMap((part, index) => {
         if (!isRecord(part) || (part.type !== "file" && !part.url)) return [];
 
-        const url = stringValue(part.url);
-        const name = stringValue(part.name) ?? `Shared file ${index + 1}`;
+        const url = stringValue(part.downloadUrl) ?? stringValue(part.url);
+        const name =
+          stringValue(part.filename) ??
+          stringValue(part.name) ??
+          `Shared file ${index + 1}`;
         const mediaType =
           stringValue(part.mediaType) ??
           stringValue(part.contentType) ??

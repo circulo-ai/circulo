@@ -1,123 +1,56 @@
-import { db, humanApproval, message, scheduledTask, workflowRun } from "@/db";
-import { chatMemberRepo } from "@/db/repositories";
+import { db, humanApproval, scheduledTask } from "@/db";
 import { createLogger } from "@/lib/logs/console/logger";
-import { calculateNextRun } from "@/services/scheduling";
 import { workflowRunService } from "@/workflows/runtime/workflow-run-service";
-import { and, eq, lte } from "drizzle-orm";
+import { and, asc, eq, lte, or, sql } from "drizzle-orm";
+import { dispatchScheduledTask } from "./scheduled-dispatch";
 
 const logger = createLogger("Scheduler");
-
 const SCHEDULER_KEY = Symbol.for("circulo.scheduler");
 const schedulerState = globalThis as unknown as {
   [SCHEDULER_KEY]?: ReturnType<typeof setInterval>;
 };
 let databaseRetryAt = 0;
+let ticking = false;
 
-async function runTask(task: typeof scheduledTask.$inferSelect) {
-  const now = new Date();
-  if (
-    !task.chatId ||
-    !(await chatMemberRepo.isMember(task.createdBy, task.chatId))
-  ) {
-    await db
-      .update(scheduledTask)
-      .set({
-        status: "paused",
-        metadata: {
-          ...task.metadata,
-          pausedReason: "The associated chat is unavailable to the task owner.",
-        },
-        updatedAt: now,
-      })
-      .where(eq(scheduledTask.id, task.id));
-    return;
-  }
-  const next = calculateNextRun(task, now);
-  const [claimed] = await db
-    .update(scheduledTask)
-    .set({
-      lastRunAt: now,
-      nextRunAt: next,
-      status: next ? "active" : "completed",
-      updatedAt: now,
-    })
-    .where(
-      and(
-        eq(scheduledTask.id, task.id),
-        eq(scheduledTask.status, "active"),
-        eq(scheduledTask.chatId, task.chatId),
-        lte(scheduledTask.nextRunAt, now),
-      ),
-    )
-    .returning();
-  if (!claimed) return;
-
-  const messageId = crypto.randomUUID();
-  await db.insert(message).values({
-    id: messageId,
-    chatId: task.chatId!,
-    authorType: "user",
-    authorId: task.createdBy,
-    role: "user",
-    content: task.prompt,
-    parts: [{ type: "text", text: task.prompt }],
-    attachments: [],
-  });
-
-  const run = await workflowRunService.start({
-    chatId: task.chatId!,
-    messages: [
-      {
-        id: messageId,
-        role: "user",
-        parts: [{ type: "text", text: task.prompt }],
-      },
-    ],
-    triggerType: "user_message",
-    actor: { userId: task.createdBy, organizationId: task.organizationId },
-  });
-  await db.insert(workflowRun).values({
-    id: run.runId,
-    chatId: task.chatId!,
-    userId: task.createdBy,
-    organizationId: task.organizationId,
-  });
-  void workflowRunService.run(run.runId).catch((error: unknown) => {
-    logger.error("[Scheduler] workflow failed", { runId: run.runId, error });
-  });
-}
-
-async function tick() {
-  if (Date.now() < databaseRetryAt) return;
-
-  let due: (typeof scheduledTask.$inferSelect)[];
+export async function tickScheduler() {
+  if (ticking || Date.now() < databaseRetryAt) return;
+  ticking = true;
   try {
     await expirePendingApprovals();
-    due = await db.query.scheduledTask.findMany({
-      where: and(
-        eq(scheduledTask.status, "active"),
-        lte(scheduledTask.nextRunAt, new Date()),
+    const due = await db.query.scheduledTask.findMany({
+      where: or(
+        and(
+          eq(scheduledTask.status, "active"),
+          lte(scheduledTask.nextRunAt, new Date()),
+        ),
+        and(
+          sql`${scheduledTask.status} in ('active', 'completed')`,
+          sql`${scheduledTask.metadata}->'_execution'->'pending' is not null`,
+        ),
       ),
+      orderBy: asc(scheduledTask.nextRunAt),
       limit: 20,
     });
     databaseRetryAt = 0;
+    for (const task of due) {
+      try {
+        await dispatchScheduledTask(task.id);
+      } catch (error) {
+        logger.error("Task dispatch failed; durable intent will be retried", {
+          taskId: task.id,
+          error: error instanceof Error ? error.message : "Dispatch failed",
+        });
+        databaseRetryAt = Date.now() + 30_000;
+      }
+    }
   } catch (error) {
     databaseRetryAt = Date.now() + 30_000;
     logger.error(
-      "[Scheduler] database unavailable; retrying in 30 seconds",
+      "Database unavailable; retrying in 30 seconds",
       error instanceof Error ? error.message : String(error),
     );
-    return;
-  }
-  for (const task of due) {
-    if (!task.chatId) continue;
-    await runTask(task).catch(async (error) => {
-      logger.error("[Scheduler] task failed", { taskId: task.id, error });
-      await db
-        .update(scheduledTask)
-        .set({ status: "failed", updatedAt: new Date() })
-        .where(eq(scheduledTask.id, task.id));
-    });
+  } finally {
+    ticking = false;
   }
 }
 
@@ -133,42 +66,31 @@ async function expirePendingApprovals(): Promise<void> {
       ),
     )
     .returning({ workflowRunId: humanApproval.workflowRunId });
-
-  await Promise.all(
+  for (const runId of new Set(
     expired
-      .map((approval) => approval.workflowRunId)
-      .filter((workflowRunId): workflowRunId is string =>
-        Boolean(workflowRunId),
-      )
-      .map((workflowRunId) =>
-        workflowRunService.resume(workflowRunId).catch((error: unknown) => {
-          logger.error("[Scheduler] failed to resume expired approval", {
-            workflowRunId,
-            error,
-          });
-        }),
-      ),
-  );
+      .map((row) => row.workflowRunId)
+      .filter((id): id is string => Boolean(id)),
+  )) {
+    await workflowRunService
+      .resume(runId)
+      .catch((error) =>
+        logger.error("Could not resume expired approval", { runId, error }),
+      );
+  }
 }
 
 export function startScheduler(): () => void {
-  if (schedulerState[SCHEDULER_KEY]) {
-    return () => stopScheduler();
-  }
-  void tick().catch((error) =>
-    logger.error("[Scheduler] initial tick failed", error),
-  );
-  schedulerState[SCHEDULER_KEY] = setInterval(() => {
-    void tick().catch((error) =>
-      logger.error("[Scheduler] tick failed", error),
+  if (!schedulerState[SCHEDULER_KEY]) {
+    void tickScheduler();
+    schedulerState[SCHEDULER_KEY] = setInterval(
+      () => void tickScheduler(),
+      15_000,
     );
-  }, 15_000);
-  return () => stopScheduler();
+  }
+  return stopScheduler;
 }
-
 export function stopScheduler(): void {
   const interval = schedulerState[SCHEDULER_KEY];
-  if (!interval) return;
-  clearInterval(interval);
+  if (interval) clearInterval(interval);
   schedulerState[SCHEDULER_KEY] = undefined;
 }

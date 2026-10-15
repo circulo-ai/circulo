@@ -166,7 +166,13 @@ const PurePreviewMessage = ({
                       })}
                       data-testid="message-content"
                     >
-                      <Response>{sanitizeText(part.text)}</Response>
+                      <Response
+                        mode={isLoading ? "streaming" : "static"}
+                        isAnimating={isLoading}
+                        parseIncompleteMarkdown={isLoading}
+                      >
+                        {sanitizeText(part.text)}
+                      </Response>
                     </MessageContent>
                   </div>
                 );

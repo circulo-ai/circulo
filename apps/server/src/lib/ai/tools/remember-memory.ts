@@ -1,5 +1,8 @@
 import { db, memory, memoryHistory, memoryPreference } from "@/db";
-import { createMemoryEmbedding } from "@/lib/memory/retrieval";
+import {
+  createMemoryEmbedding,
+  writeMemoryWithEmbedding,
+} from "@/lib/memory/retrieval";
 import type { ActorContext, ChatMessage } from "@/lib/types";
 import type { Tool, UIMessageStreamWriter } from "ai";
 import { tool } from "ai";
@@ -20,11 +23,12 @@ export function rememberMemory(params: {
       importance: z.number().int().min(0).max(100).default(60),
     }),
     execute: async (input) => {
-      if (!params.session.organizationId)
+      const organizationId = params.session.organizationId;
+      if (!organizationId)
         throw new Error("An organization is required for personal memory");
       const preference = await db.query.memoryPreference.findFirst({
         where: and(
-          eq(memoryPreference.organizationId, params.session.organizationId),
+          eq(memoryPreference.organizationId, organizationId),
           eq(memoryPreference.userId, params.session.userId),
         ),
       });
@@ -35,76 +39,81 @@ export function rememberMemory(params: {
         };
       }
 
-      const existing = await db.query.memory.findFirst({
-        where: and(
-          eq(memory.organizationId, params.session.organizationId),
-          eq(memory.scope, "user"),
-          eq(memory.userId, params.session.userId),
-          eq(memory.key, input.key),
-        ),
-      });
       const embedding = await createMemoryEmbedding({
         key: input.key,
         content: input.content,
         userId: params.session.userId,
+        organizationId: organizationId,
       });
-      if (existing) {
-        await db.insert(memoryHistory).values({
-          memoryId: existing.id,
-          organizationId: existing.organizationId,
-          userId: existing.userId ?? existing.createdBy,
-          key: existing.key,
-          content: existing.content,
-          metadata: existing.metadata,
-          importance: existing.importance,
-        });
-      }
-      const [saved] = existing
-        ? await db
-            .update(memory)
-            .set({
-              content: input.content,
-              importance: input.importance,
-              embedding: embedding?.embedding ?? null,
-              embeddingModel: embedding?.model ?? null,
-              embeddingUpdatedAt: embedding ? new Date() : null,
-              sourceType: "chat",
-              sourceId: params.chatId,
-              updatedAt: new Date(),
-            })
-            .where(eq(memory.id, existing.id))
-            .returning()
-        : await db
-            .insert(memory)
-            .values({
-              organizationId: params.session.organizationId,
-              userId: params.session.userId,
-              chatId: null,
-              agentId: null,
-              createdBy: params.session.userId,
-              scope: "user",
-              key: input.key,
-              content: input.content,
-              embedding: embedding?.embedding ?? null,
-              embeddingModel: embedding?.model ?? null,
-              embeddingUpdatedAt: embedding ? new Date() : null,
-              importance: input.importance,
-              sourceType: "chat",
-              sourceId: params.chatId,
-            })
-            .returning();
+      const { row: saved } = await writeMemoryWithEmbedding(
+        organizationId,
+        embedding,
+        async (tx, embeddingFields) => {
+          const current = await tx.query.memory.findFirst({
+            where: and(
+              eq(memory.organizationId, organizationId!),
+              eq(memory.scope, "user"),
+              eq(memory.userId, params.session.userId),
+              eq(memory.key, input.key),
+            ),
+          });
+          if (current)
+            await tx
+              .insert(memoryHistory)
+              .values({
+                memoryId: current.id,
+                organizationId: current.organizationId,
+                userId: current.userId ?? current.createdBy,
+                key: current.key,
+                content: current.content,
+                metadata: current.metadata,
+                importance: current.importance,
+              });
+          const [saved] = current
+            ? await tx
+                .update(memory)
+                .set({
+                  content: input.content,
+                  importance: input.importance,
+                  ...embeddingFields,
+                  sourceType: "chat",
+                  sourceId: params.chatId,
+                  updatedAt: new Date(),
+                })
+                .where(eq(memory.id, current.id))
+                .returning()
+            : await tx
+                .insert(memory)
+                .values({
+                  organizationId: organizationId,
+                  userId: params.session.userId,
+                  chatId: null,
+                  agentId: null,
+                  createdBy: params.session.userId,
+                  scope: "user",
+                  key: input.key,
+                  content: input.content,
+                  ...embeddingFields,
+                  importance: input.importance,
+                  sourceType: "chat",
+                  sourceId: params.chatId,
+                })
+                .returning();
+          return saved;
+        },
+      );
       if (!saved) throw new Error("Unable to save personal memory");
       if (preference?.automaticManagementEnabled !== false) {
         await db
           .insert(memoryPreference)
           .values({
-            organizationId: params.session.organizationId,
+            organizationId: organizationId,
             userId: params.session.userId,
           })
           .onConflictDoNothing();
         const memories = await db.query.memory.findMany({
           where: and(
-            eq(memory.organizationId, params.session.organizationId),
+            eq(memory.organizationId, organizationId),
             eq(memory.scope, "user"),
             eq(memory.userId, params.session.userId),
           ),
@@ -122,10 +131,7 @@ export function rememberMemory(params: {
           })
           .where(
             and(
-              eq(
-                memoryPreference.organizationId,
-                params.session.organizationId,
-              ),
+              eq(memoryPreference.organizationId, organizationId),
               eq(memoryPreference.userId, params.session.userId),
             ),
           );

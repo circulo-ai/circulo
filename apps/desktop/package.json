@@ -17,6 +17,7 @@
     "appId": "ai.circulo.desktop",
     "productName": "Circulo",
     "asar": true,
+    "afterPack": "scripts/verify-runtime.cjs",
     "directories": {
       "output": "dist"
     },
@@ -28,6 +29,10 @@
       {
         "from": "runtime-build/server",
         "to": "runtime/server"
+      },
+      {
+        "from": "runtime-build/server/node_modules",
+        "to": "runtime/server/node_modules"
       },
       {
         "from": "runtime-build/web",

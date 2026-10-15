@@ -1,3 +1,4 @@
+import type { EmbeddingPreferences } from "@circulo-ai/types";
 import { relations, sql } from "drizzle-orm";
 import {
   boolean,
@@ -289,3 +290,54 @@ export type KnowledgeDocument = typeof knowledgeDocument.$inferSelect;
 export type Memory = typeof memory.$inferSelect;
 export type MemoryPreference = typeof memoryPreference.$inferSelect;
 export type MemoryHistory = typeof memoryHistory.$inferSelect;
+
+export const embeddingPreference = pgTable("embedding_preferences", {
+  organizationId: text("organization_id")
+    .primaryKey()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  config: jsonb("config").$type<EmbeddingPreferences>().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const embeddingChunk = pgTable(
+  "embedding_chunks",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    documentId: uuid("document_id").references(() => knowledgeDocument.id, {
+      onDelete: "cascade",
+    }),
+    memoryId: uuid("memory_id").references(() => memory.id, {
+      onDelete: "cascade",
+    }),
+    ordinal: integer("ordinal").notNull(),
+    content: text("content").notNull(),
+    model: text("model").notNull(),
+    embedding: vector("embedding", { dimensions: 1536 }).notNull(),
+  },
+  (t) => [
+    index("embedding_chunks_document_idx").on(t.documentId),
+    index("embedding_chunks_memory_idx").on(t.memoryId),
+    index("embedding_chunks_org_model_idx").on(t.organizationId, t.model),
+    index("embedding_chunks_vector_idx").using(
+      "hnsw",
+      t.embedding.op("vector_cosine_ops"),
+    ),
+    uniqueIndex("embedding_chunks_document_ordinal_idx").on(
+      t.documentId,
+      t.ordinal,
+    ),
+    uniqueIndex("embedding_chunks_memory_ordinal_idx").on(
+      t.memoryId,
+      t.ordinal,
+    ),
+    check(
+      "embedding_chunks_target_check",
+      sql`(${t.documentId} IS NOT NULL AND ${t.memoryId} IS NULL) OR (${t.memoryId} IS NOT NULL AND ${t.documentId} IS NULL)`,
+    ),
+  ],
+);

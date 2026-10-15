@@ -35,7 +35,12 @@ export async function createHumanApprovalRequest(params: {
       requestedBy: params.session.userId,
       title: params.title,
       description: params.description,
-      requestedAction: params.requestedAction,
+      requestedAction: {
+        ...params.requestedAction,
+        executionResult: undefined,
+        apiKeyPermissions: params.session.apiKeyPermissions ?? null,
+        apiKeyId: params.session.apiKeyId ?? null,
+      },
       approverUserId: params.approverUserId,
       expiresAt: params.expiresAt,
     })

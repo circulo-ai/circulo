@@ -73,7 +73,7 @@ function PureEditor({
       }
     };
     // NOTE: we only want to run this effect once
-  }, [content]);
+  }, []);
 
   useEffect(() => {
     if (editorRef.current) {
@@ -90,7 +90,7 @@ function PureEditor({
   }, [onSaveContent]);
 
   useEffect(() => {
-    if (editorRef.current && content) {
+    if (editorRef.current) {
       const currentContent = buildContentFromDocument(
         editorRef.current.state.doc,
       );

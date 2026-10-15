@@ -2,6 +2,18 @@
 
 import { RequireSession } from "@/components/auth/require-session";
 import { AutomationWebhooks } from "@/components/automation-webhooks";
+import { EnhancedLink } from "@/components/enhanced-link";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -26,9 +38,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 import { authClient } from "@/lib/auth-client";
+import {
+  scheduleFor,
+  taskSchema,
+  type Repeat,
+  type TaskForm,
+} from "@/lib/automation-schedule-form";
 import {
   Bell,
   CalendarClock,
@@ -42,18 +61,15 @@ import {
   X,
 } from "lucide-react";
 import {
+  useMemo,
+  useState,
   type Dispatch,
   type ReactNode,
   type SetStateAction,
-  useMemo,
-  useState,
 } from "react";
 import { toast } from "sonner";
 import useSWR from "swr";
-import { z } from "zod";
 
-type Repeat = "once" | "daily" | "weekdays" | "weekly" | "interval" | "cron";
-type NotificationMode = "important_updates" | "all_activity" | "none";
 type Task = {
   id: string;
   name: string;
@@ -63,22 +79,12 @@ type Task = {
   schedule: string;
   status: string;
   nextRunAt: string | null;
+  timezone: string;
   metadata?: Record<string, unknown>;
 };
 type Approval = { id: string; title: string; description: string };
 type Handoff = { id: string; task: string; status: string };
 type Conversation = { id: string; title?: string | null; name?: string | null };
-type TaskForm = {
-  chatId: string;
-  name: string;
-  prompt: string;
-  repeat: Repeat;
-  schedule: string;
-  at: string;
-  dayOfWeek: string;
-  intervalSeconds: string;
-  notificationMode: NotificationMode;
-};
 
 const suggestions = [
   {
@@ -86,7 +92,7 @@ const suggestions = [
     name: "Daily brief",
     detail: "Weekdays at 8:00 AM",
     prompt:
-      "Start each weekday with a summary of my calendar, unread email, and priorities.",
+      "Summarize the priorities and open questions in this chat and its assigned knowledge sources. Cite the source of each actionable item.",
     repeat: "weekdays" as Repeat,
     schedule: "0 8 * * 1-5",
     at: "08:00",
@@ -107,7 +113,7 @@ const suggestions = [
     name: "Follow-up monitor",
     detail: "Weekdays at 9:00 AM",
     prompt:
-      "Review recent email and calendar activity and flag anything that needs my attention.",
+      "Review recent messages and assigned knowledge sources in this chat. Flag changes that need attention and cite their sources. State any missing access.",
     repeat: "weekdays" as Repeat,
     schedule: "0 9 * * 1-5",
     at: "09:00",
@@ -124,30 +130,8 @@ const emptyForm: TaskForm = {
   at: "09:00",
   dayOfWeek: "5",
   intervalSeconds: "3600",
-  notificationMode: "important_updates",
+  timezone: "UTC",
 };
-const taskSchema = z.object({
-  chatId: z
-    .string()
-    .trim()
-    .min(1, "Choose the chat this task should post into."),
-  name: z
-    .string()
-    .trim()
-    .min(1, "Add a title for this scheduled task.")
-    .max(200),
-  prompt: z
-    .string()
-    .trim()
-    .min(1, "Describe what the task should do.")
-    .max(20_000),
-  repeat: z.enum(["once", "daily", "weekdays", "weekly", "interval", "cron"]),
-  schedule: z.string().trim().min(1, "Choose when this task should run."),
-  at: z.string(),
-  dayOfWeek: z.string(),
-  intervalSeconds: z.string(),
-  notificationMode: z.enum(["important_updates", "all_activity", "none"]),
-});
 
 const fetcher = async (url: string) => {
   const response = await fetch(url);
@@ -168,30 +152,11 @@ async function request(url: string, init?: RequestInit) {
   }
   return response.json();
 }
-function scheduleFor(form: TaskForm) {
-  if (form.repeat === "once")
-    return {
-      scheduleType: "once" as const,
-      schedule: new Date(form.schedule).toISOString(),
-    };
-  if (form.repeat === "interval")
-    return {
-      scheduleType: "interval" as const,
-      schedule: form.intervalSeconds,
-    };
-  if (form.repeat === "cron")
-    return { scheduleType: "cron" as const, schedule: form.schedule };
-  const [hour, minute] = form.at.split(":").map(Number);
-  const day =
-    form.repeat === "daily"
-      ? "*"
-      : form.repeat === "weekly"
-        ? form.dayOfWeek
-        : "1-5";
-  return {
-    scheduleType: "cron" as const,
-    schedule: `${minute} ${hour} * * ${day}`,
-  };
+function localDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (number: number) => String(number).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 function formFromTask(item: Task): TaskForm {
   const metadata = item.metadata ?? {};
@@ -205,17 +170,19 @@ function formFromTask(item: Task): TaskForm {
     name: item.name,
     prompt: item.prompt,
     repeat: repeat as Repeat,
-    schedule: item.schedule,
+    schedule:
+      item.scheduleType === "once"
+        ? localDateTime(item.schedule)
+        : item.schedule,
     at: String(metadata.at ?? "09:00"),
     dayOfWeek: String(metadata.dayOfWeek ?? "5"),
     intervalSeconds: item.scheduleType === "interval" ? item.schedule : "3600",
-    notificationMode:
-      (metadata.notificationMode as NotificationMode) ?? "important_updates",
+    timezone: item.timezone,
   };
 }
 function taskSchedule(item: Task) {
   return item.nextRunAt
-    ? `Next ${new Date(item.nextRunAt).toLocaleString()}`
+    ? `Next ${new Date(item.nextRunAt).toLocaleString(undefined, { timeZone: item.timezone })} (${item.timezone})`
     : item.scheduleType === "interval"
       ? `Every ${item.schedule} seconds`
       : item.schedule;
@@ -224,10 +191,14 @@ function taskSchedule(item: Task) {
 function AutomationPageContent() {
   const { data: organization } = authClient.useActiveOrganization();
   const organizationId = organization?.id;
-  const { data: tasks, mutate: mutateTasks } = useSWR<Task[]>(
-    organizationId ? "/api/automation/tasks" : null,
-    fetcher,
-  );
+  const {
+    data: tasks,
+    error: tasksError,
+    isLoading: tasksLoading,
+    mutate: mutateTasks,
+  } = useSWR<Task[]>(organizationId ? "/api/automation/tasks" : null, fetcher, {
+    refreshInterval: 10_000,
+  });
   const { data: approvals, mutate: mutateApprovals } = useSWR<Approval[]>(
     organizationId ? "/api/automation/approvals" : null,
     fetcher,
@@ -244,8 +215,11 @@ function AutomationPageContent() {
   const [search, setSearch] = useState("");
   const [form, setForm] = useState<TaskForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [deletingTask, setDeletingTask] = useState<Task | null>(null);
+  const [taskBusy, setTaskBusy] = useState<string | null>(null);
   const [handoffNotes, setHandoffNotes] = useState<Record<string, string>>({});
   const filteredTasks = useMemo(
     () =>
@@ -258,27 +232,34 @@ function AutomationPageContent() {
   );
 
   const openNew = (preset?: (typeof suggestions)[number]) => {
+    setEditorOpen(true);
     setEditingId(null);
     setErrors({});
     setForm(
       preset
         ? {
             ...emptyForm,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             name: preset.name,
             prompt: preset.prompt,
             repeat: preset.repeat,
             schedule: preset.schedule,
             at: preset.at,
           }
-        : emptyForm,
+        : {
+            ...emptyForm,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          },
     );
   };
   const openEdit = (task: Task) => {
+    setEditorOpen(true);
     setEditingId(task.id);
     setErrors({});
     setForm(formFromTask(task));
   };
   const closeEditor = () => {
+    setEditorOpen(false);
     setEditingId(null);
     setErrors({});
     setForm(emptyForm);
@@ -301,6 +282,13 @@ function AutomationPageContent() {
     let schedule: ReturnType<typeof scheduleFor> | undefined;
     try {
       schedule = scheduleFor(form);
+      const current = tasks?.find((task) => task.id === editingId);
+      if (
+        current?.scheduleType === "once" &&
+        form.repeat === "once" &&
+        form.schedule === localDateTime(current.schedule)
+      )
+        schedule.schedule = current.schedule;
     } catch {
       setErrors({ schedule: "Enter a valid future date and time." });
       return;
@@ -313,12 +301,11 @@ function AutomationPageContent() {
         name: parsed.data.name,
         prompt: parsed.data.prompt,
         ...schedule,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        timezone: parsed.data.timezone,
         metadata: {
           repeat: parsed.data.repeat,
           at: parsed.data.at,
           dayOfWeek: parsed.data.dayOfWeek,
-          notificationMode: parsed.data.notificationMode,
           runsIn: "existing_chat",
           executionTarget: "workspace_scheduler",
         },
@@ -348,6 +335,8 @@ function AutomationPageContent() {
     }
   };
   const updateStatus = async (task: Task) => {
+    if (taskBusy) return;
+    setTaskBusy(task.id);
     try {
       await request(`/api/automation/tasks/${task.id}`, {
         method: "PATCH",
@@ -362,20 +351,27 @@ function AutomationPageContent() {
           ? error.message
           : "Unable to update scheduled task",
       );
+    } finally {
+      setTaskBusy(null);
     }
   };
   const deleteTask = async (id: string) => {
+    if (taskBusy) return;
+    setTaskBusy(id);
     try {
       await request(`/api/automation/tasks/${id}`, { method: "DELETE" });
       await mutateTasks();
       if (editingId === id) closeEditor();
       toast.success("Scheduled task deleted");
+      setDeletingTask(null);
     } catch (error) {
       toast.error(
         error instanceof Error
           ? error.message
           : "Unable to delete scheduled task",
       );
+    } finally {
+      setTaskBusy(null);
     }
   };
   const decideApproval = async (
@@ -446,6 +442,30 @@ function AutomationPageContent() {
       title="Scheduled tasks"
     >
       <div className="flex flex-col gap-8">
+        {tasksLoading && <Skeleton className="h-16" />}
+        {tasksError && (
+          <Alert variant="destructive">
+            <AlertTitle>Scheduled tasks unavailable</AlertTitle>
+            <AlertDescription>
+              {tasksError.message}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void mutateTasks()}
+              >
+                Retry
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+        <Alert>
+          <AlertTitle>When tasks run</AlertTitle>
+          <AlertDescription>
+            Tasks run while the Circulo server is running. Keep the desktop app
+            open for local schedules; a hosted server can run them while you are
+            away. Results appear in the destination chat.
+          </AlertDescription>
+        </Alert>
         <section className="overflow-hidden rounded-2xl border bg-card">
           <div className="grid min-h-[560px] lg:grid-cols-[280px_minmax(0,1fr)]">
             <aside className="border-b bg-muted/20 lg:border-r lg:border-b-0">
@@ -469,7 +489,7 @@ function AutomationPageContent() {
                   <Input
                     aria-label="Search scheduled tasks"
                     className="pl-9"
-                    onChange={(event) => setSearch(event.target.value)}
+                    onChange={({ target: { value } }) => setSearch(value)}
                     placeholder="Search scheduled tasks"
                     value={search}
                   />
@@ -530,7 +550,7 @@ function AutomationPageContent() {
               </div>
             </aside>
             <div className="flex min-w-0 flex-col">
-              {!editingId && !form.name ? (
+              {!editorOpen ? (
                 <div className="flex flex-1 flex-col items-center justify-center gap-3 p-10 text-center">
                   <CalendarClock
                     className="text-muted-foreground"
@@ -573,7 +593,7 @@ function AutomationPageContent() {
               </p>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
-              {tasks.map((task) => (
+              {filteredTasks.map((task) => (
                 <div
                   className="flex items-start justify-between gap-4 rounded-xl border bg-card p-4"
                   key={task.id}
@@ -589,6 +609,35 @@ function AutomationPageContent() {
                     <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
                       {task.prompt}
                     </p>
+                    {task.metadata?.pausedReason != null &&
+                      task.status === "paused" && (
+                        <p
+                          role="status"
+                          className="mt-2 text-sm text-muted-foreground"
+                        >
+                          {String(task.metadata.pausedReason)}
+                        </p>
+                      )}
+                    {(
+                      task.metadata?._execution as
+                        | { lastOutcome?: string }
+                        | undefined
+                    )?.lastOutcome && (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Last workflow:{" "}
+                        {String(
+                          (task.metadata!._execution as { lastOutcome: string })
+                            .lastOutcome,
+                        )}
+                      </p>
+                    )}
+                    {task.chatId && (
+                      <Button variant="link" size="sm" asChild>
+                        <EnhancedLink href={`/chat/${task.chatId}`}>
+                          Open destination chat
+                        </EnhancedLink>
+                      </Button>
+                    )}
                   </div>
                   <div className="flex shrink-0 gap-1">
                     <Button
@@ -602,6 +651,7 @@ function AutomationPageContent() {
                     {(task.status === "active" || task.status === "paused") && (
                       <Button
                         aria-label={`${task.status === "paused" ? "Resume" : "Pause"} ${task.name}`}
+                        disabled={Boolean(taskBusy)}
                         onClick={() => void updateStatus(task)}
                         size="icon"
                         variant="ghost"
@@ -615,7 +665,8 @@ function AutomationPageContent() {
                     )}
                     <Button
                       aria-label={`Delete ${task.name}`}
-                      onClick={() => void deleteTask(task.id)}
+                      disabled={Boolean(taskBusy)}
+                      onClick={() => setDeletingTask(task)}
                       size="icon"
                       variant="ghost"
                     >
@@ -631,6 +682,36 @@ function AutomationPageContent() {
           conversations={conversations}
           organizationId={organizationId}
         />
+        <AlertDialog
+          open={Boolean(deletingTask)}
+          onOpenChange={(open) => {
+            if (!open && !taskBusy) setDeletingTask(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete scheduled task?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This permanently removes {deletingTask?.name}. Messages and
+                existing workflows in the chat remain.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={Boolean(taskBusy)}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                disabled={Boolean(taskBusy)}
+                onClick={(event) => {
+                  event.preventDefault();
+                  if (deletingTask) void deleteTask(deletingTask.id);
+                }}
+              >
+                {taskBusy ? "Deleting…" : "Delete task"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <div className="grid gap-6 lg:grid-cols-2">
           <Attention title="Human approvals" empty="No pending approvals.">
             {(approvals ?? []).map((approval) => (
@@ -695,10 +776,10 @@ function AutomationPageContent() {
                   <div className="flex gap-2">
                     <Input
                       aria-label="Handoff completion note"
-                      onChange={(event) =>
+                      onChange={({ target: { value } }) =>
                         setHandoffNotes((current) => ({
                           ...current,
-                          [handoff.id]: event.target.value,
+                          [handoff.id]: value,
                         }))
                       }
                       placeholder="Completion note"
@@ -754,10 +835,9 @@ function TaskEditor({
     <div className="flex min-w-0 flex-1 flex-col">
       <div className="flex items-center justify-between gap-3 border-b px-5 py-4">
         <div>
-          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-            {editing ? "Edit" : "New"}
-          </p>
-          <h2 className="mt-1 text-lg font-medium">Scheduled task</h2>
+          <h2 className="text-lg font-medium">
+            {editing ? "Edit scheduled task" : "Create scheduled task"}
+          </h2>
         </div>
         <Button
           aria-label="Close scheduled task editor"
@@ -777,8 +857,8 @@ function TaskEditor({
             <Input
               aria-invalid={Boolean(errors.name)}
               id="scheduled-task-name"
-              onChange={(event) =>
-                setForm((current) => ({ ...current, name: event.target.value }))
+              onChange={({ target: { value } }) =>
+                setForm((current) => ({ ...current, name: value }))
               }
               placeholder="Give this task a clear title"
               value={form.name}
@@ -792,10 +872,10 @@ function TaskEditor({
             <Textarea
               aria-invalid={Boolean(errors.prompt)}
               id="scheduled-task-prompt"
-              onChange={(event) =>
+              onChange={({ target: { value } }) =>
                 setForm((current) => ({
                   ...current,
-                  prompt: event.target.value,
+                  prompt: value,
                 }))
               }
               placeholder="Describe what Circulo should do"
@@ -804,40 +884,15 @@ function TaskEditor({
             {errors.prompt && <FieldError>{errors.prompt}</FieldError>}
           </Field>
           <ScheduleSection title="Details">
-            <ScheduleRow
-              description="The workspace scheduler keeps this task running even when you are away."
-              label="Runs on"
-            >
-              <Select defaultValue="workspace">
-                <SelectTrigger disabled>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="workspace">
-                      Workspace scheduler
-                    </SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </ScheduleRow>
-            <ScheduleRow
-              description="Messages and results are posted to the selected chat."
-              label="Runs in"
-            >
-              <Select defaultValue="existing">
-                <SelectTrigger disabled>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="existing">Existing chat</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </ScheduleRow>
             <ScheduleRow label="Chat">
               <Select
+                items={conversations.map((chat) => ({
+                  value: chat.id,
+                  label:
+                    chat.title?.trim() ||
+                    chat.name?.trim() ||
+                    `Untitled chat (${chat.id.slice(0, 6)})`,
+                }))}
                 onValueChange={(value) =>
                   setForm((current) => ({ ...current, chatId: value ?? "" }))
                 }
@@ -862,8 +917,33 @@ function TaskEditor({
             </ScheduleRow>
           </ScheduleSection>
           <ScheduleSection title="Frequency">
+            <ScheduleRow
+              label="Time zone"
+              description="Cron times use this IANA zone. One-time dates use your device's local time."
+            >
+              <Input
+                aria-label="Scheduled task time zone"
+                value={form.timezone}
+                onChange={({ target: { value } }) =>
+                  setForm((current) => ({
+                    ...current,
+                    timezone: value,
+                  }))
+                }
+                placeholder="Asia/Tehran"
+              />
+              {errors.timezone && <FieldError>{errors.timezone}</FieldError>}
+            </ScheduleRow>
             <ScheduleRow label="Repeat">
               <Select
+                items={[
+                  { value: "once", label: "One time" },
+                  { value: "daily", label: "Daily" },
+                  { value: "weekdays", label: "Weekdays" },
+                  { value: "weekly", label: "Weekly" },
+                  { value: "interval", label: "Every interval" },
+                  { value: "cron", label: "Custom cron" },
+                ]}
                 onValueChange={(value) =>
                   setForm((current) => ({
                     ...current,
@@ -892,12 +972,13 @@ function TaskEditor({
               <ScheduleRow label="At">
                 <Input
                   aria-invalid={Boolean(errors.schedule)}
-                  onChange={(event) =>
+                  onChange={({ target: { value } }) =>
                     setForm((current) => ({
                       ...current,
-                      schedule: event.target.value,
+                      schedule: value,
                     }))
                   }
+                  aria-label="Scheduled task date and time"
                   type="datetime-local"
                   value={form.schedule}
                 />
@@ -908,10 +989,10 @@ function TaskEditor({
               <ScheduleRow label="Every">
                 <Input
                   min={10}
-                  onChange={(event) =>
+                  onChange={({ target: { value } }) =>
                     setForm((current) => ({
                       ...current,
-                      intervalSeconds: event.target.value,
+                      intervalSeconds: value,
                     }))
                   }
                   type="number"
@@ -926,10 +1007,10 @@ function TaskEditor({
               <ScheduleRow label="Cron">
                 <Input
                   aria-invalid={Boolean(errors.schedule)}
-                  onChange={(event) =>
+                  onChange={({ target: { value } }) =>
                     setForm((current) => ({
                       ...current,
-                      schedule: event.target.value,
+                      schedule: value,
                     }))
                   }
                   placeholder="*/15 * * * *"
@@ -942,10 +1023,10 @@ function TaskEditor({
               <>
                 <ScheduleRow label="At">
                   <Input
-                    onChange={(event) =>
+                    onChange={({ target: { value } }) =>
                       setForm((current) => ({
                         ...current,
-                        at: event.target.value,
+                        at: value,
                       }))
                     }
                     type="time"
@@ -955,6 +1036,15 @@ function TaskEditor({
                 {form.repeat === "weekly" && (
                   <ScheduleRow label="On">
                     <Select
+                      items={[
+                        { value: "1", label: "Monday" },
+                        { value: "2", label: "Tuesday" },
+                        { value: "3", label: "Wednesday" },
+                        { value: "4", label: "Thursday" },
+                        { value: "5", label: "Friday" },
+                        { value: "6", label: "Saturday" },
+                        { value: "0", label: "Sunday" },
+                      ]}
                       onValueChange={(value) =>
                         setForm((current) => ({
                           ...current,
@@ -988,35 +1078,6 @@ function TaskEditor({
                 )}
               </>
             )}
-          </ScheduleSection>
-          <ScheduleSection title="Notifications">
-            <ScheduleRow
-              description="Choose how much task activity should be surfaced."
-              label="Notifications"
-            >
-              <Select
-                onValueChange={(value) =>
-                  setForm((current) => ({
-                    ...current,
-                    notificationMode: value as NotificationMode,
-                  }))
-                }
-                value={form.notificationMode}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="important_updates">
-                      Important updates
-                    </SelectItem>
-                    <SelectItem value="all_activity">All activity</SelectItem>
-                    <SelectItem value="none">No notifications</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </ScheduleRow>
           </ScheduleSection>
         </FieldGroup>
       </div>

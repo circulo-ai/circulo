@@ -1,5 +1,15 @@
+import { knowledgeSemanticDistance } from "@/lib/knowledge/semantic-distance";
 import { db } from "@/db";
-import { knowledgeBase, knowledgeDocument } from "@/db/schema";
+import {
+  embeddingChunk,
+  embeddingPreference,
+  knowledgeBase,
+  knowledgeDocument,
+} from "@/db/schema";
+import {
+  getEmbeddingPreferences,
+  resolveEmbeddingConfig,
+} from "@/lib/knowledge/embedding-settings";
 import { enforceOrganizationFeatureLimit } from "@/lib/billing/limits";
 import { createRouter } from "@/lib/create-app";
 import {
@@ -9,7 +19,7 @@ import {
   hasKnowledgeImageSignature,
 } from "@/lib/knowledge/assets";
 import {
-  createKnowledgeEmbedding,
+  createKnowledgeEmbeddingWithMetadata,
   refreshKnowledgeDocumentEmbedding,
 } from "@/lib/knowledge/embeddings";
 import {
@@ -90,7 +100,6 @@ async function getBase(id: string, organizationId: string) {
       eq(knowledgeBase.id, id),
       eq(knowledgeBase.organizationId, organizationId),
     ),
-    with: { documents: true },
   });
   if (!base) throw new NotFoundError("Knowledge base not found");
   return base;
@@ -100,7 +109,7 @@ router.get("/knowledge-bases", requireAuth, async (c) => {
   const organizationId = await getActiveOrganization(c);
   const bases = await db.query.knowledgeBase.findMany({
     where: eq(knowledgeBase.organizationId, organizationId),
-    with: { documents: true },
+    with: { documents: { columns: { id: true } } },
     orderBy: desc(knowledgeBase.updatedAt),
   });
   return c.json(
@@ -211,8 +220,54 @@ router.get(
   async (c) => {
     const organizationId = await getActiveOrganization(c);
     const { id } = c.req.valid("param");
-    const base = await getBase(id, organizationId);
-    return c.json(base.documents);
+    await getBase(id, organizationId);
+    return c.json(
+      await db.query.knowledgeDocument.findMany({
+        where: and(
+          eq(knowledgeDocument.knowledgeBaseId, id),
+          eq(knowledgeDocument.organizationId, organizationId),
+        ),
+        columns: { embedding: false },
+        orderBy: desc(knowledgeDocument.createdAt),
+      }),
+    );
+  },
+);
+
+router.get(
+  "/knowledge-bases/:id/index-status",
+  requireAuth,
+  zValidator("param", idParams),
+  async (c) => {
+    const organizationId = await getActiveOrganization(c);
+    const { id } = c.req.valid("param");
+    await getBase(id, organizationId);
+    const config = await resolveEmbeddingConfig(
+      c.var.user!.id,
+      await getEmbeddingPreferences(organizationId),
+    );
+    const rows = await db
+      .select({
+        id: knowledgeDocument.id,
+        isSemanticReady: config
+          ? sql<boolean>`${knowledgeDocument.embedding} IS NOT NULL AND ${knowledgeDocument.embeddingModel} = ${config.identity}`
+          : sql<boolean>`false`,
+        visionIndexed: sql<boolean>`${knowledgeDocument.metadata}->>'visionIndexedAt' IS NOT NULL`,
+      })
+      .from(knowledgeDocument)
+      .where(
+        and(
+          eq(knowledgeDocument.knowledgeBaseId, id),
+          eq(knowledgeDocument.organizationId, organizationId),
+        ),
+      );
+    return c.json(
+      rows.map((row) => ({
+        ...row,
+        isSemanticReady: Boolean(row.isSemanticReady),
+        visionIndexed: Boolean(row.visionIndexed),
+      })),
+    );
   },
 );
 
@@ -230,12 +285,17 @@ router.get(
         limit: z.coerce.number().int().min(1).max(50).default(10),
       })
       .parse(c.req.query());
-    const queryEmbedding = await createKnowledgeEmbedding(query.q, "", {
-      userId: c.var.user!.id,
-    }).catch(() => null);
+    const queryEmbedding = await createKnowledgeEmbeddingWithMetadata(
+      query.q,
+      "",
+      {
+        userId: c.var.user!.id,
+        organizationId,
+      },
+    ).catch(() => null);
     const lexicalMatch = sql`to_tsvector('simple', ${knowledgeDocument.title} || ' ' || ${knowledgeDocument.content}) @@ plainto_tsquery('simple', ${query.q})`;
     const vectorDistance = queryEmbedding
-      ? sql<number>`${knowledgeDocument.embedding} <=> ${JSON.stringify(queryEmbedding)}::vector`
+      ? knowledgeSemanticDistance(queryEmbedding)
       : null;
     return c.json(
       await db.query.knowledgeDocument.findMany({
@@ -245,7 +305,7 @@ router.get(
           eq(knowledgeDocument.status, "ready"),
           queryEmbedding
             ? or(
-                sql`${knowledgeDocument.embedding} IS NOT NULL`,
+                sql`${knowledgeSemanticDistance(queryEmbedding)} IS NOT NULL`,
                 lexicalMatch,
                 sql`${knowledgeDocument.contentType} LIKE 'image/%'`,
               )
@@ -257,7 +317,7 @@ router.get(
         orderBy: queryEmbedding
           ? [
               asc(
-                sql`CASE WHEN ${knowledgeDocument.embedding} IS NULL THEN 1 ELSE 0 END`,
+                sql`CASE WHEN ${knowledgeSemanticDistance(queryEmbedding)} IS NULL THEN 1 ELSE 0 END`,
               ),
               asc(vectorDistance!),
               desc(
@@ -308,6 +368,7 @@ router.post(
       title: created.title,
       content: created.content,
       userId: c.var.user!.id,
+      organizationId,
     }).catch((error) => {
       logger.warn("[Knowledge Embedding] document indexing skipped", {
         documentId: created.id,
@@ -397,6 +458,7 @@ router.post(
           contentType: imageContentType,
           buffer,
           existingMetadata: created.metadata,
+          userId: c.var.user!.id,
         }).catch((error) => {
           logger.warn("[Knowledge Vision] image indexing skipped", {
             documentId: created.id,
@@ -454,6 +516,7 @@ router.post(
       title: created.title,
       content: created.content,
       userId: c.var.user!.id,
+      organizationId,
     }).catch((error) => {
       logger.warn("[Knowledge Embedding] document indexing skipped", {
         documentId: created.id,
@@ -503,6 +566,7 @@ router.post(
             contentType: document.contentType,
             buffer,
             existingMetadata: document.metadata,
+            userId: c.var.user!.id,
           });
           if (result.visionIndexed) visionIndexed += 1;
           if (result.embeddingIndexed) indexed += 1;
@@ -551,11 +615,50 @@ router.patch(
       ),
     });
     if (!existing) throw new NotFoundError("Knowledge document not found");
-    const [updated] = await db
-      .update(knowledgeDocument)
-      .set({ ...c.req.valid("json"), updatedAt: new Date() })
-      .where(eq(knowledgeDocument.id, documentId))
-      .returning();
+    const changes = c.req.valid("json");
+    const contentChanged =
+      (changes.content !== undefined && changes.content !== existing.content) ||
+      (changes.title !== undefined && changes.title !== existing.title);
+    if (contentChanged) await getEmbeddingPreferences(organizationId);
+    const updated = await db.transaction(async (tx) => {
+      if (contentChanged)
+        await tx
+          .select()
+          .from(embeddingPreference)
+          .where(eq(embeddingPreference.organizationId, organizationId))
+          .for("update");
+      if (contentChanged)
+        await tx
+          .delete(embeddingChunk)
+          .where(eq(embeddingChunk.documentId, documentId));
+      const [row] = await tx
+        .update(knowledgeDocument)
+        .set({
+          ...changes,
+          ...(contentChanged
+            ? {
+                embedding: null,
+                embeddingModel: null,
+                embeddingUpdatedAt: null,
+              }
+            : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(knowledgeDocument.id, documentId))
+        .returning();
+      return row;
+    });
+    if (updated && contentChanged)
+      void refreshKnowledgeDocumentEmbedding({
+        documentId,
+        title: updated.title,
+        content: updated.content,
+        userId: c.var.user!.id,
+      }).catch(() =>
+        logger.warn("Knowledge document requires semantic reindexing", {
+          documentId,
+        }),
+      );
     return c.json(updated);
   },
 );

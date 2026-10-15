@@ -29,6 +29,8 @@ import {
   InputGroupButton,
   InputGroupTextarea,
 } from "@/components/ui/input-group";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
+import { Popover, PopoverContent } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -36,6 +38,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
+import { tokenizeComposer } from "@/lib/composer-tokens";
+import {
+  getMentionRange,
+  getCommandRange,
+  insertMention,
+  moveMentionIndex,
+} from "@/lib/mention-picker";
+import type { Attachment } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import type { ChatStatus, FileUIPart } from "ai";
 import {
@@ -68,6 +79,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -831,6 +843,7 @@ export type PromptInputTextareaProps = ComponentProps<
   minHeight?: number;
   maxHeight?: number;
   disableAutoResize?: boolean;
+  onMentionSelect?: (item: MentionItemType) => void | boolean;
 };
 
 export type MentionItemType = {
@@ -841,7 +854,9 @@ export type MentionItemType = {
   /** Text inserted after @. Defaults to username. */
   insertText?: string;
   description?: string;
-  kind?: "agent" | "tool";
+  kind?: "agent" | "tool" | "file";
+  attachment?: Attachment;
+  command?: string;
 };
 
 export type CommandItemType = {
@@ -849,6 +864,7 @@ export type CommandItemType = {
   name: string;
   icon: ReactNode;
   command: string;
+  description?: string;
 };
 
 export const PromptInputTextarea = ({
@@ -860,82 +876,202 @@ export const PromptInputTextarea = ({
   className,
   placeholder = "What would you like to know?",
   enableMentions = false,
-  enableCommands: _enableCommands,
+  enableCommands = false,
   mentions,
-  commands: _commands,
+  commands,
   fetchMentions,
-  fetchCommands: _fetchCommands,
+  onMentionSelect,
+  fetchCommands,
   minHeight,
   maxHeight,
   disableAutoResize: _disableAutoResize,
   ...props
 }: PromptInputTextareaProps) => {
   const controller = useOptionalPromptInputController();
-  const attachments = usePromptInputAttachments();
+  const providerAttachments = useOptionalProviderAttachments();
+  const localAttachments = useContext(LocalAttachmentsContext);
+  const attachments = providerAttachments ?? localAttachments;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mirrorRef = useRef<HTMLDivElement>(null);
+  const selectedMentionsRef = useRef<MentionItemType[]>([]);
+  const [decorationValue, setDecorationValue] = useState("");
+  const displayValue = String(
+    controller?.textInput.value ?? props.value ?? decorationValue,
+  );
   const [isComposing, setIsComposing] = useState(false);
   const [mentionItems, setMentionItems] = useState<MentionItemType[]>(
     mentions ?? [],
   );
+  const decoratedTokens = tokenizeComposer(
+    displayValue,
+    [...selectedMentionsRef.current, ...mentionItems].filter(
+      (item) => !item.command,
+    ),
+  );
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    const mirror = mirrorRef.current;
+    if (!textarea || !mirror) return;
+    const sync = () => {
+      const style = getComputedStyle(textarea);
+      for (const property of [
+        "font",
+        "letter-spacing",
+        "line-height",
+        "padding",
+        "border-width",
+        "box-sizing",
+        "tab-size",
+        "text-indent",
+        "text-align",
+        "direction",
+        "word-break",
+        "overflow-wrap",
+      ])
+        mirror.style.setProperty(property, style.getPropertyValue(property));
+      mirror.style.width = `${textarea.clientWidth}px`;
+      mirror.style.height = `${textarea.clientHeight}px`;
+      mirror.scrollTop = textarea.scrollTop;
+      mirror.scrollLeft = textarea.scrollLeft;
+    };
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(textarea);
+    textarea.addEventListener("scroll", sync);
+    return () => {
+      observer.disconnect();
+      textarea.removeEventListener("scroll", sync);
+    };
+  }, []);
   const [mentionRange, setMentionRange] = useState<{
     start: number;
     end: number;
     query: string;
+    prefix: "@" | "/";
   } | null>(null);
   const [isMentionOpen, setIsMentionOpen] = useState(false);
   const [isMentionLoading, setIsMentionLoading] = useState(false);
   const [highlightedMentionIndex, setHighlightedMentionIndex] = useState(0);
   const mentionRequestRef = useRef(0);
+  const mentionListId = useId();
+  const mentionListRef = useRef<HTMLDivElement>(null);
+  const mentionOptionRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const [mentionAriaIds, setMentionAriaIds] = useState<{
+    list?: string;
+    active?: string;
+  }>({});
+  const [mentionError, setMentionError] = useState("");
+  const [mentionAttempt, setMentionAttempt] = useState(0);
+  const [toolbarOffset, setToolbarOffset] = useState(8);
+  useEffect(() => {
+    setToolbarOffset(
+      document.documentElement.dataset.circuloDesktop === "true" ? 48 : 8,
+    );
+  }, []);
 
   const updateMentionRange = useCallback(
     (value: string, cursor: number) => {
-      if (!enableMentions) {
+      if (!enableMentions && !enableCommands) {
         setMentionRange(null);
         setIsMentionOpen(false);
         return;
       }
 
-      const beforeCursor = value.slice(0, cursor);
-      const match = beforeCursor.match(/(?:^|\s)@([^\s@]*)$/);
-      if (!match) {
+      const mention = enableMentions ? getMentionRange(value, cursor) : null;
+      const command =
+        enableCommands && (commands?.length || fetchCommands)
+          ? getCommandRange(value, cursor)
+          : null;
+      const range = mention
+        ? { ...mention, prefix: "@" as const }
+        : command
+          ? { ...command, prefix: "/" as const }
+          : null;
+      if (!range) {
         setMentionRange(null);
         setIsMentionOpen(false);
         return;
       }
 
-      const query = match[1] ?? "";
-      setMentionRange({
-        start: cursor - query.length - 1,
-        end: cursor,
-        query,
-      });
-      setHighlightedMentionIndex(0);
+      setMentionRange((current) =>
+        current?.start === range.start &&
+        current.end === range.end &&
+        current.prefix === range.prefix &&
+        current.query === range.query
+          ? current
+          : range,
+      );
+      if (
+        mentionRange?.start !== range.start ||
+        mentionRange.prefix !== range.prefix ||
+        mentionRange.end !== range.end ||
+        mentionRange.query !== range.query
+      )
+        setHighlightedMentionIndex(0);
       setIsMentionOpen(true);
     },
-    [enableMentions],
+    [enableMentions, enableCommands, commands, fetchCommands, mentionRange],
   );
 
   useEffect(() => {
-    if (!enableMentions || !mentionRange) {
+    if (
+      (!enableMentions && !enableCommands) ||
+      !mentionRange ||
+      !isMentionOpen
+    ) {
       setMentionItems(mentions ?? []);
       setIsMentionLoading(false);
       return;
     }
 
-    const requestId = mentionRequestRef.current + 1;
+    const requestId = mentionRequestRef.current + 1 + mentionAttempt;
     mentionRequestRef.current = requestId;
+    setIsMentionLoading(true);
+    setMentionItems([]);
+    setMentionError("");
     const timer = window.setTimeout(() => {
       setIsMentionLoading(true);
-      const request = fetchMentions
-        ? fetchMentions(mentionRange.query)
-        : Promise.resolve(mentions ?? []);
+      const request: Promise<MentionItemType[]> =
+        mentionRange.prefix === "/"
+          ? (fetchCommands
+              ? fetchCommands(mentionRange.query)
+              : Promise.resolve(
+                  (commands ?? []).filter((item) =>
+                    item.command
+                      .toLowerCase()
+                      .includes(mentionRange.query.toLowerCase()),
+                  ),
+                )
+            ).then((items) =>
+              items.map((item) => ({
+                type: "mention" as const,
+                kind: "tool" as const,
+                name: item.name,
+                icon: item.icon,
+                description: item.description,
+                username: `command:${item.command}`,
+                insertText: item.command.replace(/^\//, ""),
+                command: item.command,
+              })),
+            )
+          : fetchMentions
+            ? fetchMentions(mentionRange.query)
+            : Promise.resolve(mentions ?? []);
       void request
         .then((items) => {
           if (mentionRequestRef.current !== requestId) return;
-          setMentionItems(items.slice(0, 12));
+          setMentionItems(items.slice(0, 80));
+          setHighlightedMentionIndex(0);
         })
         .catch(() => {
-          if (mentionRequestRef.current === requestId) setMentionItems([]);
+          if (mentionRequestRef.current === requestId) {
+            setMentionItems([]);
+            setMentionError(
+              mentionRange.prefix === "/"
+                ? "Commands could not be loaded. Try again."
+                : "Mentions could not be loaded. Try again.",
+            );
+          }
         })
         .finally(() => {
           if (mentionRequestRef.current === requestId) {
@@ -944,20 +1080,52 @@ export const PromptInputTextarea = ({
         });
     }, 120);
 
-    return () => window.clearTimeout(timer);
-  }, [enableMentions, fetchMentions, mentionRange, mentions]);
+    return () => {
+      window.clearTimeout(timer);
+      if (mentionRequestRef.current === requestId) mentionRequestRef.current++;
+    };
+  }, [
+    enableMentions,
+    enableCommands,
+    commands,
+    fetchCommands,
+    fetchMentions,
+    mentionRange,
+    mentions,
+    isMentionOpen,
+    mentionAttempt,
+  ]);
+
+  useEffect(() => {
+    if (!isMentionOpen) return;
+    const active = mentionItems[highlightedMentionIndex]
+      ? mentionOptionRefs.current[highlightedMentionIndex]
+      : undefined;
+    active?.scrollIntoView({ block: "nearest" });
+    setMentionAriaIds({ list: mentionListRef.current?.id, active: active?.id });
+  }, [highlightedMentionIndex, isMentionOpen, mentionItems]);
 
   const selectMention = useCallback(
     (item: MentionItemType) => {
       const textarea = textareaRef.current;
       if (!textarea || !mentionRange) return;
 
-      const value = textarea.value;
-      const insertion = `@${item.insertText ?? item.username} `;
-      const nextValue = `${value.slice(0, mentionRange.start)}${insertion}${value.slice(mentionRange.end)}`;
-      const nextCursor = mentionRange.start + insertion.length;
+      if (!item.command && onMentionSelect?.(item) === false) return;
+      selectedMentionsRef.current = [
+        ...selectedMentionsRef.current.filter(
+          (choice) => choice.username !== item.username,
+        ),
+        item,
+      ];
+      const { value: nextValue, cursor: nextCursor } = insertMention(
+        textarea.value,
+        mentionRange,
+        item,
+        mentionRange.prefix,
+      );
       controller?.textInput.setInput(nextValue);
       onValueChange?.(nextValue);
+      setDecorationValue(nextValue);
       setMentionRange(null);
       setIsMentionOpen(false);
       requestAnimationFrame(() => {
@@ -965,7 +1133,7 @@ export const PromptInputTextarea = ({
         textarea.setSelectionRange(nextCursor, nextCursor);
       });
     },
-    [controller, mentionRange, onValueChange],
+    [controller, mentionRange, onValueChange, onMentionSelect],
   );
 
   const setTextareaRef = useCallback(
@@ -982,17 +1150,22 @@ export const PromptInputTextarea = ({
   );
 
   const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
-    if (isMentionOpen && mentionItems.length > 0) {
-      if (e.key === "ArrowDown") {
+    if (
+      isComposing ||
+      e.nativeEvent.isComposing ||
+      e.nativeEvent.keyCode === 229
+    )
+      return;
+    if (isMentionOpen && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (
+        ["ArrowDown", "ArrowUp", "Home", "End", "PageDown", "PageUp"].includes(
+          e.key,
+        )
+      ) {
         e.preventDefault();
         setHighlightedMentionIndex((index) =>
-          Math.min(index + 1, mentionItems.length - 1),
+          moveMentionIndex(index, e.key, mentionItems.length),
         );
-        return;
-      }
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setHighlightedMentionIndex((index) => Math.max(index - 1, 0));
         return;
       }
       if (e.key === "Escape") {
@@ -1001,6 +1174,10 @@ export const PromptInputTextarea = ({
         return;
       }
       if (e.key === "Enter" || e.key === "Tab") {
+        if (e.key === "Tab" && mentionItems.length === 0) {
+          setIsMentionOpen(false);
+          return;
+        }
         e.preventDefault();
         const item = mentionItems[highlightedMentionIndex];
         if (item) selectMention(item);
@@ -1012,7 +1189,11 @@ export const PromptInputTextarea = ({
     if (e.defaultPrevented) return;
 
     if (e.key === "Enter") {
-      if (isComposing || e.nativeEvent.isComposing) {
+      if (
+        isComposing ||
+        e.nativeEvent.isComposing ||
+        e.nativeEvent.keyCode === 229
+      ) {
         return;
       }
       if (e.shiftKey) {
@@ -1036,17 +1217,18 @@ export const PromptInputTextarea = ({
     if (
       e.key === "Backspace" &&
       e.currentTarget.value === "" &&
-      attachments.files.length > 0
+      (attachments?.files.length ?? 0) > 0
     ) {
       e.preventDefault();
-      const lastAttachment = attachments.files.at(-1);
+      const lastAttachment = attachments?.files.at(-1);
       if (lastAttachment) {
-        attachments.remove(lastAttachment.id);
+        attachments?.remove(lastAttachment.id);
       }
     }
   };
 
   const handlePaste: ClipboardEventHandler<HTMLTextAreaElement> = (event) => {
+    if (event.defaultPrevented || !attachments) return;
     const items = event.clipboardData?.items;
 
     if (!items) {
@@ -1066,11 +1248,12 @@ export const PromptInputTextarea = ({
 
     if (files.length > 0) {
       event.preventDefault();
-      attachments.add(files);
+      attachments?.add(files);
     }
   };
 
   const handleChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
+    setDecorationValue(e.currentTarget.value);
     if (controller) {
       controller.textInput.setInput(e.currentTarget.value);
     }
@@ -1095,77 +1278,215 @@ export const PromptInputTextarea = ({
     : { onChange: handleChange };
 
   return (
-    <div className="relative w-full min-w-0">
-      <InputGroupTextarea
-        aria-controls={isMentionOpen ? "prompt-input-mentions" : undefined}
-        aria-expanded={isMentionOpen}
-        className={cn("field-sizing-content max-h-48 min-h-16", className)}
-        name="message"
-        onCompositionEnd={() => setIsComposing(false)}
-        onCompositionStart={() => setIsComposing(true)}
-        onFocus={handleFocus}
-        onKeyDown={handleKeyDown}
-        onPaste={handlePaste}
-        placeholder={placeholder}
-        style={{
-          ...(minHeight === undefined ? {} : { minHeight }),
-          ...(maxHeight === undefined ? {} : { maxHeight }),
-        }}
-        {...props}
-        ref={setTextareaRef}
-        {...controlledProps}
-      />
-      {enableMentions && isMentionOpen && (
+    <Popover
+      open={(enableMentions || enableCommands) && isMentionOpen}
+      onOpenChange={(open) => {
+        if (!open) setIsMentionOpen(false);
+      }}
+    >
+      <div className="relative w-full min-w-0">
         <div
-          className="absolute right-2 bottom-full left-2 z-50 mb-2 overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-xl"
-          id="prompt-input-mentions"
-          role="listbox"
+          aria-hidden="true"
+          ref={mirrorRef}
+          className="composer-token-mirror pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap border-transparent text-foreground"
         >
-          {isMentionLoading ? (
-            <div className="flex items-center gap-2 px-3 py-3 text-sm text-muted-foreground">
-              <Loader2Icon className="size-4 animate-spin" />
-              Finding agents and tools…
-            </div>
-          ) : mentionItems.length === 0 ? (
-            <div className="px-3 py-3 text-sm text-muted-foreground">
-              No matching agents or tools
-            </div>
-          ) : (
-            <Command shouldFilter={false}>
-              <CommandList className="max-h-64">
-                <CommandGroup heading="Direct work to">
-                  {mentionItems.map((item, index) => (
-                    <CommandItem
-                      aria-selected={index === highlightedMentionIndex}
-                      key={`${item.kind ?? "mention"}:${item.username}`}
-                      onMouseDown={(event) => event.preventDefault()}
-                      onSelect={() => selectMention(item)}
-                      value={`${item.name} ${item.username}`}
-                    >
-                      <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                        {item.icon}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-medium">
-                          {item.name}
-                        </span>
-                        <span className="block truncate text-xs text-muted-foreground">
-                          {item.description ??
-                            (item.kind === "tool" ? "Tool" : "Agent")}
-                        </span>
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {item.kind === "tool" ? "tool" : "agent"}
-                      </span>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          )}
+          {decoratedTokens.map((token, index) => (
+            <span
+              key={`${index}:${token.kind ?? "text"}`}
+              data-token-kind={token.kind}
+            >
+              {token.text}
+            </span>
+          ))}
+          {displayValue.endsWith("\n") ? "\u200b" : null}
         </div>
-      )}
-    </div>
+        <InputGroupTextarea
+          aria-controls={isMentionOpen ? mentionAriaIds.list : undefined}
+          aria-autocomplete={
+            enableMentions || enableCommands ? "list" : undefined
+          }
+          aria-activedescendant={
+            isMentionOpen && mentionItems[highlightedMentionIndex]
+              ? mentionAriaIds.active
+              : undefined
+          }
+          aria-expanded={isMentionOpen}
+          className={cn(
+            "field-sizing-content max-h-48 min-h-16",
+            displayValue && "composer-token-input",
+            className,
+          )}
+          name="message"
+          onCompositionEnd={() => setIsComposing(false)}
+          onCompositionStart={() => setIsComposing(true)}
+          onFocus={handleFocus}
+          onSelect={(event) => {
+            if (
+              event.currentTarget.selectionStart ===
+              event.currentTarget.selectionEnd
+            )
+              updateMentionRange(
+                event.currentTarget.value,
+                event.currentTarget.selectionStart,
+              );
+            else setIsMentionOpen(false);
+          }}
+          onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
+          placeholder={placeholder}
+          style={{
+            ...(minHeight === undefined ? {} : { minHeight }),
+            ...(maxHeight === undefined ? {} : { maxHeight }),
+          }}
+          {...props}
+          ref={setTextareaRef}
+          {...controlledProps}
+        />
+        {(enableMentions || enableCommands) && isMentionOpen && (
+          <PopoverContent
+            anchor={textareaRef}
+            side="top"
+            align="start"
+            sideOffset={8}
+            collisionPadding={{
+              top: toolbarOffset,
+              left: 8,
+              right: 8,
+              bottom: 8,
+            }}
+            initialFocus={false}
+            finalFocus={false}
+            className="w-[min(36rem,calc(100vw-2rem))] gap-0 overflow-hidden p-0"
+            aria-label={
+              mentionRange?.prefix === "/"
+                ? "Commands"
+                : "Mention agents, tools, and files"
+            }
+          >
+            {isMentionLoading ? (
+              <output className="flex items-center gap-2 px-4 py-4 text-sm text-muted-foreground">
+                <Spinner />{" "}
+                {mentionRange?.prefix === "/"
+                  ? "Finding commands…"
+                  : "Finding agents, tools, and files…"}
+              </output>
+            ) : mentionError ? (
+              <div className="flex items-center justify-between gap-3 px-4 py-4">
+                <p className="text-sm text-muted-foreground">{mentionError}</p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setMentionAttempt((value) => value + 1)}
+                >
+                  Retry
+                </Button>
+              </div>
+            ) : mentionItems.length === 0 ? (
+              <div className="px-3 py-3 text-sm text-muted-foreground">
+                {mentionRange?.prefix === "/"
+                  ? "No matching commands."
+                  : "No matching agents, tools, or files. Try @agent:, @tool:, or @file:."}
+              </div>
+            ) : (
+              <Command
+                shouldFilter={false}
+                value={mentionItems[highlightedMentionIndex]?.username ?? ""}
+                onValueChange={(value) => {
+                  const index = mentionItems.findIndex(
+                    (item) => item.username === value,
+                  );
+                  if (index >= 0) setHighlightedMentionIndex(index);
+                }}
+              >
+                <CommandList
+                  ref={mentionListRef}
+                  className="chat-scrollbar max-h-[min(20rem,calc(var(--available-height)-3rem))]"
+                >
+                  {(["agent", "tool", "file"] as const).map((kind) => (
+                    <CommandGroup
+                      key={kind}
+                      heading={
+                        mentionRange?.prefix === "/"
+                          ? "Commands"
+                          : kind === "agent"
+                            ? "Agents"
+                            : kind === "tool"
+                              ? "Tools"
+                              : "Files & attachments"
+                      }
+                      className={
+                        mentionItems.some(
+                          (item) => (item.kind ?? "agent") === kind,
+                        )
+                          ? undefined
+                          : "hidden"
+                      }
+                    >
+                      {mentionItems.map((item, index) =>
+                        (item.kind ?? "agent") !== kind ? null : (
+                          <CommandItem
+                            aria-selected={index === highlightedMentionIndex}
+                            key={`${item.kind ?? "mention"}:${item.username}`}
+                            id={`${mentionListId}-item-${index}`}
+                            ref={(node) => {
+                              mentionOptionRefs.current[index] = node;
+                            }}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onSelect={() => selectMention(item)}
+                            value={item.username}
+                          >
+                            <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                              {item.icon}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate font-medium">
+                                {item.name}
+                              </span>
+                              <span className="block truncate text-xs text-muted-foreground">
+                                {item.description ??
+                                  (item.kind === "tool"
+                                    ? "Tool"
+                                    : item.kind === "file"
+                                      ? "File"
+                                      : "Agent")}
+                              </span>
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {item.command
+                                ? `/${item.command}`
+                                : item.kind === "tool"
+                                  ? "tool"
+                                  : item.kind === "file"
+                                    ? "file"
+                                    : "agent"}
+                            </span>
+                          </CommandItem>
+                        ),
+                      )}
+                    </CommandGroup>
+                  ))}
+                </CommandList>
+              </Command>
+            )}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t px-3 py-2 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <KbdGroup>
+                  <Kbd>↑</Kbd>
+                  <Kbd>↓</Kbd>
+                </KbdGroup>{" "}
+                Navigate
+              </span>
+              <span className="flex items-center gap-1">
+                <Kbd>Enter</Kbd> Select
+              </span>
+              <span className="flex items-center gap-1">
+                <Kbd>Esc</Kbd> Close
+              </span>
+            </div>
+          </PopoverContent>
+        )}
+      </div>
+    </Popover>
   );
 };
 

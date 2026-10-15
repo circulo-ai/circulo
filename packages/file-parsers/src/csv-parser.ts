@@ -6,14 +6,16 @@ import type { FileParseResult, FileParser } from "./types.js";
 import { sanitizeTextForUTF8 } from "./utils.js";
 
 const CONFIG = {
-  MAX_PREVIEW_ROWS: 1000,
   MAX_SAMPLE_ROWS: 100,
   MAX_ERRORS: 100,
   STREAM_CHUNK_SIZE: 16384,
 };
 
 export class CsvParser implements FileParser {
-  constructor(private readonly logger: Logger = createLogger("CsvParser")) {}
+  constructor(
+    private readonly logger: Logger = createLogger("CsvParser"),
+    private readonly delimiter = ",",
+  ) {}
 
   async parseFile(filePath: string): Promise<FileParseResult> {
     if (!filePath) {
@@ -58,12 +60,21 @@ export class CsvParser implements FileParser {
       let aborted = false;
 
       const parserOptions: Options = {
-        columns: true,
+        columns: (values: string[]) => {
+          headers = values.map((value) => sanitizeTextForUTF8(value));
+          processedContent = `${headers.join(", ")}\n`;
+          firstRowProcessed = true;
+          return headers;
+        },
+        group_columns_by_name: true,
+        delimiter: this.delimiter,
+        bom: true,
+        max_record_size: 500000,
         skip_empty_lines: true,
         trim: true,
-        relax_column_count: true,
-        relax_quotes: true,
-        skip_records_with_error: true,
+        relax_column_count: false,
+        relax_quotes: false,
+        skip_records_with_error: false,
         raw: false,
         cast: false,
       };
@@ -82,12 +93,21 @@ export class CsvParser implements FileParser {
             firstRowProcessed = true;
           }
 
-          if (rowCount <= CONFIG.MAX_PREVIEW_ROWS) {
+          {
             try {
               const cleanValues = Object.values(record).map((v: unknown) =>
                 sanitizeTextForUTF8(String(v ?? "")),
               );
               processedContent += `${cleanValues.join(", ")}\n`;
+              if (processedContent.length > 500000) {
+                aborted = true;
+                parser.destroy(
+                  new Error(
+                    "CSV text exceeds 500,000 characters; split the file",
+                  ),
+                );
+                break;
+              }
 
               if (rowCount <= CONFIG.MAX_SAMPLE_ROWS) {
                 sampledRows.push(record);
@@ -130,10 +150,6 @@ export class CsvParser implements FileParser {
 
       parser.on("end", () => {
         if (!aborted) {
-          if (rowCount > CONFIG.MAX_PREVIEW_ROWS) {
-            processedContent += `\n[... ${rowCount.toLocaleString()} total rows, showing first ${CONFIG.MAX_PREVIEW_ROWS} ...]\n`;
-          }
-
           this.logger.info(
             `CSV parsing complete: ${rowCount} rows, ${errorCount} errors`,
           );
@@ -145,7 +161,7 @@ export class CsvParser implements FileParser {
               headers,
               errorCount,
               errors: errors.slice(0, 10),
-              truncated: rowCount > CONFIG.MAX_PREVIEW_ROWS,
+              truncated: false,
               sampledData: sampledRows,
             },
           });

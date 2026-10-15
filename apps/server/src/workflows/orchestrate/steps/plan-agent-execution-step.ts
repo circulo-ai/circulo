@@ -40,7 +40,7 @@ const executionPlanSchema = z.object({
         .describe("Estimated time (e.g., '30s', '2m'), or null"),
       priority: z.enum(["low", "medium", "high"]),
     }),
-  ),
+  ).max(12),
   fallbackAgentId: z
     .union([z.uuid(), z.null()])
     .describe("Fallback agent if primary fails, or null"),

@@ -1,5 +1,7 @@
 "use client";
 
+import { latestWorkflowTrace } from "@/lib/chat-streaming";
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +16,7 @@ import {
   PopoverTrigger as PopoverTriggerButton,
 } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
+import { getHarnessProgress } from "@/lib/harness-progress";
 import type {
   ChatMessage,
   WorkflowAgentTrace,
@@ -28,8 +31,9 @@ import {
   Sparkles,
   XCircle,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { HarnessProgress } from "./harness-progress";
 import { ToolCallPart, type ToolPart } from "./tool-call-part";
 
 type WorkflowPart = {
@@ -59,15 +63,20 @@ export function WorkflowProcess({
   // memoizing this projection can otherwise leave the activity card stuck on
   // its first event until the terminal message arrives.
   const process = buildProcess(parts);
+  const harnessSnapshots = getHarnessProgress(parts);
   const [now, setNow] = useState(0);
   const [fallbackStartedAt, setFallbackStartedAt] = useState<number>();
   const [actionStatuses, setActionStatuses] = useState<Record<string, string>>(
     {},
   );
   const [processOpen, setProcessOpen] = useState(false);
+  const processToggledByUser = useRef(false);
   useEffect(() => {
+    if (processToggledByUser.current) return;
     if (process?.status === "running" || process?.status === "paused") {
       setProcessOpen(true);
+    } else if (process?.status === "completed") {
+      setProcessOpen(false);
     }
   }, [process?.status]);
   useEffect(() => {
@@ -180,7 +189,10 @@ export function WorkflowProcess({
   return (
     <Collapsible
       className="not-prose w-full overflow-hidden rounded-xl border bg-card text-sm text-card-foreground"
-      onOpenChange={setProcessOpen}
+      onOpenChange={(open) => {
+        processToggledByUser.current = true;
+        setProcessOpen(open);
+      }}
       open={processOpen}
     >
       <CollapsibleTrigger asChild nativeButton>
@@ -214,6 +226,9 @@ export function WorkflowProcess({
         <Separator />
 
         <div className="flex flex-col gap-1 px-3 py-2">
+          {harnessSnapshots.map((snapshot) => (
+            <HarnessProgress key={snapshot.executionId} snapshot={snapshot} />
+          ))}
           {process.classification && (
             <ProcessRow
               done
@@ -278,7 +293,12 @@ export function WorkflowProcess({
 
           {visibleProcess.approvals.map((approval) => (
             <ApprovalProcessRow
-              busy={actionStatuses[approval.id] === "updating"}
+              busy={
+                actionStatuses[approval.id] === "updating" ||
+                isReadonly ||
+                visibleProcess.status === "failed" ||
+                visibleProcess.status === "completed"
+              }
               key={`approval-${approval.id}`}
               approval={approval}
               onDecide={decideApproval}
@@ -651,8 +671,7 @@ function buildProcess(parts: ChatMessage["parts"]): BuiltProcess | null {
 
   if (events.length === 0) return null;
 
-  const trace = events.find((event) => event.type === "data-workflowTrace")
-    ?.data as WorkflowTrace | undefined;
+  const trace = latestWorkflowTrace(parts);
   if (trace) {
     return {
       status: trace.status,
@@ -1103,9 +1122,14 @@ function buildActivity(events: ProcessEvent[]): ActivityEntry[] {
         return [
           {
             id,
-            label: `${String(data.agentName ?? "Agent")} finished`,
+            label: `${String(data.agentName ?? "Agent")} ${data.status === "paused" ? "awaiting approval" : "finished"}`,
             detail: data.error ? String(data.error) : undefined,
-            status: data.status === "failed" ? "error" : "completed",
+            status:
+              data.status === "failed"
+                ? "error"
+                : data.status === "paused"
+                  ? "paused"
+                  : "completed",
             kind: "agent-completed",
             agentId: String(data.agentId ?? ""),
           },
@@ -1174,12 +1198,20 @@ function buildActivity(events: ProcessEvent[]): ActivityEntry[] {
         ];
       default:
         if (event.type.startsWith("tool-") || event.type === "dynamic-tool") {
-          const state = String(data.state ?? "input-available");
+          const pendingApproval =
+            data.output &&
+            typeof data.output === "object" &&
+            (data.output as { status?: unknown }).status === "pending" &&
+            (data.output as { approvalId?: unknown }).approvalId;
+          const state = pendingApproval
+            ? "approval-requested"
+            : String(data.state ?? "input-available");
           const name =
             event.type === "dynamic-tool"
               ? "Tool"
               : event.type
                   .replace(/^tool-/, "")
+                  .replace(/^mcp_[a-f0-9_]{36}_/, "")
                   .replace(/[-_]/g, " ")
                   .replace(/([a-z])([A-Z])/g, "$1 $2");
           const toolError =

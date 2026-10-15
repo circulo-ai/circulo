@@ -170,6 +170,7 @@ function spawnProcess(command, args, env, cwd) {
 function startLocalRuntime() {
   const root = workspaceRoot();
   const bun = process.env.CIRCULO_DESKTOP_BUN || "bun";
+  const node = process.env.CIRCULO_DESKTOP_NODE || "node";
   const secrets = loadSecrets();
   const dataDir = path.join(app.getPath("userData"), "data");
   fs.mkdirSync(dataDir, { recursive: true });
@@ -237,12 +238,13 @@ function startLocalRuntime() {
       );
     } else {
       spawnProcess(
-        bun,
+        node,
         [
-          "--cwd",
-          path.join(root, "apps/web"),
+          path.join(root, "apps/web/node_modules/next/dist/bin/next"),
           "dev",
-          "--",
+          "--webpack",
+          "-H",
+          "127.0.0.1",
           "-p",
           String(WEB_PORT),
         ],
@@ -252,7 +254,7 @@ function startLocalRuntime() {
           SERVER_API_URL: apiUrl,
           NEXT_PUBLIC_BETTER_AUTH_URL: apiUrl,
         },
-        root,
+        path.join(root, "apps/web"),
       );
     }
   }
@@ -343,6 +345,8 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // Chromium's built-in PDF viewer is a plugin; attachment previews need it.
+      plugins: true,
       preload: path.join(__dirname, "preload.cjs"),
     },
   });

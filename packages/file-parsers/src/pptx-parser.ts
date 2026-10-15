@@ -19,32 +19,17 @@ export class PptxParser implements FileParser {
   }
 
   async parseBuffer(buffer: Buffer): Promise<FileParseResult> {
-    const officeParser = await import("officeparser");
-    const parsed = await new Promise<{ value: string; metadata?: unknown }>(
-      (resolve, reject) => {
-        (officeParser as any).parseOfficeAsync(
-          buffer,
-          {
-            contentType:
-              "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-          },
-          (err: unknown, data: any) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(data);
-            }
-          },
-        );
-      },
+    const { parseOfficeAsync } = await import("officeparser");
+    const content = sanitizeTextForUTF8(
+      await parseOfficeAsync(buffer, {
+        outputErrorToConsole: false,
+        newlineDelimiter: "\n",
+      }),
     );
-
-    const content = sanitizeTextForUTF8(parsed?.value ?? "");
 
     return {
       content,
       metadata: {
-        meta: parsed?.metadata,
         characterCount: content.length,
         tokenCount: Math.floor(content.length / 4),
         source: "officeparser",

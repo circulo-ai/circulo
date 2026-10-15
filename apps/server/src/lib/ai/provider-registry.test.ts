@@ -67,6 +67,14 @@ describe("AI provider registry", () => {
     expect(message).not.toContain("another-secret");
     expect(message).toContain("[redacted]");
   });
+  it("explains a provider billing rejection without exposing its response body", () => {
+    const error = Object.assign(new Error("Private provider response"), {
+      statusCode: 402,
+      responseBody: "private-account-metadata",
+    });
+    expect(redactProviderError(error)).toContain("credit or spending limit");
+    expect(redactProviderError(error)).not.toContain("Private");
+  });
 
   it("estimates direct-provider cost when provider metadata is absent", () => {
     expect(

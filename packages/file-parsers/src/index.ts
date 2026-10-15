@@ -1,20 +1,86 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { createLogger, type Logger } from "./logger.js";
-import type {
-  FileParseResult,
-  FileParser,
-  SupportedFileType,
-} from "./types.js";
+import type { FileParseResult, FileParser } from "./types.js";
 
-let parserInstancesPromise: Promise<Record<string, FileParser>> | null = null;
-
-type ParserLoaders = {
-  [K in SupportedFileType]?: () => Promise<FileParser>;
-};
+type ParserLoaders = Record<string, () => Promise<FileParser>>;
+export const TEXT_FILE_EXTENSIONS = [
+  "txt",
+  "md",
+  "markdown",
+  "log",
+  "ts",
+  "tsx",
+  "js",
+  "jsx",
+  "mjs",
+  "cjs",
+  "py",
+  "java",
+  "rs",
+  "go",
+  "c",
+  "cpp",
+  "h",
+  "css",
+  "scss",
+  "sql",
+  "sh",
+  "ps1",
+  "toml",
+  "xml",
+  "ini",
+  "env",
+  "jsonl",
+] as const;
+export const SUPPORTED_FILE_EXTENSIONS = [
+  ...TEXT_FILE_EXTENSIONS,
+  "pdf",
+  "csv",
+  "tsv",
+  "doc",
+  "docx",
+  "xlsx",
+  "xls",
+  "ods",
+  "odt",
+  "odp",
+  "html",
+  "htm",
+  "pptx",
+  "json",
+  "yaml",
+  "yml",
+] as const;
 
 function buildLoaders(logger: Logger): ParserLoaders {
   return {
+    ...Object.fromEntries(
+      TEXT_FILE_EXTENSIONS.map((extension) => [
+        extension,
+        async () => {
+          const { TxtParser } = await import("./txt-parser.js");
+          return new TxtParser(createLogger("TxtParser", logger));
+        },
+      ]),
+    ),
+    tsv: async () => {
+      const { CsvParser } = await import("./csv-parser.js");
+      return new CsvParser(createLogger("CsvParser", logger), "\t");
+    },
+    ...Object.fromEntries(
+      ["odt", "odp"].map((extension) => [
+        extension,
+        async () => {
+          const { PptxParser } = await import("./pptx-parser.js");
+          return new PptxParser(createLogger("OfficeParser", logger));
+        },
+      ]),
+    ),
+    ods: async () => {
+      const { XlsxParser } = await import("./xlsx-parser.js");
+      return new XlsxParser(createLogger("XlsxParser", logger));
+    },
     pdf: async () => {
       const { PdfParser } = await import("./pdf-parser.js");
       return new PdfParser(createLogger("PdfParser", logger));
@@ -51,10 +117,6 @@ function buildLoaders(logger: Logger): ParserLoaders {
       const { PptxParser } = await import("./pptx-parser.js");
       return new PptxParser(createLogger("PptxParser", logger));
     },
-    ppt: async () => {
-      const { PptxParser } = await import("./pptx-parser.js");
-      return new PptxParser(createLogger("PptParser", logger));
-    },
     html: async () => {
       const { HtmlParser } = await import("./html-parser.js");
       return new HtmlParser(createLogger("HtmlParser", logger));
@@ -87,41 +149,34 @@ function buildLoaders(logger: Logger): ParserLoaders {
   };
 }
 
-async function getParserInstances(logger: Logger) {
-  if (!parserInstancesPromise) {
-    const loaders = buildLoaders(logger);
-    parserInstancesPromise = (async () => {
-      const entries = await Promise.all(
-        Object.entries(loaders).map(async ([ext, loader]) => {
-          try {
-            const parser = await loader!();
-            return [ext, parser] as const;
-          } catch (error) {
-            logger.error(`Failed to load parser for ${ext}:`, error);
-            return null;
-          }
-        }),
-      );
-      const ready: Record<string, FileParser> = {};
-      for (const entry of entries) {
-        if (entry) ready[entry[0]] = entry[1];
-      }
-      return ready;
-    })();
-  }
-  return parserInstancesPromise;
-}
-
 export type FileParserConfig = {
   logger?: Logger;
 };
 
 function normalizeExtension(ext: string): string {
-  return ext.toLowerCase();
+  return ext.trim().replace(/^\./, "").toLowerCase();
 }
 
 export function createFileParser(config: FileParserConfig = {}) {
   const logger = createLogger("FileParser", config.logger);
+  const loaders = buildLoaders(logger);
+  const parsers = new Map<string, Promise<FileParser>>();
+  function getParser(extension: string): Promise<FileParser> {
+    const loader = loaders[extension];
+    if (!loader)
+      throw new Error(
+        `Unsupported file type: ${extension}. Supported types: ${SUPPORTED_FILE_EXTENSIONS.join(", ")}. Convert legacy .ppt presentations to .pptx.`,
+      );
+    let parser = parsers.get(extension);
+    if (!parser) {
+      parser = loader().catch((error) => {
+        parsers.delete(extension);
+        throw error;
+      });
+      parsers.set(extension, parser);
+    }
+    return parser;
+  }
 
   async function parseFile(filePath: string): Promise<FileParseResult> {
     if (!filePath) {
@@ -133,17 +188,10 @@ export function createFileParser(config: FileParserConfig = {}) {
     }
 
     const extension = normalizeExtension(path.extname(filePath).slice(1));
-    const parsers = await getParserInstances(logger);
-    const parser = parsers[extension];
-    if (!parser) {
-      throw new Error(
-        `Unsupported file type: ${extension}. Supported types are: ${Object.keys(
-          parsers,
-        ).join(", ")}`,
-      );
-    }
-
-    return parser.parseFile(filePath);
+    const { readFile, stat } = await import("node:fs/promises");
+    if ((await stat(filePath)).size > 25 * 1024 * 1024)
+      throw new Error("Files must be 25 MB or smaller");
+    return parseBuffer(await readFile(filePath), extension);
   }
 
   async function parseBuffer(
@@ -158,33 +206,59 @@ export function createFileParser(config: FileParserConfig = {}) {
       throw new Error("No file extension provided");
     }
 
+    if (buffer.length > 25 * 1024 * 1024)
+      throw new Error("Files must be 25 MB or smaller");
     const normalizedExtension = normalizeExtension(extension);
-    const parsers = await getParserInstances(logger);
-    const parser = parsers[normalizedExtension];
-    if (!parser) {
-      throw new Error(
-        `Unsupported file type: ${normalizedExtension}. Supported types are: ${Object.keys(
-          parsers,
-        ).join(", ")}`,
-      );
-    }
-
-    if (parser.parseBuffer) {
-      return parser.parseBuffer(buffer);
-    }
-    throw new Error(
-      `Parser for ${normalizedExtension} does not support buffer parsing`,
+    const { validateParserBuffer, decodeTextBuffer } = await import(
+      "./validation.js"
     );
+    validateParserBuffer(buffer, normalizedExtension);
+    if (
+      [
+        ...TEXT_FILE_EXTENSIONS,
+        "csv",
+        "tsv",
+        "json",
+        "yaml",
+        "yml",
+        "html",
+        "htm",
+      ].includes(normalizedExtension)
+    ) {
+      const text = decodeTextBuffer(buffer);
+      if (text.length > 500000)
+        throw new Error("Text exceeds 500,000 characters; split the document");
+      buffer = Buffer.from(text, "utf8");
+    }
+    const parser = await getParser(normalizedExtension);
+    if (!parser.parseBuffer)
+      throw new Error(`Parser for ${normalizedExtension} cannot parse buffers`);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const result = await Promise.race([
+        parser.parseBuffer(buffer),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () =>
+              reject(
+                new Error("File parsing timed out; split or convert the file"),
+              ),
+            30000,
+          );
+        }),
+      ]);
+      if (result.content.length > 500000)
+        throw new Error(
+          "Parsed text exceeds 500,000 characters; split the document",
+        );
+      return result;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 
   async function isSupportedFileType(extension: string): Promise<boolean> {
-    try {
-      const parsers = await getParserInstances(logger);
-      return Object.keys(parsers).includes(normalizeExtension(extension));
-    } catch (error) {
-      logger.error("Error checking supported file type:", error);
-      return false;
-    }
+    return Boolean(loaders[normalizeExtension(extension)]);
   }
 
   return { parseFile, parseBuffer, isSupportedFileType };
@@ -208,7 +282,6 @@ export { TxtParser } from "./txt-parser.js";
 export type {
   FileParseResult,
   FileParser,
-  SupportedFileType,
 } from "./types.js";
 export { XlsxParser } from "./xlsx-parser.js";
 export { parseYAML, parseYAMLBuffer } from "./yaml-parser.js";

@@ -669,6 +669,12 @@ export function WorkspaceTools({
                           </div>
                           <div className="flex items-center gap-2 self-end sm:self-auto">
                             <Select
+                              items={[
+                                { value: "auto", label: "Auto" },
+                                { value: "prompt", label: "Ask first" },
+                                { value: "writes", label: "Ask for writes" },
+                                { value: "approve", label: "Always ask" },
+                              ]}
                               value={tool.approvalMode}
                               onValueChange={(approvalMode) =>
                                 void updateTool(integration.id, tool.id, {
@@ -689,7 +695,7 @@ export function WorkspaceTools({
                                     Ask for writes
                                   </SelectItem>
                                   <SelectItem value="approve">
-                                    Always approve
+                                    Always ask
                                   </SelectItem>
                                 </SelectGroup>
                               </SelectContent>
@@ -723,6 +729,14 @@ export function WorkspaceTools({
                       <Field>
                         <FieldLabel>Scope</FieldLabel>
                         <Select
+                          items={[
+                            {
+                              value: "organization",
+                              label: "Entire workspace",
+                            },
+                            { value: "chat", label: "One chat" },
+                            { value: "agent", label: "One agent" },
+                          ]}
                           value={scope.type}
                           onValueChange={(value) =>
                             setScope((current) => ({
@@ -752,6 +766,7 @@ export function WorkspaceTools({
                             {scope.type === "chat" ? "Chat" : "Agent"}
                           </FieldLabel>
                           <Select
+                            items={availableTargets}
                             value={scope.targetId}
                             onValueChange={(value) =>
                               setScope((current) => ({
@@ -833,6 +848,8 @@ export function WorkspaceTools({
                       </Combobox>
                       <FieldDescription>
                         Leave blank to allow all discovered tools in this scope.
+                        Access scopes are additive; an unrestricted workspace
+                        scope grants all enabled tools throughout the workspace.
                       </FieldDescription>
                     </Field>
                     <Button
@@ -944,6 +961,10 @@ export function WorkspaceTools({
             <Field>
               <FieldLabel>Transport</FieldLabel>
               <Select
+                items={[
+                  { value: "streamable_http", label: "Streamable HTTP" },
+                  { value: "sse", label: "Server-sent events" },
+                ]}
                 value={form.transport}
                 onValueChange={(value) =>
                   setForm((current) => ({

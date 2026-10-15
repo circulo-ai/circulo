@@ -45,6 +45,7 @@ export function ChatSidebarSearch({
         disabled={open ? undefined : true}
         placeholder="Search chats and messages"
         type="search"
+        className="[&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
@@ -65,5 +66,3 @@ export function ChatSidebarSearch({
     </CustomInputGroup>
   );
 }
-
-// TODO save search state when sidebar collapses and use it when it extends

@@ -12,9 +12,12 @@ export class WorkflowOutputChannel {
   private readonly listeners = new Set<Listener>();
   private closed = false;
   private textMessageStarted = false;
+  private readonly deliveredEventIds = new Set<string>();
 
-  write(chunk: CustomUIMessageChunk): void {
+  write(chunk: CustomUIMessageChunk, eventId?: string): void {
     if (this.closed) return;
+    if (eventId && this.deliveredEventIds.has(eventId)) return;
+    if (eventId) this.deliveredEventIds.add(eventId);
     if (chunk.type === "text-start") this.textMessageStarted = true;
     this.chunks.push(chunk);
     this.notify();
@@ -128,8 +131,9 @@ export function getWorkflowOutputChannel(
 export function publishWorkflowChunk(
   workflowId: string,
   chunk: CustomUIMessageChunk,
+  eventId?: string,
 ): void {
-  channels.get(workflowId)?.write(chunk);
+  channels.get(workflowId)?.write(chunk, eventId);
 }
 
 export function closeWorkflowOutputChannel(workflowId: string): void {

@@ -5,6 +5,7 @@ import {
 } from "@/lib/ai/providers";
 import type { ChatMessage } from "@/lib/types";
 import { getTextFromMessages } from "@/lib/utils";
+import { getHarnessSignal } from "@/workflows/harness/cancellation";
 import type { ChatContext } from "@/workflows/orchestrate/steps/load-chat-step";
 import { generateText, Output } from "ai";
 import { asc, eq } from "drizzle-orm";
@@ -114,6 +115,12 @@ export async function evaluateAgentProgressStep(params: {
     success: result.success,
     output: (result.output ?? "").slice(0, MAX_RESULT_CHARACTERS),
     error: result.error,
+    verification: result.harness,
+    toolOutcomes: result.toolCalls?.map((call) => ({
+      toolName: call.toolName,
+      status: call.status,
+      error: call.error,
+    })),
   }));
 
   const { output } = await withModelFallback({
@@ -124,6 +131,7 @@ export async function evaluateAgentProgressStep(params: {
       params.orchestrationFallbackModel ?? orchestrationFallbackModel,
     run: (model) =>
       generateText({
+        abortSignal: getHarnessSignal(params.workflowId),
         model,
         output: Output.object({ schema: agentProgressDecisionSchema }),
         system: `${formatOrchestrationAgentProfile(params.orchestrationAgent)}${params.orchestrationAgent ? "\n\n" : ""}You are the progress controller for a durable multi-agent workflow.
@@ -137,6 +145,7 @@ Rules:
 - Never select an agent that is not in AVAILABLE AGENTS.
 - Do not repeat an already completed agent/task unless the next task is materially different.
 - Prefer complete when the goal is satisfied; do not create work merely to extend the loop.
+- A successful model response is not proof of completing an external action. Check actual tool outcomes and the execution checklist. Pending approvals, budget exhaustion, and unfinished requirements are not completion.
 - The orchestration controller can finish work about workflows, orchestration, agents, tools, MCP, planning, harness behavior, and chat coordination itself. Mark complete when that controller-owned goal is satisfied instead of routing it to a specialist.
 - Never create a handoff just because another agent is available. Continue only when a distinct capability is genuinely required.
 - A blocked decision must not include next steps.
@@ -161,10 +170,18 @@ ${JSON.stringify(params.classification, null, 2)}`,
     if (
       !enabledAgentIds.has(step.agentId) ||
       seenTasks.has(taskKey) ||
-      params.previousResults.some(
+      params.previousResults
+        .filter(
+          (result) =>
+            result.agentId === step.agentId &&
+            result.task.trim() === step.task.trim(),
+        )
+        .some((result) => result.success) ||
+      params.previousResults.filter(
         (result) =>
-          result.agentId === step.agentId && result.task === step.task,
-      )
+          result.agentId === step.agentId &&
+          result.task.trim() === step.task.trim(),
+      ).length >= 2
     ) {
       return false;
     }
@@ -181,5 +198,26 @@ ${JSON.stringify(params.classification, null, 2)}`,
       nextSteps: [],
     };
   }
-  return { ...output, nextSteps };
+  if (output.decision === "complete") {
+    const latest = new Map<string, AgentExecutionResult>();
+    for (const result of params.previousResults)
+      latest.set(`${result.agentId}\u001f${result.task.trim()}`, result);
+    if (
+      !latest.size ||
+      [...latest.values()].some(
+        (result) => !result.success || result.harness?.status === "blocked",
+      )
+    ) {
+      return {
+        decision: "blocked",
+        reasoning:
+          "The controller proposed completion while required work is still failed or unverified.",
+        nextSteps: [],
+      };
+    }
+  }
+  return {
+    ...output,
+    nextSteps: output.decision === "continue" ? nextSteps : [],
+  };
 }

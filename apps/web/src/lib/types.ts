@@ -19,12 +19,13 @@ export type WorkflowToolTrace = {
 };
 
 export type WorkflowAgentTrace = {
+  harness?: import("@circulo-ai/types").HarnessSnapshot;
   agentId: string;
   agentName: string;
   model?: string;
   avatarUrl?: string | null;
   task: string;
-  status: "running" | "completed" | "failed" | "skipped";
+  status: "running" | "paused" | "completed" | "failed" | "skipped";
   startedAt?: string;
   completedAt?: string;
   durationMs?: number;
@@ -84,6 +85,16 @@ export type DataPart = { type: "append-message"; message: string };
 
 export const messageMetadataSchema = z.object({
   createdAt: z.string(),
+  mentions: z
+    .array(
+      z.object({
+        kind: z.enum(["agent", "tool", "file"]),
+        key: z.string().min(1).max(200),
+        label: z.string().max(200).optional(),
+      }),
+    )
+    .max(20)
+    .optional(),
 });
 
 export type MessageMetadata = z.infer<typeof messageMetadataSchema>;
@@ -93,6 +104,7 @@ export type ChatTools = Record<string, any>;
 export type SuggestionStreamData = Omit<Suggestion, "userId" | "createdAt">;
 
 export type CustomUIDataTypes = {
+  workflowHarnessProgress: import("@circulo-ai/types").HarnessSnapshot;
   textDelta: string;
   imageDelta: string;
   sheetDelta: string;

@@ -35,6 +35,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { getAuthCookiePolicy } from "./auth/cookie-policy";
 import {
   authorizeUserProvisioning,
   finalizeBootstrap,
@@ -1770,16 +1771,12 @@ const authOptions: BetterAuthOptions = {
         ? { trustedProxies: trustedProxyIps }
         : {}),
     },
-    defaultCookieAttributes: {
-      // Secure cross-site cookies are required in production, but they are
-      // rejected by browsers when local development runs over plain HTTP.
-      sameSite: isProduction ? "none" : "lax",
-      secure: isProduction,
-      ...(isProduction ? { partitioned: true } : {}), // Partitioned cookies also require Secure.
-    },
-    crossSubDomainCookies: {
-      enabled: isProduction,
-    },
+    ...getAuthCookiePolicy({
+      production: isProduction,
+      runtimeKind: getRuntimeKind(),
+      authUrl: env.BETTER_AUTH_URL ?? "http://localhost:3002",
+      appUrl: env.NEXT_PUBLIC_APP_URL,
+    }),
   },
 };
 

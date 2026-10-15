@@ -1,4 +1,8 @@
 import {
+  knowledgeSemanticDistance,
+  relevantKnowledgeContent,
+} from "@/lib/knowledge/semantic-distance";
+import {
   chatMember,
   chat as chatTable,
   db,
@@ -140,6 +144,7 @@ export async function loadChatContextStep(
   const queryEmbeddingResult = queryText?.trim()
     ? await createKnowledgeEmbeddingWithMetadata(queryText.trim(), "", {
         userId,
+        organizationId: chat.organizationId,
       }).catch(() => null)
     : null;
   const queryEmbedding = queryEmbeddingResult?.embedding ?? null;
@@ -147,7 +152,7 @@ export async function loadChatContextStep(
     ? sql`to_tsvector('simple', ${knowledgeDocument.title} || ' ' || ${knowledgeDocument.content}) @@ plainto_tsquery('simple', ${queryText.trim()})`
     : null;
   const semanticDistance = queryEmbedding
-    ? sql<number>`${knowledgeDocument.embedding} <=> ${JSON.stringify(queryEmbedding)}::vector`
+    ? knowledgeSemanticDistance(queryEmbeddingResult)
     : null;
   const knowledgeDocuments = uniqueKnowledgeBaseIds.length
     ? await db.query.knowledgeDocument.findMany({
@@ -159,7 +164,7 @@ export async function loadChatContextStep(
             ? [
                 queryEmbedding
                   ? or(
-                      sql`${knowledgeDocument.embedding} IS NOT NULL`,
+                      sql`${knowledgeSemanticDistance(queryEmbeddingResult)} IS NOT NULL`,
                       lexicalKnowledgeMatch!,
                       sql`${knowledgeDocument.contentType} LIKE 'image/%'`,
                     )
@@ -174,7 +179,7 @@ export async function loadChatContextStep(
         orderBy: queryEmbedding
           ? [
               asc(
-                sql`CASE WHEN ${knowledgeDocument.embedding} IS NULL THEN 1 ELSE 0 END`,
+                sql`CASE WHEN ${knowledgeSemanticDistance(queryEmbeddingResult)} IS NULL THEN 1 ELSE 0 END`,
               ),
               asc(semanticDistance!),
               desc(
@@ -200,10 +205,10 @@ export async function loadChatContextStep(
   const currentMember = members.find((member) => member.userId === userId);
   const canReadChatMemory = Boolean(
     currentMember &&
-    (currentMember.role === "owner" ||
-      currentMember.role === "admin" ||
-      currentMember.canManageKnowledge ||
-      canReadOrganizationMemory),
+      (currentMember.role === "owner" ||
+        currentMember.role === "admin" ||
+        currentMember.canManageKnowledge ||
+        canReadOrganizationMemory),
   );
   const readableAgentIds = agentIds;
   const userMemoryPreference = await db.query.memoryPreference.findFirst({
@@ -349,7 +354,14 @@ export async function loadChatContextStep(
   }
 
   const knowledgeDocumentsWithImages = await Promise.all(
-    knowledgeDocuments.map(async (document) => {
+    knowledgeDocuments.map(async (sourceDocument) => {
+      const document = {
+        ...sourceDocument,
+        content: await relevantKnowledgeContent(
+          sourceDocument,
+          queryEmbeddingResult,
+        ),
+      };
       if (!isKnowledgeImageDocument(document)) return { document };
       const assetKey = getKnowledgeAssetKey(document.metadata);
       if (!assetKey) return { document };

@@ -1,0 +1,1 @@
+CREATE INDEX "embedding_chunks_org_model_idx" ON "embedding_chunks" USING btree ("organization_id","model");

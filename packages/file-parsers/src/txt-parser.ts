@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { createLogger, type Logger } from "./logger.js";
 import type { FileParseResult, FileParser } from "./types.js";
 import { sanitizeTextForUTF8 } from "./utils.js";
+import { decodeTextBuffer } from "./validation.js";
 
 export class TxtParser implements FileParser {
   constructor(readonly _logger: Logger = createLogger("TxtParser")) {}
@@ -12,7 +13,7 @@ export class TxtParser implements FileParser {
   }
 
   async parseBuffer(buffer: Buffer): Promise<FileParseResult> {
-    const content = sanitizeTextForUTF8(buffer.toString("utf8"));
+    const content = sanitizeTextForUTF8(decodeTextBuffer(buffer));
     return {
       content,
       metadata: {

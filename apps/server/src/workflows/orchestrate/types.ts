@@ -6,10 +6,12 @@ export interface WorkflowActor {
   organizationId: string;
   /** Preserve request-scoped API-key restrictions across durable execution. */
   apiKeyPermissions?: ApiKeyPermissions;
+  apiKeyId?: string;
+  timeZone?: string;
 }
 
 export type PromptMention = {
-  kind: "agent" | "tool";
+  kind: "agent" | "tool" | "file";
   key: string;
   label?: string;
 };

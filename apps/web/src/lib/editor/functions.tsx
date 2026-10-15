@@ -1,21 +1,24 @@
 "use client";
 
-import { defaultMarkdownSerializer } from "prosemirror-markdown";
-import { DOMParser, type Node } from "prosemirror-model";
+import {
+  defaultMarkdownParser,
+  defaultMarkdownSerializer,
+  MarkdownParser,
+} from "prosemirror-markdown";
+import { type Node } from "prosemirror-model";
 import { Decoration, DecorationSet, type EditorView } from "prosemirror-view";
-import { renderToString } from "react-dom/server";
-
-import { Response } from "@/components/ai-elements/response";
 
 import { documentSchema } from "./config";
 import { createSuggestionWidget, type UISuggestion } from "./suggestions";
 
 export const buildDocumentFromContent = (content: string) => {
-  const parser = DOMParser.fromSchema(documentSchema);
-  const stringFromMarkdown = renderToString(<Response>{content}</Response>);
-  const tempContainer = document.createElement("div");
-  tempContainer.innerHTML = stringFromMarkdown;
-  return parser.parse(tempContainer);
+  // Streaming React renderers need effects and cannot provide synchronous
+  // editor content through renderToString. Parse Markdown directly instead.
+  return new MarkdownParser(
+    documentSchema,
+    defaultMarkdownParser.tokenizer,
+    defaultMarkdownParser.tokens,
+  ).parse(content);
 };
 
 export const buildContentFromDocument = (document: Node) => {

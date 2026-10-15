@@ -12,7 +12,6 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
-    "preserveSymlinks": true,
     "types": ["node"],
     "baseUrl": ".",
     "paths": {

@@ -1,0 +1,1 @@
+ALTER TABLE "workflow_webhooks" ADD COLUMN "actor_api_key_id" text;

@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import * as XLSX from "xlsx";
 import { createLogger, type Logger } from "./logger.js";
 import type { FileParseResult, FileParser } from "./types.js";
@@ -14,11 +15,11 @@ export class XlsxParser implements FileParser {
     if (!existsSync(filePath)) {
       throw new Error(`File not found: ${filePath}`);
     }
-    const workbook = XLSX.readFile(filePath, { cellDates: true });
-    return this.parseWorkbook(workbook);
+    return this.parseBuffer(await readFile(filePath));
   }
 
   async parseBuffer(buffer: Buffer): Promise<FileParseResult> {
+    XLSX.set_cptable(await import("xlsx/dist/cpexcel.full.mjs"));
     const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
     return this.parseWorkbook(workbook);
   }
@@ -35,6 +36,13 @@ export class XlsxParser implements FileParser {
     sheets.forEach((sheetName) => {
       const worksheet = workbook.Sheets[sheetName];
       if (!worksheet) return;
+      const range = XLSX.utils.decode_range(worksheet["!ref"] ?? "A1");
+      if ((range.e.r - range.s.r + 1) * (range.e.c - range.s.c + 1) > 1000000)
+        throw new Error(
+          "Spreadsheet range exceeds one million cells; split the sheet",
+        );
+      if (sheets.length > 100)
+        throw new Error("Spreadsheets must contain at most 100 sheets");
 
       const rows = XLSX.utils.sheet_to_json(worksheet, {
         header: 1,
@@ -48,6 +56,10 @@ export class XlsxParser implements FileParser {
       );
       content += sanitizedRows.map((r) => r.join(", ")).join("\n");
       content += "\n\n";
+      if (content.length > 500000)
+        throw new Error(
+          "Spreadsheet text exceeds 500,000 characters; split the file",
+        );
     });
 
     content = sanitizeTextForUTF8(content);

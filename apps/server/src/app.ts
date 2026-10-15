@@ -34,6 +34,7 @@ import health from "@/routes/health";
 import history from "@/routes/history";
 import instance from "@/routes/instance";
 import knowledge from "@/routes/knowledge";
+import embeddingSettings from "@/routes/embedding-settings";
 import memories from "@/routes/memories";
 import messages from "@/routes/messages";
 import models from "@/routes/models";
@@ -143,6 +144,7 @@ const routes = [
   history,
   instance,
   knowledge,
+  embeddingSettings,
   memories,
   newsletter,
   suggestions,

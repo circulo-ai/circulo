@@ -8,6 +8,24 @@ import {
 } from "./output-channel";
 
 describe("WorkflowOutputChannel", () => {
+  it("delivers live and durable copies once while preserving repeated token text", async () => {
+    const channel = new WorkflowOutputChannel();
+    const delta: CustomUIMessageChunk = {
+      type: "text-delta",
+      id: "reply",
+      delta: "ha",
+    };
+    channel.write(delta, "event-a");
+    channel.write(delta, "event-a");
+    channel.write(delta, "event-b");
+    channel.write(delta, "event-b");
+    channel.close();
+    const reader = channel.createReadable().getReader();
+    expect((await reader.read()).value).toEqual(delta);
+    expect((await reader.read()).value).toEqual(delta);
+    expect((await reader.read()).done).toBe(true);
+    expect(channel.size).toBe(2);
+  });
   it("replays buffered chunks and closes after the terminal chunk", async () => {
     const channel = new WorkflowOutputChannel();
     const terminal: CustomUIMessageChunk = {

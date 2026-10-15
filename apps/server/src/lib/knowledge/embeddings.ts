@@ -1,129 +1,78 @@
-import { db, knowledgeDocument } from "@/db";
-import { getUserProviderCredential } from "@/lib/ai/provider-registry";
-import { env } from "@/lib/env";
-import { eq } from "drizzle-orm";
+import {
+  db,
+  embeddingChunk,
+  embeddingPreference,
+  knowledgeDocument,
+} from "@/db";
+import { and, eq } from "drizzle-orm";
+import {
+  embeddingPreferencesSchema,
+  type EmbeddingPreferences,
+} from "@circulo-ai/types";
 import {
   averageKnowledgeEmbeddings,
   chunkKnowledgeText,
-  isKnowledgeEmbedding,
 } from "./embedding-utils";
-
+import {
+  getEmbeddingPreferences,
+  resolveEmbeddingConfig,
+} from "./embedding-settings";
+import { requestEmbeddingVectors } from "./embedding-provider";
 export {
   averageKnowledgeEmbeddings,
   chunkKnowledgeText,
   KNOWLEDGE_EMBEDDING_DIMENSIONS,
 } from "./embedding-utils";
 
-const DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
-const DEFAULT_EMBEDDING_MODEL = "openai/text-embedding-3-small";
-const DEFAULT_OPENAI_EMBEDDING_MODEL = "text-embedding-3-small";
-
-type EmbeddingResponse = {
-  data?: Array<{ embedding?: number[] }>;
+export type EmbeddingResult = {
+  embedding: number[];
+  model: string;
+  chunks: Array<{ content: string; embedding: number[]; ordinal: number }>;
+  preferences: EmbeddingPreferences;
+  sourceText: string;
 };
-
-function getBaseUrl() {
-  return (env.OPENROUTER_BASE_URL ?? DEFAULT_OPENROUTER_BASE_URL).replace(
-    /\/$/,
-    "",
-  );
-}
-
-async function getEmbeddingConfig(userId?: string) {
-  if (userId) {
-    const credential =
-      (await getUserProviderCredential(userId, "openrouter")) ??
-      (await getUserProviderCredential(userId, "openai"));
-    if (!credential) return null;
-    return {
-      apiKey: credential.apiKey,
-      baseUrl:
-        credential.baseUrl ??
-        (credential.providerId === "openai"
-          ? "https://api.openai.com/v1"
-          : DEFAULT_OPENROUTER_BASE_URL),
-      model:
-        credential.providerId === "openai"
-          ? DEFAULT_OPENAI_EMBEDDING_MODEL
-          : getEmbeddingModel(),
-    };
-  }
-
-  if (!env.OPENROUTER_API_KEY) return null;
-  return {
-    apiKey: env.OPENROUTER_API_KEY,
-    baseUrl: getBaseUrl(),
-    model: getEmbeddingModel(),
-  };
-}
-
-function getEmbeddingModel() {
-  return env.CIRCULO_EMBEDDING_MODEL ?? DEFAULT_EMBEDDING_MODEL;
-}
-
 export async function createKnowledgeEmbedding(
   title: string,
   content: string,
-  options?: { userId?: string },
-): Promise<number[] | null> {
-  const result = await createKnowledgeEmbeddingWithMetadata(
-    title,
-    content,
-    options,
+  options?: { userId?: string; organizationId?: string },
+) {
+  return (
+    (await createKnowledgeEmbeddingWithMetadata(title, content, options))
+      ?.embedding ?? null
   );
-  return result?.embedding ?? null;
 }
-
 export async function createKnowledgeEmbeddingWithMetadata(
   title: string,
   content: string,
-  options?: { userId?: string },
-): Promise<{ embedding: number[]; model: string } | null> {
-  const config = await getEmbeddingConfig(options?.userId);
+  options?: {
+    userId?: string;
+    organizationId?: string;
+    preferences?: EmbeddingPreferences;
+    signal?: AbortSignal;
+  },
+): Promise<EmbeddingResult | null> {
+  const preferences =
+    options?.preferences ??
+    (await getEmbeddingPreferences(options?.organizationId));
+  const config = await resolveEmbeddingConfig(options?.userId, preferences);
   if (!config) return null;
-
-  const chunks = chunkKnowledgeText(`${title}\n\n${content}`);
+  const chunks = chunkKnowledgeText(`${title}\n\n${content}`, preferences);
   if (!chunks.length) return null;
-
-  const response = await fetch(`${config.baseUrl}/embeddings`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${config.apiKey}`,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      ...(env.OPENROUTER_HTTP_REFERER
-        ? { "HTTP-Referer": env.OPENROUTER_HTTP_REFERER }
-        : {}),
-      ...(env.OPENROUTER_APP_TITLE
-        ? { "X-Title": env.OPENROUTER_APP_TITLE }
-        : {}),
-    },
-    body: JSON.stringify({
-      model: config.model,
-      input: chunks,
-    }),
-    signal: AbortSignal.timeout(15_000),
-  });
-
-  if (!response.ok) {
-    const providerMessage = (await response.text()).slice(0, 500);
-    throw new Error(
-      `Embedding request failed (${response.status})${providerMessage ? `: ${providerMessage}` : ""}`,
-    );
-  }
-
-  const payload = (await response.json()) as EmbeddingResponse;
-  const vectors = (payload.data ?? [])
-    .map((item) => item.embedding)
-    .filter((item): item is number[] => isKnowledgeEmbedding(item));
-  if (vectors.length !== chunks.length) {
-    throw new Error(
-      `Embedding provider returned ${vectors.length} valid vectors for ${chunks.length} chunks`,
-    );
-  }
+  const vectors = await requestEmbeddingVectors(
+    config,
+    chunks,
+    options?.signal,
+  );
   return {
     embedding: averageKnowledgeEmbeddings(vectors),
-    model: config.model,
+    model: config.identity,
+    chunks: chunks.map((content, ordinal) => ({
+      content,
+      ordinal,
+      embedding: vectors[ordinal]!,
+    })),
+    preferences,
+    sourceText: `${title}\n\n${content}`,
   };
 }
 
@@ -132,22 +81,66 @@ export async function refreshKnowledgeDocumentEmbedding(params: {
   title: string;
   content: string;
   userId?: string;
+  organizationId?: string;
+  signal?: AbortSignal;
 }): Promise<boolean> {
+  const document = await db.query.knowledgeDocument.findFirst({
+    where: eq(knowledgeDocument.id, params.documentId),
+  });
+  if (
+    !document ||
+    document.title !== params.title ||
+    document.content !== params.content
+  )
+    return false;
   const result = await createKnowledgeEmbeddingWithMetadata(
     params.title,
     params.content,
-    params.userId ? { userId: params.userId } : undefined,
+    {
+      userId: params.userId,
+      organizationId: document.organizationId,
+      signal: params.signal,
+    },
   );
   if (!result) return false;
-
-  await db
-    .update(knowledgeDocument)
-    .set({
-      embedding: result.embedding,
-      embeddingModel: result.model,
-      embeddingUpdatedAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .where(eq(knowledgeDocument.id, params.documentId));
-  return true;
+  return db.transaction(async (tx) => {
+    const [settings] = await tx
+      .select()
+      .from(embeddingPreference)
+      .where(eq(embeddingPreference.organizationId, document.organizationId))
+      .for("update");
+    if (
+      JSON.stringify(embeddingPreferencesSchema.parse(settings?.config)) !==
+      JSON.stringify(result.preferences)
+    )
+      return false;
+    const [updated] = await tx
+      .update(knowledgeDocument)
+      .set({
+        embedding: result.embedding,
+        embeddingModel: result.model,
+        embeddingUpdatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(knowledgeDocument.id, params.documentId),
+          eq(knowledgeDocument.title, params.title),
+          eq(knowledgeDocument.content, params.content),
+        ),
+      )
+      .returning({ id: knowledgeDocument.id });
+    if (!updated) return false;
+    await tx
+      .delete(embeddingChunk)
+      .where(eq(embeddingChunk.documentId, params.documentId));
+    await tx.insert(embeddingChunk).values(
+      result.chunks.map((chunk) => ({
+        ...chunk,
+        model: result.model,
+        organizationId: document.organizationId,
+        documentId: params.documentId,
+      })),
+    );
+    return true;
+  });
 }

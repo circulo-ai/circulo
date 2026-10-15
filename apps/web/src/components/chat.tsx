@@ -14,6 +14,8 @@ import {
 import { useChatVisibility } from "@/hooks/api/chats/use-chat-visibility";
 import type { ChatMessagePagination } from "@/hooks/api/chats/use-message-pagination";
 import { ApiRequestError } from "@/lib/api/client";
+import { CHAT_STREAM_THROTTLE_MS } from "@/lib/chat-streaming";
+import { reconcileIdleTranscript } from "@/lib/chat-transcript-sync";
 import { extractPromptMentions } from "@/lib/prompt-mentions";
 import {
   clearCachePattern,
@@ -29,7 +31,7 @@ import type { AppUsage } from "@circulo-ai/types";
 import { DefaultChatTransport } from "ai";
 import { TextAlignJustify } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import useSWR, { useSWRConfig } from "swr";
 import { unstable_serialize } from "swr/infinite";
 import { useDataStreamActions } from "./data-stream-provider";
@@ -68,6 +70,7 @@ export function Chat({
   isReadonly: boolean;
   initialLastContext?: AppUsage;
 }) {
+  const idleSyncSince = useRef(Date.now());
   const { isMobile, setOpenMobile } = useSidebar();
 
   const { visibilityType } = useChatVisibility({
@@ -197,6 +200,7 @@ export function Chat({
     regenerate,
     clearError,
   } = useChat<ChatMessage>({
+    throttle: CHAT_STREAM_THROTTLE_MS,
     resume: !!activeWorkflowRunId,
     id,
     messages: initialMessages,
@@ -222,13 +226,16 @@ export function Chat({
               id: message.id ?? generateUUID(),
             },
             visibility: visibilityType,
+            clientTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             agentIds: [],
-            mentions: extractPromptMentions(
-              message.parts
-                ?.filter((part) => part.type === "text")
-                .map((part) => part.text)
-                .join("") ?? "",
-            ),
+            mentions:
+              message.metadata?.mentions ??
+              extractPromptMentions(
+                message.parts
+                  ?.filter((part) => part.type === "text")
+                  .map((part) => part.text)
+                  .join("") ?? "",
+              ),
           },
         };
       },
@@ -379,6 +386,7 @@ export function Chat({
     },
 
     onFinish: async () => {
+      idleSyncSince.current = Date.now();
       handleChatEnd();
       await mutate(`/api/chat/${id}/resources`);
       mutate(unstable_serialize(getChatHistoryPaginationKey));
@@ -419,6 +427,36 @@ export function Chat({
       });
     },
   });
+
+  const { data: incomingTranscript } = useSWR(
+    (status === "ready" || status === "error") && !activeWorkflowRunId
+      ? `/api/chat/${id}/messages?limit=50`
+      : null,
+    async (url: string) => {
+      const startedAt = Date.now();
+      const page = await getFetcher()<{ messages: ChatMessage[] }>(url);
+      return { ...page, startedAt };
+    },
+    {
+      refreshInterval: 15_000,
+      refreshWhenHidden: false,
+      refreshWhenOffline: false,
+      errorRetryInterval: 30_000,
+    },
+  );
+  useEffect(() => {
+    if ((status !== "ready" && status !== "error") || activeWorkflowRunId) {
+      idleSyncSince.current = Date.now();
+      return;
+    }
+    if (
+      incomingTranscript &&
+      incomingTranscript.startedAt >= idleSyncSince.current
+    )
+      setMessages((current) =>
+        reconcileIdleTranscript(current, incomingTranscript.messages),
+      );
+  }, [incomingTranscript, status, activeWorkflowRunId, setMessages]);
 
   const searchParams = useSearchParams();
   const query = searchParams.get("query");

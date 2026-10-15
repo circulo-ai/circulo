@@ -26,32 +26,25 @@ export class DocParser implements FileParser {
       `Parsing DOC buffer, size: ${buffer.length} bytes (${(buffer.length / 1024).toFixed(2)} KB)`,
     );
 
-    const officeParser = await import("officeparser");
-    const parsed = await new Promise<{ value: string; metadata?: unknown }>(
-      (resolve, reject) => {
-        (officeParser as any).parseOfficeAsync(
-          buffer,
-          { contentType: "application/msword" },
-          (err: unknown, data: any) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve(data);
-            }
-          },
-        );
-      },
+    const { default: WordExtractor } = await import("word-extractor");
+    const parsed = await new WordExtractor().extract(buffer);
+    const content = sanitizeTextForUTF8(
+      [
+        parsed.getBody(),
+        parsed.getHeaders(),
+        parsed.getFootnotes(),
+        parsed.getEndnotes(),
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
     );
-
-    const content = sanitizeTextForUTF8(parsed?.value ?? "");
 
     return {
       content,
       metadata: {
-        meta: parsed?.metadata,
         characterCount: content.length,
         tokenCount: Math.floor(content.length / 4),
-        source: "officeparser",
+        source: "word-extractor",
       },
     };
   }

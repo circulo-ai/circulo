@@ -38,7 +38,8 @@
     "mammoth": "^1.11.0",
     "officeparser": "^5.2.2",
     "pdf-parse": "^2.4.5",
-    "xlsx": "^0.18.5"
+    "word-extractor": "^1.0.4",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",

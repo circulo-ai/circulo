@@ -1,5 +1,10 @@
 "use client";
+import { COMPOSER_COMMANDS } from "@/lib/composer-commands";
 
+import {
+  type MentionItemType,
+  PromptInputTextarea,
+} from "@/components/ai-elements/prompt-input";
 import { DataStreamHandler } from "@/components/data-stream-handler";
 import { PageSpinner } from "@/components/page-spinner";
 import { PreviewAttachment } from "@/components/preview-attachment";
@@ -54,6 +59,7 @@ import {
 } from "@/components/ui/tooltip";
 import { FileInput } from "@/components/uploads/file-input";
 import { VoiceRecordingIndicator } from "@/components/voice-recording-indicator";
+import { useComposerMentions } from "@/hooks/use-composer-mentions";
 import { useMergedRefs } from "@/hooks/use-merged-refs";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useUploadTaskManager } from "@/hooks/use-upload-task-manager";
@@ -61,7 +67,9 @@ import { useVoiceRecorder } from "@/hooks/use-voice-recorder";
 import { defaultModelForProvider } from "@/lib/ai-providers";
 import type { ApiRequestError } from "@/lib/api/client";
 import { attachmentFromUploadTask } from "@/lib/attachments";
+import { CHAT_STREAM_THROTTLE_MS } from "@/lib/chat-streaming";
 import { deepReplace } from "@/lib/deep-replace";
+import { extractPromptMentions } from "@/lib/prompt-mentions";
 import {
   clearCachePattern,
   fetchWithErrorHandlers,
@@ -213,6 +221,39 @@ export function NewChat({ id }: NewChatProps) {
   });
 
   // Use a ref so the transport closure always reads the latest agentIds at send time
+  const { fetchMentions, getMentions } = useComposerMentions({ attachments });
+  const onMentionSelect = useCallback(
+    (item: MentionItemType) => {
+      if (item.kind === "agent") {
+        if (
+          !selectedAgentIds.includes(item.username) &&
+          selectedAgentIds.length >= AGENT_SELECTION_LIMIT
+        ) {
+          toast.error(
+            `You can select up to ${AGENT_SELECTION_LIMIT} agents for this chat.`,
+          );
+          return false;
+        }
+        setSelectedAgentIds((current) =>
+          current.includes(item.username)
+            ? current
+            : [...current, item.username],
+        );
+        selectedAgentIdsRef.current = [
+          ...new Set([...selectedAgentIdsRef.current, item.username]),
+        ];
+      }
+      if (item.kind === "file" && item.attachment) {
+        const file = item.attachment;
+        setAttachments((current) =>
+          current.some((existing) => existing.url === file.url)
+            ? current
+            : [...current, file],
+        );
+      }
+    },
+    [selectedAgentIds, setSelectedAgentIds],
+  );
   const selectedAgentIdsRef = useRef<string[]>([]);
   useEffect(() => {
     selectedAgentIdsRef.current = selectedAgentIds;
@@ -259,6 +300,7 @@ export function NewChat({ id }: NewChatProps) {
   );
 
   const { sendMessage, status } = useChat({
+    throttle: CHAT_STREAM_THROTTLE_MS,
     id: chatId,
     generateId: generateUUID,
     transport: new DefaultChatTransport({
@@ -280,6 +322,20 @@ export function NewChat({ id }: NewChatProps) {
             };
           })(),
           agentIds: selectedAgentIdsRef.current,
+          clientTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          mentions:
+            (
+              config.messages.at(-1)?.metadata as
+                | { mentions?: import("@/lib/prompt-mentions").PromptMention[] }
+                | undefined
+            )?.mentions ??
+            extractPromptMentions(
+              config.messages
+                .at(-1)
+                ?.parts.filter((part) => part.type === "text")
+                .map((part) => part.text)
+                .join(" ") ?? "",
+            ),
         },
       }),
     }),
@@ -340,6 +396,10 @@ export function NewChat({ id }: NewChatProps) {
     setInputText("");
     void sendMessage({
       role: "user",
+      metadata: {
+        createdAt: new Date().toISOString(),
+        mentions: getMentions(text),
+      },
       parts: [
         ...attachments.map((attachment) => ({
           type: "file" as const,
@@ -347,6 +407,7 @@ export function NewChat({ id }: NewChatProps) {
           filename: attachment.name,
           mediaType: attachment.contentType,
           downloadUrl: attachment.downloadUrl,
+          size: attachment.size,
           lastModified: attachment.lastModified,
         })),
         ...(text ? [{ type: "text" as const, text }] : []),
@@ -374,6 +435,7 @@ export function NewChat({ id }: NewChatProps) {
     status,
     uploadManager,
     voiceRecorder.isRecording,
+    getMentions,
   ]);
 
   const agentPanel = (
@@ -504,12 +566,26 @@ export function NewChat({ id }: NewChatProps) {
                   </div>
                 </InputGroupAddon>
               )}
-              <div className="flex w-full min-w-0 items-center">
-                {/* TODO multiline + combine with CHAT SDK's main input */}
-                <CustomInputGroupInput
-                  placeholder=" Your first message (optional)"
+              <div className="flex w-full min-w-0 flex-wrap items-center sm:flex-nowrap">
+                <PromptInputTextarea
+                  enableMentions
+                  enableCommands
+                  commands={COMPOSER_COMMANDS}
+                  fetchMentions={fetchMentions}
+                  onMentionSelect={onMentionSelect}
+                  onValueChange={setInputText}
+                  onPaste={(event) => {
+                    const files = Array.from(event.clipboardData.files);
+                    if (files.length) {
+                      event.preventDefault();
+                      uploadManager.enqueueUploads(files, "chat");
+                    }
+                  }}
+                  minHeight={44}
+                  className="min-h-11 px-3 py-2"
+                  aria-label="Your first message"
+                  placeholder="Message or @ to add context"
                   value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
@@ -536,7 +612,7 @@ export function NewChat({ id }: NewChatProps) {
                   </Tooltip>
                 </InputGroupAddon>
 
-                <InputGroupAddon align="inline-end" className="mr-0!">
+                <InputGroupAddon align="inline-end" className="mr-0! ml-auto">
                   {isMobile ? (
                     <Sheet>
                       <SheetTrigger asChild>

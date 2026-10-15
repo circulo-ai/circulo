@@ -2,6 +2,30 @@ import { describe, expect, it } from "vitest";
 import { signWebhookPayload, verifyWebhookSignature } from "./signature";
 
 describe("webhook signatures", () => {
+  it("binds the event identity and rejects malformed hex suffixes", () => {
+    const timestamp = 1_800_000_000_000;
+    const signature = signWebhookPayload("secret", timestamp, "{}", "event-1");
+    const base = {
+      secret: "secret",
+      body: "{}",
+      timestamp: String(timestamp),
+      now: timestamp,
+      signature,
+    };
+    expect(verifyWebhookSignature({ ...base, eventId: "event-1" }).valid).toBe(
+      true,
+    );
+    expect(verifyWebhookSignature({ ...base, eventId: "event-2" }).valid).toBe(
+      false,
+    );
+    expect(
+      verifyWebhookSignature({
+        ...base,
+        eventId: "event-1",
+        signature: signature + "ZZ",
+      }).valid,
+    ).toBe(false);
+  });
   it("accepts a fresh millisecond signature", () => {
     const now = 1_800_000_000_000;
     const body = JSON.stringify({ event: "push" });

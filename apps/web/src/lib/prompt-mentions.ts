@@ -1,5 +1,5 @@
 export type PromptMention = {
-  kind: "agent" | "tool";
+  kind: "agent" | "tool" | "file";
   key: string;
   label?: string;
 };
@@ -15,9 +15,13 @@ export function extractPromptMentions(text: string): PromptMention[] {
     if (!token) continue;
 
     const toolMatch = token.match(/^(?:tool|mcp)[:/_-](.+)$/i);
-    const mention: PromptMention = toolMatch
-      ? { kind: "tool", key: toolMatch[1] ?? "" }
-      : { kind: "agent", key: token };
+    const fileMatch = token.match(/^(?:file|attachment)[:/](.+)$/i);
+    const agentMatch = token.match(/^agent[:/](.+)$/i);
+    const mention: PromptMention = fileMatch
+      ? { kind: "file", key: fileMatch[1] ?? "" }
+      : toolMatch
+        ? { kind: "tool", key: toolMatch[1] ?? "" }
+        : { kind: "agent", key: agentMatch?.[1] ?? token };
     if (!mention.key) continue;
 
     const identity = `${mention.kind}:${mention.key.toLowerCase()}`;

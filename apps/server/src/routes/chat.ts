@@ -31,7 +31,7 @@ import { z } from "zod";
 const logger = createLogger("ChatRoute");
 
 const promptMentionSchema = z.object({
-  kind: z.enum(["agent", "tool"]),
+  kind: z.enum(["agent", "tool", "file"]),
   key: z.string().trim().min(1).max(200),
   label: z.string().trim().min(1).max(200).optional(),
 });
@@ -108,6 +108,18 @@ const createChatSchema = z.object({
     }),
   message: messageSchema,
   mentions: z.array(promptMentionSchema).max(20).optional().default([]),
+  clientTimezone: z
+    .string()
+    .max(100)
+    .refine((value) => {
+      try {
+        new Intl.DateTimeFormat("en-US", { timeZone: value });
+        return true;
+      } catch {
+        return false;
+      }
+    }, "Invalid IANA time zone")
+    .optional(),
 });
 
 const router = createRouter();
@@ -242,6 +254,7 @@ router.post(
         visibility: selectedVisibilityType,
         agentIds,
         mentions,
+        clientTimezone,
       } = c.req.valid("json");
       const { user } = c.var;
       const di: RequestServices = c.di;
@@ -395,6 +408,8 @@ router.post(
           userId: user!.id,
           organizationId: activeOrganizationId,
           apiKeyPermissions: c.var.apiKeyPermissions,
+          apiKeyId: c.var.apiKeyId,
+          timeZone: clientTimezone,
         },
       });
 

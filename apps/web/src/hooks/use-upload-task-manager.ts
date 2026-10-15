@@ -420,10 +420,27 @@ export function useUploadTaskManager({
           );
           const sizeError = validateFileSize(file.size, MAX_FILE_SIZE);
           const validationError = typeError ?? sizeError;
+          const extensionMime = getMimeTypeFromExtension(
+            file.name.split(".").pop() ?? "",
+          );
+          const canonicalMime =
+            file.name.toLowerCase().endsWith(".webm") &&
+            file.type.startsWith("video/")
+              ? file.type
+              : extensionMime !== "application/octet-stream"
+                ? extensionMime
+                : file.type || extensionMime;
+          const uploadFile =
+            !validationError && file.type !== canonicalMime
+              ? new File([file], file.name, {
+                  type: canonicalMime,
+                  lastModified: file.lastModified,
+                })
+              : file;
 
           nextTasks[taskId] = {
             id: taskId,
-            file,
+            file: uploadFile,
             context,
             status: validationError ? "error" : "queued",
             progress: 0,

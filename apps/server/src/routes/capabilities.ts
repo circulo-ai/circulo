@@ -26,7 +26,12 @@ const builtinPlugins = [
     description: "Create and update document artifacts in a chat.",
     status: "active" as const,
     capabilities: ["read", "write"],
-    tools: ["createDocument", "updateDocument"],
+    tools: [
+      "createDocument",
+      "updateDocument",
+      "readDocument",
+      "readChatAttachment",
+    ],
   },
   {
     id: "builtin:workflow-coordination",
@@ -35,7 +40,12 @@ const builtinPlugins = [
     description: "Coordinate handoffs, scheduled work, and human decisions.",
     status: "active" as const,
     capabilities: ["read", "write", "approval"],
-    tools: ["handoffTask", "scheduleTask", "requestHumanApproval"],
+    tools: [
+      "handoffTask",
+      "scheduleTask",
+      "manageScheduledTasks",
+      "requestHumanApproval",
+    ],
   },
   {
     id: "builtin:memory",
@@ -106,17 +116,26 @@ router.get("/capabilities", requireAuth, async (c) => {
     c.var.apiKeyPermissions,
   );
 
-  const integrations = await db.query.mcpIntegration.findMany({
-    where: isManager
-      ? eq(mcpIntegration.organizationId, organizationId)
-      : and(
-          eq(mcpIntegration.organizationId, organizationId),
-          eq(mcpIntegration.enabled, true),
-          eq(mcpIntegration.status, "published"),
-        ),
-    with: { tools: true, links: true },
-    orderBy: desc(mcpIntegration.updatedAt),
-  });
+  const canReadMcp = await hasPermissionForUser(
+    userId,
+    organizationId,
+    "mcp",
+    "read",
+    c.var.apiKeyPermissions,
+  );
+  const integrations = canReadMcp
+    ? await db.query.mcpIntegration.findMany({
+        where: isManager
+          ? eq(mcpIntegration.organizationId, organizationId)
+          : and(
+              eq(mcpIntegration.organizationId, organizationId),
+              eq(mcpIntegration.enabled, true),
+              eq(mcpIntegration.status, "published"),
+            ),
+        with: { tools: true, links: true },
+        orderBy: desc(mcpIntegration.updatedAt),
+      })
+    : [];
   const skills = canReadSkills
     ? await db.query.skill.findMany({
         where: eq(skill.organizationId, organizationId),
@@ -136,6 +155,7 @@ router.get("/capabilities", requireAuth, async (c) => {
         description:
           integration.description ?? `MCP server at ${integration.endpoint}`,
         status: integration.status,
+        enabled: integration.enabled,
         capabilities: ["mcp"],
         tools: integration.tools.map((tool) => tool.name),
         integrationId: integration.id,

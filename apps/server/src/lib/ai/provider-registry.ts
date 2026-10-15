@@ -425,6 +425,13 @@ export function getDefaultModelForProvider(providerId: AiProviderId): string {
 }
 
 export function redactProviderError(error: unknown): string {
+  if (
+    error &&
+    typeof error === "object" &&
+    "statusCode" in error &&
+    error.statusCode === 402
+  )
+    return "The AI provider rejected this request because of its credit or spending limit. Check the provider's billing settings or choose a smaller response limit.";
   const message = error instanceof Error ? error.message : String(error);
   return message
     .replace(/Bearer\s+\S+/gi, "Bearer [redacted]")

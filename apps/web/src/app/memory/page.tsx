@@ -54,6 +54,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { WorkspaceShell } from "@/components/workspace/workspace-shell";
+import { EmbeddingSettings } from "@/components/workspace/embedding-settings";
 import {
   Brain,
   Check,
@@ -371,6 +372,7 @@ function MemoryPageContent() {
         description="Review and control the facts Circulo can remember across conversations."
         title="Memory"
       >
+        <EmbeddingSettings />
         {error && <p className="text-sm text-destructive">{error.message}</p>}
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           <Card>
@@ -541,6 +543,9 @@ function MemoryPageContent() {
                       Where should it apply?
                     </FieldLabel>
                     <Select
+                      items={Object.entries(scopeLabel).map(
+                        ([value, label]) => ({ value, label }),
+                      )}
                       onValueChange={(value) =>
                         setForm((current) => ({
                           ...current,
@@ -576,6 +581,12 @@ function MemoryPageContent() {
                     <Field data-invalid={Boolean(formErrors.chatId)}>
                       <FieldLabel>Chat</FieldLabel>
                       <Select
+                        items={(chatHistory?.chats ?? []).map((chat) => ({
+                          value: chat.id,
+                          label:
+                            chat.title?.trim() ||
+                            `Untitled chat (${chat.id.slice(0, 6)})`,
+                        }))}
                         onValueChange={(value) =>
                           setForm((current) => ({
                             ...current,
@@ -615,6 +626,10 @@ function MemoryPageContent() {
                     <Field data-invalid={Boolean(formErrors.agentId)}>
                       <FieldLabel>Agent</FieldLabel>
                       <Select
+                        items={(agents ?? []).map((agent) => ({
+                          value: agent.id,
+                          label: `${agent.name}${agent.model ? ` · ${agent.model}` : ""}`,
+                        }))}
                         onValueChange={(value) =>
                           setForm((current) => ({
                             ...current,

@@ -9,9 +9,15 @@ export function signWebhookPayload(
   secret: string,
   timestamp: number,
   body: string,
+  eventId?: string,
 ): string {
   return createHmac("sha256", secret)
-    .update(`${timestamp}.${body}`, "utf8")
+    .update(
+      eventId === undefined
+        ? `${timestamp}.${body}`
+        : `${timestamp}.${eventId}.${body}`,
+      "utf8",
+    )
     .digest("hex");
 }
 
@@ -20,6 +26,7 @@ export function verifyWebhookSignature(params: {
   body: string;
   signature: string | undefined;
   timestamp: string | undefined;
+  eventId?: string;
   now?: number;
   maxAgeMs?: number;
 }): { valid: boolean; reason?: string } {
@@ -47,10 +54,13 @@ export function verifyWebhookSignature(params: {
   const provided = params.signature.startsWith("sha256=")
     ? params.signature.slice("sha256=".length)
     : params.signature;
+  if (!/^[a-fA-F0-9]{64}$/.test(provided))
+    return { valid: false, reason: "invalid signature encoding" };
   const expected = signWebhookPayload(
     params.secret,
     parsedTimestamp,
     params.body,
+    params.eventId,
   );
   const providedBuffer = Buffer.from(provided, "hex");
   const expectedBuffer = Buffer.from(expected, "hex");

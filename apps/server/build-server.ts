@@ -1,3 +1,6 @@
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+
 if (process.env.NODE_ENV !== "production") {
   throw new Error(
     "The server bundle must be built with NODE_ENV=production so production safeguards are not compiled out.",
@@ -13,9 +16,15 @@ const result = await Bun.build({
   target: "node",
   format: "esm",
   sourcemap: "external",
+  external: ["pdf-parse", "officeparser", "word-extractor"],
 });
 
 if (!result.success) {
   for (const log of result.logs) console.error(log);
   process.exit(1);
 }
+execFileSync(
+  process.execPath,
+  [fileURLToPath(new URL("./build-runtime-dependencies.cjs", import.meta.url))],
+  { stdio: "inherit" },
+);

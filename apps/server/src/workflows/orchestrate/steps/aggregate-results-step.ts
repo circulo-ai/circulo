@@ -90,9 +90,16 @@ export async function aggregateResultsStep(params: {
     }
   }
 
-  // If single agent, return its result directly
-  if (agentResults.length === 1) {
-    const result = agentResults[0]!;
+  // Approved MCP calls are evidence for the continuing agent, not additional
+  // authors whose outputs need another synthesis (and a duplicate text stream).
+  const responseResults = agentResults.filter(
+    (result) => !result.agentId.startsWith("mcp:"),
+  );
+  const successfulApprovals = agentResults
+    .filter((result) => result.agentId.startsWith("mcp:"))
+    .every((result) => result.success);
+  if (responseResults.length === 1 && successfulApprovals) {
+    const result = responseResults[0]!;
     return {
       summary: result.success
         ? `${result.agentName} completed the task`

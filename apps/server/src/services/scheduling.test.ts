@@ -1,11 +1,69 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateNextRun,
+  firstRunAt,
   validateSchedule,
   validateTimezone,
 } from "./scheduling";
 
 describe("scheduling", () => {
+  it("gives one-time tasks a future first due date", () => {
+    expect(
+      firstRunAt(
+        {
+          scheduleType: "once",
+          schedule: "2026-08-17T14:00:00+03:30",
+          timezone: "Asia/Tehran",
+        },
+        new Date("2026-08-17T10:00:00Z"),
+      ),
+    ).toEqual(new Date("2026-08-17T10:30:00Z"));
+  });
+  it("rejects naive dates, impossible cron dates and unbounded intervals", () => {
+    expect(() =>
+      validateSchedule({
+        scheduleType: "once",
+        schedule: "2026-12-01T10:00:00",
+        timezone: "UTC",
+      }),
+    ).toThrow("timezone offset");
+    expect(() =>
+      firstRunAt({
+        scheduleType: "cron",
+        schedule: "0 0 31 2 *",
+        timezone: "UTC",
+      }),
+    ).toThrow();
+    expect(() =>
+      validateSchedule({
+        scheduleType: "interval",
+        schedule: "9007199254740991",
+        timezone: "UTC",
+      }),
+    ).toThrow("one year");
+  });
+  it("handles timezone offsets and daylight-saving gaps", () => {
+    expect(
+      firstRunAt(
+        {
+          scheduleType: "cron",
+          schedule: "0 9 * * *",
+          timezone: "Asia/Tehran",
+        },
+        new Date("2026-08-17T00:00:00Z"),
+      ),
+    ).toEqual(new Date("2026-08-17T05:30:00Z"));
+    expect(
+      firstRunAt(
+        {
+          scheduleType: "cron",
+          schedule: "30 2 * * *",
+          timezone: "America/New_York",
+        },
+        new Date("2026-03-08T00:00:00Z"),
+      ),
+    ).toEqual(new Date("2026-03-08T07:30:00Z"));
+  });
   it("calculates interval schedules from the current time", () => {
     const now = new Date("2026-08-17T10:00:00.000Z");
     expect(
@@ -64,6 +122,6 @@ describe("scheduling", () => {
         schedule: "61 * * * *",
         timezone: "UTC",
       }),
-    ).toThrow("between 0 and 59");
+    ).toThrow("cron schedule");
   });
 });

@@ -1,7 +1,9 @@
-import { db, humanApproval, mcpIntegration, taskHandoff } from "@/db";
-import { McpClient } from "@/lib/mcp/client";
+import { db, humanApproval, taskHandoff } from "@/db";
+import { assertMcpInvocationAccess, McpClient } from "@/lib/mcp/client";
 import type { WorkflowPlanStepTrace } from "@/lib/types";
 import { getTextFromMessages } from "@/lib/utils";
+import { withHarnessSignal } from "@/workflows/harness/cancellation";
+import { recordApprovedHarnessAction } from "@/workflows/harness/runtime";
 import { aggregateResultsStep } from "@/workflows/orchestrate/steps/aggregate-results-step";
 import {
   type AgentExecutionResult,
@@ -23,7 +25,7 @@ import {
 } from "@/workflows/orchestrate/steps/plan-agent-execution-step";
 import type { WorkflowDefinition } from "@circulo-ai/wf";
 import { complete, defineWorkflow, waitForAndRetry } from "@circulo-ai/wf";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import {
   hasExplicitAgentDirective,
   hasExplicitToolDirective,
@@ -253,352 +255,451 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
       OrchestrationWorkflowState,
       OrchestrationWorkflowState
     >("execute-agents", {
-      run: async (state, workflowContext) => {
-        if (
-          state.failureReason ||
-          !state.context ||
-          !state.plan ||
-          !state.classification
-        ) {
-          return complete({ ...state, agentResults: [] });
-        }
-
-        if (
-          state.input.triggerType === "user_message" &&
-          state.context.members.length > 1 &&
-          !state.classification.shouldEngageAgents &&
-          !hasExplicitAgentDirective(
-            state.input.messages,
-            state.context.agents,
-            state.input.mentions,
-          ) &&
-          !hasExplicitToolDirective(state.input.messages, state.input.mentions)
-        ) {
-          return complete({
-            ...state,
-            agentResults: [],
-            silent: true,
-            workflowRunId: workflowContext.workflow.id,
-          });
-        }
-
-        if (
-          !state.context.chat.orchestrationEnabled ||
-          state.context.agents.length === 0 ||
-          state.plan.selectedAgents.length === 0
-        ) {
-          const directPlan = createDirectCheckpointPlan(state);
-          const directTaskDescriptors = toTaskDescriptors([directPlan], 1);
-          let directTaskLedger = markAgentTasksRunning(
-            addAgentTasks([], directTaskDescriptors),
-            directTaskDescriptors,
-          );
-          await persistDurableAgentLoopSnapshot(workflowContext.workflow.id, {
-            iteration: 1,
-            phase: "executing",
-            resultCount: 0,
-            ledger: directTaskLedger,
-          });
-          const durableAgentResults = await loadDurableAgentResults(
-            workflowContext.workflow.id,
-          );
-          const directKey = getAgentExecutionKey(directPlan);
-          let directResult = durableAgentResults.get(directKey);
-          if (!directResult) {
-            directResult = await executeDirectResponseStep({
-              actor: state.input.actor,
-              context: state.context,
-              inputMessages: state.input.messages,
-              workflowId: workflowContext.workflow.id,
-            });
-            await flushDurableUIChunks(workflowContext.workflow.id);
-            await persistDurableAgentResult(
-              workflowContext.workflow.id,
-              directKey,
-              directResult,
-            );
-          }
-          directTaskLedger = recordAgentTaskResults(directTaskLedger, [
-            directResult,
-          ]);
-          await persistDurableAgentLoopSnapshot(workflowContext.workflow.id, {
-            iteration: 1,
-            phase: "completed",
-            resultCount: 1,
-            status: directResult.success ? "completed" : "blocked",
-            reason: directResult.error,
-            ledger: directTaskLedger,
-          });
-          await flushDurableUIChunks(workflowContext.workflow.id);
-          return complete({
-            ...state,
-            agentResults: [directResult],
-            workflowRunId: workflowContext.workflow.id,
-            agentLoopIteration: 1,
-            agentLoopStatus: "completed",
-            agentTaskLedger: directTaskLedger,
-          });
-        }
-
-        const circularDependency = detectCircularDependencies(
-          state.plan.selectedAgents,
-        );
-        if (circularDependency) {
-          return complete({
-            ...state,
-            agentResults: [],
-            failureReason: `Execution plan invalid: ${circularDependency}`,
-          });
-        }
-
-        const durableAgentResults = await loadDurableAgentResults(
+      run: async (state, workflowContext) =>
+        withHarnessSignal(
           workflowContext.workflow.id,
-        );
-        const loopResult = await executeAgenticLoop({
-          actor: state.input.actor,
-          plan: state.plan,
-          context: state.context,
-          webhookPayload: state.input.webhookPayload,
-          workflowId: workflowContext.workflow.id,
-          durableAgentResults,
-          triggerMessages: state.input.messages,
-          classification: state.classification,
-          orchestrationAgent: state.context.orchestrationAgent,
-          orchestrationModel: state.context.chat.orchestrationModel,
-          orchestrationFallbackModel:
-            state.context.chat.orchestrationFallbackModel,
-        });
-        await flushDurableUIChunks(workflowContext.workflow.id);
+          workflowContext.signal,
+          async () => {
+            if (
+              state.failureReason ||
+              !state.context ||
+              !state.plan ||
+              !state.classification
+            ) {
+              return complete({ ...state, agentResults: [] });
+            }
 
-        let finalAgentResults = loopResult.results;
-        let finalTaskLedger = loopResult.taskLedger;
-        if (
-          state.plan.fallbackAgentId &&
-          finalAgentResults.length > 0 &&
-          finalAgentResults.every((result) => !result.success) &&
-          !finalAgentResults.some(
-            (result) => result.agentId === state.plan?.fallbackAgentId,
-          )
-        ) {
-          const fallbackAgent = state.context.agents.find(
-            (agent) => agent.agentId === state.plan?.fallbackAgentId,
-          );
+            if (
+              state.input.triggerType === "user_message" &&
+              state.context.members.length > 1 &&
+              !state.classification.shouldEngageAgents &&
+              !hasExplicitAgentDirective(
+                state.input.messages,
+                state.context.agents,
+                state.input.mentions,
+              ) &&
+              !hasExplicitToolDirective(
+                state.input.messages,
+                state.input.mentions,
+              )
+            ) {
+              return complete({
+                ...state,
+                agentResults: [],
+                silent: true,
+                workflowRunId: workflowContext.workflow.id,
+              });
+            }
 
-          if (fallbackAgent) {
-            const fallbackPlan: ExecutionPlan["selectedAgents"][number] = {
-              agentId: fallbackAgent.agentId,
-              order: finalAgentResults.length,
-              parallelGroup: null,
-              dependsOn: null,
-              reason: "Reserve agent invoked after primary execution failed.",
-              task: `Retry the original request using the reserve agent.\n\n${getTextFromMessages(state.input.messages)}`,
-              estimatedDuration: null,
-              priority: "high",
-            };
-            const fallbackResult = await executeCheckpointedAgent({
+            if (
+              !state.context.chat.orchestrationEnabled ||
+              state.context.agents.length === 0 ||
+              state.plan.selectedAgents.length === 0
+            ) {
+              const directPlan = createDirectCheckpointPlan(state);
+              const directTaskDescriptors = toTaskDescriptors([directPlan], 1);
+              let directTaskLedger = markAgentTasksRunning(
+                addAgentTasks([], directTaskDescriptors),
+                directTaskDescriptors,
+              );
+              await persistDurableAgentLoopSnapshot(
+                workflowContext.workflow.id,
+                {
+                  iteration: 1,
+                  phase: "executing",
+                  resultCount: 0,
+                  ledger: directTaskLedger,
+                },
+              );
+              const durableAgentResults = await loadDurableAgentResults(
+                workflowContext.workflow.id,
+              );
+              const directKey = getAgentExecutionKey(directPlan);
+              let directResult = durableAgentResults.get(directKey);
+              if (!directResult) {
+                directResult = await executeDirectResponseStep({
+                  actor: state.input.actor,
+                  context: state.context,
+                  inputMessages: state.input.messages,
+                  workflowId: workflowContext.workflow.id,
+                });
+                await flushDurableUIChunks(workflowContext.workflow.id);
+                await persistDurableAgentResult(
+                  workflowContext.workflow.id,
+                  directKey,
+                  directResult,
+                );
+              }
+              directTaskLedger = recordAgentTaskResults(directTaskLedger, [
+                directResult,
+              ]);
+              await persistDurableAgentLoopSnapshot(
+                workflowContext.workflow.id,
+                {
+                  iteration: 1,
+                  phase: "completed",
+                  resultCount: 1,
+                  status: directResult.success ? "completed" : "blocked",
+                  reason: directResult.error,
+                  ledger: directTaskLedger,
+                },
+              );
+              await flushDurableUIChunks(workflowContext.workflow.id);
+              return complete({
+                ...state,
+                agentResults: [directResult],
+                pendingApprovalId: directResult.approvalId,
+                workflowRunId: workflowContext.workflow.id,
+                agentLoopIteration: 1,
+                agentLoopStatus: directResult.success ? "completed" : "blocked",
+                agentLoopDecision: directResult.error,
+                agentTaskLedger: directTaskLedger,
+              });
+            }
+
+            const circularDependency = detectCircularDependencies(
+              state.plan.selectedAgents,
+            );
+            if (circularDependency) {
+              return complete({
+                ...state,
+                agentResults: [],
+                failureReason: `Execution plan invalid: ${circularDependency}`,
+              });
+            }
+
+            const durableAgentResults = await loadDurableAgentResults(
+              workflowContext.workflow.id,
+            );
+            const loopResult = await executeAgenticLoop({
               actor: state.input.actor,
-              agentPlan: fallbackPlan,
+              plan: state.plan,
               context: state.context,
-              previousResults: finalAgentResults,
               webhookPayload: state.input.webhookPayload,
               workflowId: workflowContext.workflow.id,
               durableAgentResults,
-              plan: state.plan,
+              triggerMessages: state.input.messages,
+              mentions: state.input.mentions,
+              classification: state.classification,
+              orchestrationAgent: state.context.orchestrationAgent,
+              orchestrationModel: state.context.chat.orchestrationModel,
+              orchestrationFallbackModel:
+                state.context.chat.orchestrationFallbackModel,
+              startedAt: state.startedAt,
             });
-            finalAgentResults = [...finalAgentResults, fallbackResult];
-            const fallbackDescriptors = toTaskDescriptors(
-              [fallbackPlan],
-              loopResult.iterations + 1,
-            );
-            finalTaskLedger = recordAgentTaskResults(
-              markAgentTasksRunning(
-                addAgentTasks(finalTaskLedger, fallbackDescriptors),
-                fallbackDescriptors,
-              ),
-              [fallbackResult],
-            );
-            await persistDurableAgentLoopSnapshot(workflowContext.workflow.id, {
-              iteration: loopResult.iterations + 1,
-              phase: "completed",
-              resultCount: finalAgentResults.length,
-              status: fallbackResult.success ? "completed" : "blocked",
-              reason: fallbackResult.error,
-              ledger: finalTaskLedger,
-            });
-          }
-        }
+            await flushDurableUIChunks(workflowContext.workflow.id);
 
-        const pendingApproval = finalAgentResults.find(
-          (result) => result.approvalId,
-        );
-        return complete({
-          ...state,
-          agentResults: finalAgentResults,
-          workflowRunId: workflowContext.workflow.id,
-          pendingApprovalId: pendingApproval?.approvalId,
-          agentLoopIteration: loopResult.iterations,
-          agentLoopStatus: loopResult.status,
-          agentLoopDecision: loopResult.reason,
-          agentLoopPlanSteps: loopResult.planSteps,
-          agentTaskLedger: finalTaskLedger,
-        });
-      },
+            let finalAgentResults = loopResult.results;
+            let finalTaskLedger = loopResult.taskLedger;
+            if (
+              state.plan.fallbackAgentId &&
+              finalAgentResults.length > 0 &&
+              finalAgentResults.every((result) => !result.success) &&
+              !finalAgentResults.some(
+                (result) => result.agentId === state.plan?.fallbackAgentId,
+              )
+            ) {
+              const fallbackAgent = state.context.agents.find(
+                (agent) => agent.agentId === state.plan?.fallbackAgentId,
+              );
+
+              if (fallbackAgent) {
+                const fallbackPlan: ExecutionPlan["selectedAgents"][number] = {
+                  agentId: fallbackAgent.agentId,
+                  order: finalAgentResults.length,
+                  parallelGroup: null,
+                  dependsOn: null,
+                  reason:
+                    "Reserve agent invoked after primary execution failed.",
+                  task: `Retry the original request using the reserve agent.\n\n${getTextFromMessages(state.input.messages)}`,
+                  estimatedDuration: null,
+                  priority: "high",
+                };
+                const fallbackResult = await executeCheckpointedAgent({
+                  actor: state.input.actor,
+                  agentPlan: fallbackPlan,
+                  context: state.context,
+                  previousResults: finalAgentResults,
+                  webhookPayload: state.input.webhookPayload,
+                  workflowId: workflowContext.workflow.id,
+                  durableAgentResults,
+                  plan: state.plan,
+                });
+                finalAgentResults = [...finalAgentResults, fallbackResult];
+                const fallbackDescriptors = toTaskDescriptors(
+                  [fallbackPlan],
+                  loopResult.iterations + 1,
+                );
+                finalTaskLedger = recordAgentTaskResults(
+                  markAgentTasksRunning(
+                    addAgentTasks(finalTaskLedger, fallbackDescriptors),
+                    fallbackDescriptors,
+                  ),
+                  [fallbackResult],
+                );
+                await persistDurableAgentLoopSnapshot(
+                  workflowContext.workflow.id,
+                  {
+                    iteration: loopResult.iterations + 1,
+                    phase: "completed",
+                    resultCount: finalAgentResults.length,
+                    status: fallbackResult.success ? "completed" : "blocked",
+                    reason: fallbackResult.error,
+                    ledger: finalTaskLedger,
+                  },
+                );
+              }
+            }
+
+            const pendingApproval = finalAgentResults.find(
+              (result) => result.approvalId,
+            );
+            return complete({
+              ...state,
+              agentResults: finalAgentResults,
+              workflowRunId: workflowContext.workflow.id,
+              pendingApprovalId: pendingApproval?.approvalId,
+              agentLoopIteration: loopResult.iterations,
+              agentLoopStatus: loopResult.status,
+              agentLoopDecision: loopResult.reason,
+              agentLoopPlanSteps: loopResult.planSteps,
+              agentTaskLedger: finalTaskLedger,
+            });
+          },
+        ),
     })
     .step<
       "execute-agent-handoffs",
       OrchestrationWorkflowState,
       OrchestrationWorkflowState
     >("execute-agent-handoffs", {
-      run: async (state, workflowContext) => {
-        if (
-          state.failureReason ||
-          !state.context ||
-          !state.workflowRunId ||
-          !state.agentResults
-        ) {
-          return complete(state);
-        }
-
-        const agentResults = [...state.agentResults];
-        let pendingApprovalId = state.pendingApprovalId;
-        let pendingHumanHandoffId = state.pendingHumanHandoffId;
-        let processed = 0;
-        const seenHandoffIds = new Set(state.processedHandoffIds ?? []);
-        const selfHandoffCounts = { ...(state.selfHandoffCounts ?? {}) };
-        const maxSelfHandoffsPerAgent = 3;
-
-        if (pendingHumanHandoffId) {
-          const pendingHandoff = await db.query.taskHandoff.findFirst({
-            where: eq(taskHandoff.id, pendingHumanHandoffId),
-          });
-          if (
-            pendingHandoff &&
-            (pendingHandoff.status === "pending" ||
-              pendingHandoff.status === "accepted")
-          ) {
-            return complete({
-              ...state,
-              pendingHumanHandoffId,
-              processedHandoffIds: [...seenHandoffIds],
-              selfHandoffCounts,
-            });
-          }
-          if (pendingHandoff) {
-            agentResults.push(createHumanHandoffResult(pendingHandoff));
-            seenHandoffIds.add(pendingHandoff.id);
-          }
-          pendingHumanHandoffId = undefined;
-        }
-
-        // Process handoffs in creation order. A pending human assignment
-        // pauses the workflow and must not be bypassed by later work.
-        while (!pendingHumanHandoffId && processed < 10) {
-          const handoffs = await db.query.taskHandoff.findMany({
-            where: eq(taskHandoff.chatId, state.input.chatId),
-            orderBy: asc(taskHandoff.createdAt),
-          });
-          const handoff = handoffs.find(
-            (candidate) =>
-              !seenHandoffIds.has(candidate.id) &&
-              (candidate.toAgentId || candidate.toUserId) &&
-              candidate.context?.workflowRunId === state.workflowRunId &&
-              (candidate.status === "pending" ||
-                (candidate.status === "accepted" &&
-                  candidate.context?.executionWorkflowId ===
-                    workflowContext.workflow.id) ||
-                candidate.status === "completed" ||
-                candidate.status === "rejected" ||
-                candidate.status === "cancelled"),
-          );
-
-          if (!handoff) break;
-          seenHandoffIds.add(handoff.id);
-
-          if (handoff.toUserId) {
-            if (handoff.status === "pending" || handoff.status === "accepted") {
-              pendingHumanHandoffId = handoff.id;
-              break;
+      run: async (state, workflowContext) =>
+        withHarnessSignal(
+          workflowContext.workflow.id,
+          workflowContext.signal,
+          async () => {
+            if (
+              state.failureReason ||
+              !state.context ||
+              !state.workflowRunId ||
+              !state.agentResults
+            ) {
+              return complete(state);
             }
-            agentResults.push(createHumanHandoffResult(handoff));
-            processed += 1;
-            continue;
-          }
 
-          if (!handoff.toAgentId) continue;
-          processed += 1;
+            const agentResults = [...state.agentResults];
+            let pendingApprovalId = state.pendingApprovalId;
+            let pendingHumanHandoffId = state.pendingHumanHandoffId;
+            let processed = 0;
+            const seenHandoffIds = new Set(state.processedHandoffIds ?? []);
+            const selfHandoffCounts = { ...(state.selfHandoffCounts ?? {}) };
+            const maxSelfHandoffsPerAgent = 3;
 
-          const storedResult = deserializeHandoffResult(
-            handoff.context?.executionResult,
-          );
-          if (handoff.status === "completed" && storedResult) {
-            agentResults.push(storedResult);
-            if (!pendingApprovalId) pendingApprovalId = storedResult.approvalId;
-            continue;
-          }
+            if (pendingHumanHandoffId) {
+              const pendingHandoff = await db.query.taskHandoff.findFirst({
+                where: eq(taskHandoff.id, pendingHumanHandoffId),
+              });
+              if (
+                pendingHandoff &&
+                (pendingHandoff.status === "pending" ||
+                  pendingHandoff.status === "accepted")
+              ) {
+                return complete({
+                  ...state,
+                  pendingHumanHandoffId,
+                  processedHandoffIds: [...seenHandoffIds],
+                  selfHandoffCounts,
+                });
+              }
+              if (pendingHandoff) {
+                agentResults.push(createHumanHandoffResult(pendingHandoff));
+                seenHandoffIds.add(pendingHandoff.id);
+              }
+              pendingHumanHandoffId = undefined;
+            }
 
-          const target = state.context.agents.find(
-            (candidate) => candidate.agentId === handoff.toAgentId,
-          );
-          if (!target || !target.isEnabled) {
-            await db
-              .update(taskHandoff)
-              .set({
-                status: "rejected",
-                completedAt: new Date(),
-                context: {
-                  ...handoff.context,
-                  executionError:
-                    !target || !target.isEnabled
-                      ? "The target agent is no longer enabled in this chat."
-                      : "The target agent is not available for this handoff.",
-                },
-              })
-              .where(eq(taskHandoff.id, handoff.id));
-            continue;
-          }
+            // Process handoffs in creation order. A pending human assignment
+            // pauses the workflow and must not be bypassed by later work.
+            while (!pendingHumanHandoffId && processed < 10) {
+              const handoffs = await db.query.taskHandoff.findMany({
+                where: eq(taskHandoff.chatId, state.input.chatId),
+                orderBy: asc(taskHandoff.createdAt),
+              });
+              const handoff = handoffs.find(
+                (candidate) =>
+                  !seenHandoffIds.has(candidate.id) &&
+                  (candidate.toAgentId || candidate.toUserId) &&
+                  candidate.context?.workflowRunId === state.workflowRunId &&
+                  (candidate.status === "pending" ||
+                    (candidate.status === "accepted" &&
+                      candidate.context?.executionWorkflowId ===
+                        workflowContext.workflow.id) ||
+                    candidate.status === "completed" ||
+                    candidate.status === "rejected" ||
+                    candidate.status === "cancelled"),
+              );
 
-          const isRetryingOwnClaim =
-            handoff.status === "accepted" &&
-            handoff.context?.executionWorkflowId ===
-              workflowContext.workflow.id;
-          const claimed = isRetryingOwnClaim
-            ? [handoff]
-            : await db
+              if (!handoff) break;
+              seenHandoffIds.add(handoff.id);
+
+              if (handoff.toUserId) {
+                if (
+                  handoff.status === "pending" ||
+                  handoff.status === "accepted"
+                ) {
+                  pendingHumanHandoffId = handoff.id;
+                  break;
+                }
+                agentResults.push(createHumanHandoffResult(handoff));
+                processed += 1;
+                continue;
+              }
+
+              if (!handoff.toAgentId) continue;
+              processed += 1;
+
+              const storedResult = deserializeHandoffResult(
+                handoff.context?.executionResult,
+              );
+              if (handoff.status === "completed" && storedResult) {
+                agentResults.push(storedResult);
+                if (!pendingApprovalId)
+                  pendingApprovalId = storedResult.approvalId;
+                continue;
+              }
+
+              const target = state.context.agents.find(
+                (candidate) => candidate.agentId === handoff.toAgentId,
+              );
+              if (!target || !target.isEnabled) {
+                await db
+                  .update(taskHandoff)
+                  .set({
+                    status: "rejected",
+                    completedAt: new Date(),
+                    context: {
+                      ...handoff.context,
+                      executionError:
+                        !target || !target.isEnabled
+                          ? "The target agent is no longer enabled in this chat."
+                          : "The target agent is not available for this handoff.",
+                    },
+                  })
+                  .where(eq(taskHandoff.id, handoff.id));
+                continue;
+              }
+
+              const isRetryingOwnClaim =
+                handoff.status === "accepted" &&
+                handoff.context?.executionWorkflowId ===
+                  workflowContext.workflow.id;
+              const claimed = isRetryingOwnClaim
+                ? [handoff]
+                : await db
+                    .update(taskHandoff)
+                    .set({
+                      status: "accepted",
+                      acceptedAt: handoff.acceptedAt ?? new Date(),
+                      context: {
+                        ...handoff.context,
+                        executionWorkflowId: workflowContext.workflow.id,
+                      },
+                    })
+                    .where(
+                      and(
+                        eq(taskHandoff.id, handoff.id),
+                        eq(taskHandoff.status, "pending"),
+                      ),
+                    )
+                    .returning();
+
+              if (!claimed[0]) {
+                const current = await db.query.taskHandoff.findFirst({
+                  where: eq(taskHandoff.id, handoff.id),
+                });
+                const retryResult = deserializeHandoffResult(
+                  current?.context?.executionResult,
+                );
+                if (current?.status === "completed" && retryResult) {
+                  agentResults.push(retryResult);
+                  if (!pendingApprovalId)
+                    pendingApprovalId = retryResult.approvalId;
+                }
+                continue;
+              }
+
+              if (handoff.fromAgentId === handoff.toAgentId) {
+                const count = selfHandoffCounts[handoff.toAgentId] ?? 0;
+                if (count >= maxSelfHandoffsPerAgent) {
+                  await db
+                    .update(taskHandoff)
+                    .set({
+                      status: "rejected",
+                      completedAt: new Date(),
+                      context: {
+                        ...handoff.context,
+                        executionError: `Self-continuation limit exceeded (${maxSelfHandoffsPerAgent}) for this workflow.`,
+                      },
+                    })
+                    .where(eq(taskHandoff.id, handoff.id));
+                  continue;
+                }
+                selfHandoffCounts[handoff.toAgentId] = count + 1;
+              }
+
+              const handoffPlan: ExecutionPlan["selectedAgents"][number] = {
+                agentId: target.agentId,
+                order: agentResults.length,
+                parallelGroup: null,
+                dependsOn: null,
+                reason: "Executed as a task handoff from another agent.",
+                task: `${handoff.task}\n\nHandoff context:\n${JSON.stringify(
+                  handoff.context ?? {},
+                  null,
+                  2,
+                )}`,
+                estimatedDuration: null,
+                priority: "high",
+              };
+              const result = await executeAgentTaskStep({
+                actor: state.input.actor,
+                agentPlan: handoffPlan,
+                context: state.context,
+                previousResults: agentResults,
+                webhookPayload: state.input.webhookPayload,
+                workflowId: workflowContext.workflow.id,
+              });
+              agentResults.push(result);
+              if (!pendingApprovalId) pendingApprovalId = result.approvalId;
+
+              await db
                 .update(taskHandoff)
                 .set({
-                  status: "accepted",
-                  acceptedAt: handoff.acceptedAt ?? new Date(),
+                  status: "completed",
+                  completedAt: new Date(),
                   context: {
                     ...handoff.context,
                     executionWorkflowId: workflowContext.workflow.id,
+                    executionResult: serializeHandoffResult(result),
                   },
                 })
-                .where(
-                  and(
-                    eq(taskHandoff.id, handoff.id),
-                    eq(taskHandoff.status, "pending"),
-                  ),
-                )
-                .returning();
-
-          if (!claimed[0]) {
-            const current = await db.query.taskHandoff.findFirst({
-              where: eq(taskHandoff.id, handoff.id),
-            });
-            const retryResult = deserializeHandoffResult(
-              current?.context?.executionResult,
-            );
-            if (current?.status === "completed" && retryResult) {
-              agentResults.push(retryResult);
-              if (!pendingApprovalId)
-                pendingApprovalId = retryResult.approvalId;
+                .where(eq(taskHandoff.id, handoff.id));
             }
-            continue;
-          }
 
-          if (handoff.fromAgentId === handoff.toAgentId) {
-            const count = selfHandoffCounts[handoff.toAgentId] ?? 0;
-            if (count >= maxSelfHandoffsPerAgent) {
+            const remainingHandoffs = await db.query.taskHandoff.findMany({
+              where: eq(taskHandoff.chatId, state.input.chatId),
+              orderBy: asc(taskHandoff.createdAt),
+            });
+            for (const handoff of remainingHandoffs) {
+              if (
+                processed < 10 ||
+                seenHandoffIds.has(handoff.id) ||
+                handoff.status !== "pending" ||
+                !handoff.toAgentId ||
+                handoff.context?.workflowRunId !== state.workflowRunId
+              ) {
+                continue;
+              }
               await db
                 .update(taskHandoff)
                 .set({
@@ -606,158 +707,196 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
                   completedAt: new Date(),
                   context: {
                     ...handoff.context,
-                    executionError: `Self-continuation limit exceeded (${maxSelfHandoffsPerAgent}) for this workflow.`,
+                    executionError: "The workflow handoff limit was exceeded.",
                   },
                 })
                 .where(eq(taskHandoff.id, handoff.id));
-              continue;
             }
-            selfHandoffCounts[handoff.toAgentId] = count + 1;
-          }
 
-          const handoffPlan: ExecutionPlan["selectedAgents"][number] = {
-            agentId: target.agentId,
-            order: agentResults.length,
-            parallelGroup: null,
-            dependsOn: null,
-            reason: "Executed as a task handoff from another agent.",
-            task: `${handoff.task}\n\nHandoff context:\n${JSON.stringify(
-              handoff.context ?? {},
-              null,
-              2,
-            )}`,
-            estimatedDuration: null,
-            priority: "high",
-          };
-          const result = await executeAgentTaskStep({
-            actor: state.input.actor,
-            agentPlan: handoffPlan,
-            context: state.context,
-            previousResults: agentResults,
-            webhookPayload: state.input.webhookPayload,
-            workflowId: workflowContext.workflow.id,
-          });
-          agentResults.push(result);
-          if (!pendingApprovalId) pendingApprovalId = result.approvalId;
-
-          await db
-            .update(taskHandoff)
-            .set({
-              status: "completed",
-              completedAt: new Date(),
-              context: {
-                ...handoff.context,
-                executionWorkflowId: workflowContext.workflow.id,
-                executionResult: serializeHandoffResult(result),
-              },
-            })
-            .where(eq(taskHandoff.id, handoff.id));
-        }
-
-        const remainingHandoffs = await db.query.taskHandoff.findMany({
-          where: eq(taskHandoff.chatId, state.input.chatId),
-          orderBy: asc(taskHandoff.createdAt),
-        });
-        for (const handoff of remainingHandoffs) {
-          if (
-            processed < 10 ||
-            seenHandoffIds.has(handoff.id) ||
-            handoff.status !== "pending" ||
-            !handoff.toAgentId ||
-            handoff.context?.workflowRunId !== state.workflowRunId
-          ) {
-            continue;
-          }
-          await db
-            .update(taskHandoff)
-            .set({
-              status: "rejected",
-              completedAt: new Date(),
-              context: {
-                ...handoff.context,
-                executionError: "The workflow handoff limit was exceeded.",
-              },
-            })
-            .where(eq(taskHandoff.id, handoff.id));
-        }
-
-        return complete({
-          ...state,
-          agentResults,
-          pendingApprovalId,
-          pendingHumanHandoffId,
-          processedHandoffIds: [...seenHandoffIds],
-          selfHandoffCounts,
-        });
-      },
+            return complete({
+              ...state,
+              agentResults,
+              pendingApprovalId,
+              pendingHumanHandoffId,
+              processedHandoffIds: [...seenHandoffIds],
+              selfHandoffCounts,
+            });
+          },
+        ),
     })
     .step<
       "await-human-approval",
       OrchestrationWorkflowState,
       OrchestrationWorkflowState
     >("await-human-approval", {
-      run: async (state) => {
-        if (state.pendingHumanHandoffId) {
-          const handoff = await db.query.taskHandoff.findFirst({
-            where: eq(taskHandoff.id, state.pendingHumanHandoffId),
-          });
-          if (
-            handoff &&
-            (handoff.status === "pending" || handoff.status === "accepted")
-          ) {
-            return waitForAndRetry(5_000, state);
-          }
-          return complete({
-            ...state,
-            agentResults: handoff
-              ? [
-                  ...(state.agentResults ?? []),
-                  createHumanHandoffResult(handoff),
-                ]
-              : state.agentResults,
-            pendingHumanHandoffId: undefined,
-          });
-        }
+      run: async (state, workflowContext) =>
+        withHarnessSignal(
+          workflowContext.workflow.id,
+          workflowContext.signal,
+          async () => {
+            if (state.pendingHumanHandoffId) {
+              const handoff = await db.query.taskHandoff.findFirst({
+                where: eq(taskHandoff.id, state.pendingHumanHandoffId),
+              });
+              if (
+                handoff &&
+                (handoff.status === "pending" || handoff.status === "accepted")
+              ) {
+                return waitForAndRetry(5_000, state);
+              }
+              return complete({
+                ...state,
+                agentResults: handoff
+                  ? [
+                      ...(state.agentResults ?? []),
+                      createHumanHandoffResult(handoff),
+                    ]
+                  : state.agentResults,
+                pendingHumanHandoffId: undefined,
+              });
+            }
 
-        if (!state.pendingApprovalId) return complete(state);
+            if (!state.pendingApprovalId) return complete(state);
 
-        const pendingApproval = await db.query.humanApproval.findFirst({
-          where: eq(humanApproval.id, state.pendingApprovalId),
-        });
+            const pendingApproval = await db.query.humanApproval.findFirst({
+              where: eq(humanApproval.id, state.pendingApprovalId),
+            });
 
-        if (!pendingApproval) {
-          // The approval was decided or expired between the agent step and
-          // this durable checkpoint. Continue to aggregation, which reads the
-          // final decision from the database.
-          return complete({ ...state, pendingApprovalId: undefined });
-        }
+            if (!pendingApproval) {
+              // The approval was decided or expired between the agent step and
+              // this durable checkpoint. Continue to aggregation, which reads the
+              // final decision from the database.
+              return complete({ ...state, pendingApprovalId: undefined });
+            }
 
-        if (pendingApproval.status === "pending") {
-          return waitForAndRetry(5_000, state);
-        }
+            if (pendingApproval.status === "pending") {
+              return waitForAndRetry(5_000, state);
+            }
 
-        if (
-          pendingApproval.status === "approved" &&
-          pendingApproval.requestedAction.kind === "mcp_tool_call"
-        ) {
-          const executionResult = await executeApprovedMcpAction({
-            approval: pendingApproval,
-            organizationId: state.input.actor.organizationId,
-          });
-          return complete({
-            ...state,
-            agentResults: executionResult
-              ? [...(state.agentResults ?? []), executionResult]
-              : state.agentResults,
-            pendingApprovalId: undefined,
-          });
-        }
+            if (
+              pendingApproval.status === "approved" &&
+              pendingApproval.requestedAction.kind === "mcp_tool_call"
+            ) {
+              const executionResult = await executeApprovedMcpAction({
+                approval: pendingApproval,
+                organizationId: state.input.actor.organizationId,
+              });
+              const original = state.agentResults?.find(
+                (result) => result.approvalId === pendingApproval.id,
+              );
+              if (
+                executionResult?.success &&
+                original?.harness &&
+                state.workflowRunId
+              ) {
+                let approvedOutput: unknown = executionResult.output;
+                try {
+                  approvedOutput = JSON.parse(executionResult.output ?? "null");
+                } catch {
+                  /* Plain text is valid MCP output. */
+                }
+                await recordApprovedHarnessAction(
+                  state.workflowRunId,
+                  pendingApproval.id,
+                  approvedOutput,
+                );
+                const resumeKey = `approval:${pendingApproval.id}:${original.harness.executionId}`;
+                let resumed = (
+                  await loadDurableAgentResults(workflowContext.workflow.id)
+                ).get(resumeKey);
+                if (!resumed) {
+                  const context = await loadChatContextStep(
+                    state.input.chatId,
+                    state.input.actor.userId,
+                    getTextFromMessages(state.input.messages),
+                    state.input.actor.apiKeyPermissions,
+                  );
+                  const resumeOptions = {
+                    actor: state.input.actor,
+                    context,
+                    workflowId: workflowContext.workflow.id,
+                    resumeAfterApproval: pendingApproval.id,
+                    executionIdOverride: original.harness.executionId,
+                  };
+                  if (
+                    original.agentId === "circulo-default" ||
+                    original.agentId === context.orchestrationAgent?.id
+                  ) {
+                    resumed = await executeDirectResponseStep({
+                      ...resumeOptions,
+                      inputMessages: state.input.messages,
+                    });
+                  } else {
+                    resumed = await executeAgentTaskStep({
+                      ...resumeOptions,
+                      agentPlan: {
+                        agentId: original.agentId,
+                        task: original.task,
+                        order: 0,
+                        priority: "high",
+                        dependsOn: null,
+                        parallelGroup: null,
+                        estimatedDuration: null,
+                        reason:
+                          "Continue the original requirements after the approved action",
+                      },
+                      previousResults: [
+                        ...(state.agentResults ?? []).filter(
+                          (result) => result !== original,
+                        ),
+                        executionResult,
+                      ],
+                      webhookPayload: state.input.webhookPayload,
+                    });
+                  }
+                  await flushDurableUIChunks(workflowContext.workflow.id);
+                  await persistDurableAgentResult(
+                    workflowContext.workflow.id,
+                    resumeKey,
+                    resumed,
+                  );
+                }
+                const agentResults = [
+                  ...(state.agentResults ?? []).filter(
+                    (result) => result !== original,
+                  ),
+                  executionResult,
+                  resumed,
+                ];
+                const nextState = {
+                  ...state,
+                  agentResults,
+                  pendingApprovalId: resumed.approvalId,
+                  agentLoopStatus: agentResults.every(
+                    (result) => result.success,
+                  )
+                    ? ("completed" as const)
+                    : ("blocked" as const),
+                  agentLoopDecision: resumed.error,
+                };
+                return resumed.approvalId
+                  ? waitForAndRetry(5_000, nextState)
+                  : complete(nextState);
+              }
+              return complete({
+                ...state,
+                agentResults: executionResult
+                  ? [...(state.agentResults ?? []), executionResult]
+                  : state.agentResults,
+                pendingApprovalId: undefined,
+                agentLoopStatus: "blocked",
+                agentLoopDecision:
+                  executionResult?.error ??
+                  "The approved action did not verify the remaining goal requirements.",
+              });
+            }
 
-        // An approved non-MCP request is already complete. MCP requests were
-        // executed above; all other terminal decisions should be projected to
-        // aggregation instead of polling forever.
-        return complete({ ...state, pendingApprovalId: undefined });
-      },
+            // An approved non-MCP request is already complete. MCP requests were
+            // executed above; all other terminal decisions should be projected to
+            // aggregation instead of polling forever.
+            return complete({ ...state, pendingApprovalId: undefined });
+          },
+        ),
     })
     .step<
       "aggregate-results",
@@ -805,7 +944,22 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
         });
         await flushDurableUIChunks(workflowContext.workflow.id);
 
-        return complete({ ...state, finalResult });
+        return complete({
+          ...state,
+          finalResult:
+            state.agentLoopStatus === "blocked"
+              ? {
+                  ...finalResult,
+                  overallSuccess: false,
+                  summary: "Task incomplete",
+                  detailedResponse: finalResult.detailedResponse.includes(
+                    "Task incomplete:",
+                  )
+                    ? finalResult.detailedResponse
+                    : `${finalResult.detailedResponse}\n\nTask incomplete: ${state.agentLoopDecision ?? "The goal has not been verified complete."}`,
+                }
+              : finalResult,
+        });
       },
     })
     .build();
@@ -837,7 +991,9 @@ async function executeApprovedMcpAction(params: {
       error:
         stored.status === "failed"
           ? String(stored.error ?? "MCP action failed")
-          : undefined,
+          : stored.status !== "completed"
+            ? "The approved action has an uncertain outcome. Verify it before repeating it."
+            : undefined,
       startTime: now,
       endTime: now,
       durationMs: 0,
@@ -852,16 +1008,33 @@ async function executeApprovedMcpAction(params: {
   ) {
     throw new Error("The approved MCP action payload is invalid");
   }
-  const integration = await db.query.mcpIntegration.findFirst({
-    where: and(
-      eq(mcpIntegration.id, action.integrationId),
-      eq(mcpIntegration.organizationId, params.organizationId),
-      eq(mcpIntegration.enabled, true),
-      eq(mcpIntegration.status, "published"),
-    ),
+  const integration = await assertMcpInvocationAccess({
+    userId: params.approval.requestedBy,
+    organizationId: params.organizationId,
+    chatId: params.approval.chatId,
+    integrationId: action.integrationId,
+    toolName: action.tool,
+    agentId: typeof action.agentId === "string" ? action.agentId : undefined,
+    apiKeyPermissions:
+      action.apiKeyPermissions as OrchestrationInput["actor"]["apiKeyPermissions"],
+    apiKeyId: typeof action.apiKeyId === "string" ? action.apiKeyId : undefined,
   });
-  if (!integration)
-    throw new Error("The approved MCP app is no longer available");
+  const [claim] = await db
+    .update(humanApproval)
+    .set({
+      requestedAction: { ...action, executionResult: { status: "started" } },
+    })
+    .where(
+      and(
+        eq(humanApproval.id, params.approval.id),
+        sql`${humanApproval.requestedAction}->'executionResult' is null`,
+      ),
+    )
+    .returning({ id: humanApproval.id });
+  if (!claim)
+    throw new Error(
+      "Another worker claimed the approved action. Its outcome must be verified before retrying.",
+    );
   const startedAt = new Date();
   try {
     const output = await new McpClient(integration).callTool(
@@ -1036,7 +1209,8 @@ type AgenticLoopResult = {
   reason: string;
 };
 
-async function executeAgenticLoop(params: {
+export async function executeAgenticLoop(params: {
+  startedAt: number;
   actor: OrchestrationInput["actor"];
   plan: ExecutionPlan;
   context: ChatContext;
@@ -1057,7 +1231,7 @@ async function executeAgenticLoop(params: {
   const writeLoopEvent = (chunk: WorkflowStreamChunk) =>
     dataStream.write(chunk);
   const loopDeadline =
-    Date.now() +
+    params.startedAt +
     Math.min(
       MAX_AGENTIC_RUNTIME_MS,
       Math.max(60_000, params.plan.timeoutMinutes * 60_000),
@@ -1076,6 +1250,41 @@ async function executeAgenticLoop(params: {
     params.plan.selectedAgents,
     1,
   );
+  if (
+    Date.now() >= loopDeadline ||
+    params.plan.selectedAgents.length > MAX_AGENTIC_AGENT_STEPS
+  ) {
+    const reason = "The execution budget was exceeded before work could start.";
+    const taskLedger = markUnfinishedAgentTasksBlocked(
+      addAgentTasks([], initialTaskDescriptors),
+      reason,
+    );
+    writeLoopEvent({
+      type: "data-workflowLoopCompleted",
+      data: {
+        workflowId: params.workflowId,
+        iterations: 0,
+        status: "blocked",
+        reason,
+      },
+    });
+    await persistDurableAgentLoopSnapshot(params.workflowId, {
+      iteration: 0,
+      phase: "completed",
+      resultCount: 0,
+      status: "blocked",
+      reason,
+      ledger: taskLedger,
+    });
+    return {
+      results: [],
+      planSteps: [],
+      taskLedger,
+      iterations: 0,
+      status: "blocked",
+      reason,
+    };
+  }
   const durableSnapshots = await loadDurableAgentLoopSnapshots(
     params.workflowId,
   );
@@ -1113,10 +1322,10 @@ async function executeAgenticLoop(params: {
     params.workflowId,
   );
   const executedPlans: ExecutionPlan[] = [params.plan];
-  let status: AgenticLoopResult["status"] = "completed";
-  let reason = "The initial execution plan completed.";
+  let status: AgenticLoopResult["status"] = "blocked";
+  let reason = "The goal has not yet been verified complete.";
 
-  while (iterations < MAX_AGENTIC_ITERATIONS && Date.now() < loopDeadline) {
+  while (iterations <= MAX_AGENTIC_ITERATIONS && Date.now() < loopDeadline) {
     writeLoopEvent({
       type: "data-workflowLoopIteration",
       data: {
@@ -1191,6 +1400,13 @@ async function executeAgenticLoop(params: {
       break;
     }
 
+    if (iterations >= MAX_AGENTIC_ITERATIONS) {
+      status = "blocked";
+      reason =
+        "The agentic iteration budget was exhausted before the goal was verified complete.";
+      break;
+    }
+
     const remainingCapacity = MAX_AGENTIC_AGENT_STEPS - results.length;
     const nextSteps = decision.nextSteps.slice(0, remainingCapacity);
     if (nextSteps.length === 0) {
@@ -1252,10 +1468,7 @@ async function executeAgenticLoop(params: {
     iterations += 1;
   }
 
-  if (iterations >= MAX_AGENTIC_ITERATIONS && status === "completed") {
-    reason = "The maximum agentic iteration budget was reached.";
-  }
-  if (Date.now() >= loopDeadline && iterations < MAX_AGENTIC_ITERATIONS) {
+  if (Date.now() >= loopDeadline && status !== "completed") {
     status = "blocked";
     reason = "The agentic execution time budget was reached.";
   }

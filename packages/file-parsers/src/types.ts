@@ -9,18 +9,4 @@ export interface FileParser {
 }
 
 export type SupportedFileType =
-  | "pdf"
-  | "csv"
-  | "doc"
-  | "docx"
-  | "txt"
-  | "md"
-  | "xlsx"
-  | "xls"
-  | "html"
-  | "htm"
-  | "pptx"
-  | "ppt"
-  | "json"
-  | "yaml"
-  | "yml";
+  typeof import("./index.js").SUPPORTED_FILE_EXTENSIONS[number];

@@ -1,6 +1,7 @@
 "use client";
 
 import type { ArtifactKind } from "@/components/artifacts/artifact";
+import { AttachmentPreviewDialog } from "@/components/attachment-preview-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -29,8 +30,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useArtifact } from "@/hooks/api/chats/use-artifact";
+import { getAttachmentPreviewUrl } from "@/lib/attachment-preview";
 import { getFetcher } from "@/lib/swr";
-import { getSafeNavigationUrl } from "@/lib/urls/safe";
 import { Search01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { format, isValid } from "date-fns";
@@ -114,6 +115,7 @@ export function ChatResourceLibrary({ chatId }: { chatId: string }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<ResourceFilter>("all");
+  const [previewResource, setPreviewResource] = useState<ChatResource>();
   const { setArtifact } = useArtifact();
   const { data, error, isLoading, mutate } = useSWR<{
     resources: ChatResource[];
@@ -301,6 +303,7 @@ export function ChatResourceLibrary({ chatId }: { chatId: string }) {
                           <ResourceRow
                             key={resource.id}
                             onOpenArtifact={openArtifact}
+                            onPreview={setPreviewResource}
                             resource={resource}
                           />
                         ))}
@@ -313,6 +316,22 @@ export function ChatResourceLibrary({ chatId }: { chatId: string }) {
           </div>
         </SheetContent>
       </Sheet>
+      {previewResource && (
+        <AttachmentPreviewDialog
+          attachment={{
+            name: previewResource.name,
+            url: previewResource.url ?? "",
+            contentType: previewResource.mediaType ?? "",
+            size: previewResource.size ?? undefined,
+          }}
+          sharedBy={previewResource.sender.name}
+          sharedAt={formatResourceDate(previewResource.createdAt) ?? undefined}
+          open={Boolean(previewResource)}
+          onOpenChange={(isOpen) => {
+            if (!isOpen) setPreviewResource(undefined);
+          }}
+        />
+      )}
     </>
   );
 }
@@ -320,11 +339,13 @@ export function ChatResourceLibrary({ chatId }: { chatId: string }) {
 function ResourceRow({
   resource,
   onOpenArtifact,
+  onPreview,
 }: {
   resource: ChatResource;
   onOpenArtifact: (resource: ChatResource) => void;
+  onPreview: (resource: ChatResource) => void;
 }) {
-  const safeUrl = getSafeNavigationUrl(resource.url);
+  const safeUrl = getAttachmentPreviewUrl(resource.url);
   const Icon = resourceIcon(resource.type);
   const createdAt = formatResourceDate(resource.createdAt);
   const modifiedAt = formatResourceDate(resource.modifiedAt);
@@ -429,15 +450,14 @@ function ResourceRow({
 
   if (safeUrl) {
     return (
-      <a
-        aria-label={`Open ${resource.name} in a new tab`}
+      <button
+        aria-label={`Preview ${resource.name}`}
         className="group block min-w-0 rounded-xl text-left focus-visible:outline-none"
-        href={safeUrl}
-        rel="noreferrer"
-        target="_blank"
+        type="button"
+        onClick={() => onPreview(resource)}
       >
         {content}
-      </a>
+      </button>
     );
   }
 

@@ -1,8 +1,15 @@
-import { db, knowledgeDocument } from "@/db";
+import {
+  db,
+  embeddingChunk,
+  embeddingPreference,
+  knowledgeDocument,
+} from "@/db";
 import { env } from "@/lib/env";
+import { getUserProviderCredential } from "@/lib/ai/provider-registry";
 import { eq } from "drizzle-orm";
 import { getKnowledgeAssetKey, toKnowledgeImageDataUrl } from "./assets";
 import { refreshKnowledgeDocumentEmbedding } from "./embeddings";
+import { getEmbeddingPreferences } from "./embedding-settings";
 import type { VisionMessageContent } from "./vision-utils";
 import { buildImageKnowledgeContent, extractVisionText } from "./vision-utils";
 
@@ -34,56 +41,72 @@ export async function createKnowledgeImageVisionText(params: {
   fileName: string;
   contentType: string;
   buffer: Buffer;
-}): Promise<string | null> {
-  if (!env.OPENROUTER_API_KEY) return null;
+  userId?: string;
+}): Promise<{ content: string; model: string } | null> {
+  const credential = params.userId
+    ? ((await getUserProviderCredential(params.userId, "openrouter")) ??
+      (await getUserProviderCredential(params.userId, "openai")))
+    : null;
+  const apiKey = credential?.apiKey ?? env.OPENROUTER_API_KEY;
+  if (!apiKey) return null;
+  const baseUrl =
+    credential?.baseUrl ??
+    (credential?.providerId === "openai"
+      ? "https://api.openai.com/v1"
+      : getBaseUrl());
+  const model =
+    credential?.providerId === "openai" ? "gpt-4o-mini" : getVisionModel();
   const imageDataUrl = toKnowledgeImageDataUrl(
     params.buffer,
     params.contentType,
   );
   if (!imageDataUrl) return null;
 
-  const response = await fetch(`${getBaseUrl()}/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      ...(env.OPENROUTER_HTTP_REFERER
-        ? { "HTTP-Referer": env.OPENROUTER_HTTP_REFERER }
-        : {}),
-      ...(env.OPENROUTER_APP_TITLE
-        ? { "X-Title": env.OPENROUTER_APP_TITLE }
-        : {}),
+  const response = await fetch(
+    `${baseUrl.replace(/\/$/, "")}/chat/completions`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(env.OPENROUTER_HTTP_REFERER
+          ? { "HTTP-Referer": env.OPENROUTER_HTTP_REFERER }
+          : {}),
+        ...(env.OPENROUTER_APP_TITLE
+          ? { "X-Title": env.OPENROUTER_APP_TITLE }
+          : {}),
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0,
+        max_tokens: 1200,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: `Index this image for knowledge retrieval. File name: ${params.fileName}. Extract readable text faithfully, then add a concise description of important visible entities, layout, and meaning. Use the headings "Readable text" and "Visual description". Do not invent details.`,
+              },
+              { type: "image_url", image_url: { url: imageDataUrl } },
+            ],
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(30_000),
     },
-    body: JSON.stringify({
-      model: getVisionModel(),
-      temperature: 0,
-      max_tokens: 1200,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: `Index this image for knowledge retrieval. File name: ${params.fileName}. Extract readable text faithfully, then add a concise description of important visible entities, layout, and meaning. Use the headings "Readable text" and "Visual description". Do not invent details.`,
-            },
-            { type: "image_url", image_url: { url: imageDataUrl } },
-          ],
-        },
-      ],
-    }),
-    signal: AbortSignal.timeout(30_000),
-  });
+  );
 
   if (!response.ok) {
-    const providerMessage = (await response.text()).slice(0, 500);
     throw new Error(
-      `Vision request failed (${response.status})${providerMessage ? `: ${providerMessage}` : ""}`,
+      `Vision provider returned HTTP ${response.status}. Check credentials, balance, and vision-model access.`,
     );
   }
 
   const payload = (await response.json()) as VisionResponse;
-  return extractVisionText(payload.choices?.[0]?.message?.content);
+  const content = extractVisionText(payload.choices?.[0]?.message?.content);
+  return content ? { content, model } : null;
 }
 
 export async function refreshKnowledgeImageDocument(params: {
@@ -93,32 +116,64 @@ export async function refreshKnowledgeImageDocument(params: {
   contentType: string;
   buffer: Buffer;
   existingMetadata?: Record<string, unknown> | null;
+  userId?: string;
 }): Promise<{ visionIndexed: boolean; embeddingIndexed: boolean }> {
+  const source = await db.query.knowledgeDocument.findFirst({
+    where: eq(knowledgeDocument.id, params.documentId),
+  });
+  if (!source || source.title !== params.title)
+    return { visionIndexed: false, embeddingIndexed: false };
+  await getEmbeddingPreferences(source.organizationId);
   const visionText = await createKnowledgeImageVisionText(params);
   if (!visionText) {
     return {
       visionIndexed: false,
-      embeddingIndexed: await refreshKnowledgeDocumentEmbedding({
-        documentId: params.documentId,
-        title: params.title,
-        content: `Image attachment: ${params.fileName}`,
-      }),
+      embeddingIndexed: false,
     };
   }
 
-  const content = buildImageKnowledgeContent(params.fileName, visionText);
-  await db
-    .update(knowledgeDocument)
-    .set({
-      content,
-      metadata: {
-        ...(params.existingMetadata ?? {}),
-        visionIndexedAt: new Date().toISOString(),
-        visionModel: getVisionModel(),
-      },
-      updatedAt: new Date(),
-    })
-    .where(eq(knowledgeDocument.id, params.documentId));
+  const content = buildImageKnowledgeContent(
+    params.fileName,
+    visionText.content,
+  );
+  const saved = await db.transaction(async (tx) => {
+    await tx
+      .select()
+      .from(embeddingPreference)
+      .where(eq(embeddingPreference.organizationId, source.organizationId))
+      .for("update");
+    const [current] = await tx
+      .select()
+      .from(knowledgeDocument)
+      .where(eq(knowledgeDocument.id, params.documentId))
+      .for("update");
+    if (
+      !current ||
+      current.updatedAt.getTime() !== source.updatedAt.getTime() ||
+      current.content !== source.content
+    )
+      return false;
+    await tx
+      .delete(embeddingChunk)
+      .where(eq(embeddingChunk.documentId, params.documentId));
+    await tx
+      .update(knowledgeDocument)
+      .set({
+        content,
+        embedding: null,
+        embeddingModel: null,
+        embeddingUpdatedAt: null,
+        metadata: {
+          ...current.metadata,
+          visionIndexedAt: new Date().toISOString(),
+          visionModel: visionText.model,
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(knowledgeDocument.id, params.documentId));
+    return true;
+  });
+  if (!saved) return { visionIndexed: false, embeddingIndexed: false };
 
   return {
     visionIndexed: true,
@@ -126,6 +181,7 @@ export async function refreshKnowledgeImageDocument(params: {
       documentId: params.documentId,
       title: params.title,
       content,
+      userId: params.userId,
     }),
   };
 }

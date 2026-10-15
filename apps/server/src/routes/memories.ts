@@ -8,7 +8,11 @@ import {
   memoryPreference,
 } from "@/db/schema";
 import { createRouter } from "@/lib/create-app";
-import { createMemoryEmbedding } from "@/lib/memory/retrieval";
+import {
+  createMemoryEmbedding,
+  writeMemoryWithEmbedding,
+  type MemoryTransaction,
+} from "@/lib/memory/retrieval";
 import {
   hasPermissionForUser,
   isMemberOf,
@@ -233,8 +237,11 @@ async function refreshMemorySummaryWhenEnabled(
   }
 }
 
-async function snapshotMemory(existing: typeof memory.$inferSelect) {
-  await db.insert(memoryHistory).values({
+async function snapshotMemory(
+  existing: typeof memory.$inferSelect,
+  tx: MemoryTransaction,
+) {
+  await tx.insert(memoryHistory).values({
     memoryId: existing.id,
     organizationId: existing.organizationId,
     userId: existing.userId ?? existing.createdBy,
@@ -482,47 +489,79 @@ router.post(
       key: body.key,
       content: body.content,
       userId: c.var.user!.id,
+      organizationId,
     });
     if (existing) {
-      await snapshotMemory(existing);
-      const [updated] = await db
-        .update(memory)
-        .set({
-          content: body.content,
-          metadata: body.metadata ?? {},
-          importance: body.importance ?? existing.importance,
-          embedding: embedding?.embedding ?? null,
-          embeddingModel: embedding?.model ?? null,
-          embeddingUpdatedAt: embedding ? new Date() : null,
-          updatedAt: new Date(),
-        })
-        .where(eq(memory.id, existing.id))
-        .returning();
+      const { row: updated } = await writeMemoryWithEmbedding(
+        organizationId,
+        embedding,
+        async (tx, embeddingFields) => {
+          const snapshot = await tx.query.memory.findFirst({
+            where: eq(memory.id, existing.id),
+          });
+          if (snapshot) await snapshotMemory(snapshot, tx);
+          const [updated] = await tx
+            .update(memory)
+            .set({
+              content: body.content,
+              metadata: body.metadata ?? {},
+              importance: body.importance ?? existing.importance,
+              ...embeddingFields,
+              updatedAt: new Date(),
+            })
+            .where(eq(memory.id, existing.id))
+            .returning();
+          return updated;
+        },
+      );
       if (body.scope === "user") {
         await refreshMemorySummaryWhenEnabled(organizationId, c.var.user!.id);
       }
       return c.json(memoryResponse(updated));
     }
-    const [created] = await db
-      .insert(memory)
-      .values({
-        organizationId,
-        chatId: body.scope === "chat" ? body.chatId : null,
-        agentId: body.scope === "agent" ? body.agentId : null,
-        createdBy: c.var.user!.id,
-        scope: body.scope,
-        key: body.key,
-        content: body.content,
-        metadata: body.metadata ?? {},
-        importance: body.importance ?? 50,
-        embedding: embedding?.embedding ?? null,
-        embeddingModel: embedding?.model ?? null,
-        embeddingUpdatedAt: embedding ? new Date() : null,
-        sourceType: body.sourceType ?? "manual",
-        sourceId: body.sourceId ?? null,
-        userId: body.scope === "user" ? c.var.user!.id : null,
-      })
-      .returning();
+    const { row: created } = await writeMemoryWithEmbedding(
+      organizationId,
+      embedding,
+      async (tx, embeddingFields) => {
+        const current = await tx.query.memory.findFirst({
+          where: and(...conditions, eq(memory.key, body.key)),
+        });
+        if (current) {
+          await snapshotMemory(current, tx);
+          const [updated] = await tx
+            .update(memory)
+            .set({
+              content: body.content,
+              metadata: body.metadata ?? {},
+              importance: body.importance ?? current.importance,
+              ...embeddingFields,
+              updatedAt: new Date(),
+            })
+            .where(eq(memory.id, current.id))
+            .returning();
+          return updated;
+        }
+        const [created] = await tx
+          .insert(memory)
+          .values({
+            organizationId,
+            chatId: body.scope === "chat" ? body.chatId : null,
+            agentId: body.scope === "agent" ? body.agentId : null,
+            createdBy: c.var.user!.id,
+            scope: body.scope,
+            key: body.key,
+            content: body.content,
+            metadata: body.metadata ?? {},
+            importance: body.importance ?? 50,
+            ...embeddingFields,
+            sourceType: body.sourceType ?? "manual",
+            sourceId: body.sourceId ?? null,
+            userId: body.scope === "user" ? c.var.user!.id : null,
+          })
+          .returning();
+        return created;
+      },
+    );
     if (body.scope === "user") {
       await refreshMemorySummaryWhenEnabled(organizationId, c.var.user!.id);
     }
@@ -606,22 +645,31 @@ router.post(
       key: history.key,
       content: history.content,
       userId: c.var.user!.id,
+      organizationId,
     });
-    await snapshotMemory(existing);
-    const [restored] = await db
-      .update(memory)
-      .set({
-        key: history.key,
-        content: history.content,
-        metadata: history.metadata,
-        importance: history.importance,
-        embedding: embedding?.embedding ?? null,
-        embeddingModel: embedding?.model ?? null,
-        embeddingUpdatedAt: embedding ? new Date() : null,
-        updatedAt: new Date(),
-      })
-      .where(eq(memory.id, id))
-      .returning();
+    const { row: restored } = await writeMemoryWithEmbedding(
+      organizationId,
+      embedding,
+      async (tx, embeddingFields) => {
+        const snapshot = await tx.query.memory.findFirst({
+          where: eq(memory.id, id),
+        });
+        if (snapshot) await snapshotMemory(snapshot, tx);
+        const [restored] = await tx
+          .update(memory)
+          .set({
+            key: history.key,
+            content: history.content,
+            metadata: history.metadata,
+            importance: history.importance,
+            ...embeddingFields,
+            updatedAt: new Date(),
+          })
+          .where(eq(memory.id, id))
+          .returning();
+        return restored;
+      },
+    );
     if (existing.scope === "user") {
       await refreshMemorySummaryWhenEnabled(organizationId, c.var.user!.id);
     }
@@ -676,30 +724,35 @@ router.patch(
           key: existing.key,
           content: nextContent,
           userId: c.var.user!.id,
+          organizationId,
         })
       : undefined;
-    if (
-      contentChanged ||
-      changes.importance !== undefined ||
-      changes.metadata !== undefined
-    ) {
-      await snapshotMemory(existing);
-    }
-    const [updated] = await db
-      .update(memory)
-      .set({
-        ...changes,
-        ...(contentChanged
-          ? {
-              embedding: embedding?.embedding ?? null,
-              embeddingModel: embedding?.model ?? null,
-              embeddingUpdatedAt: embedding ? new Date() : null,
-            }
-          : {}),
-        updatedAt: new Date(),
-      })
-      .where(eq(memory.id, id))
-      .returning();
+    const { row: updated } = await writeMemoryWithEmbedding(
+      organizationId,
+      embedding,
+      async (tx, embeddingFields) => {
+        if (
+          contentChanged ||
+          changes.importance !== undefined ||
+          changes.metadata !== undefined
+        ) {
+          const snapshot = await tx.query.memory.findFirst({
+            where: eq(memory.id, id),
+          });
+          if (snapshot) await snapshotMemory(snapshot, tx);
+        }
+        const [updated] = await tx
+          .update(memory)
+          .set({
+            ...changes,
+            ...embeddingFields,
+            updatedAt: new Date(),
+          })
+          .where(eq(memory.id, id))
+          .returning();
+        return updated;
+      },
+    );
     if (existing.scope === "user") {
       await refreshMemorySummaryWhenEnabled(organizationId, c.var.user!.id);
     }

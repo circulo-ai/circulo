@@ -15,6 +15,7 @@ export class HtmlParser implements FileParser {
   async parseBuffer(buffer: Buffer): Promise<FileParseResult> {
     const html = buffer.toString("utf8");
     const $ = cheerio.load(html);
+    $("script,style,noscript,template").remove();
     const text = sanitizeTextForUTF8($.text());
 
     const title = $("title").first().text() || undefined;

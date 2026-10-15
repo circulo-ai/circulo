@@ -20,7 +20,8 @@ import {
   type ApiKeyPermissions,
 } from "@/lib/permissions";
 import { requireAuth } from "@/middleware/auth";
-import { calculateNextRun, validateSchedule } from "@/services/scheduling";
+import { executionMetadata } from "@/services/scheduled-dispatch";
+import { firstRunAt } from "@/services/scheduling";
 import { workflowRunService } from "@/workflows/runtime/workflow-run-service";
 import {
   BadRequestError,
@@ -32,6 +33,61 @@ import { and, desc, eq, inArray, isNull, lte } from "drizzle-orm";
 import { z } from "zod";
 
 const router = createRouter();
+router.use("/automation/*", async (c, next) => {
+  // Webhook management has its own checks; signed ingress has no session.
+  if (/\/automation\/webhooks(?:\/|$)/.test(c.req.path)) return next();
+  return requireAuth(c, async () => {
+    const organizationId = c.get("activeOrgId");
+    if (!organizationId) throw new BadRequestError("No active organization");
+    const resource = c.req.path.includes("/automation/mcp")
+      ? "mcp"
+      : "automation";
+    const action =
+      c.req.method === "GET"
+        ? "read"
+        : c.req.method === "POST"
+          ? "create"
+          : c.req.method === "DELETE"
+            ? "delete"
+            : "update";
+    if (
+      c.req.method === "PATCH" &&
+      /\/automation\/(approvals|handoffs)\//.test(c.req.path)
+    ) {
+      if (
+        c.var.apiKeyPermissions &&
+        !c.var.apiKeyPermissions.automation?.some(
+          (action) => action === "update" || action === "manage",
+        )
+      )
+        throw new ForbiddenError(
+          "Your API key does not allow automation updates.",
+        );
+      // The handler validates the assigned human or chat manager relationship.
+      return next();
+    }
+    const allowed =
+      (await hasPermissionForUser(
+        c.var.user!.id,
+        organizationId,
+        resource,
+        action,
+        c.var.apiKeyPermissions,
+      )) ||
+      (await hasPermissionForUser(
+        c.var.user!.id,
+        organizationId,
+        resource,
+        "manage",
+        c.var.apiKeyPermissions,
+      ));
+    if (!allowed)
+      throw new ForbiddenError(
+        `Your workspace role or API key does not allow ${resource} ${action}.`,
+      );
+    await next();
+  });
+});
 const idParams = z.object({ id: z.uuid() });
 function nextRunAt(
   scheduleType: "once" | "interval" | "cron",
@@ -39,9 +95,7 @@ function nextRunAt(
   timezone: string,
 ) {
   try {
-    validateSchedule({ scheduleType, schedule, timezone });
-    if (scheduleType === "once") return new Date(schedule);
-    return calculateNextRun({ scheduleType, schedule, timezone }, new Date());
+    return firstRunAt({ scheduleType, schedule, timezone });
   } catch (error) {
     throw new BadRequestError(
       error instanceof Error ? error.message : "Invalid schedule",
@@ -137,7 +191,31 @@ const taskSchema = z.object({
 const taskUpdateSchema = taskSchema
   .partial()
   .omit({ organizationId: true })
-  .extend({ status: z.enum(["active", "paused"]).optional() });
+  .extend({
+    // Zod 4 applies nested defaults even under partial(). A status-only
+    // update must not silently change a task's existing scheduling zone.
+    timezone: z.string().trim().min(1).max(100).optional(),
+    status: z.enum(["active", "paused"]).optional(),
+  });
+
+router.get("/automation/access", requireAuth, async (c) => {
+  const organizationId = c.get("activeOrgId")!;
+  const access = Object.fromEntries(
+    await Promise.all(
+      ["read", "create", "update", "delete", "manage"].map(async (action) => [
+        action,
+        await hasPermissionForUser(
+          c.var.user!.id,
+          organizationId,
+          "automation",
+          action,
+          c.var.apiKeyPermissions,
+        ),
+      ]),
+    ),
+  );
+  return c.json(access);
+});
 
 router.get("/automation/tasks", requireAuth, async (c) => {
   const organizationId = c.get("activeOrgId");
@@ -184,7 +262,13 @@ router.post(
         ...body,
         createdBy: userId,
         nextRunAt: next,
-        metadata: body.metadata ?? {},
+        metadata: {
+          ...body.metadata,
+          _execution: {
+            apiKeyPermissions: c.var.apiKeyPermissions ?? null,
+            apiKeyId: c.var.apiKeyId ?? null,
+          },
+        },
       })
       .returning();
     return c.json(created, 201);
@@ -224,13 +308,27 @@ router.patch(
       const targetChat = await requireChatMember(c.var.user!.id, targetChatId);
       if (targetChat.organizationId !== current.organizationId)
         throw new ForbiddenError("Chat belongs to another organization");
-      if (targetChat.creatorId !== c.var.user!.id && !isOrganizationManager)
+      if (current.createdBy !== c.var.user!.id && !isOrganizationManager)
         throw new ForbiddenError("Only chat managers can update chat tasks");
     }
     const scheduleType = body.scheduleType ?? current.scheduleType;
     const schedule = body.schedule ?? current.schedule;
     const timezone = body.timezone ?? current.timezone;
-    const status = body.status ?? current.status;
+    const pending = executionMetadata(current.metadata).pending;
+    if (pending && body.chatId && body.chatId !== current.chatId)
+      throw new BadRequestError(
+        "This task has a queued run. Pause or finish it before changing the destination chat.",
+      );
+    const scheduleChanged =
+      (body.scheduleType !== undefined &&
+        body.scheduleType !== current.scheduleType) ||
+      (body.schedule !== undefined && body.schedule !== current.schedule) ||
+      (body.timezone !== undefined && body.timezone !== current.timezone);
+    const status =
+      body.status ??
+      (scheduleChanged && current.status !== "paused"
+        ? "active"
+        : current.status);
     if (status === "active" && !current.chatId && !body.chatId) {
       throw new BadRequestError(
         "A scheduled task needs an active chat before it can resume",
@@ -244,10 +342,26 @@ router.patch(
         scheduleType,
         schedule,
         timezone,
+        metadata: {
+          ...current.metadata,
+          ...body.metadata,
+          _execution: current.metadata._execution,
+        },
         nextRunAt:
           status === "paused"
-            ? current.nextRunAt
-            : nextRunAt(scheduleType, schedule, timezone),
+            ? scheduleChanged
+              ? nextRunAt(scheduleType, schedule, timezone)
+              : current.nextRunAt
+            : !scheduleChanged &&
+                current.scheduleType === "once" &&
+                current.nextRunAt
+              ? current.nextRunAt
+              : scheduleChanged ||
+                  (body.status === "active" &&
+                    current.status !== "active" &&
+                    !pending)
+                ? nextRunAt(scheduleType, schedule, timezone)
+                : current.nextRunAt,
         updatedAt: new Date(),
       })
       .where(eq(scheduledTask.id, id))
@@ -467,6 +581,7 @@ router.get("/automation/approvals", requireAuth, async (c) => {
     organizationId,
     "automation",
     "manage",
+    c.var.apiKeyPermissions,
   );
   const expired = await db
     .update(humanApproval)
@@ -544,7 +659,16 @@ router.post(
     }
     const [created] = await db
       .insert(humanApproval)
-      .values({ ...body, requestedBy: c.var.user!.id })
+      .values({
+        ...body,
+        requestedBy: c.var.user!.id,
+        requestedAction: {
+          ...body.requestedAction,
+          executionResult: undefined,
+          apiKeyPermissions: c.var.apiKeyPermissions ?? null,
+          apiKeyId: c.var.apiKeyId ?? null,
+        },
+      })
       .returning();
     return c.json(created, 201);
   },
@@ -600,6 +724,15 @@ router.patch(
       throw new ForbiddenError(
         "Only chat or workspace managers can decide approvals",
       );
+    if (current.workflowRunId) {
+      const run = await db.query.workflowRun.findFirst({
+        where: eq(workflowRun.id, current.workflowRunId),
+      });
+      if (!run || run.state === "failed" || run.state === "completed")
+        throw new BadRequestError(
+          "This workflow has ended. Continue the task in chat to request a new action.",
+        );
+    }
     const [updated] = await db
       .update(humanApproval)
       .set({ ...body, approverUserId: c.var.user!.id, decidedAt: new Date() })

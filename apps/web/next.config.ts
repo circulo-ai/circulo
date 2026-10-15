@@ -46,15 +46,19 @@ const contentSecurityPolicy = [
   "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
+  `media-src 'self' data: blob: ${apiOrigin} https:`,
   "font-src 'self' data: https:",
   `connect-src ${connectSources.join(" ")}`,
   "worker-src 'self' blob:",
   "child-src 'self' blob:",
-  "frame-src 'self' https:",
+  "frame-src 'self' blob: https:",
 ].join("; ");
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  ...(process.env.NEXT_PUBLIC_CIRCULO_RUNTIME_KIND === "desktop"
+    ? { experimental: { cpus: 2 } }
+    : {}),
   devIndicators: false,
   images: {
     remotePatterns: [

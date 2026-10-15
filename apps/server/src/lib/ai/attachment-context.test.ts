@@ -1,5 +1,7 @@
 import type { ChatMessage } from "@/lib/types";
 import { describe, expect, it } from "vitest";
+import { readFile } from "node:fs/promises";
+import { convertToModelMessages } from "ai";
 import { normalizeAttachmentContext } from "./attachment-context";
 
 function asMessage(parts: unknown[]): ChatMessage {
@@ -11,6 +13,27 @@ function asMessage(parts: unknown[]): ChatMessage {
 }
 
 describe("attachment context normalization", () => {
+  it("passes real PDF text and a leading command through to model messages", async () => {
+    const pdf = await readFile(
+      new URL("../knowledge/fixtures/document.pdf", import.meta.url),
+    );
+    const normalized = await normalizeAttachmentContext([
+      asMessage([
+        {
+          type: "file",
+          filename: "document.pdf",
+          mediaType: "application/pdf",
+          url: `data:application/pdf;base64,${pdf.toString("base64")}`,
+        },
+        { type: "text", text: "/summarize the attached PDF" },
+      ]),
+    ]);
+    const modelMessages = await convertToModelMessages(normalized);
+    expect(normalized[0]?.parts).toHaveLength(1);
+    expect(JSON.stringify(modelMessages)).toContain("Parser verification");
+    expect(JSON.stringify(modelMessages)).toContain("Summarize");
+    expect(JSON.stringify(modelMessages)).not.toContain('"type":"file"');
+  });
   it("turns markdown data URLs into bounded text context", async () => {
     const source = "# Release notes\n\nAttachment parsing works.";
     const dataUrl = `data:text/markdown;base64,${Buffer.from(source).toString("base64")}`;

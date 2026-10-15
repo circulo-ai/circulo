@@ -11,6 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -36,6 +37,7 @@ import { FormRoot } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { WorkspaceShell } from "@/components/workspace/workspace-shell";
+import { EmbeddingSettings } from "@/components/workspace/embedding-settings";
 import {
   BookOpen,
   Check,
@@ -48,7 +50,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import useSWR from "swr";
 import { z } from "zod";
@@ -66,6 +68,8 @@ type Document = {
   contentType: string;
   sourceKey: string | null;
   updatedAt?: string;
+  embeddingUpdatedAt?: string | null;
+  metadata?: Record<string, unknown>;
 };
 const emptyBase = { name: "", description: "" };
 const emptyDocument = { title: "", content: "", sourceKey: "" };
@@ -110,6 +114,30 @@ function KnowledgePageContent() {
     activeId ? `/api/knowledge-bases/${activeId}/documents` : null,
     fetcher,
   );
+  const { data: indexStatuses } = useSWR<
+    Array<{ id: string; isSemanticReady: boolean; visionIndexed: boolean }>
+  >(
+    activeId ? `/api/knowledge-bases/${activeId}/index-status` : null,
+    fetcher,
+    {
+      refreshInterval: (latest) =>
+        latest?.some((document) => !document.isSemanticReady) ? 10000 : 0,
+    },
+  );
+  const indexStatusMap = new Map(
+    indexStatuses?.map((status) => [status.id, status]),
+  );
+  useEffect(() => {
+    const newlyIndexed = documents?.some((document) => {
+      const status = indexStatuses?.find((item) => item.id === document.id);
+      return (
+        status &&
+        ((status.isSemanticReady && !document.embeddingUpdatedAt) ||
+          (status.visionIndexed && !document.metadata?.visionIndexedAt))
+      );
+    });
+    if (newlyIndexed) void mutateDocuments();
+  }, [documents, indexStatuses, mutateDocuments]);
   const [baseForm, setBaseForm] = useState(emptyBase);
   const [documentForm, setDocumentForm] = useState(emptyDocument);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -264,17 +292,46 @@ function KnowledgePageContent() {
     if (!activeId) return;
     setReindexing(true);
     try {
-      const result = (await request(
-        `/api/knowledge-bases/${activeId}/reindex`,
-        {
+      let cursor: string | undefined;
+      let indexed = 0;
+      let processed = 0;
+      let failureMessage = "";
+      do {
+        const result = (await request("/api/embedding-settings/reindex", {
           method: "POST",
-        },
-      )) as { indexed: number; total: number };
-      toast.success(
-        result.indexed > 0
-          ? `Semantic index rebuilt for ${result.indexed} of ${result.total} documents`
-          : "Semantic index is unavailable; lexical search remains active",
-      );
+          body: JSON.stringify({
+            kind: "knowledge",
+            knowledgeBaseId: activeId,
+            cursor,
+            limit: 1,
+          }),
+        })) as {
+          indexed: number;
+          processed: number;
+          cursor?: string;
+          done: boolean;
+          failures: Array<{ message: string }>;
+        };
+        indexed += result.indexed;
+        processed += result.processed;
+        failureMessage ||= result.failures[0]?.message ?? "";
+        if (result.done) break;
+        if (!result.cursor || result.cursor === cursor)
+          throw new Error(
+            "Rebuild could not advance. Retry the index rebuild.",
+          );
+        cursor = result.cursor;
+      } while (true);
+      if (failureMessage)
+        toast.error(
+          `${indexed} of ${processed} documents indexed. ${failureMessage}`,
+        );
+      else
+        toast.success(
+          indexed
+            ? `${indexed} documents indexed`
+            : "No documents need indexing",
+        );
       await mutateDocuments();
     } catch (reindexError) {
       toast.error(
@@ -343,6 +400,7 @@ function KnowledgePageContent() {
         description="Organize durable sources that agents can use in the right chats."
         title="Knowledge"
       >
+        <EmbeddingSettings />
         {error && <p className="text-sm text-destructive">{error.message}</p>}
         <div className="grid items-start gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
           <Card>
@@ -544,6 +602,22 @@ function KnowledgePageContent() {
                               <div className="font-medium">
                                 {document.title}
                               </div>
+                              <Badge variant="secondary" className="mt-1">
+                                {(indexStatusMap.get(document.id)
+                                  ?.isSemanticReady ??
+                                Boolean(document.embeddingUpdatedAt))
+                                  ? "Semantic index ready"
+                                  : document.contentType.startsWith("image/") &&
+                                      !(
+                                        indexStatusMap.get(document.id)
+                                          ?.visionIndexed ??
+                                        Boolean(
+                                          document.metadata?.visionIndexedAt,
+                                        )
+                                      )
+                                    ? "Image extraction pending"
+                                    : "Text search available"}
+                              </Badge>
                               {document.sourceKey && (
                                 <div className="text-xs text-muted-foreground">
                                   Source: {document.sourceKey}
@@ -694,7 +768,7 @@ function KnowledgePageContent() {
                       </p>
                     </div>
                     <Input
-                      accept=".csv,.doc,.docx,.gif,.html,.htm,.jpeg,.jpg,.json,.md,.pdf,.png,.ppt,.pptx,.txt,.webp,.xls,.xlsx,.yaml,.yml"
+                      accept=".csv,.tsv,.doc,.docx,.gif,.html,.htm,.jpeg,.jpg,.json,.md,.markdown,.pdf,.png,.pptx,.odt,.ods,.odp,.txt,.log,.ts,.tsx,.js,.jsx,.py,.java,.rs,.go,.css,.sql,.toml,.xml,.webp,.xls,.xlsx,.yaml,.yml"
                       aria-label="Upload a document"
                       disabled={uploading}
                       onChange={(event) => {

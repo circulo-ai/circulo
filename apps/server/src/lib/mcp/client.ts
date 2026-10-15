@@ -1,10 +1,16 @@
 import { db } from "@/db";
-import { mcpIntegration } from "@/db/schema";
+import { chatMemberRepo, chatRepo } from "@/db/repositories";
+import { agent as agentTable, mcpIntegration } from "@/db/schema";
 import { createHumanApprovalRequest } from "@/lib/ai/tools/request-human-approval";
+import { currentAutomationPermissions } from "@/lib/automation-actor";
 import { createLogger } from "@/lib/logs/console/logger";
 import { validateMcpEndpoint } from "@/lib/mcp/endpoint";
-import { parseRpcResponse, parseSseEvents } from "@/lib/mcp/protocol";
+import type { ApiKeyPermissions } from "@/lib/permissions";
+import { hasPermissionForUser } from "@/lib/permissions";
 import type { ActorContext, ChatMessage } from "@/lib/types";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
   dynamicTool,
   jsonSchema,
@@ -15,7 +21,6 @@ import { and, eq } from "drizzle-orm";
 
 const logger = createLogger("McpClient");
 
-const MCP_PROTOCOL_VERSION = "2025-06-18";
 const MCP_CREDENTIAL_REF = /^MCP_CREDENTIAL_[A-Z0-9_]+$/;
 
 type McpTool = {
@@ -44,135 +49,131 @@ function getCredential(credentialRef: string | null) {
 }
 
 export class McpClient {
-  private initialized = false;
-  private sessionId: string | undefined;
-  private messageEndpoint: string | undefined;
-
   constructor(
     private readonly integration: typeof mcpIntegration.$inferSelect,
   ) {}
 
-  async listTools(): Promise<McpTool[]> {
-    await this.initialize();
-    const response = await this.request("tools/list", {});
-    return response.tools ?? [];
-  }
-
-  async callTool(name: string, input: Record<string, unknown>) {
-    await this.initialize();
-    const response = await this.request("tools/call", {
-      name,
-      arguments: input,
-    });
-    return response.content ?? response;
-  }
-
-  private async initialize(): Promise<void> {
-    if (this.initialized) return;
-
-    if (this.integration.transport === "sse") {
-      this.messageEndpoint = await this.openSseEndpoint();
-    }
-
-    await this.request("initialize", {
-      protocolVersion: MCP_PROTOCOL_VERSION,
-      capabilities: {},
-      clientInfo: { name: "circulo", version: "0.1.0" },
-    });
-    await this.notify("notifications/initialized", {});
-    this.initialized = true;
-  }
-
-  private async openSseEndpoint(): Promise<string> {
-    const endpoint = await validateMcpEndpoint(this.integration.endpoint);
-    const response = await fetch(endpoint, {
-      method: "GET",
-      headers: this.headers("text/event-stream"),
-      signal: AbortSignal.timeout(20_000),
-    });
-    if (!response.ok) {
-      throw new Error(`MCP SSE handshake failed with HTTP ${response.status}`);
-    }
-
-    const reader = response.body?.getReader();
-    if (!reader) throw new Error("MCP SSE handshake returned no response body");
-
-    const decoder = new TextDecoder();
-    let buffer = "";
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const events = parseSseEvents(buffer);
-        for (const event of events) {
-          if (event.event !== "endpoint") continue;
-          const messageEndpoint = new URL(event.data, endpoint).toString();
-          return await validateMcpEndpoint(messageEndpoint);
-        }
-        // Keep only the final incomplete SSE block for the next chunk.
-        const separators = [...buffer.matchAll(/\r?\n\r?\n/g)];
-        const lastSeparator = separators.at(-1);
-        if (lastSeparator?.index !== undefined) {
-          buffer = buffer.slice(lastSeparator.index + lastSeparator[0].length);
-        }
+  async listTools(signal?: AbortSignal): Promise<McpTool[]> {
+    return this.operate(async (client, bounded) => {
+      const tools: McpTool[] = [];
+      const seen = new Set<string>();
+      let cursor: string | undefined;
+      for (let page = 0; page < 100; page++) {
+        const result = await client.listTools(cursor ? { cursor } : {}, {
+          signal: bounded,
+          timeout: 60_000,
+        });
+        tools.push(...result.tools);
+        if (tools.length > 5000)
+          throw new Error("MCP tool catalog exceeds the discovery limit.");
+        if (!result.nextCursor) return tools;
+        if (seen.has(result.nextCursor))
+          throw new Error("MCP tool pagination repeated a cursor.");
+        seen.add(result.nextCursor);
+        cursor = result.nextCursor;
       }
-    } finally {
-      await reader.cancel().catch(() => undefined);
-    }
-
-    throw new Error("MCP SSE handshake did not provide a message endpoint");
+      throw new Error("MCP tool pagination exceeds the discovery limit.");
+    }, signal);
   }
 
-  private async notify(method: string, params: Record<string, unknown>) {
-    await this.request(method, params, false);
-  }
-
-  private async request(
-    method: string,
-    params: Record<string, unknown>,
-    expectsResponse = true,
+  async callTool(
+    name: string,
+    input: Record<string, unknown>,
+    signal?: AbortSignal,
   ) {
-    const endpoint = await validateMcpEndpoint(
-      this.messageEndpoint ?? this.integration.endpoint,
-    );
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: this.headers("application/json, text/event-stream"),
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        ...(expectsResponse ? { id: crypto.randomUUID() } : {}),
-        method,
-        params,
-      }),
-      signal: AbortSignal.timeout(20_000),
-    });
-
-    this.sessionId = response.headers.get("mcp-session-id") ?? this.sessionId;
-
-    if (!response.ok && response.status !== 202) {
-      throw new Error(`MCP request failed with HTTP ${response.status}`);
-    }
-    if (!expectsResponse || response.status === 202) return {};
-
-    const payload = parseRpcResponse(await response.text());
-    if (payload.error?.message) {
-      throw new Error(
-        `MCP error ${payload.error.code ?? "unknown"}: ${payload.error.message}`,
+    return this.operate(async (client, bounded) => {
+      const response = await client.callTool(
+        { name, arguments: input },
+        undefined,
+        { signal: bounded, timeout: 60_000 },
       );
-    }
-    return payload.result ?? {};
+      if (response.isError === true)
+        throw new Error(`MCP tool ${name} reported an execution error.`);
+      return response.structuredContent
+        ? {
+            content: response.content,
+            structuredContent: response.structuredContent,
+          }
+        : response.content;
+    }, signal);
   }
 
-  private headers(accept: string): Record<string, string> {
+  private async operate<T>(
+    operation: (client: Client, signal: AbortSignal) => Promise<T>,
+    signal?: AbortSignal,
+  ): Promise<T> {
+    const deadline = AbortSignal.timeout(60_000);
+    const bounded = signal ? AbortSignal.any([signal, deadline]) : deadline;
+    const endpoint = new URL(
+      await validateMcpEndpoint(this.integration.endpoint),
+    );
     const credential = getCredential(this.integration.credentialRef);
-    return {
-      Accept: accept,
-      "Content-Type": "application/json",
-      "MCP-Protocol-Version": MCP_PROTOCOL_VERSION,
-      ...(this.sessionId ? { "Mcp-Session-Id": this.sessionId } : {}),
-      ...(credential ? { Authorization: `Bearer ${credential}` } : {}),
+    const requestInit: RequestInit = {
+      headers: credential ? { Authorization: `Bearer ${credential}` } : {},
     };
+    const guardedFetch: typeof fetch = async (input, init) => {
+      const url = new URL(
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url,
+      );
+      if (url.origin !== endpoint.origin)
+        throw new Error(
+          "MCP requests must remain on the configured server origin.",
+        );
+      await validateMcpEndpoint(url.href);
+      const response = await fetch(url, {
+        ...init,
+        redirect: "manual",
+        signal: init?.signal
+          ? AbortSignal.any([bounded, init.signal])
+          : bounded,
+      });
+      if (response.status >= 300 && response.status < 400)
+        throw new Error(
+          "MCP redirects are disabled. Configure the final server endpoint.",
+        );
+      return response;
+    };
+    const transport =
+      this.integration.transport === "sse"
+        ? new SSEClientTransport(endpoint, { fetch: guardedFetch, requestInit })
+        : new StreamableHTTPClientTransport(endpoint, {
+            fetch: guardedFetch,
+            requestInit,
+            reconnectionOptions: {
+              maxRetries: 0,
+              initialReconnectionDelay: 1000,
+              maxReconnectionDelay: 1000,
+              reconnectionDelayGrowFactor: 1,
+            },
+          });
+    const client = new Client(
+      { name: "circulo", version: "0.1.0" },
+      { capabilities: {} },
+    );
+    let rejectAbort: (error: unknown) => void = () => {};
+    const aborted = new Promise<never>((_resolve, reject) => {
+      rejectAbort = reject;
+    });
+    const onAbort = () => {
+      rejectAbort(bounded.reason ?? new Error("MCP operation cancelled"));
+      void transport.close();
+    };
+    bounded.addEventListener("abort", onAbort, { once: true });
+    try {
+      bounded.throwIfAborted();
+      await Promise.race([
+        client.connect(transport, { signal: bounded, timeout: 60_000 }),
+        aborted,
+      ]);
+      return await Promise.race([operation(client, bounded), aborted]);
+    } finally {
+      bounded.removeEventListener("abort", onAbort);
+      await client.close().catch(() => undefined);
+    }
   }
 }
 
@@ -185,6 +186,16 @@ export async function getMcpToolsForAgent(params: {
   dataStream: UIMessageStreamWriter<ChatMessage>;
   allowedIntegrationIds?: string[];
 }): Promise<ToolSet> {
+  if (
+    !(await hasPermissionForUser(
+      params.session.userId,
+      params.organizationId,
+      "mcp",
+      "read",
+      params.session.apiKeyPermissions,
+    ))
+  )
+    return {};
   const integrations = await db.query.mcpIntegration.findMany({
     where: and(
       eq(mcpIntegration.organizationId, params.organizationId),
@@ -199,7 +210,10 @@ export async function getMcpToolsForAgent(params: {
     if (
       params.allowedIntegrationIds !== undefined &&
       !params.allowedIntegrationIds.some(
-        (id) => id === integration.id || id === `mcp:${integration.id}`,
+        (id) =>
+          id === integration.id ||
+          id === `mcp:${integration.id}` ||
+          id.startsWith(`mcp_${integration.id.replaceAll("-", "_")}_`),
       )
     ) {
       continue;
@@ -246,15 +260,28 @@ export async function getMcpToolsForAgent(params: {
     }
 
     const allowedTools = new Set(links.flatMap((link) => link.allowedTools));
-    const hasAllowList = links.some((link) => link.allowedTools.length > 0);
+    // Applicable scopes grant access independently. An unrestricted scope
+    // must not be narrowed by an additional, restricted link.
+    const hasAllowList = links.every((link) => link.allowedTools.length > 0);
     for (const remoteTool of available) {
       if (hasAllowList && !allowedTools.has(remoteTool.name)) continue;
       const readOnlyHint =
         remoteTool.readOnlyHint ?? remoteTool.annotations?.readOnlyHint ?? null;
       const approvalMode = remoteTool.approvalMode ?? "prompt";
       const name = `mcp_${integration.id.replaceAll("-", "_")}_${remoteTool.name.replaceAll(/[^a-zA-Z0-9_]/g, "_")}`;
+      if (
+        params.allowedIntegrationIds !== undefined &&
+        !params.allowedIntegrationIds.some(
+          (id) =>
+            id === integration.id ||
+            id === `mcp:${integration.id}` ||
+            id === name,
+        )
+      )
+        continue;
       tools[name] = dynamicTool({
         description:
+          `MCP integration: ${integration.name}. Remote tool: ${remoteTool.name}. ` +
           (remoteTool.title ? `${remoteTool.title}: ` : "") +
           (remoteTool.description ??
             `MCP tool ${remoteTool.name} from ${integration.name}`),
@@ -264,7 +291,17 @@ export async function getMcpToolsForAgent(params: {
             additionalProperties: true,
           },
         ),
-        execute: async (input) => {
+        execute: async (input, call) => {
+          const current = await assertMcpInvocationAccess({
+            userId: params.session.userId,
+            organizationId: params.organizationId,
+            chatId: params.chatId,
+            agentId: params.agentId,
+            integrationId: integration.id,
+            toolName: remoteTool.name,
+            apiKeyPermissions: params.session.apiKeyPermissions,
+            apiKeyId: params.session.apiKeyId,
+          });
           const requiresApproval =
             approvalMode === "approve" ||
             (approvalMode === "prompt" && readOnlyHint !== true) ||
@@ -283,6 +320,8 @@ export async function getMcpToolsForAgent(params: {
                 tool: remoteTool.name,
                 arguments: isRecord(input) ? input : {},
                 readOnlyHint,
+                agentId: params.agentId ?? null,
+                apiKeyPermissions: params.session.apiKeyPermissions ?? null,
               },
             });
             params.dataStream.write({
@@ -301,13 +340,103 @@ export async function getMcpToolsForAgent(params: {
                 "Approval requested. The MCP action has not been executed.",
             };
           }
-          return client.callTool(remoteTool.name, isRecord(input) ? input : {});
+          return new McpClient(current).callTool(
+            remoteTool.name,
+            isRecord(input) ? input : {},
+            call.abortSignal,
+          );
         },
       });
     }
   }
 
   return tools;
+}
+
+/** Recheck revocation at action time, including after a human approval wait. */
+export async function assertMcpInvocationAccess(params: {
+  userId: string;
+  organizationId: string;
+  chatId: string;
+  integrationId: string;
+  toolName: string;
+  agentId?: string;
+  apiKeyPermissions?: ApiKeyPermissions;
+  apiKeyId?: string;
+}) {
+  const permissions = await currentAutomationPermissions(params);
+  if (
+    !(await hasPermissionForUser(
+      params.userId,
+      params.organizationId,
+      "mcp",
+      "read",
+      permissions,
+    ))
+  )
+    throw new Error("Your current role or API key does not allow MCP access.");
+  const chat = await chatRepo.findById(params.chatId);
+  if (
+    !chat ||
+    chat.isDeleted ||
+    chat.organizationId !== params.organizationId ||
+    !(await chatMemberRepo.isMember(params.userId, params.chatId))
+  )
+    throw new Error("The requester no longer has access to this chat.");
+  const integration = await db.query.mcpIntegration.findFirst({
+    where: and(
+      eq(mcpIntegration.id, params.integrationId),
+      eq(mcpIntegration.organizationId, params.organizationId),
+      eq(mcpIntegration.enabled, true),
+      eq(mcpIntegration.status, "published"),
+    ),
+    with: { links: true, tools: true },
+  });
+  if (!integration)
+    throw new Error("This published MCP integration is no longer available.");
+  const granted = integration.links.some(
+    (link) =>
+      link.enabled &&
+      (link.scope === "organization" ||
+        (link.scope === "chat" && link.chatId === params.chatId) ||
+        (link.scope === "agent" && link.agentId === params.agentId)) &&
+      (!link.allowedTools.length ||
+        link.allowedTools.includes(params.toolName)),
+  );
+  if (
+    !granted ||
+    (integration.tools.length &&
+      !integration.tools.some(
+        (tool) => tool.enabled && tool.name === params.toolName,
+      ))
+  )
+    throw new Error(
+      "This MCP tool is disabled or outside the current access scopes.",
+    );
+  if (params.agentId) {
+    const agent = await db.query.agent.findFirst({
+      where: and(
+        eq(agentTable.id, params.agentId),
+        eq(agentTable.organizationId, params.organizationId),
+        eq(agentTable.isArchived, false),
+      ),
+    });
+    const runtimeName = `mcp_${integration.id.replaceAll("-", "_")}_${params.toolName.replaceAll(/[^a-zA-Z0-9_]/g, "_")}`;
+    if (
+      !agent ||
+      (agent.toolAccessMode === "allowlist" &&
+        !agent.defaultToolIds?.some(
+          (id) =>
+            id === integration.id ||
+            id === `mcp:${integration.id}` ||
+            id === runtimeName,
+        ))
+    )
+      throw new Error(
+        "This agent's current tool policy does not allow the requested MCP tool.",
+      );
+  }
+  return integration;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
