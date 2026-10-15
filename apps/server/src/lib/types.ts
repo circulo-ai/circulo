@@ -50,6 +50,7 @@ export type WorkflowPlanStepTrace = {
 };
 
 export type WorkflowTrace = {
+  timing?: import("@circulo-ai/types").WorkflowTiming;
   workflowId: string;
   status: "running" | "paused" | "completed" | "failed";
   startedAt: string;
@@ -183,6 +184,7 @@ export type CustomUIDataTypes = {
     executionTimeMs: number;
   };
   workflowCompleted: { success: boolean; executionTimeMs: number };
+  workflowTiming: import("@circulo-ai/types").WorkflowTiming;
   workflowPaused: { workflowId: string };
   workflowError: { error: string; agentId?: string };
   workflowHeartbeat: { timestamp: string };

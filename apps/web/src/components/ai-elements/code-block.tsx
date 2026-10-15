@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { writeTextToClipboard } from "@/lib/clipboard";
+import { CHAT_CODE_THEMES } from "@/lib/code-theme";
 import { cn } from "@/lib/utils";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import {
@@ -61,12 +62,12 @@ export async function highlightCode(
   return await Promise.all([
     codeToHtml(code, {
       lang: language,
-      theme: "one-light",
+      theme: CHAT_CODE_THEMES[0],
       transformers,
     }),
     codeToHtml(code, {
       lang: language,
-      theme: "one-dark-pro",
+      theme: CHAT_CODE_THEMES[1],
       transformers,
     }),
   ]);
@@ -117,6 +118,11 @@ export const CodeBlock = ({
         {...props}
       >
         <div className="relative">
+          {!html && !darkHtml && (
+            <pre className="m-0 overflow-auto bg-background p-4 text-sm text-foreground">
+              <code>{code}</code>
+            </pre>
+          )}
           <div
             className="overflow-auto dark:hidden [&_code]:font-mono [&_code]:text-sm [&>pre]:m-0 [&>pre]:bg-background! [&>pre]:p-4 [&>pre]:text-sm [&>pre]:text-foreground!"
             dangerouslySetInnerHTML={{ __html: html }}

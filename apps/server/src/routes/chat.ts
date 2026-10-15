@@ -17,6 +17,7 @@ import {
 } from "@/lib/utils";
 import { requireAuth } from "@/middleware/auth";
 import { workflowRunService } from "@/workflows/runtime/workflow-run-service";
+import { withWorkflowTimings } from "@/workflows/runtime/workflow-timing";
 import {
   BadRequestError,
   ForbiddenError,
@@ -193,7 +194,7 @@ router.get(
     });
     return c.json({
       chat,
-      messages: convertToUIMessages(page.items),
+      messages: await withWorkflowTimings(convertToUIMessages(page.items), id),
       hasMore: page.hasMore,
       nextCursor: page.nextCursor,
     });
@@ -235,7 +236,7 @@ router.get(
     });
 
     return c.json({
-      messages: convertToUIMessages(page.items),
+      messages: await withWorkflowTimings(convertToUIMessages(page.items), id),
       hasMore: page.hasMore,
       nextCursor: page.nextCursor,
     });

@@ -1,6 +1,10 @@
 "use client";
 
 import { latestWorkflowTrace } from "@/lib/chat-streaming";
+import {
+  formatWorkflowDuration as formatDuration,
+  projectWorkflowTiming,
+} from "@/lib/workflow-timing";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -65,6 +69,15 @@ export function WorkflowProcess({
   const process = buildProcess(parts);
   const harnessSnapshots = getHarnessProgress(parts);
   const [now, setNow] = useState(0);
+  const [timingReceivedAt, setTimingReceivedAt] = useState(0);
+  useEffect(() => {
+    setTimingReceivedAt(Date.now());
+    setNow(Date.now());
+  }, [
+    process?.timing?.sampledAtMs,
+    process?.timing?.activeTimeMs,
+    process?.timing?.isActive,
+  ]);
   const [fallbackStartedAt, setFallbackStartedAt] = useState<number>();
   const [actionStatuses, setActionStatuses] = useState<Record<string, string>>(
     {},
@@ -92,12 +105,20 @@ export function WorkflowProcess({
     );
   }, [process?.status, process?.startedAt]);
   useEffect(() => {
-    if (process?.status !== "running") return;
+    if (process?.status !== "running" && process?.status !== "paused") return;
     const timer = setInterval(() => setNow(Date.now()), 1_000);
     return () => clearInterval(timer);
   }, [process?.status]);
   if (!process) return null;
   const liveElapsedMs = getElapsedMs(process, now, fallbackStartedAt);
+  const timing = process.timing
+    ? projectWorkflowTiming(
+        process.timing,
+        now,
+        timingReceivedAt,
+        process.status === "completed" || process.status === "failed",
+      )
+    : undefined;
   const visibleProcess = {
     ...process,
     approvals: process.approvals.map((approval) => ({
@@ -197,10 +218,10 @@ export function WorkflowProcess({
     >
       <CollapsibleTrigger asChild nativeButton>
         <button
-          className="group flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset"
+          className="group flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-2.5 text-left transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-inset"
           type="button"
         >
-          <span className="flex min-w-0 items-center gap-2">
+          <span className="flex shrink-0 items-center gap-2">
             <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-background ring-1 ring-border">
               <Sparkles className="size-3.5" />
             </span>
@@ -214,9 +235,19 @@ export function WorkflowProcess({
               {visibleProcess.status}
             </Badge>
           </span>
-          <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+          <span className="ml-auto flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
             <span>{visibleProcess.activity.length} steps</span>
-            {liveElapsedMs !== undefined && formatDuration(liveElapsedMs)}
+            {timing ? (
+              <span className="tabular-nums">
+                {formatDuration(timing.activeTimeMs)} active
+              </span>
+            ) : (
+              liveElapsedMs !== undefined && (
+                <span className="tabular-nums">
+                  {formatDuration(liveElapsedMs)} elapsed
+                </span>
+              )
+            )}
             <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180" />
           </span>
         </button>
@@ -226,6 +257,28 @@ export function WorkflowProcess({
         <Separator />
 
         <div className="flex flex-col gap-1 px-3 py-2">
+          {timing && (
+            <dl className="flex flex-wrap gap-x-4 gap-y-1 py-2 text-xs text-muted-foreground">
+              <div className="flex gap-1">
+                <dt>Active processing</dt>
+                <dd className="tabular-nums">
+                  {formatDuration(timing.activeTimeMs)}
+                </dd>
+              </div>
+              <div className="flex gap-1">
+                <dt>Waiting / idle</dt>
+                <dd className="tabular-nums">
+                  {formatDuration(timing.idleTimeMs)}
+                </dd>
+              </div>
+              <div className="flex gap-1">
+                <dt>Total elapsed</dt>
+                <dd className="tabular-nums">
+                  {formatDuration(timing.elapsedTimeMs)}
+                </dd>
+              </div>
+            </dl>
+          )}
           {harnessSnapshots.map((snapshot) => (
             <HarnessProgress key={snapshot.executionId} snapshot={snapshot} />
           ))}
@@ -617,6 +670,7 @@ function ProcessRow({ done, label }: { done?: boolean; label: string }) {
 }
 
 type BuiltProcess = {
+  timing?: import("@circulo-ai/types").WorkflowTiming;
   status: WorkflowTrace["status"];
   startedAt?: string;
   executionTimeMs?: number;
@@ -671,9 +725,15 @@ function buildProcess(parts: ChatMessage["parts"]): BuiltProcess | null {
 
   if (events.length === 0) return null;
 
+  const liveTiming = [...parts]
+    .reverse()
+    .find((part) => part.type === "data-workflowTiming") as
+    | { data: import("@circulo-ai/types").WorkflowTiming }
+    | undefined;
   const trace = latestWorkflowTrace(parts);
   if (trace) {
     return {
+      timing: liveTiming?.data ?? trace.timing,
       status: trace.status,
       startedAt: trace.startedAt,
       executionTimeMs: trace.executionTimeMs,
@@ -836,6 +896,7 @@ function buildProcess(parts: ChatMessage["parts"]): BuiltProcess | null {
   }
 
   return {
+    timing: liveTiming?.data,
     status,
     startedAt,
     executionTimeMs,
@@ -1275,9 +1336,4 @@ function buildActivity(events: ProcessEvent[]): ActivityEntry[] {
   }
 
   return coalesced;
-}
-
-function formatDuration(durationMs: number): string {
-  if (durationMs < 1000) return `${Math.max(0, Math.round(durationMs))} ms`;
-  return `${(durationMs / 1000).toFixed(1)} s`;
 }

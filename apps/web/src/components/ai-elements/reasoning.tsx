@@ -10,7 +10,7 @@ import { useControllableState } from "@radix-ui/react-use-controllable-state";
 import { BrainIcon, ChevronDownIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { createContext, memo, useContext, useEffect, useState } from "react";
-import { Streamdown } from "streamdown";
+import { Response } from "./response";
 import { Shimmer } from "./shimmer";
 
 type ReasoningContextValue = {
@@ -179,13 +179,13 @@ export const ReasoningContent = memo(
         )}
         {...props}
       >
-        <Streamdown
+        <Response
           mode={isStreaming ? "streaming" : "static"}
           isAnimating={isStreaming}
           parseIncompleteMarkdown={isStreaming}
         >
           {children}
-        </Streamdown>
+        </Response>
       </CollapsibleContent>
     );
   },

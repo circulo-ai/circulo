@@ -248,7 +248,10 @@ export function ToolCallPart({
 
   return (
     <Tool
-      className={cn("bg-background/60", failure && "border-destructive/40")}
+      className={cn(
+        "bg-card text-card-foreground",
+        failure && "border-destructive/40",
+      )}
       defaultOpen={
         ![
           "updateExecutionPlan",

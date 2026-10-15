@@ -2,18 +2,81 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+/* Streamdown ships utility class names in JS, outside Tailwind's app scan. */
+@source "../../node_modules/streamdown/dist/*.js";
 
 @custom-variant dark (&:is(.dark *));
 
+/* Opaque reading surfaces keep wallpaper out of snippets in both themes. */
+.chat-markdown [data-streamdown="code-block"],
+.chat-markdown [data-streamdown="table-wrapper"],
+.chat-markdown table {
+  background-color: var(--card);
+  color: var(--card-foreground);
+}
+.chat-markdown [data-streamdown="code-block-header"] {
+  background-color: var(--muted);
+  color: var(--muted-foreground);
+}
+.chat-markdown [data-streamdown="code-block-body"] {
+  --shiki-dark-bg: var(--background);
+  background-color: var(--background) !important;
+  color: var(--foreground) !important;
+  overflow-x: auto;
+}
+.chat-markdown [data-streamdown="code-block-body"] code > span::before {
+  color: var(--muted-foreground);
+}
+.dark .chat-markdown [data-streamdown="code-block-body"] span {
+  color: var(--shiki-dark, var(--foreground)) !important;
+  background-color: transparent !important;
+}
+.chat-markdown [data-streamdown="inline-code"] {
+  background-color: var(--muted);
+  color: var(--foreground);
+}
+
 /* The real textarea retains editing, selection, IME and screen-reader behavior. */
-.composer-token-input { color: transparent; caret-color: var(--foreground); }
-.composer-token-input::selection { color: var(--foreground); background: var(--accent); }
-.composer-token-mirror [data-token-kind] { border-radius: 0.2em; }
-.composer-token-mirror [data-token-kind="agent"] { color: var(--primary); background: color-mix(in oklab, var(--primary) 12%, transparent); }
-.composer-token-mirror [data-token-kind="tool"] { color: var(--accent-foreground); background: var(--accent); text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 0.15em; }
-.composer-token-mirror [data-token-kind="file"] { color: var(--secondary-foreground); background: var(--secondary); text-decoration: underline; text-underline-offset: 0.15em; }
-.composer-token-mirror [data-token-kind="command"] { color: var(--primary-foreground); background: var(--primary); }
-@media (forced-colors: active) { .composer-token-input { color: CanvasText; } .composer-token-mirror { display: none; } }
+.composer-token-input {
+  color: transparent;
+  caret-color: var(--foreground);
+}
+.composer-token-input::selection {
+  color: var(--foreground);
+  background: var(--accent);
+}
+.composer-token-mirror [data-token-kind] {
+  border-radius: 0.2em;
+}
+.composer-token-mirror [data-token-kind="agent"] {
+  color: var(--primary);
+  background: color-mix(in oklab, var(--primary) 12%, transparent);
+}
+.composer-token-mirror [data-token-kind="tool"] {
+  color: var(--accent-foreground);
+  background: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: var(--border);
+  text-underline-offset: 0.15em;
+}
+.composer-token-mirror [data-token-kind="file"] {
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+.composer-token-mirror [data-token-kind="command"] {
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+@media (forced-colors: active) {
+  .composer-token-input {
+    color: CanvasText;
+  }
+  .composer-token-mirror {
+    display: none;
+  }
+}
 
 @theme inline {
   --color-background: var(--background);

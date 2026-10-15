@@ -161,7 +161,7 @@ const PurePreviewMessage = ({
                       className={cn({
                         "w-fit max-w-full rounded-2xl bg-primary px-3 py-2 text-right wrap-break-word text-primary-foreground":
                           message.role === "user",
-                        "bg-transparent px-0 py-0 text-left":
+                        "rounded-xl bg-card px-4 py-3 text-left text-card-foreground":
                           message.role === "assistant",
                       })}
                       data-testid="message-content"
@@ -216,7 +216,7 @@ const PurePreviewMessage = ({
 
               return safeUrl ? (
                 <a
-                  className="inline-flex max-w-full min-w-0 items-center gap-1.5 self-start rounded-full border bg-background/60 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  className="inline-flex max-w-full min-w-0 items-center gap-1.5 self-start rounded-full border bg-background px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   href={safeUrl}
                   key={key}
                   rel="noreferrer"
@@ -227,7 +227,7 @@ const PurePreviewMessage = ({
                 </a>
               ) : (
                 <div
-                  className="inline-flex max-w-full min-w-0 items-center gap-1.5 self-start rounded-full border bg-background/60 px-2.5 py-1 text-xs text-muted-foreground"
+                  className="inline-flex max-w-full min-w-0 items-center gap-1.5 self-start rounded-full border bg-background px-2.5 py-1 text-xs text-muted-foreground"
                   key={key}
                 >
                   <FileText className="size-3.5 shrink-0" />
@@ -319,7 +319,7 @@ function MessageArtifactCard({
 
   return (
     <button
-      className="group flex min-w-0 items-center gap-3 rounded-2xl border bg-background/70 p-3 text-left transition-colors hover:bg-muted"
+      className="group flex min-w-0 items-center gap-3 rounded-2xl border bg-card p-3 text-left transition-colors hover:bg-muted"
       onClick={() => {
         setArtifact((currentArtifact) => ({
           ...currentArtifact,

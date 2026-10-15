@@ -10,6 +10,7 @@ export * from "./usage";
 
 // Keep this barrel as the stable public entrypoint for the shared types package.
 
-export * from "./embedding-preferences";
 export * from "./agent-harness";
 export * from "./composer-commands";
+export * from "./embedding-preferences";
+export * from "./workflow-timing";

@@ -26,6 +26,7 @@ export function MessageReasoning({
 
   return (
     <Reasoning
+      className="rounded-xl bg-card p-4 text-card-foreground"
       data-testid="message-reasoning"
       defaultOpen={hasBeenStreaming}
       isStreaming={isLoading}

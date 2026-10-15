@@ -26,6 +26,7 @@ import {
   getWorkflowRuntime,
   type WorkflowApplicationEngine,
 } from "./wf-config";
+import { loadWorkflowTimings } from "./workflow-timing";
 
 const logger = createLogger("WorkflowRunService");
 
@@ -218,6 +219,7 @@ export class WorkflowRunService {
         (part as { type?: unknown }).type === "data-workflowTrace",
     ) as { data?: WorkflowTrace } | undefined;
     const trace = tracePart?.data;
+    if (trace) trace.timing = (await loadWorkflowTimings([runId])).get(runId);
     if (trace) {
       publishWorkflowChunk(runId, {
         type: "data-workflowTrace",
@@ -326,6 +328,16 @@ export class WorkflowRunService {
         event.id,
       );
       return;
+    }
+
+    if (event.eventType.startsWith("workflow.")) {
+      const timing = (await loadWorkflowTimings([runId])).get(runId);
+      if (timing)
+        publishWorkflowChunk(runId, {
+          type: "data-workflowTiming",
+          id: `timing:${runId}`,
+          data: timing,
+        });
     }
 
     switch (event.eventType) {
@@ -706,6 +718,7 @@ export class WorkflowRunService {
     chatId: string,
     workflowId: string,
   ): Promise<void> {
+    trace.timing = (await loadWorkflowTimings([workflowId])).get(workflowId);
     const [approvals, handoffs] = await Promise.all([
       db.query.humanApproval.findMany({
         where: eq(humanApproval.workflowRunId, workflowId),
@@ -1036,6 +1049,15 @@ export class WorkflowRunService {
         this.handledEventIds.set(runId, handled);
       }
     }
+    // Recovered streams bypass applyEvent for historical lifecycle events.
+    // Emit a fresh sample after replay so clocks resume from durable state.
+    const timing = (await loadWorkflowTimings([runId])).get(runId);
+    if (timing)
+      publishWorkflowChunk(runId, {
+        type: "data-workflowTiming",
+        id: `timing:${runId}`,
+        data: timing,
+      });
   }
 }
 
