@@ -34,7 +34,7 @@ services:
     restart: unless-stopped
 
   minio:
-    image: minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    image: cgr.dev/chainguard/minio@sha256:2136d593beacf4461187035eca949fe49abd589d5079735025c711ca58fee0c8
     container_name: circulo-minio
     command: server /data --console-address ":9001"
     environment:
@@ -46,14 +46,18 @@ services:
     volumes:
       - miniodata:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test:
+        [
+          "CMD-SHELL",
+          "mc --config-dir /tmp/mc alias set local http://127.0.0.1:9000 \"$$MINIO_ROOT_USER\" \"$$MINIO_ROOT_PASSWORD\" >/dev/null 2>&1 && mc --config-dir /tmp/mc ready local",
+        ]
       interval: 5s
       timeout: 3s
       retries: 10
     restart: unless-stopped
 
   minio-init:
-    image: minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+    image: cgr.dev/chainguard/minio@sha256:2136d593beacf4461187035eca949fe49abd589d5079735025c711ca58fee0c8
     container_name: circulo-minio-init
     depends_on:
       minio:
@@ -64,9 +68,9 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >-
-        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" &&
+        mc --config-dir /tmp/mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" &&
         for bucket in files knowledge chat profile; do
-          mc mb --ignore-existing "local/$$bucket";
+          mc --config-dir /tmp/mc mb --ignore-existing "local/$$bucket";
         done
     restart: "no"
 

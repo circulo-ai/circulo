@@ -2,6 +2,7 @@
 
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Logo } from "./logo";
 
 type NavigationState = {
   canGoBack: boolean;
@@ -52,6 +53,7 @@ export function DesktopWindowToolbar() {
   }, []);
 
   return (
+    // biome-ignore lint/a11y/useSemanticElements: <explanation>
     <div
       ref={toolbarRef}
       id="circulo-desktop-window-toolbar"
@@ -81,6 +83,12 @@ export function DesktopWindowToolbar() {
         >
           <ArrowRight aria-hidden="true" size={17} strokeWidth={1.8} />
         </button>
+        <div className="flex items-center gap-1.5">
+          <Logo className="h-5 w-auto" />
+          <h1 className="text-lg font-medium leading-none tracking-tight">
+            Circulo
+          </h1>
+        </div>
       </div>
       <div
         className="circulo-desktop-window-drag-area"

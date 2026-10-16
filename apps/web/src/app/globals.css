@@ -561,6 +561,10 @@ html[data-circulo-desktop="true"] {
   );
 }
 
+html[data-circulo-desktop="true"] .landing-page {
+  padding-top: 0.75rem;
+}
+
 /* Keep the illustrated chat wallpaper in light mode while giving it enough
    contrast reduction to keep message surfaces and controls easy to scan. */
 html:not(.dark) .bg-chat {

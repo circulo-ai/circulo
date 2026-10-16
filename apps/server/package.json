@@ -4,7 +4,7 @@
   "private": true,
   "version": "0.0.2",
   "scripts": {
-    "dev": "cross-env NODE_ENV=development bun --watch src/index.ts",
+    "dev": "cd ../.. && cross-env NODE_ENV=development bun --env-file apps/server/.env --watch apps/server/src/index.ts",
     "build": "cross-env NODE_ENV=production bun ./build-server.ts",
     "start": "cross-env NODE_ENV=production bun dist/index.js",
     "typecheck": "bun ./node_modules/typescript/bin/tsc -p tsconfig.typecheck.json --noEmit",

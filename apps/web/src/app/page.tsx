@@ -6,12 +6,12 @@ import { PricingSection } from "@/components/pricing-section";
 
 export default function Home() {
   return (
-    <>
+    <div className="landing-page">
       <Nav />
       <HeroSection />
       <PricingSection />
       <FaqSection />
       <FooterSection />
-    </>
+    </div>
   );
 }
