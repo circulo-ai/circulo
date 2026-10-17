@@ -114,5 +114,8 @@ jobs:
       - name: Check repository formatting
         run: bun run format:check
 
+      - name: Run repository lint
+        run: bun run lint:check
+
       - name: Build production application graph
         run: bun run build
