@@ -45,6 +45,14 @@ platform artifacts and metadata. Configure that variable in the release
 environment; development builds do not check for updates. Code-signing secrets
 belong in CI and are not committed.
 
+Desktop installers are built for Windows, macOS, and Linux by the
+`Release - Desktop` GitHub Actions workflow. To publish a release, update the
+desktop version in `apps/desktop/package.json`, commit that change, and push a
+matching `desktop-v<version>` tag (for example, `desktop-v0.1.0`). CI checks the
+tag against the package version, packages all three platforms in parallel, and
+attaches the installers to the GitHub Release. A manual workflow run builds
+and stores the platform artifacts without publishing a release.
+
 ## Cloud pairing
 
 While signed in to the cloud workspace, call `POST /api/sync/pairing/start`

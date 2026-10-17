@@ -1,0 +1,137 @@
+name: Release - Desktop
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "desktop-v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-desktop-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    name: Package desktop (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3310
+      NEXT_PUBLIC_BETTER_AUTH_URL: http://127.0.0.1:3322
+      SERVER_API_URL: http://127.0.0.1:3322
+      BETTER_AUTH_URL: http://127.0.0.1:3322
+      BETTER_AUTH_SECRET: release-build-secret-with-at-least-32-characters
+      ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      INTERNAL_API_SECRET: release-build-internal-secret-with-32-chars
+      DATABASE_URL: postgres://user:password@127.0.0.1:5432/circulo
+      ELECTRON_CACHE: ${{ runner.temp }}/electron-cache
+      ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder-cache
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Verify release tag matches desktop version
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          node -e 'const expected = `desktop-v${require("./apps/desktop/package.json").version}`; if (process.env.RELEASE_TAG !== expected) { console.error(`Tag ${process.env.RELEASE_TAG} does not match ${expected}`); process.exit(1); }'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.4"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          package-manager-cache: false
+
+      - name: Cache Bun packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: ${{ runner.os }}-bun-
+
+      - name: Cache Turborepo outputs
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
+
+      - name: Cache Next.js build data
+        uses: actions/cache@v4
+        with:
+          path: apps/web/.next/cache
+          key: ${{ runner.os }}-next-${{ hashFiles('bun.lock') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-next-${{ hashFiles('bun.lock') }}-
+
+      - name: Cache Electron downloads and builder tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ runner.temp }}/electron-cache
+            ${{ runner.temp }}/electron-builder-cache
+          key: ${{ runner.os }}-electron-${{ hashFiles('bun.lock') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-electron-${{ hashFiles('bun.lock') }}-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build server runtime dependencies
+        run: bun run build:workspace
+
+      - name: Build desktop web runtime
+        run: bun --cwd apps/desktop build:web
+
+      - name: Stage self-contained desktop runtime
+        run: bun --cwd apps/desktop prepare-runtime
+
+      - name: Package desktop installers
+        run: bun --cwd apps/desktop package
+
+      - name: Upload platform installers
+        uses: actions/upload-artifact@v6
+        with:
+          name: desktop-${{ runner.os }}-${{ github.sha }}
+          path: apps/desktop/dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/desktop-v')
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download platform installers
+        uses: actions/download-artifact@v6
+        with:
+          pattern: desktop-*-${{ github.sha }}
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create release and attach installers
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: release-assets/*

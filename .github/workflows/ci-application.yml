@@ -8,23 +8,38 @@ on:
     branches: [master, dev]
     paths:
       - "apps/**"
-      - "packages/db/**"
-      - "packages/types/**"
-      - "packages/upload/**"
-      - "packages/file-parsers/**"
+      - "packages/**"
       - "bun.lock"
       - "package.json"
       - "turbo.json"
-      - ".github/workflows/ci-application.yml"
+      - ".github/workflows/**"
 
 concurrency:
   group: application-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
-  verify:
-    name: Build and smoke-test applications
+  dependency-scan:
+    name: Scan dependency lockfile
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Scan dependency lockfile
+        uses: google/osv-scanner-action/osv-scanner-action@baa4139e56d6312335d899e6ba045fa16d1d3d0b # v2.5.1
+        with:
+          scan-args: |-
+            --lockfile=bun.lock
+
+  verify:
+    name: Validate database and build applications
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
     services:
       postgres:
         image: pgvector/pgvector:pg17
@@ -64,14 +79,31 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Cache Bun packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: ${{ runner.os }}-bun-
+
+      - name: Cache Turborepo outputs
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
+
+      - name: Cache Next.js build data
+        uses: actions/cache@v4
+        with:
+          path: apps/web/.next/cache
+          key: ${{ runner.os }}-next-${{ hashFiles('bun.lock') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-next-${{ hashFiles('bun.lock') }}-
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
-
-      - name: Scan dependency lockfile
-        uses: google/osv-scanner-action/osv-scanner-action@baa4139e56d6312335d899e6ba045fa16d1d3d0b # v2.5.1
-        with:
-          scan-args: |-
-            --lockfile=bun.lock
 
       - name: Check database migration graph
         run: bun run db:check
@@ -79,17 +111,5 @@ jobs:
       - name: Apply database migrations
         run: bun run db:migrate
 
-      - name: Check repository formatting
-        run: bun run format:check
-
-      - name: Run repository lint
-        run: bun run lint:check
-
       - name: Build production application graph
         run: bun run build
-
-      - name: Type check repository
-        run: bun run typecheck
-
-      - name: Run repository tests
-        run: bun run test

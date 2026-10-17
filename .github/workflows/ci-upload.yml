@@ -14,6 +14,7 @@ permissions:
 jobs:
   upload:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -27,6 +28,11 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.4.2"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.4.2-${{ hashFiles('bun.lock') }}
+          restore-keys: ${{ runner.os }}-bun-1.4.2-
       - run: bun install --frozen-lockfile
       - name: Verify packed package and unit contracts
         working-directory: packages/upload
