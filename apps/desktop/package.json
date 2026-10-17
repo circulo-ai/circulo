@@ -3,7 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "description": "Offline-capable Electron shell for Circulo",
-  "author": "Circulo AI",
+  "homepage": "https://circulo-ai.com",
+  "author": {
+    "name": "Circulo AI",
+    "email": "1839491@gmail.com"
+  },
   "main": "src/main.cjs",
   "scripts": {
     "dev": "electron .",
@@ -62,6 +66,7 @@
     },
     "linux": {
       "executableName": "circulo",
+      "maintainer": "Circulo AI <1839491@gmail.com>",
       "target": [
         "AppImage",
         "deb"
