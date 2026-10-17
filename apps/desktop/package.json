@@ -66,6 +66,7 @@
     },
     "linux": {
       "executableName": "circulo",
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
       "maintainer": "Circulo AI <1839491@gmail.com>",
       "target": [
         "AppImage",
