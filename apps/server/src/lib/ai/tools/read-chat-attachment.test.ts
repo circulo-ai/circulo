@@ -1,6 +1,6 @@
+import type { ChatMessage } from "@/lib/types";
 import { describe, expect, it } from "vitest";
 import { readChatAttachment } from "./read-chat-attachment";
-import type { ChatMessage } from "@/lib/types";
 
 describe("paginated chat attachment reads", () => {
   const source = "authorized content ".repeat(2000);

@@ -1,6 +1,6 @@
+import { embeddingPreferencesSchema } from "@circulo-ai/types";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { requestEmbeddingVectors } from "./embedding-provider";
-import { embeddingPreferencesSchema } from "@circulo-ai/types";
 const config = {
   apiKey: "test-credential",
   baseUrl: "https://provider.example/v1",
@@ -24,30 +24,31 @@ describe("embedding provider protocol", () => {
     expect(result[1]?.[0]).toBe(2);
     expect(JSON.parse(fetchMock.mock.calls[0]![1].body).dimensions).toBe(1536);
   });
-  it.each([
-    "duplicate",
-    "dimensions",
-    "zero",
-    "missing",
-  ])("rejects %s provider responses", async (problem) => {
-    const data =
-      problem === "missing"
-        ? []
-        : [
-            {
-              index: 0,
-              embedding:
-                problem === "dimensions"
-                  ? [1]
-                  : vector(problem === "zero" ? 0 : 1),
-            },
-            { index: problem === "duplicate" ? 0 : 1, embedding: vector(1) },
-          ];
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ data })));
-    await expect(
-      requestEmbeddingVectors(config, ["one", "two"]),
-    ).rejects.toThrow();
-  });
+  it.each(["duplicate", "dimensions", "zero", "missing"])(
+    "rejects %s provider responses",
+    async (problem) => {
+      const data =
+        problem === "missing"
+          ? []
+          : [
+              {
+                index: 0,
+                embedding:
+                  problem === "dimensions"
+                    ? [1]
+                    : vector(problem === "zero" ? 0 : 1),
+              },
+              { index: problem === "duplicate" ? 0 : 1, embedding: vector(1) },
+            ];
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(Response.json({ data })),
+      );
+      await expect(
+        requestEmbeddingVectors(config, ["one", "two"]),
+      ).rejects.toThrow();
+    },
+  );
   it("batches inputs and bounds total work", async () => {
     const fetchMock = vi.fn().mockImplementation(async (_url, init) =>
       Response.json({

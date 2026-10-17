@@ -41,8 +41,8 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { tokenizeComposer } from "@/lib/composer-tokens";
 import {
-  getMentionRange,
   getCommandRange,
+  getMentionRange,
   insertMention,
   moveMentionIndex,
 } from "@/lib/mention-picker";
@@ -1288,7 +1288,7 @@ export const PromptInputTextarea = ({
         <div
           aria-hidden="true"
           ref={mirrorRef}
-          className="composer-token-mirror pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap border-transparent text-foreground"
+          className="composer-token-mirror pointer-events-none absolute inset-0 overflow-hidden border-transparent whitespace-pre-wrap text-foreground"
         >
           {decoratedTokens.map((token, index) => (
             <span

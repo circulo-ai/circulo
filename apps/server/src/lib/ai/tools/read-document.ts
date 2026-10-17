@@ -30,7 +30,9 @@ export function readDocument(session: ActorContext): Tool<
         throw new Error(
           "Provide a saved document ID or its exact title in this chat.",
         );
-      let document;
+      let document:
+        | Awaited<ReturnType<typeof artifactRepo.getDocumentById>>
+        | undefined;
       if (id) document = await artifactRepo.getDocumentById({ id });
       else if (session.chatId && title) {
         const matches = await db

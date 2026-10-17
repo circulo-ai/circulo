@@ -4,12 +4,12 @@ import {
   embeddingPreference,
   knowledgeDocument,
 } from "@/db";
-import { env } from "@/lib/env";
 import { getUserProviderCredential } from "@/lib/ai/provider-registry";
+import { env } from "@/lib/env";
 import { eq } from "drizzle-orm";
 import { getKnowledgeAssetKey, toKnowledgeImageDataUrl } from "./assets";
-import { refreshKnowledgeDocumentEmbedding } from "./embeddings";
 import { getEmbeddingPreferences } from "./embedding-settings";
+import { refreshKnowledgeDocumentEmbedding } from "./embeddings";
 import type { VisionMessageContent } from "./vision-utils";
 import { buildImageKnowledgeContent, extractVisionText } from "./vision-utils";
 

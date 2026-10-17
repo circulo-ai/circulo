@@ -20,17 +20,17 @@ Document edits invalidate old vectors and schedule indexing. Source and settings
 
 The same parser facade is used for knowledge uploads and chat attachment context:
 
-| Format | Extraction |
-| --- | --- |
-| PDF | Extractable text and page metadata |
-| DOCX / legacy DOC | Document body; legacy Word also includes headers and notes |
-| PPTX / ODP / ODT | Office text, including presentation notes |
-| XLSX / XLS / ODS | Sheet names and cell values |
-| CSV / TSV | All rows within the text budget; malformed input produces an error |
-| JSON / YAML | Validated source text and bounded structured metadata |
-| HTML | Text with script, style, and template content removed |
-| Text, Markdown, source code, XML, TOML, logs | UTF-8 or BOM-marked UTF-16 text |
-| Raster images | Stored originals plus extraction using a configured vision-capable provider |
+| Format                                       | Extraction                                                                  |
+| -------------------------------------------- | --------------------------------------------------------------------------- |
+| PDF                                          | Extractable text and page metadata                                          |
+| DOCX / legacy DOC                            | Document body; legacy Word also includes headers and notes                  |
+| PPTX / ODP / ODT                             | Office text, including presentation notes                                   |
+| XLSX / XLS / ODS                             | Sheet names and cell values                                                 |
+| CSV / TSV                                    | All rows within the text budget; malformed input produces an error          |
+| JSON / YAML                                  | Validated source text and bounded structured metadata                       |
+| HTML                                         | Text with script, style, and template content removed                       |
+| Text, Markdown, source code, XML, TOML, logs | UTF-8 or BOM-marked UTF-16 text                                             |
+| Raster images                                | Stored originals plus extraction using a configured vision-capable provider |
 
 Files are limited to 25 MB for parsing and 500,000 extracted characters. Office archive expansion, spreadsheet ranges, structured metadata depth, and embedding batches have additional limits. Unsupported, encrypted, invalid, or oversized files produce actionable errors. Legacy `.ppt` must be converted to `.pptx`. Scanned PDFs without extractable text need OCR or image extraction; audio and video context depends on model support or an available transcript.
 

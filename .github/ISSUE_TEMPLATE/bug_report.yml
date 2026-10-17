@@ -1,0 +1,53 @@
+name: Bug report
+description: Report a reproducible problem with Circulo.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include credentials, personal data, production secrets, or security vulnerabilities. Use the private reporting process in SECURITY.md for security issues.
+  - type: input
+    id: version
+    attributes:
+      label: Circulo version
+      description: Include the release, commit, or package version.
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, runtime, and deployment type.
+      placeholder: Windows 11, Bun 1.3.4, self-hosted
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest sequence that reproduces the issue.
+      placeholder: |
+        1. Start ...
+        2. Open ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs or screenshots
+      description: Remove secrets, tokens, and personal information before posting.
+    validations:
+      required: false

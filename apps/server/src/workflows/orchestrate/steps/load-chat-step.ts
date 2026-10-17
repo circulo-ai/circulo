@@ -1,8 +1,4 @@
 import {
-  knowledgeSemanticDistance,
-  relevantKnowledgeContent,
-} from "@/lib/knowledge/semantic-distance";
-import {
   chatMember,
   chat as chatTable,
   db,
@@ -28,6 +24,10 @@ import {
   toKnowledgeImageDataUrl,
 } from "@/lib/knowledge/assets";
 import { createKnowledgeEmbeddingWithMetadata } from "@/lib/knowledge/embeddings";
+import {
+  knowledgeSemanticDistance,
+  relevantKnowledgeContent,
+} from "@/lib/knowledge/semantic-distance";
 import { createLogger } from "@/lib/logs/console/logger";
 import { retrieveMemories } from "@/lib/memory/retrieval";
 import {
@@ -205,10 +205,10 @@ export async function loadChatContextStep(
   const currentMember = members.find((member) => member.userId === userId);
   const canReadChatMemory = Boolean(
     currentMember &&
-      (currentMember.role === "owner" ||
-        currentMember.role === "admin" ||
-        currentMember.canManageKnowledge ||
-        canReadOrganizationMemory),
+    (currentMember.role === "owner" ||
+      currentMember.role === "admin" ||
+      currentMember.canManageKnowledge ||
+      canReadOrganizationMemory),
   );
   const readableAgentIds = agentIds;
   const userMemoryPreference = await db.query.memoryPreference.findFirst({

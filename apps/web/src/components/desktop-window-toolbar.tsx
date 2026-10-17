@@ -85,7 +85,7 @@ export function DesktopWindowToolbar() {
         </button>
         <div className="flex items-center gap-1.5">
           <Logo className="h-5 w-auto" />
-          <h1 className="text-lg font-medium leading-none tracking-tight">
+          <h1 className="text-lg leading-none font-medium tracking-tight">
             Circulo
           </h1>
         </div>

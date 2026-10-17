@@ -2,7 +2,6 @@ import { Chat } from "@/domain/chat/chat";
 import { ChatAgentLink } from "@/domain/chat/chat-agent-link";
 import { Message } from "@/domain/message/message";
 import { createDrizzleRepositories } from "@/infrastructure/drizzle/repository-factory";
-import type { DbInstance } from "@circulo-ai/db";
 import {
   Guard,
   Identifier,
@@ -12,6 +11,7 @@ import {
   type UnitOfWork,
   type UseCase,
 } from "@circulo-ai/core";
+import type { DbInstance } from "@circulo-ai/db";
 
 export type CreateChatWithMessageInput = {
   id: string;

@@ -1,7 +1,7 @@
 import type { ChatMessage } from "@/lib/types";
-import { describe, expect, it } from "vitest";
-import { readFile } from "node:fs/promises";
 import { convertToModelMessages } from "ai";
+import { readFile } from "node:fs/promises";
+import { describe, expect, it } from "vitest";
 import { normalizeAttachmentContext } from "./attachment-context";
 
 function asMessage(parts: unknown[]): ChatMessage {

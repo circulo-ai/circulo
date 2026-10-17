@@ -53,8 +53,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 import { EmbeddingSettings } from "@/components/workspace/embedding-settings";
+import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 import {
   Brain,
   Check,

@@ -1,5 +1,5 @@
-import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
 const serverRoot = fileURLToPath(new URL(".", import.meta.url));

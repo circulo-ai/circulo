@@ -209,9 +209,8 @@ export function createFileParser(config: FileParserConfig = {}) {
     if (buffer.length > 25 * 1024 * 1024)
       throw new Error("Files must be 25 MB or smaller");
     const normalizedExtension = normalizeExtension(extension);
-    const { validateParserBuffer, decodeTextBuffer } = await import(
-      "./validation.js"
-    );
+    const { validateParserBuffer, decodeTextBuffer } =
+      await import("./validation.js");
     validateParserBuffer(buffer, normalizedExtension);
     if (
       [
@@ -279,9 +278,6 @@ export { MdParser } from "./md-parser.js";
 export { PdfParser } from "./pdf-parser.js";
 export { PptxParser } from "./pptx-parser.js";
 export { TxtParser } from "./txt-parser.js";
-export type {
-  FileParseResult,
-  FileParser,
-} from "./types.js";
+export type { FileParseResult, FileParser } from "./types.js";
 export { XlsxParser } from "./xlsx-parser.js";
 export { parseYAML, parseYAMLBuffer } from "./yaml-parser.js";

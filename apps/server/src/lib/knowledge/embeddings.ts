@@ -4,20 +4,20 @@ import {
   embeddingPreference,
   knowledgeDocument,
 } from "@/db";
-import { and, eq } from "drizzle-orm";
 import {
   embeddingPreferencesSchema,
   type EmbeddingPreferences,
 } from "@circulo-ai/types";
-import {
-  averageKnowledgeEmbeddings,
-  chunkKnowledgeText,
-} from "./embedding-utils";
+import { and, eq } from "drizzle-orm";
+import { requestEmbeddingVectors } from "./embedding-provider";
 import {
   getEmbeddingPreferences,
   resolveEmbeddingConfig,
 } from "./embedding-settings";
-import { requestEmbeddingVectors } from "./embedding-provider";
+import {
+  averageKnowledgeEmbeddings,
+  chunkKnowledgeText,
+} from "./embedding-utils";
 export {
   averageKnowledgeEmbeddings,
   chunkKnowledgeText,

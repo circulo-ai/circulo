@@ -20,27 +20,29 @@ const executionPlanSchema = z.object({
   strategy: z.enum(["sequential", "parallel", "conditional", "single"]),
   reasoning: z.string().describe("Explain the orchestration strategy chosen"),
   stopOnError: z.boolean().describe("Whether to stop if an agent fails"),
-  selectedAgents: z.array(
-    z.object({
-      agentId: z.uuid(),
-      order: z.number().describe("Execution order (0-based)"),
-      // Azure/OpenAI strict structured output requires every property to be
-      // required. Nullable fields preserve the planner's ability to express
-      // that a dependency or parallel group is not applicable.
-      parallelGroup: z
-        .union([z.number(), z.null()])
-        .describe("Agents in same group run in parallel, or null"),
-      dependsOn: z
-        .union([z.array(z.uuid()), z.null()])
-        .describe("Agent IDs this depends on, or null"),
-      reason: z.string().describe("Why this agent was selected"),
-      task: z.string().describe("Specific task for this agent"),
-      estimatedDuration: z
-        .union([z.string(), z.null()])
-        .describe("Estimated time (e.g., '30s', '2m'), or null"),
-      priority: z.enum(["low", "medium", "high"]),
-    }),
-  ).max(12),
+  selectedAgents: z
+    .array(
+      z.object({
+        agentId: z.uuid(),
+        order: z.number().describe("Execution order (0-based)"),
+        // Azure/OpenAI strict structured output requires every property to be
+        // required. Nullable fields preserve the planner's ability to express
+        // that a dependency or parallel group is not applicable.
+        parallelGroup: z
+          .union([z.number(), z.null()])
+          .describe("Agents in same group run in parallel, or null"),
+        dependsOn: z
+          .union([z.array(z.uuid()), z.null()])
+          .describe("Agent IDs this depends on, or null"),
+        reason: z.string().describe("Why this agent was selected"),
+        task: z.string().describe("Specific task for this agent"),
+        estimatedDuration: z
+          .union([z.string(), z.null()])
+          .describe("Estimated time (e.g., '30s', '2m'), or null"),
+        priority: z.enum(["low", "medium", "high"]),
+      }),
+    )
+    .max(12),
   fallbackAgentId: z
     .union([z.uuid(), z.null()])
     .describe("Fallback agent if primary fails, or null"),

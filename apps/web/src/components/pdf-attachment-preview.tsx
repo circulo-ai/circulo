@@ -36,7 +36,7 @@ export function PdfAttachmentPreview({
   useEffect(() => {
     let disposed = false;
     let task:
-      | ReturnType<typeof import("pdfjs-dist")["getDocument"]>
+      | ReturnType<(typeof import("pdfjs-dist"))["getDocument"]>
       | undefined;
     const timeout = setTimeout(() => {
       if (!disposed) {

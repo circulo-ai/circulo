@@ -12,7 +12,11 @@ export function Submit({ disabled, children, ...props }: SubmitProps) {
   } = useFormContext();
 
   return (
-    <Button type="submit" disabled={Boolean(disabled) || isSubmitting} {...props}>
+    <Button
+      type="submit"
+      disabled={Boolean(disabled) || isSubmitting}
+      {...props}
+    >
       {isSubmitting && <Spinner />}
       {children}
     </Button>

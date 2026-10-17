@@ -36,7 +36,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "mc --config-dir /tmp/mc alias set local http://127.0.0.1:9000 \"$$MINIO_ROOT_USER\" \"$$MINIO_ROOT_PASSWORD\" >/dev/null 2>&1 && mc --config-dir /tmp/mc ready local",
+          'mc --config-dir /tmp/mc alias set local http://127.0.0.1:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null 2>&1 && mc --config-dir /tmp/mc ready local',
         ]
       interval: 5s
       timeout: 3s

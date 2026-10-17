@@ -1,36 +1,46 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Circulo web application
 
-## Getting Started
+The web application is the browser interface for Circulo. It uses Next.js and
+connects to the Hono API in [`apps/server`](../server/README.md).
 
-First, run the development server:
+## Run locally
+
+Configure the repository-level environment files and start the supporting
+services from the repository root. See the [root README](../../README.md) for
+the complete setup.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+bun install --frozen-lockfile
+docker compose -f apps/web/docker-compose.yml up -d
+bun run db:migrate
+bun run dev:stack
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The web application runs at `http://localhost:3000`. The API defaults to
+`http://localhost:3002`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Use `apps/web/.env.example` as the starting point for `apps/web/.env.local`.
+Use `apps/server/.env.example` for API and provider configuration. Keep local
+secrets in those ignored files and do not add them to source control.
 
-## Learn More
+## Useful commands
 
-To learn more about Next.js, take a look at the following resources:
+Run these commands from the repository root:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+bun --filter web typecheck
+bun --filter web test
+bun --filter web build
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The production build uses the Webpack build path configured in the package
+script. Repository-wide lint and formatting commands are documented in the
+[root README](../../README.md).
 
-## Deploy on Vercel
+## Related documentation
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [Self-hosting](../../docs/self-hosting.md)
+- [Repository contribution guide](../../CONTRIBUTING.md)
+- [Security policy](../../SECURITY.md)

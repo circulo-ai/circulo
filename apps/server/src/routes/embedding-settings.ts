@@ -6,23 +6,23 @@ import {
   memory,
 } from "@/db";
 import { createRouter, type AppEnv } from "@/lib/create-app";
+import { getKnowledgeAssetKey } from "@/lib/knowledge/assets";
+import { requestEmbeddingVectors } from "@/lib/knowledge/embedding-provider";
 import {
   getEmbeddingPreferences,
   resolveEmbeddingConfig,
 } from "@/lib/knowledge/embedding-settings";
-import { requestEmbeddingVectors } from "@/lib/knowledge/embedding-provider";
 import { refreshKnowledgeDocumentEmbedding } from "@/lib/knowledge/embeddings";
-import { getKnowledgeAssetKey } from "@/lib/knowledge/assets";
 import {
   getKnowledgeImageFileName,
   refreshKnowledgeImageDocument,
 } from "@/lib/knowledge/vision";
-import { storageManager } from "@/lib/storage/config";
 import {
   createMemoryEmbedding,
   writeMemoryWithEmbedding,
 } from "@/lib/memory/retrieval";
 import { hasPermissionForUser, isMemberOf } from "@/lib/permissions";
+import { storageManager } from "@/lib/storage/config";
 import { requireAuth } from "@/middleware/auth";
 import { rateLimit } from "@/middleware/rate-limit";
 import {

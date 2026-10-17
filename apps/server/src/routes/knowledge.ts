@@ -1,4 +1,3 @@
-import { knowledgeSemanticDistance } from "@/lib/knowledge/semantic-distance";
 import { db } from "@/db";
 import {
   embeddingChunk,
@@ -6,10 +5,6 @@ import {
   knowledgeBase,
   knowledgeDocument,
 } from "@/db/schema";
-import {
-  getEmbeddingPreferences,
-  resolveEmbeddingConfig,
-} from "@/lib/knowledge/embedding-settings";
 import { enforceOrganizationFeatureLimit } from "@/lib/billing/limits";
 import { createRouter } from "@/lib/create-app";
 import {
@@ -19,9 +14,14 @@ import {
   hasKnowledgeImageSignature,
 } from "@/lib/knowledge/assets";
 import {
+  getEmbeddingPreferences,
+  resolveEmbeddingConfig,
+} from "@/lib/knowledge/embedding-settings";
+import {
   createKnowledgeEmbeddingWithMetadata,
   refreshKnowledgeDocumentEmbedding,
 } from "@/lib/knowledge/embeddings";
+import { knowledgeSemanticDistance } from "@/lib/knowledge/semantic-distance";
 import {
   getKnowledgeImageFileName,
   refreshKnowledgeImageDocument,

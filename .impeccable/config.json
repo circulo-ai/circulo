@@ -6,9 +6,7 @@
       {
         "rule": "ai-color-palette",
         "value": "*",
-        "files": [
-          "apps/web/src/app/(chat)/components/chat-sidebar-item.tsx"
-        ],
+        "files": ["apps/web/src/app/(chat)/components/chat-sidebar-item.tsx"],
         "createdAt": "2026-10-12T13:02:50.942Z",
         "reason": "User requested restoring the unique chat-avatar gradients; these exact gradient classes are the earlier implementation in the parent of commit 0cd982f."
       }

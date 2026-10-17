@@ -1,5 +1,5 @@
-import type { ChatMessage } from "@/lib/types";
 import { createLogger } from "@/lib/logs/console/logger";
+import type { ChatMessage } from "@/lib/types";
 import {
   parseBuffer,
   SUPPORTED_FILE_EXTENSIONS,
@@ -98,9 +98,8 @@ async function getChatStorageKey(value: string): Promise<string | undefined> {
       const token = parsed.searchParams.get("token");
       if (!token) return undefined;
 
-      const { verifyFileAccessToken } = await import(
-        "@/lib/storage/file-access-token"
-      );
+      const { verifyFileAccessToken } =
+        await import("@/lib/storage/file-access-token");
       const context = parsed.searchParams.get("context") ?? "general";
       if (context !== "chat") return undefined;
       return verifyFileAccessToken(key, context, token) ? key : undefined;
@@ -142,10 +141,17 @@ async function loadAttachmentBuffer(
  * Remote URLs are never fetched here; only inline data or signed local storage. */
 export async function readAttachmentText(part: MessagePart): Promise<string> {
   const buffer = await loadAttachmentBuffer(part);
-  if (!buffer) throw new Error("This attachment is not available from local authorized storage.");
-  if (buffer.length > MAX_ATTACHMENT_BYTES_TO_PARSE) throw new Error("This attachment exceeds the text extraction limit.");
+  if (!buffer)
+    throw new Error(
+      "This attachment is not available from local authorized storage.",
+    );
+  if (buffer.length > MAX_ATTACHMENT_BYTES_TO_PARSE)
+    throw new Error("This attachment exceeds the text extraction limit.");
   const extension = getExtension(getFileName(part), getMediaType(part));
-  if (!extension || !PARSABLE_EXTENSIONS.has(extension)) throw new Error("This format does not support text extraction. Use its media content or a transcript.");
+  if (!extension || !PARSABLE_EXTENSIONS.has(extension))
+    throw new Error(
+      "This format does not support text extraction. Use its media content or a transcript.",
+    );
   return (await parseBuffer(buffer, extension)).content;
 }
 

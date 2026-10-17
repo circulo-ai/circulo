@@ -1,8 +1,8 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { eq } from "drizzle-orm";
+import { readMigrationFiles } from "drizzle-orm/migrator";
 import { createServer, type Server } from "node:http";
 import { fileURLToPath } from "node:url";
-import { readMigrationFiles } from "drizzle-orm/migrator";
-import { eq } from "drizzle-orm";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   baseUrl: "",
@@ -10,16 +10,13 @@ const state = vi.hoisted(() => ({
   member: true,
 }));
 vi.mock("@/db", async () => {
-  const { PGlite } = await import(
-    "../../../../../packages/db/node_modules/@electric-sql/pglite/dist/index.js"
-  );
-  const { vector } = await import(
-    "../../../../../packages/db/node_modules/@electric-sql/pglite-pgvector/dist/index.js"
-  );
+  const { PGlite } =
+    await import("../../../../../packages/db/node_modules/@electric-sql/pglite/dist/index.js");
+  const { vector } =
+    await import("../../../../../packages/db/node_modules/@electric-sql/pglite-pgvector/dist/index.js");
   const { drizzle } = await import("drizzle-orm/pglite");
-  const schema = await import(
-    "../../../../../packages/db/dist/schema/index.js"
-  );
+  const schema =
+    await import("../../../../../packages/db/dist/schema/index.js");
   const client = new PGlite({ extensions: { vector } });
   return { ...schema, db: drizzle(client, { schema }), __client: client };
 });
@@ -55,14 +52,6 @@ vi.mock("@/lib/storage/config", () => ({
 
 import * as database from "@/db";
 import {
-  createKnowledgeEmbeddingWithMetadata,
-  refreshKnowledgeDocumentEmbedding,
-} from "./embeddings";
-import {
-  knowledgeSemanticDistance,
-  relevantKnowledgeContent,
-} from "./semantic-distance";
-import {
   createMemoryEmbedding,
   retrieveMemories,
   writeMemoryWithEmbedding,
@@ -70,6 +59,14 @@ import {
 import router from "@/routes/embedding-settings";
 import memoryRouter from "@/routes/memories";
 import { Hono } from "hono";
+import {
+  createKnowledgeEmbeddingWithMetadata,
+  refreshKnowledgeDocumentEmbedding,
+} from "./embeddings";
+import {
+  knowledgeSemanticDistance,
+  relevantKnowledgeContent,
+} from "./semantic-distance";
 
 let provider: Server;
 let documentId: string;

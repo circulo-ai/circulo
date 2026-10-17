@@ -611,12 +611,9 @@ function AutomationPageContent() {
                     </p>
                     {task.metadata?.pausedReason != null &&
                       task.status === "paused" && (
-                        <p
-                          role="status"
-                          className="mt-2 text-sm text-muted-foreground"
-                        >
+                        <output className="mt-2 block text-sm text-muted-foreground">
                           {String(task.metadata.pausedReason)}
-                        </p>
+                        </output>
                       )}
                     {(
                       task.metadata?._execution as

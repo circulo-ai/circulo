@@ -36,8 +36,8 @@ import {
 import { FormRoot } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 import { EmbeddingSettings } from "@/components/workspace/embedding-settings";
+import { WorkspaceShell } from "@/components/workspace/workspace-shell";
 import {
   BookOpen,
   Check,
@@ -296,7 +296,8 @@ function KnowledgePageContent() {
       let indexed = 0;
       let processed = 0;
       let failureMessage = "";
-      do {
+      let hasMore = true;
+      while (hasMore) {
         const result = (await request("/api/embedding-settings/reindex", {
           method: "POST",
           body: JSON.stringify({
@@ -315,13 +316,14 @@ function KnowledgePageContent() {
         indexed += result.indexed;
         processed += result.processed;
         failureMessage ||= result.failures[0]?.message ?? "";
-        if (result.done) break;
+        hasMore = !result.done;
+        if (!hasMore) break;
         if (!result.cursor || result.cursor === cursor)
           throw new Error(
             "Rebuild could not advance. Retry the index rebuild.",
           );
         cursor = result.cursor;
-      } while (true);
+      }
       if (failureMessage)
         toast.error(
           `${indexed} of ${processed} documents indexed. ${failureMessage}`,

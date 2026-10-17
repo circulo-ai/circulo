@@ -33,6 +33,11 @@ storybook-static
 # Turborepo cache
 .turbo
 
+# Local tool output and generated packaging checks
+.codex/upload-smoke/
+.impeccable/hook.cache.json
+apps/desktop/dist-config-check/
+
 
 # ===============================
 # Database & generated code

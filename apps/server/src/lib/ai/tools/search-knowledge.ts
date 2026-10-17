@@ -1,9 +1,9 @@
+import { db, knowledgeBase, knowledgeDocument } from "@/db";
+import { createKnowledgeEmbeddingWithMetadata } from "@/lib/knowledge/embeddings";
 import {
   knowledgeSemanticDistance,
   relevantKnowledgeContent,
 } from "@/lib/knowledge/semantic-distance";
-import { db, knowledgeBase, knowledgeDocument } from "@/db";
-import { createKnowledgeEmbeddingWithMetadata } from "@/lib/knowledge/embeddings";
 import type { Tool } from "ai";
 import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";

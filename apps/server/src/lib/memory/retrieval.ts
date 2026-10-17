@@ -1,9 +1,9 @@
-import { db, memory, embeddingChunk, embeddingPreference } from "@/db";
+import { db, embeddingChunk, embeddingPreference, memory } from "@/db";
+import { getEmbeddingPreferences } from "@/lib/knowledge/embedding-settings";
 import {
   createKnowledgeEmbeddingWithMetadata,
   type EmbeddingResult,
 } from "@/lib/knowledge/embeddings";
-import { getEmbeddingPreferences } from "@/lib/knowledge/embedding-settings";
 import { memorySemanticDistance } from "@/lib/knowledge/semantic-distance";
 import { embeddingPreferencesSchema } from "@circulo-ai/types";
 import { and, asc, desc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
@@ -181,16 +181,14 @@ export async function writeMemoryWithEmbedding(
         .delete(embeddingChunk)
         .where(eq(embeddingChunk.memoryId, row.id));
       if (valid && result)
-        await tx
-          .insert(embeddingChunk)
-          .values(
-            result.chunks.map((chunk) => ({
-              ...chunk,
-              memoryId: row.id,
-              organizationId,
-              model: result.model,
-            })),
-          );
+        await tx.insert(embeddingChunk).values(
+          result.chunks.map((chunk) => ({
+            ...chunk,
+            memoryId: row.id,
+            organizationId,
+            model: result.model,
+          })),
+        );
     }
     return { row, indexed: Boolean(valid && result) };
   });

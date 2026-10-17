@@ -1,6 +1,6 @@
+import { expandComposerCommand } from "@circulo-ai/types";
 import { describe, expect, it } from "vitest";
 import { tokenizeComposer } from "./composer-tokens";
-import { expandComposerCommand } from "@circulo-ai/types";
 
 describe("composer token decoration", () => {
   it("preserves text, whitespace, punctuation and email addresses", () => {

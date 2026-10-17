@@ -1,6 +1,5 @@
 import { Message } from "@/domain/message/message";
 import { createDrizzleRepositories } from "@/infrastructure/drizzle";
-import type { DbInstance } from "@circulo-ai/db";
 import {
   Guard,
   Identifier,
@@ -9,6 +8,7 @@ import {
   type UnitOfWork,
   type UseCase,
 } from "@circulo-ai/core";
+import type { DbInstance } from "@circulo-ai/db";
 
 export type PostMessageInput = {
   id: string;
@@ -25,9 +25,7 @@ export class PostMessage implements UseCase<
   PostMessageInput,
   PostMessageOutput
 > {
-  constructor(
-    private readonly uow: UnitOfWork<{ client: DbInstance }>,
-  ) {}
+  constructor(private readonly uow: UnitOfWork<{ client: DbInstance }>) {}
 
   async execute(input: PostMessageInput): Promise<PostMessageOutput> {
     const idCheck = Guard.isUuid(input.id, "id");

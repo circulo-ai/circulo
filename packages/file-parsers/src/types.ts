@@ -9,4 +9,4 @@ export interface FileParser {
 }
 
 export type SupportedFileType =
-  typeof import("./index.js").SUPPORTED_FILE_EXTENSIONS[number];
+  (typeof import("./index.js").SUPPORTED_FILE_EXTENSIONS)[number];

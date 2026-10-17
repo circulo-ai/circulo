@@ -58,17 +58,15 @@ export function rememberMemory(params: {
             ),
           });
           if (current)
-            await tx
-              .insert(memoryHistory)
-              .values({
-                memoryId: current.id,
-                organizationId: current.organizationId,
-                userId: current.userId ?? current.createdBy,
-                key: current.key,
-                content: current.content,
-                metadata: current.metadata,
-                importance: current.importance,
-              });
+            await tx.insert(memoryHistory).values({
+              memoryId: current.id,
+              organizationId: current.organizationId,
+              userId: current.userId ?? current.createdBy,
+              key: current.key,
+              content: current.content,
+              metadata: current.metadata,
+              importance: current.importance,
+            });
           const [saved] = current
             ? await tx
                 .update(memory)

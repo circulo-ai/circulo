@@ -536,12 +536,9 @@ export function AutomationWebhooks({
                                 </Button>
                               )}
                               {delivery.error && (
-                                <p
-                                  role="status"
-                                  className="break-words text-destructive"
-                                >
+                                <output className="block break-words text-destructive">
                                   {delivery.error}
-                                </p>
+                                </output>
                               )}
                             </div>
                           ))

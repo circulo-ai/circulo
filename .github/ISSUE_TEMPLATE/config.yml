@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Support and documentation
+    url: https://github.com/circulo-ai/circulo/blob/master/SUPPORT.md
+    about: Start with the project documentation and support guidance.
+  - name: Report a security vulnerability
+    url: https://github.com/circulo-ai/circulo/security/advisories/new
+    about: Report vulnerabilities privately. See SECURITY.md for the fallback process.

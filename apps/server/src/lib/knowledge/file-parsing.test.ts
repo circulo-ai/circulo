@@ -1,22 +1,17 @@
-import { parseBuffer, isSupportedFileType } from "@circulo-ai/file-parsers";
-import { describe, expect, it } from "vitest";
+import { isSupportedFileType, parseBuffer } from "@circulo-ai/file-parsers";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
 
 describe("file ingestion", () => {
-  it.each([
-    "txt",
-    ".MD",
-    "ts",
-    "py",
-    "xml",
-    "toml",
-    "log",
-  ])("parses %s text without loading Office parsers", async (extension) => {
-    expect(
-      (await parseBuffer(Buffer.from("Source content"), extension)).content,
-    ).toBe("Source content");
-  });
+  it.each(["txt", ".MD", "ts", "py", "xml", "toml", "log"])(
+    "parses %s text without loading Office parsers",
+    async (extension) => {
+      expect(
+        (await parseBuffer(Buffer.from("Source content"), extension)).content,
+      ).toBe("Source content");
+    },
+  );
   it("decodes UTF-16 text and rejects disguised binaries", async () => {
     const unicode = "سلام 😀 𐐀";
     expect((await parseBuffer(Buffer.from(unicode), "txt")).content).toBe(

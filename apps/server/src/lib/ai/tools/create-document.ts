@@ -1,10 +1,10 @@
+import { artifactRepo } from "@/db/repositories";
 import {
   artifactKinds,
   documentHandlersByArtifactKind,
 } from "@/lib/artifacts/server";
 import type { ActorContext, ChatMessage } from "@/lib/types";
 import { generateUUID } from "@/lib/utils";
-import { artifactRepo } from "@/db/repositories";
 import { tool, type Tool, type UIMessageStreamWriter } from "ai";
 import { z } from "zod";
 

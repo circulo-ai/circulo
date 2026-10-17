@@ -1,7 +1,7 @@
+import type { HarnessSnapshot } from "@circulo-ai/types";
 import { describe, expect, it } from "vitest";
 import { getHarnessProgress } from "./harness-progress";
 import type { ChatMessage } from "./types";
-import type { HarnessSnapshot } from "@circulo-ai/types";
 
 const snapshot: HarnessSnapshot = {
   executionId: "execution",

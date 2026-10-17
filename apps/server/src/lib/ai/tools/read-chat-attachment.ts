@@ -3,9 +3,7 @@ import type { ChatMessage } from "@/lib/types";
 import { tool, type Tool } from "ai";
 import { z } from "zod";
 
-export function readChatAttachment(
-  messages: ChatMessage[],
-): Tool<
+export function readChatAttachment(messages: ChatMessage[]): Tool<
   {
     filename: string;
     messageId: string | null;
