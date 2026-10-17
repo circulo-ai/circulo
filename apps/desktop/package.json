@@ -61,6 +61,7 @@
       }
     },
     "linux": {
+      "executableName": "circulo",
       "target": [
         "AppImage",
         "deb"
