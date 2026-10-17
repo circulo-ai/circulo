@@ -32,8 +32,6 @@ jobs:
       ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       INTERNAL_API_SECRET: release-build-internal-secret-with-32-chars
       DATABASE_URL: postgres://user:password@127.0.0.1:5432/circulo
-      ELECTRON_CACHE: ${{ runner.temp }}/electron-cache
-      ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder-cache
 
     steps:
       - name: Checkout
@@ -104,6 +102,9 @@ jobs:
 
       - name: Package desktop installers
         run: bun --cwd apps/desktop package
+        env:
+          ELECTRON_CACHE: ${{ runner.temp }}/electron-cache
+          ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder-cache
 
       - name: Upload platform installers
         uses: actions/upload-artifact@v6
