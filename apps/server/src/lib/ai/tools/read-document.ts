@@ -32,6 +32,7 @@ export function readDocument(session: ActorContext): Tool<
         );
       let document:
         | Awaited<ReturnType<typeof artifactRepo.getDocumentById>>
+        | typeof artifact.$inferSelect
         | undefined;
       if (id) document = await artifactRepo.getDocumentById({ id });
       else if (session.chatId && title) {
