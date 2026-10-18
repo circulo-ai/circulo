@@ -42,7 +42,7 @@ await harness.stopActivities();
 
 console.log({
   status: "completed",
-  output: (events.at(-1)?.payload as { output: string }).output,
+  output: (events.at(-1)!.payload as { output: string }).output,
   activityExecutions: events.filter(
     (event) => event.eventType === "activity.completed",
   ).length,

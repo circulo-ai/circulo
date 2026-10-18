@@ -572,7 +572,7 @@ describe("replay-safe workflow execution", () => {
     });
     const terminal = events.at(-1);
     expect(
-      (terminal?.payload as { error: { message: string } }).error.message,
+      (terminal!.payload as { error: { message: string } }).error.message,
     ).toContain("original failure");
     expect(
       events.filter((event) => event.eventType === "activity.failed"),

@@ -23,7 +23,7 @@ const events = await harness.waitFor(
 await harness.stopTimers();
 
 console.log({
-  output: (events.at(-1)?.payload as { output: string }).output,
+  output: (events.at(-1)!.payload as { output: string }).output,
   usedAbsoluteTimestamp: true,
 });
 process.exit(0);

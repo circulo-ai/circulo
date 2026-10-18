@@ -35,12 +35,12 @@
     "typecheck": "bun ./node_modules/typescript/bin/tsc --noEmit"
   },
   "peerDependencies": {
-    "drizzle-orm": "^0.45.2",
-    "postgres": "^3.4.7"
+    "drizzle-orm": "^0.45.4",
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
-    "@types/node": "^20.19.25",
-    "typescript": "^5.7.3"
+    "@types/node": "^20.19.43",
+    "typescript": "^5.9.3"
   },
   "overrides": {
     "drizzle-orm": "^0.45.2",
@@ -48,7 +48,7 @@
   },
   "dependencies": {
     "@circulo-ai/types": "workspace:*",
-    "@electric-sql/pglite": "^0.5.8",
+    "@electric-sql/pglite": "^0.5.10",
     "@electric-sql/pglite-pgvector": "^0.0.9"
   }
 }

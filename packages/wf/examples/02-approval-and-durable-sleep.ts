@@ -41,7 +41,7 @@ const historyAfterWait = await harness.waitFor(
   started.workflowId,
   started.runId,
 );
-const waitId = (historyAfterWait.at(-1)?.payload as { waitId: string }).waitId;
+const waitId = (historyAfterWait.at(-1)!.payload as { waitId: string }).waitId;
 
 await harness.runner.signal(
   started.workflowId,
@@ -67,7 +67,7 @@ const events = await harness.waitFor(
 await harness.stopActivities();
 
 console.log({
-  output: (events.at(-1)?.payload as { output: string }).output,
+  output: (events.at(-1)!.payload as { output: string }).output,
   replayedAfterSleep: events.some((event) => event.eventType === "timer.fired"),
 });
 process.exit(0);

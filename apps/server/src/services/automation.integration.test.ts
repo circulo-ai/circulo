@@ -370,7 +370,7 @@ describe("automation routes and durable dispatch", () => {
       .from(scheduledTask)
       .where(eq(scheduledTask.id, task.id));
     expect(queued?.status).toBe("completed");
-    expect((queued?.metadata._execution as any).pending.messageId).toBeTruthy();
+    expect((queued!.metadata._execution as any).pending.messageId).toBeTruthy();
     await dispatchScheduledTask(task.id, new Date(Date.now() + 121_000));
     expect(fixture.startCalls).toHaveLength(2);
     expect(fixture.startCalls[0].messageId).toBe(
@@ -380,7 +380,7 @@ describe("automation routes and durable dispatch", () => {
       .select()
       .from(scheduledTask)
       .where(eq(scheduledTask.id, task.id));
-    expect((saved?.metadata._execution as any).pending).toBeUndefined();
+    expect((saved!.metadata._execution as any).pending).toBeUndefined();
     expect(
       await db
         .select()

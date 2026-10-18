@@ -14,11 +14,11 @@ describe("GitHub connector client", () => {
       expect(new URL(input).pathname).toBe("/user/repos");
       expect(new URL(input).searchParams.get("per_page")).toBe("2");
       expect(init?.method).toBe("GET");
-      expect((init?.headers as Record<string, string>).Authorization).toBe(
+      expect((init!.headers as Record<string, string>).Authorization).toBe(
         "Bearer test-token",
       );
       expect(
-        (init?.headers as Record<string, string>)["X-GitHub-Api-Version"],
+        (init!.headers as Record<string, string>)["X-GitHub-Api-Version"],
       ).toBe("2022-11-28");
       return response([
         {

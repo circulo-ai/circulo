@@ -18,7 +18,7 @@
     "typecheck": "bun ./node_modules/typescript/bin/tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
-    "@types/node": "^20.19.25",
+    "@types/node": "^20.19.43",
     "typescript": "^5.9.3"
   }
 }
