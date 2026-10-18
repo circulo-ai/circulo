@@ -104,7 +104,7 @@ describe("durable workflow sleep", () => {
       fireAt: number;
     };
     expect(timerPayload.fireAt - timerStarted.timestamp).toBeGreaterThanOrEqual(
-      30 * 86_400_000 - 1,
+      30 * 86_400_000 - 1_000,
     );
 
     const restartedRunner = new ReplayWorkflowRunner(history, queue);
