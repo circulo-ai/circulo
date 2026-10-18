@@ -30,7 +30,9 @@ GitHub Actions. A green build does not mean every transitive dependency is
 free of known vulnerabilities; review security workflow findings and update
 affected packages promptly.
 
-The root `osv-scanner.toml` may temporarily exclude a specific advisory only
-when the affected package has no fixed release. Each exception must include a
-reason and an expiry date, and maintainers should remove it as soon as a fix is
-available.
+The root `osv-scanner.toml` may temporarily exclude an advisory only when no
+fixed version is available through the package source recognized by OSV, or
+when OSV does not recognize a verified fixed artifact from its upstream source.
+Each exception must include the affected version, evidence for the fix, a reason,
+and an expiry date. Maintainers should remove the exception as soon as the
+scanner recognizes the fixed release.

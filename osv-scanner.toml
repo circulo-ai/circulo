@@ -7,3 +7,28 @@ reason = "No fixed braces release exists yet. This is a build-tool transitive de
 id = "GHSA-hp3w-g68c-fv3c"
 ignoreUntil = 2026-11-17
 reason = "No fixed sprintf-js release exists yet. It is pulled in by electron-builder for packaging; remove this time-limited exception when upstream publishes a patch."
+
+[[IgnoredVulns]]
+id = "GHSA-3x9f-74h4-2fqr"
+ignoreUntil = 2026-11-17
+reason = "The lockfile pins SheetJS CE 0.20.3 from its official CDN, which is newer than the upstream fixed versions. OSV maps the CDN tarball URL to the vulnerable npm package without recognizing that release; verify the pinned artifact before removing this time-limited exception."
+
+[[IgnoredVulns]]
+id = "GHSA-4r6h-8v6p-xvw6"
+ignoreUntil = 2026-11-17
+reason = "The lockfile pins SheetJS CE 0.20.3 from its official CDN, which includes the upstream fix from 0.19.3. OSV maps the CDN tarball URL to the vulnerable npm package without recognizing that release; verify the pinned artifact before removing this time-limited exception."
+
+[[IgnoredVulns]]
+id = "GHSA-5pgg-2g8v-p4x9"
+ignoreUntil = 2026-11-17
+reason = "The lockfile pins SheetJS CE 0.20.3 from its official CDN, which includes the upstream fix from 0.20.2. OSV maps the CDN tarball URL to the vulnerable npm package without recognizing that release; verify the pinned artifact before removing this time-limited exception."
+
+[[IgnoredVulns]]
+id = "GHSA-8vcr-vxm8-293m"
+ignoreUntil = 2026-11-17
+reason = "The lockfile pins SheetJS CE 0.20.3 from its official CDN, which is newer than the upstream fixed versions. OSV maps the CDN tarball URL to the vulnerable npm package without recognizing that release; verify the pinned artifact before removing this time-limited exception."
+
+[[IgnoredVulns]]
+id = "GHSA-g973-978j-2c3p"
+ignoreUntil = 2026-11-17
+reason = "The lockfile pins SheetJS CE 0.20.3 from its official CDN, which is newer than the upstream fixed versions. OSV maps the CDN tarball URL to the vulnerable npm package without recognizing that release; verify the pinned artifact before removing this time-limited exception."
