@@ -27,6 +27,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useSignInContinuation } from "@/lib/auth/use-sign-in-continuation";
 import { usernamePlugin } from "@/lib/auth/username-plugin";
 import { cn } from "@/lib/utils";
+import { useCanSignUp } from "@/providers/instance-auth-context";
 import { authMutationKeys } from "@better-auth-ui/core";
 import type { UsernameAuthClient } from "@better-auth-ui/core/plugins/username";
 import {
@@ -73,6 +74,7 @@ export function SignInUsername({
     navigate,
     Link,
   } = useAuth<UsernameAuthClient>();
+  const canSignUp = useCanSignUp();
 
   const { fetchOptions, resetFetchOptions } = useFetchOptions();
   const continueSignIn = useSignInContinuation();
@@ -398,7 +400,7 @@ export function SignInUsername({
             </Link>
           )}
 
-          {emailAndPassword?.enabled && (
+          {emailAndPassword?.enabled && canSignUp && (
             <FieldDescription className="text-center">
               {localization.auth.needToCreateAnAccount}{" "}
               <Link

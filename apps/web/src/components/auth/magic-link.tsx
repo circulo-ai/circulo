@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { magicLinkPlugin } from "@/lib/auth/magic-link-plugin";
 import { cn } from "@/lib/utils";
+import { useCanSignUp } from "@/providers/instance-auth-context";
 import { MAGIC_LINK_SENT_STORAGE_KEY } from "./magic-link-sent";
 import { ProviderButtons, type SocialLayout } from "./provider-buttons";
 
@@ -57,6 +58,7 @@ export function MagicLink({
     viewPaths,
     Link,
   } = useAuth<MagicLinkAuthClient>();
+  const canSignUp = useCanSignUp();
   const { localization: magicLinkLocalization, viewPaths: magicLinkViewPaths } =
     useAuthPlugin(magicLinkPlugin);
 
@@ -185,7 +187,7 @@ export function MagicLink({
           )}
         </div>
 
-        {emailAndPassword?.enabled && (
+        {emailAndPassword?.enabled && canSignUp && (
           <div className="mt-4 flex w-full flex-col items-center gap-3">
             <FieldDescription className="text-center">
               {localization.auth.needToCreateAnAccount}{" "}

@@ -1,3 +1,7 @@
+import {
+  getAvailableSocialProviders,
+  hasGoogleOAuthCredentials,
+} from "@/lib/auth/provider-capabilities";
 import { createRouter } from "@/lib/create-app";
 import {
   ensureInstanceAuthSettings,
@@ -6,11 +10,15 @@ import {
   isSystemAdmin,
   updateSignupPolicy,
 } from "@/lib/deployment/instance-auth";
+import { env } from "@/lib/env";
 import { requireAuth } from "@/middleware/auth";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 
 const router = createRouter();
+const socialProviders = getAvailableSocialProviders(
+  hasGoogleOAuthCredentials(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET),
+);
 
 router.get("/instance/info", async (c) => {
   const runtimeKind = getRuntimeKind();
@@ -20,6 +28,7 @@ router.get("/instance/info", async (c) => {
       localAuth: false,
       signupEnabled: true,
       bootstrapRequired: false,
+      socialProviders,
     });
   }
 
@@ -29,6 +38,7 @@ router.get("/instance/info", async (c) => {
     localAuth: true,
     signupEnabled: settings.signupEnabled || !settings.bootstrapCompleted,
     bootstrapRequired: !settings.bootstrapCompleted,
+    socialProviders,
   });
 });
 

@@ -23,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { useCanSignUp } from "@/providers/instance-auth-context";
 import { UserAvatar } from "./user-avatar";
 import { UserView } from "./user-view";
 
@@ -111,6 +112,7 @@ export function UserButton({
   links,
   hideSettings = false,
 }: UserButtonProps) {
+  const canSignUp = useCanSignUp();
   const { authClient, basePaths, viewPaths, localization, plugins, navigate } =
     useAuth<MultiSessionAuthClient>();
 
@@ -242,17 +244,19 @@ export function UserButton({
               {localization.auth.signIn}
             </DropdownMenuItem>
 
-            <DropdownMenuItem
-              onClick={() =>
-                navigate({
-                  to: `${basePaths.auth}/${viewPaths.auth.signUp}`,
-                })
-              }
-            >
-              <UserPlus2 className="text-muted-foreground" />
+            {canSignUp && (
+              <DropdownMenuItem
+                onClick={() =>
+                  navigate({
+                    to: `${basePaths.auth}/${viewPaths.auth.signUp}`,
+                  })
+                }
+              >
+                <UserPlus2 className="text-muted-foreground" />
 
-              {localization.auth.signUp}
-            </DropdownMenuItem>
+                {localization.auth.signUp}
+              </DropdownMenuItem>
+            )}
 
             {plugins.flatMap((plugin) =>
               plugin.userMenuItems?.map((Item, index) => (

@@ -33,6 +33,7 @@ import { emailOtpPlugin } from "@/lib/auth/email-otp-plugin";
 import { useResendCooldown } from "@/lib/auth/use-resend-cooldown";
 import { useSignInContinuation } from "@/lib/auth/use-sign-in-continuation";
 import { cn } from "@/lib/utils";
+import { useCanSignUp } from "@/providers/instance-auth-context";
 import { OpenEmailButton } from "../open-email-button";
 import { OtpField } from "../otp-field";
 import { ProviderButtons, type SocialLayout } from "../provider-buttons";
@@ -68,6 +69,7 @@ export function EmailOtp({
     viewPaths,
     Link,
   } = useAuth();
+  const canSignUp = useCanSignUp();
   const { localization: emailOtpLocalization, otpLength } =
     useAuthPlugin(emailOtpPlugin);
 
@@ -274,7 +276,7 @@ export function EmailOtp({
           )}
         </div>
 
-        {emailAndPassword?.enabled && (
+        {emailAndPassword?.enabled && canSignUp && (
           <div className="mt-4 flex w-full flex-col items-center gap-3">
             <FieldDescription className="text-center">
               {localization.auth.needToCreateAnAccount}{" "}

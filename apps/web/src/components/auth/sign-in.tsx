@@ -33,6 +33,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { useSignInContinuation } from "@/lib/auth/use-sign-in-continuation";
 import { cn } from "@/lib/utils";
+import { useCanSignUp } from "@/providers/instance-auth-context";
 import { LastUsedBadge } from "./last-login-method/last-used-badge";
 import { ProviderButtons, type SocialLayout } from "./provider-buttons";
 
@@ -66,6 +67,7 @@ export function SignIn({
     navigate,
     Link,
   } = useAuth();
+  const canSignUp = useCanSignUp();
 
   const { fetchOptions, resetFetchOptions } = useFetchOptions();
   const continueSignIn = useSignInContinuation();
@@ -354,7 +356,7 @@ export function SignIn({
             </Link>
           )}
 
-          {emailAndPassword?.enabled && (
+          {emailAndPassword?.enabled && canSignUp && (
             <FieldDescription className="text-center">
               {localization.auth.needToCreateAnAccount}{" "}
               <Link

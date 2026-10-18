@@ -36,6 +36,8 @@ import { nanoid } from "nanoid";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { getAuthCookiePolicy } from "./auth/cookie-policy";
+import { hasGoogleOAuthCredentials } from "./auth/provider-capabilities";
+import { getTrustedAuthOrigins } from "./auth/trusted-origins";
 import {
   authorizeUserProvisioning,
   finalizeBootstrap,
@@ -47,6 +49,10 @@ import { getValidTrustedProxyIps } from "./trusted-proxies";
 const logger = createLogger("Auth");
 const isProduction = env.NODE_ENV === "production";
 const trustedProxyIps = getValidTrustedProxyIps(env.TRUSTED_PROXY_IPS);
+const googleOAuthConfigured = hasGoogleOAuthCredentials(
+  env.GOOGLE_CLIENT_ID,
+  env.GOOGLE_CLIENT_SECRET,
+);
 
 /**
  * Reads the `sub` claim from an ID token without verifying its signature.
@@ -444,15 +450,12 @@ const authOptions: BetterAuthOptions = {
       },
     },
   },
-  trustedOrigins: [
-    env.NEXT_PUBLIC_APP_URL as string,
-    env.BETTER_AUTH_URL as string,
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:3001",
-    "http://127.0.0.1:3001",
-    ...(env.CORS_ALLOWED_ORIGINS?.split(",") ?? []),
-  ].filter(Boolean),
+  trustedOrigins: getTrustedAuthOrigins({
+    appUrl: env.NEXT_PUBLIC_APP_URL,
+    authUrl: env.BETTER_AUTH_URL,
+    corsAllowedOrigins: env.CORS_ALLOWED_ORIGINS,
+    production: isProduction,
+  }),
   database: drizzleAdapter(db, {
     provider: "pg",
     schema,
@@ -508,19 +511,15 @@ const authOptions: BetterAuthOptions = {
     //     ]);
     // },
   },
-  socialProviders: {
-    google: {
-      prompt: "select_account",
-      clientId: env.GOOGLE_CLIENT_ID as string,
-      clientSecret: env.GOOGLE_CLIENT_SECRET as string,
-    },
-    // github: {
-    //     enabled: false,
-    //     clientId: env.GITHUB_CLIENT_ID as string,
-    //     clientSecret: env.GITHUB_CLIENT_SECRET as string,
-    //     scope: ['user:email', 'repo'],
-    // },
-  },
+  socialProviders: googleOAuthConfigured
+    ? {
+        google: {
+          prompt: "select_account",
+          clientId: env.GOOGLE_CLIENT_ID as string,
+          clientSecret: env.GOOGLE_CLIENT_SECRET as string,
+        },
+      }
+    : {},
   session: {
     cookieCache: {
       enabled: true,
