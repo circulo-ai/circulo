@@ -28,7 +28,7 @@ export async function executeRegistryCommand(
     output: `Config: ${project.configPath}\n${renderOutput({
       type: "table",
       columns: [{ key: "key", header: "Allowlisted step type" }],
-      rows: keys.map((key) => ({ key })),
+      rows: keys.map((key: string) => ({ key })),
     })}`,
   };
 }

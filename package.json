@@ -35,16 +35,25 @@
     "react-dom": "19.2.0",
     "next": "16.4.2",
     "@next/env": "16.4.2",
-    "drizzle-orm": "^0.45.2",
-    "postgres": "^3.4.7",
+    "cookie": "^0.7.2",
+    "esbuild": "^0.25.0",
+    "file-type": "^22.2.0",
+    "officeparser>pdfjs-dist": "6.2.108",
+    "katex": "^0.18.2",
+    "path-to-regexp": "^6.3.0",
+    "postcss-selector-parser": "^7.1.6",
+    "ws": "^8.21.0",
+    "drizzle-orm": "0.45.2",
+    "postgres": "3.4.7",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2"
   },
   "dependencies": {
+    "file-type": "^22.2.0",
     "@t3-oss/env-nextjs": "0.13.4",
     "@types/fluent-ffmpeg": "2.1.28",
-    "drizzle-orm": "^0.45.4",
-    "postgres": "^3.4.9"
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.7"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",

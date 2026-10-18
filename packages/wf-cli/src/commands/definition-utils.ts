@@ -1,6 +1,7 @@
 import {
   loadWorkflowDefinition,
   type SerializedWorkflowDefinition,
+  type SerializedWorkflowStep,
 } from "@circulo-ai/wf";
 import { readFileSync } from "node:fs";
 import { extname, resolve } from "node:path";
@@ -102,14 +103,20 @@ function parseDocument(
 function orderStepIds(
   document: SerializedWorkflowDefinition,
 ): readonly string[] {
-  const byId = new Map(document.steps.map((step) => [step.id, step] as const));
+  const byId = new Map(
+    document.steps.map(
+      (step: SerializedWorkflowStep) => [step.id, step] as const,
+    ),
+  );
   const targeted = new Set(
-    document.steps.flatMap((step) =>
+    document.steps.flatMap((step: SerializedWorkflowStep) =>
       step.nextStepId ? [step.nextStepId] : [],
     ),
   );
   const ordered: string[] = [];
-  let current = document.steps.find((step) => !targeted.has(step.id));
+  let current = document.steps.find(
+    (step: SerializedWorkflowStep) => !targeted.has(step.id),
+  );
   while (current) {
     ordered.push(current.id);
     current = current.nextStepId ? byId.get(current.nextStepId) : undefined;

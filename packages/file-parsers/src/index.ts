@@ -73,7 +73,10 @@ function buildLoaders(logger: Logger): ParserLoaders {
         extension,
         async () => {
           const { PptxParser } = await import("./pptx-parser.js");
-          return new PptxParser(createLogger("OfficeParser", logger));
+          return new PptxParser(
+            createLogger("OfficeParser", logger),
+            extension as "odt" | "odp",
+          );
         },
       ]),
     ),

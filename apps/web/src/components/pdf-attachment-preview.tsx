@@ -58,7 +58,6 @@ export function PdfAttachmentPreview({
         // Disable embedded scripting and dynamic code generation in uploaded PDFs.
         task = pdfjs.getDocument({
           data: bytes.slice(),
-          isEvalSupported: false,
           enableXfa: false,
         });
         const loaded = await task.promise;

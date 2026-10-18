@@ -1,0 +1,9 @@
+[[IgnoredVulns]]
+id = "GHSA-vfj7-8cjw-p6xm"
+ignoreUntil = 2026-11-17
+reason = "No fixed braces release exists yet. This is a build-tool transitive dependency; remove this time-limited exception when upstream publishes a patch."
+
+[[IgnoredVulns]]
+id = "GHSA-hp3w-g68c-fv3c"
+ignoreUntil = 2026-11-17
+reason = "No fixed sprintf-js release exists yet. It is pulled in by electron-builder for packaging; remove this time-limited exception when upstream publishes a patch."

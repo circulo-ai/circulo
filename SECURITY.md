@@ -29,3 +29,8 @@ Dependency security updates are handled through the repository lockfile and
 GitHub Actions. A green build does not mean every transitive dependency is
 free of known vulnerabilities; review security workflow findings and update
 affected packages promptly.
+
+The root `osv-scanner.toml` may temporarily exclude a specific advisory only
+when the affected package has no fixed release. Each exception must include a
+reason and an expiry date, and maintainers should remove it as soon as a fix is
+available.
