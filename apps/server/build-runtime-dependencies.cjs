@@ -74,7 +74,7 @@ function stage(name, from, parentDestination = destination) {
     stage(dependency, source, join(target, "node_modules"));
   }
 }
-for (const name of ["pdf-parse", "officeparser", "word-extractor"])
+for (const name of ["pdfjs-dist", "officeparser", "word-extractor"])
   stage(name, sourceRoot);
 console.log(
   "Staged document parser dependencies and assets for the Node runtime",

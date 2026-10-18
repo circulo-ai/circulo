@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: [22, 24]
+        node: [22.13.0, 24]
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -27,12 +27,12 @@ jobs:
           package-manager-cache: false
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.2"
+          bun-version: "1.4.3"
       - uses: actions/cache@v4
         with:
           path: ~/.bun/install/cache
-          key: ${{ runner.os }}-bun-1.4.2-${{ hashFiles('bun.lock') }}
-          restore-keys: ${{ runner.os }}-bun-1.4.2-
+          key: ${{ runner.os }}-bun-1.4.3-${{ hashFiles('bun.lock') }}
+          restore-keys: ${{ runner.os }}-bun-1.4.3-
       - run: bun install --frozen-lockfile
       - name: Verify packed package and unit contracts
         working-directory: packages/upload

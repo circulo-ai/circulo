@@ -94,3 +94,4 @@ packages/types/**/*.d.ts.map
 # Local agent tooling
 .agents/
 skills-lock.json
+apps/web/public/pdf.worker.min.mjs

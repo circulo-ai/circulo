@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "bun ./node_modules/next/dist/bin/next dev -H 127.0.0.1 -p 3000",
-    "build": "node ./node_modules/next/dist/bin/next build --webpack",
+    "dev": "bun run prepare:pdf-worker && bun ./node_modules/next/dist/bin/next dev -H 127.0.0.1 -p 3000",
+    "build": "bun run prepare:pdf-worker && node ./node_modules/next/dist/bin/next build --webpack",
+    "prepare:pdf-worker": "node scripts/copy-pdf-worker.cjs",
     "start": "bun ./node_modules/next/dist/bin/next start",
     "lint": "eslint",
     "format": "prettier . --write",
@@ -108,7 +109,6 @@
     "openai": "^6.49.0",
     "orderedmap": "^2.1.1",
     "papaparse": "^5.7.0",
-    "pdf-parse": "^2.4.5",
     "pdfjs-dist": "5.4.296",
     "pg": "^8.23.1",
     "postgres": "^3.4.7",
@@ -176,5 +176,5 @@
     "typescript": "^5.9.3",
     "vitest": "^4.1.12"
   },
-  "packageManager": "bun@1.3.4"
+  "packageManager": "bun@1.4.3"
 }

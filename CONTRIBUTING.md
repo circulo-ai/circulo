@@ -14,7 +14,7 @@ workflow for issues, changes, and releases.
 
 ## Set up the repository
 
-Use Bun 1.3.4, Node.js 20 or newer, and Docker Compose. Follow the
+Use Bun 1.4.3, Node.js 22.13 or newer, and Docker Compose. Follow the
 [local development instructions](README.md#local-development) to configure
 environment files, start PostgreSQL, Redis, and MinIO, and apply migrations.
 Keep `bun.lock` in sync with dependency changes.

@@ -1,4 +1,4 @@
-FROM oven/bun:1.3.4 AS build
+FROM oven/bun:1.4.3 AS build
 
 WORKDIR /app
 ARG NEXT_PUBLIC_APP_URL=http://localhost:3000
@@ -18,7 +18,7 @@ RUN bun install --frozen-lockfile
 COPY apps/web apps/web
 RUN bun --filter web build
 
-FROM oven/bun:1.3.4-slim
+FROM oven/bun:1.4.3-slim
 WORKDIR /app
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0

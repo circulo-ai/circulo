@@ -26,8 +26,8 @@ setup and API details.
 
 ## Requirements
 
-- Bun 1.3.4 (the version recorded in `packageManager`)
-- Node.js 20 or newer
+- Bun 1.4.3 (the version recorded in `packageManager`)
+- Node.js 22.13 or newer
 - Docker with the Compose plugin
 - Provider credentials only for the integrations you plan to use
 

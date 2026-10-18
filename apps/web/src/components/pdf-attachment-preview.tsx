@@ -51,10 +51,7 @@ export function PdfAttachmentPreview({
       try {
         const pdfjs = await import("pdfjs-dist");
         if (disposed) return;
-        pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-          "pdfjs-dist/build/pdf.worker.min.mjs",
-          import.meta.url,
-        ).toString();
+        pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
         // Disable embedded scripting and dynamic code generation in uploaded PDFs.
         task = pdfjs.getDocument({
           data: bytes.slice(),

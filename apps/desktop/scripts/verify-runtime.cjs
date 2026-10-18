@@ -13,7 +13,7 @@ module.exports = async ({ appOutDir, electronPlatformName, packager }) => {
           "Resources",
         )
       : join(appOutDir, "resources");
-  for (const name of ["pdf-parse", "officeparser", "word-extractor"]) {
+  for (const name of ["pdfjs-dist", "officeparser", "word-extractor"]) {
     if (
       !existsSync(
         join(

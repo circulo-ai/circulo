@@ -136,7 +136,7 @@ const nextConfig: NextConfig = {
     root: path.resolve(__dirname, "../.."),
     resolveExtensions: [".tsx", ".ts", ".jsx", ".js", ".mjs", ".json"],
   },
-  serverExternalPackages: ["pdf-parse", "postgres"],
+  serverExternalPackages: ["pdfjs-dist", "postgres"],
   transpilePackages: [
     "prettier",
     "@t3-oss/env-nextjs",

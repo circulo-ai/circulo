@@ -18,7 +18,7 @@ Lightweight, promise-based parsers for common document types. The package detect
 
 | Extension  | Notes                                                                                    |
 | ---------- | ---------------------------------------------------------------------------------------- |
-| pdf        | Uses `pdf-parse` (function or class export); estimates page count when missing.          |
+| pdf        | Uses PDF.js for text extraction and page metadata.                                       |
 | csv        | Streams rows, samples first 100, previews first 1,000, and aborts after too many errors. |
 | doc / docx | DOC via `officeparser`; DOCX via `mammoth`.                                              |
 | txt / md   | Plain UTF-8 text passthrough with sanitization.                                          |

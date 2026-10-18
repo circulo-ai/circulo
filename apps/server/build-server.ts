@@ -16,7 +16,7 @@ const result = await Bun.build({
   target: "node",
   format: "esm",
   sourcemap: "external",
-  external: ["pdf-parse", "officeparser", "word-extractor"],
+  external: ["pdfjs-dist", "officeparser", "word-extractor"],
 });
 
 if (!result.success) {

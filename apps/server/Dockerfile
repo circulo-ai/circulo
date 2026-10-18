@@ -1,4 +1,4 @@
-FROM oven/bun:1.3.4 AS build
+FROM oven/bun:1.4.3 AS build
 
 WORKDIR /app
 COPY package.json bun.lock turbo.json ./
@@ -9,7 +9,7 @@ RUN bun install --frozen-lockfile
 COPY apps/server apps/server
 RUN NODE_ENV=production bun --filter server build
 
-FROM oven/bun:1.3.4-slim
+FROM oven/bun:1.4.3-slim
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/node_modules ./node_modules
