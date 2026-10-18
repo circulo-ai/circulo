@@ -26,6 +26,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+          persist-credentials: false
 
       - name: Detect package changes
         id: changed
