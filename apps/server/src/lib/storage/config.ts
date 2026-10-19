@@ -103,6 +103,7 @@ function makeProvider(bucket: string | undefined, pathPrefix?: string) {
     bucket,
     region,
     endpoint,
+    publicEndpoint: env.S3_PUBLIC_ENDPOINT || undefined,
     forcePathStyle,
     credentials,
     pathPrefix,

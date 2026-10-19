@@ -26,6 +26,18 @@ Set `CIRCULO_RUNTIME_KIND=self-hosted` for a shared self-hosted instance. The
 first local account becomes the instance administrator and sign-up is disabled
 after bootstrap until an administrator enables it in Settings → Account.
 
+The default Compose setup exposes MinIO on `127.0.0.1:9000` for browser uploads.
+If Circulo is behind a reverse proxy or accessed from another host, set
+`S3_PUBLIC_ENDPOINT` to the browser-reachable S3 endpoint and make that same
+origin reachable from the browser. The server keeps using the internal
+`S3_ENDPOINT`; `S3_PUBLIC_ENDPOINT` is only used to sign browser-facing URLs.
+The Compose setup applies MinIO CORS rules for `NEXT_PUBLIC_APP_URL` and allows
+the signed `PUT`/`GET` requests and headers. For an external S3-compatible
+provider, allow the Circulo app origin, `PUT` and `GET`, the signed request
+headers such as `Content-Type` and `If-None-Match`, and expose `ETag` for
+multipart uploads. Rebuild the web image after changing the public storage
+origin so its Content Security Policy permits that endpoint.
+
 ## Local runtime mode
 
 For a single-process development or desktop-hosted runtime, set:

@@ -32,6 +32,8 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-circulo-local-secret}
     volumes:
       - circulo-minio:/data
+    ports:
+      - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
     healthcheck:
       test:
         [
@@ -50,11 +52,16 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-circulo}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-circulo-local-secret}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >-
         mc --config-dir /tmp/mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" &&
-        for bucket in files knowledge chat profile; do mc --config-dir /tmp/mc mb --ignore-existing "local/$$bucket"; done
+        for bucket in files knowledge chat profile; do
+        mc --config-dir /tmp/mc mb --ignore-existing "local/$$bucket" &&
+        printf '%s' "<CORSConfiguration><CORSRule><AllowedOrigin>$$NEXT_PUBLIC_APP_URL</AllowedOrigin><AllowedMethod>GET</AllowedMethod><AllowedMethod>HEAD</AllowedMethod><AllowedMethod>PUT</AllowedMethod><AllowedHeader>*</AllowedHeader><ExposeHeader>ETag</ExposeHeader><MaxAgeSeconds>3600</MaxAgeSeconds></CORSRule></CORSConfiguration>" |
+        mc --config-dir /tmp/mc cors set "local/$$bucket" -;
+        done
 
   server:
     build:
@@ -73,6 +80,7 @@ services:
       REDIS_URL: redis://redis:6379
       CIRCULO_STORAGE_DRIVER: s3
       S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://localhost:9000}
       S3_REGION: us-east-1
       S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-circulo}
       S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-circulo-local-secret}
@@ -105,6 +113,7 @@ services:
         NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
         NEXT_PUBLIC_BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3002}
         NEXT_PUBLIC_CIRCULO_RUNTIME_KIND: self-hosted
+        NEXT_PUBLIC_STORAGE_ORIGINS: ${S3_PUBLIC_ENDPOINT:-http://localhost:9000}
         SERVER_API_URL: http://server:3002
     depends_on:
       - server

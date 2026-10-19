@@ -80,6 +80,11 @@ export interface UploadTask {
 const API_UPLOAD_SWR_KEY = "upload/api";
 const PRESIGN_UPLOAD_SWR_KEY = "upload/presign";
 const UPLOAD_TASKS_SWR_KEY = "upload-manager/items";
+const API_FALLBACK_CONTEXTS = new Set<StorageContext>([
+  "general",
+  "chat",
+  "profile-pictures",
+]);
 
 const UPLOAD_MANAGER_DEFAULTS = {
   autoStartUploads: true,
@@ -170,9 +175,9 @@ export function useUploadTaskManager({
     API_UPLOAD_SWR_KEY,
     async (_key, { arg }) => {
       const { task, signal } = arg;
-      if (task.context !== "general" && task.context !== "chat") {
+      if (!API_FALLBACK_CONTEXTS.has(task.context)) {
         throw new Error(
-          `API fallback only supports "general" or "chat" context (got "${task.context}")`,
+          `API fallback does not support the "${task.context}" context`,
         );
       }
 
@@ -311,8 +316,7 @@ export function useUploadTaskManager({
         const directUploadSupported =
           presignData.directUploadSupported && presignData.presignedUrl;
         const apiFallbackAllowed =
-          enableApiFallback &&
-          (task.context === "general" || task.context === "chat");
+          enableApiFallback && API_FALLBACK_CONTEXTS.has(task.context);
 
         let result: UploadResult | undefined;
 

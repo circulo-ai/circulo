@@ -10,6 +10,8 @@ import {
 } from "@/lib/storage/file-access-token";
 import { requireAuth } from "@/middleware/auth";
 import { createHonoFileRoutes } from "@circulo-ai/upload/hono";
+import { validateFileType } from "@circulo-ai/upload/validation";
+import { bodyLimit } from "hono/body-limit";
 
 const uploadLogger = createLogger("FileUpload");
 
@@ -17,6 +19,8 @@ const fileRoutes = createHonoFileRoutes<AppEnv>(
   {
     storageManager,
     maxFileSize: 100 * 1024 * 1024,
+    validateFile: ({ fileName, contentType }) =>
+      validateFileType(fileName, contentType),
     serveUrlBuilder: (key: string, context: string) => {
       return `/api/files/serve/${encodeURIComponent(
         key,
@@ -54,7 +58,19 @@ const fileRoutes = createHonoFileRoutes<AppEnv>(
       presigned: { middleware: [requireAuth] },
       presignedBatch: { middleware: [requireAuth] },
       multipart: { middleware: [requireAuth] },
-      upload: { middleware: [requireAuth] },
+      upload: {
+        middleware: [
+          requireAuth,
+          bodyLimit({
+            maxSize: 101 * 1024 * 1024,
+            onError: (c) =>
+              c.json(
+                { error: "Upload request exceeds the 100 MiB limit" },
+                413,
+              ),
+          }),
+        ],
+      },
       serve: {
         middleware: [
           async (c, next) => {

@@ -91,6 +91,8 @@ export const env = createEnv({
 
     // Storage (S3/Azure)
     S3_ENDPOINT: z.string().optional(),
+    // Browser-facing endpoint used only to sign direct upload/download URLs.
+    S3_PUBLIC_ENDPOINT: z.string().optional(),
     S3_REGION: z.string().optional(),
     // AWS SDK convention, used when S3_REGION is unset.
     AWS_REGION: z.string().optional(),

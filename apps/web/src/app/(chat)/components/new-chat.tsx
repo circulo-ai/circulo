@@ -69,6 +69,7 @@ import type { ApiRequestError } from "@/lib/api/client";
 import { attachmentFromUploadTask } from "@/lib/attachments";
 import { CHAT_STREAM_THROTTLE_MS } from "@/lib/chat-streaming";
 import { deepReplace } from "@/lib/deep-replace";
+import { isBillingEnabled } from "@/lib/environment";
 import { extractPromptMentions } from "@/lib/prompt-mentions";
 import {
   clearCachePattern,
@@ -227,10 +228,15 @@ export function NewChat({ id }: NewChatProps) {
       if (item.kind === "agent") {
         if (
           !selectedAgentIds.includes(item.username) &&
-          selectedAgentIds.length >= AGENT_SELECTION_LIMIT
+          selectedAgentIds.length >=
+            (isBillingEnabled
+              ? BILLING_AGENT_SELECTION_LIMIT
+              : MAX_CHAT_AGENT_SELECTIONS)
         ) {
           toast.error(
-            `You can select up to ${AGENT_SELECTION_LIMIT} agents for this chat.`,
+            isBillingEnabled
+              ? `You can select up to ${BILLING_AGENT_SELECTION_LIMIT} agents for this chat.`
+              : `A chat can include up to ${MAX_CHAT_AGENT_SELECTIONS} agents.`,
           );
           return false;
         }
@@ -717,7 +723,8 @@ export function NewChat({ id }: NewChatProps) {
   );
 }
 
-const AGENT_SELECTION_LIMIT = 3;
+const BILLING_AGENT_SELECTION_LIMIT = 3;
+const MAX_CHAT_AGENT_SELECTIONS = 10;
 
 function SelectAgents() {
   const { redirect } = useRouteFlowViewContext();
@@ -826,28 +833,37 @@ const SelectableAgent = forwardRef<HTMLButtonElement, SelectableAgentProps>(
     const handleSelect = useCallback(() => {
       const nextIsSelected = !isSelected;
       if (nextIsSelected) {
-        if (selectedAgentIds.length >= AGENT_SELECTION_LIMIT) {
-          const agentElement = agentRef.current;
-          if (animationLockRef.current === false && agentElement) {
-            animationLockRef.current = true;
-            agentElement.classList.add("animate-error");
-            setIsTooltipOpen(true);
-            if (feedbackTimeoutRef.current) {
-              clearTimeout(feedbackTimeoutRef.current);
+        const selectionLimit = isBillingEnabled
+          ? BILLING_AGENT_SELECTION_LIMIT
+          : MAX_CHAT_AGENT_SELECTIONS;
+        if (selectedAgentIds.length >= selectionLimit) {
+          if (!isBillingEnabled) {
+            toast.error(
+              `A chat can include up to ${MAX_CHAT_AGENT_SELECTIONS} agents.`,
+            );
+          } else {
+            const agentElement = agentRef.current;
+            if (animationLockRef.current === false && agentElement) {
+              animationLockRef.current = true;
+              agentElement.classList.add("animate-error");
+              setIsTooltipOpen(true);
+              if (feedbackTimeoutRef.current) {
+                clearTimeout(feedbackTimeoutRef.current);
+              }
+              feedbackTimeoutRef.current = setTimeout(() => {
+                animationLockRef.current = false;
+                agentRef.current?.classList.remove("animate-error");
+                setIsTooltipOpen(false);
+                feedbackTimeoutRef.current = null;
+              }, 1500);
             }
-            feedbackTimeoutRef.current = setTimeout(() => {
-              animationLockRef.current = false;
-              agentRef.current?.classList.remove("animate-error");
-              setIsTooltipOpen(false);
-              feedbackTimeoutRef.current = null;
-            }, 1500);
           }
         } else
           setSelectedAgentIds((ids) =>
             ids.includes(agent.id) ? ids : [...ids, agent.id],
           );
       } else setSelectedAgentIds((ids) => ids.filter((id) => id !== agent.id));
-    }, [isSelected, selectedAgentIds.length, agent.id]);
+    }, [isSelected, selectedAgentIds.length, agent.id, setSelectedAgentIds]);
 
     return (
       <>
@@ -915,30 +931,32 @@ const SelectableAgent = forwardRef<HTMLButtonElement, SelectableAgentProps>(
               </CustomContextMenuItem>
             </CustomContextMenuContent>
 
-            <TooltipContent
-              side="left"
-              className="flex items-center gap-2 p-2 pe-4"
-              collisionPadding={8}
-            >
-              <Ripple asChild>
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  rounded="full"
-                  className="relative animate-ping-with-shadow shadow-background/50 fill-mode-forwards repeat-1 [animation-delay:500ms]"
-                >
-                  <CircleFadingArrowUp />
-                </Button>
-              </Ripple>
-              <div className="flex flex-col gap-1">
-                <h3 className="text-start font-medium">
-                  Upgrade to Select More Agents
-                </h3>
-                <p className="text-start text-primary-foreground">
-                  Go to the plans page to upgrade
-                </p>
-              </div>
-            </TooltipContent>
+            {isBillingEnabled && (
+              <TooltipContent
+                side="left"
+                className="flex items-center gap-2 p-2 pe-4"
+                collisionPadding={8}
+              >
+                <Ripple asChild>
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    rounded="full"
+                    className="relative animate-ping-with-shadow shadow-background/50 fill-mode-forwards repeat-1 [animation-delay:500ms]"
+                  >
+                    <CircleFadingArrowUp />
+                  </Button>
+                </Ripple>
+                <div className="flex flex-col gap-1">
+                  <h3 className="text-start font-medium">
+                    Upgrade to Select More Agents
+                  </h3>
+                  <p className="text-start text-primary-foreground">
+                    Go to the plans page to upgrade
+                  </p>
+                </div>
+              </TooltipContent>
+            )}
           </Tooltip>
         </ContextMenu>
 

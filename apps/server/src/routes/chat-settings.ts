@@ -220,10 +220,16 @@ router.patch(
       }
     }
 
-    if (body.orchestrationAgentId) {
-      const orchestrationAgent = await agentRepo.findById(
-        body.orchestrationAgentId,
-      );
+    const updateBody = { ...body };
+    const updatesOrchestration =
+      body.orchestrationAgentId !== undefined ||
+      body.orchestrationModel !== undefined;
+    const orchestrationAgentId =
+      body.orchestrationAgentId !== undefined
+        ? body.orchestrationAgentId
+        : chat.orchestrationAgentId;
+    if (updatesOrchestration && orchestrationAgentId) {
+      const orchestrationAgent = await agentRepo.findById(orchestrationAgentId);
       if (
         !orchestrationAgent ||
         orchestrationAgent.organizationId !== chat.organizationId ||
@@ -233,9 +239,10 @@ router.patch(
           "The orchestration agent must belong to this workspace and be active",
         );
       }
+      updateBody.orchestrationModel = orchestrationAgent.model;
     }
 
-    const updated = await chatRepo.update(id, body);
+    const updated = await chatRepo.update(id, updateBody);
     if (!updated) throw new NotFoundError("Chat not found");
     return c.json(updated);
   },

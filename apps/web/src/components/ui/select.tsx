@@ -2,6 +2,7 @@
 
 import { Select as SelectPrimitive } from "@base-ui/react/select";
 import type * as React from "react";
+import { Children, isValidElement } from "react";
 
 import { cn } from "@/lib/utils";
 import {
@@ -12,7 +13,119 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
-const Select = SelectPrimitive.Root;
+type SelectItemLabels = Record<string, React.ReactNode>;
+type SelectItems = SelectPrimitive.Root.Props<unknown>["items"];
+
+function collectSelectItemLabelsFromChildren(
+  children: React.ReactNode,
+): SelectItemLabels {
+  const labels = Object.create(null) as SelectItemLabels;
+
+  function visit(nodes: React.ReactNode) {
+    Children.forEach(nodes, (node) => {
+      if (!isValidElement(node)) return;
+
+      const props = node.props as {
+        children?: React.ReactNode;
+        value?: unknown;
+      };
+      if (Object.hasOwn(props, "value")) {
+        const value = props.value;
+        if (
+          (typeof value === "string" || typeof value === "number") &&
+          props.children !== undefined
+        ) {
+          labels[String(value)] = props.children;
+        }
+        return;
+      }
+
+      visit(props.children);
+    });
+  }
+
+  visit(children);
+  return labels;
+}
+
+function collectSelectItemLabelsFromItems(
+  items: SelectItems,
+): SelectItemLabels {
+  const labels = Object.create(null) as SelectItemLabels;
+  if (!items) return labels;
+
+  if (!Array.isArray(items)) {
+    Object.assign(labels, items);
+    return labels;
+  }
+
+  function visit(entries: readonly unknown[]) {
+    for (const entry of entries) {
+      if (typeof entry !== "object" || entry === null) continue;
+      const item = entry as {
+        items?: unknown;
+        label?: React.ReactNode;
+        value?: unknown;
+      };
+      if (Array.isArray(item.items)) {
+        visit(item.items);
+      } else if (
+        (typeof item.value === "string" || typeof item.value === "number") &&
+        item.label !== undefined
+      ) {
+        labels[String(item.value)] = item.label;
+      }
+    }
+  }
+
+  visit(items);
+  return labels;
+}
+
+function Select<Value = string, Multiple extends boolean | undefined = false>({
+  children,
+  items,
+  multiple,
+  value,
+  ...props
+}: SelectPrimitive.Root.Props<Value, Multiple>) {
+  const inferredItems = collectSelectItemLabelsFromChildren(children);
+  const explicitItems = collectSelectItemLabelsFromItems(items);
+  const resolvedItems = Object.assign(
+    Object.create(null) as SelectItemLabels,
+    inferredItems,
+    explicitItems,
+  );
+
+  const selectedValues = multiple
+    ? Array.isArray(value)
+      ? value
+      : []
+    : value === null || value === undefined
+      ? []
+      : [value];
+
+  for (const selectedValue of selectedValues) {
+    if (
+      (typeof selectedValue === "string" ||
+        typeof selectedValue === "number") &&
+      !Object.hasOwn(resolvedItems, String(selectedValue))
+    ) {
+      resolvedItems[String(selectedValue)] = "Unavailable option";
+    }
+  }
+
+  return (
+    <SelectPrimitive.Root
+      {...props}
+      items={resolvedItems}
+      multiple={multiple}
+      value={value}
+    >
+      {children}
+    </SelectPrimitive.Root>
+  );
+}
 
 function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
   return (

@@ -63,6 +63,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { AlertCircle, LoaderCircle, Save } from "lucide-react";
 import {
+  useEffect,
   useState,
   type Dispatch,
   type ReactNode,
@@ -192,6 +193,7 @@ export function ChatSettingsDialog({ chatId }: { chatId: string }) {
                   modelData={settings.modelData}
                   removeAgent={settings.removeAgent}
                   save={settings.save}
+                  saving={settings.saving}
                   setAgentId={settings.setAgentId}
                   setForm={settings.setForm}
                 />
@@ -641,6 +643,7 @@ function CapabilitiesPanel({
   addAgent,
   removeAgent,
   save,
+  saving,
 }: {
   data: ChatSettings;
   form: ChatSettingsForm;
@@ -654,23 +657,47 @@ function CapabilitiesPanel({
   addAgent: () => Promise<void>;
   removeAgent: (id: string) => Promise<void>;
   save: () => Promise<void>;
+  saving: boolean;
 }) {
   const availableAgents = (agentData ?? []).filter(
     (agent) => !data.agents.some((link) => link.agentId === agent.id),
   );
   const orchestrationAgents = agentData ?? [];
+  const selectedOrchestrationAgent = orchestrationAgents.find(
+    (agent) => agent.id === form.orchestrationAgentId,
+  );
+  const getModelName = (modelId: string) =>
+    modelData?.find((model) => model.id === modelId)?.name ??
+    (modelId.split("/").at(-1) ?? modelId)
+      .replace(/[-_.:]+/g, " ")
+      .replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
   const modelOptions = [
     ...(modelData ?? []),
-    { id: form.orchestrationModel, name: form.orchestrationModel },
-    {
-      id: form.orchestrationFallbackModel,
-      name: form.orchestrationFallbackModel,
-    },
+    ...[
+      selectedOrchestrationAgent?.model,
+      form.orchestrationModel,
+      form.orchestrationFallbackModel,
+    ]
+      .filter((modelId): modelId is string => Boolean(modelId))
+      .map((id) => ({ id, name: getModelName(id) })),
   ].filter(
     (model, index, models) =>
       model.id &&
       models.findIndex((candidate) => candidate.id === model.id) === index,
   );
+
+  useEffect(() => {
+    if (!selectedOrchestrationAgent) return;
+    setForm((current) =>
+      current.orchestrationAgentId === selectedOrchestrationAgent.id &&
+      current.orchestrationModel !== selectedOrchestrationAgent.model
+        ? {
+            ...current,
+            orchestrationModel: selectedOrchestrationAgent.model,
+          }
+        : current,
+    );
+  }, [selectedOrchestrationAgent, setForm]);
   return (
     <div className="flex flex-col gap-4">
       <PanelCard>
@@ -688,13 +715,19 @@ function CapabilitiesPanel({
             <FieldContent>
               <Select
                 disabled={!data.access.canManageChat}
-                onValueChange={(value) =>
+                onValueChange={(value) => {
+                  const nextAgentId = value === "none" ? null : String(value);
+                  const nextAgent = orchestrationAgents.find(
+                    (agent) => agent.id === nextAgentId,
+                  );
                   setForm((current) => ({
                     ...current,
-                    orchestrationAgentId:
-                      value === "none" ? null : String(value),
-                  }))
-                }
+                    orchestrationAgentId: nextAgentId,
+                    ...(nextAgent
+                      ? { orchestrationModel: nextAgent.model }
+                      : {}),
+                  }));
+                }}
                 value={form.orchestrationAgentId ?? "none"}
               >
                 <SelectTrigger>
@@ -721,7 +754,10 @@ function CapabilitiesPanel({
             <FieldLabel>Orchestration model</FieldLabel>
             <FieldContent>
               <Select
-                disabled={!data.access.canManageChat}
+                disabled={
+                  !data.access.canManageChat ||
+                  Boolean(form.orchestrationAgentId)
+                }
                 onValueChange={(value) =>
                   setForm((current) => ({
                     ...current,
@@ -777,6 +813,15 @@ function CapabilitiesPanel({
               </FieldDescription>
             </FieldContent>
           </Field>
+          <Button
+            className="w-full sm:w-auto"
+            disabled={!data.access.canManageChat || saving}
+            onClick={() => void save()}
+            type="button"
+          >
+            {saving ? <LoaderCircle className="animate-spin" /> : <Save />}
+            Save orchestration settings
+          </Button>
         </CardContent>
       </PanelCard>
       <PanelCard>

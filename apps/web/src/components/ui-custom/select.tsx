@@ -45,6 +45,7 @@ export function SelectInput({
 }: SelectInputProps) {
   return (
     <Select
+      items={getSelectItems(options)}
       value={value as string | undefined}
       onValueChange={(nextValue) => {
         onChange?.({
@@ -60,6 +61,18 @@ export function SelectInput({
         <RenderOptions options={options} />
       </SelectContent>
     </Select>
+  );
+}
+
+function getSelectItems(
+  options: SelectInputProps["options"],
+): Array<{ value: string; label: ReactNode }> {
+  return (options ?? []).flatMap((option) =>
+    option.type === "single"
+      ? [{ value: option.value, label: option.label }]
+      : option.type === "group"
+        ? getSelectItems(option.options)
+        : [],
   );
 }
 

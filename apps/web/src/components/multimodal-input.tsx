@@ -37,6 +37,7 @@ import { PreviewAttachment } from "./preview-attachment";
 import { SuggestedActions } from "./suggested-actions";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import { InputGroupAddon } from "./ui/input-group";
 import type { VisibilityType } from "./visibility-selector";
 import { VoiceRecordingIndicator } from "./voice-recording-indicator";
 
@@ -368,63 +369,66 @@ function PureMultimodalInput({
               item.status === "preparing" ||
               item.status === "uploading",
           )) && (
-          <div
-            className="flex max-w-full min-w-0 flex-row items-end gap-2 overflow-x-auto overscroll-contain"
+          <InputGroupAddon
+            align="block-start"
+            className="max-w-full min-w-0 justify-start overflow-x-auto overscroll-contain py-3"
             data-testid="attachments-preview"
           >
-            {attachments.map((attachment) => (
-              <PreviewAttachment
-                attachment={attachment}
-                key={attachment.url}
-                onRemove={() => {
-                  const match = uploadManager.uploadTasks.find(
-                    (item) => item.url === attachment.url,
-                  );
-                  if (match) {
-                    uploadManager.removeUploadTask(match.id);
-                  } else {
-                    setAttachments((current) =>
-                      current.filter((a) => a.url !== attachment.url),
-                    );
-                  }
-                  if (fileInputRef.current) {
-                    fileInputRef.current.value = "";
-                  }
-                }}
-              />
-            ))}
-
-            {uploadManager.uploadTasks
-              .filter(
-                (item) =>
-                  item.status === "queued" ||
-                  item.status === "preparing" ||
-                  item.status === "uploading" ||
-                  item.status === "error",
-              )
-              .map((item) => (
+            <div className="flex w-full min-w-0 flex-nowrap items-end gap-2">
+              {attachments.map((attachment) => (
                 <PreviewAttachment
-                  attachment={{
-                    url: "",
-                    name: item.file.name,
-                    contentType: item.file.type,
+                  attachment={attachment}
+                  key={attachment.url}
+                  onRemove={() => {
+                    const match = uploadManager.uploadTasks.find(
+                      (item) => item.url === attachment.url,
+                    );
+                    if (match) {
+                      uploadManager.removeUploadTask(match.id);
+                    } else {
+                      setAttachments((current) =>
+                        current.filter((a) => a.url !== attachment.url),
+                      );
+                    }
+                    if (fileInputRef.current) {
+                      fileInputRef.current.value = "";
+                    }
                   }}
-                  error={item.error}
-                  isUploading={
-                    item.status === "queued" ||
-                    item.status === "preparing" ||
-                    item.status === "uploading"
-                  }
-                  key={item.id}
-                  onRemove={() => uploadManager.removeUploadTask(item.id)}
-                  onRetry={
-                    item.status === "error"
-                      ? () => uploadManager.retryUploadTask(item.id)
-                      : undefined
-                  }
                 />
               ))}
-          </div>
+
+              {uploadManager.uploadTasks
+                .filter(
+                  (item) =>
+                    item.status === "queued" ||
+                    item.status === "preparing" ||
+                    item.status === "uploading" ||
+                    item.status === "error",
+                )
+                .map((item) => (
+                  <PreviewAttachment
+                    attachment={{
+                      url: "",
+                      name: item.file.name,
+                      contentType: item.file.type,
+                    }}
+                    error={item.error}
+                    isUploading={
+                      item.status === "queued" ||
+                      item.status === "preparing" ||
+                      item.status === "uploading"
+                    }
+                    key={item.id}
+                    onRemove={() => uploadManager.removeUploadTask(item.id)}
+                    onRetry={
+                      item.status === "error"
+                        ? () => uploadManager.retryUploadTask(item.id)
+                        : undefined
+                    }
+                  />
+                ))}
+            </div>
+          </InputGroupAddon>
         )}
         {voiceRecorder.isRecording ? (
           <VoiceRecordingIndicator

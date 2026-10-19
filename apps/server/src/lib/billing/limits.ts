@@ -1,4 +1,5 @@
 import { getSubscriptionForOrg } from "@/lib/billing/autumn";
+import { isBillingEnabled } from "@/lib/environment";
 import {
   ForbiddenError,
   getBillingPlan,
@@ -32,6 +33,8 @@ export async function getOrganizationFeatureLimit(
   organizationId: string,
   feature: OrganizationLimitFeature,
 ): Promise<BillingLimit> {
+  if (!isBillingEnabled) return "unlimited";
+
   const subscription = await getSubscriptionForOrg(organizationId);
   const configured = subscription?.features[feature];
   if (configured?.unlimited) return "unlimited";
