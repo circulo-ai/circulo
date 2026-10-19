@@ -45,6 +45,12 @@ platform artifacts and metadata. Configure that variable in the release
 environment; development builds do not check for updates. Code-signing secrets
 belong in CI and are not committed.
 
+If a packaged app cannot open its local PGlite database after an upgrade, it
+offers to move the database into a timestamped backup under the desktop data
+directory and start a fresh profile. The app never removes that backup. The new
+profile does not show the backed-up account or data; keep the backup for a
+future recovery attempt.
+
 Desktop installers are built for Windows, macOS, and Linux by the
 `Release - Desktop` GitHub Actions workflow. To publish a release, merge the
 desktop version change in `apps/desktop/package.json`, then push a matching

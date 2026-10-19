@@ -53,6 +53,7 @@ let mainWindow;
 let runtimeStatus = "starting";
 let updateStatus = "idle";
 let autoUpdater;
+let apiStderr = "";
 
 // A desktop runtime owns fixed loopback ports and a local database. Running
 // more than one copy at once creates port races and, for PGlite, database
@@ -130,7 +131,7 @@ function loadSecrets() {
   return values;
 }
 
-function spawnProcess(command, args, env, cwd) {
+function spawnProcess(command, args, env, cwd, { onStderr } = {}) {
   const child = spawn(command, args, {
     cwd,
     env: { ...process.env, ...env },
@@ -144,6 +145,7 @@ function spawnProcess(command, args, env, cwd) {
   });
   child.stderr.on("data", (chunk) => {
     const output = String(chunk);
+    onStderr?.(output);
     process.stderr.write(`[desktop:${command}] ${output}`);
     writeDesktopLog(`[${command}:stderr] ${output.trimEnd()}`);
   });
@@ -168,6 +170,7 @@ function spawnProcess(command, args, env, cwd) {
 }
 
 function startLocalRuntime() {
+  apiStderr = "";
   const root = workspaceRoot();
   const bun = process.env.CIRCULO_DESKTOP_BUN || "bun";
   const node = process.env.CIRCULO_DESKTOP_NODE || "node";
@@ -209,6 +212,7 @@ function startLocalRuntime() {
           PORT: String(API_PORT),
         },
         root,
+        { onStderr: (output) => (apiStderr += output) },
       );
     } else {
       spawnProcess(
@@ -219,6 +223,7 @@ function startLocalRuntime() {
           PORT: String(API_PORT),
         },
         root,
+        { onStderr: (output) => (apiStderr += output) },
       );
     }
   }
@@ -386,6 +391,91 @@ function stopRuntime() {
   for (const child of children) child.kill();
 }
 
+async function stopRuntimeAndWait() {
+  stopRuntime();
+  await Promise.all(
+    children.map(
+      (child) =>
+        new Promise((resolve) => {
+          let finished = false;
+          let forceKillTimeout;
+          let finalTimeout;
+          const finish = () => {
+            if (finished) return;
+            finished = true;
+            clearTimeout(forceKillTimeout);
+            clearTimeout(finalTimeout);
+            resolve();
+          };
+          if (child.exitCode !== null || child.signalCode !== null) {
+            finish();
+            return;
+          }
+          forceKillTimeout = setTimeout(() => {
+            child.kill("SIGKILL");
+            finalTimeout = setTimeout(finish, 5_000);
+          }, 5_000);
+          child.once("exit", () => {
+            finish();
+          });
+        }),
+    ),
+  );
+  children.length = 0;
+}
+
+function hasRecoverablePgliteStartupFailure() {
+  return (
+    apiStderr.includes("RuntimeError: Aborted()") &&
+    apiStderr.includes("pglite")
+  );
+}
+
+function createDatabaseBackupPath(dataDir) {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const base = path.join(dataDir, `pglite-backup-${timestamp}`);
+  let candidate = base;
+  let suffix = 1;
+  while (fs.existsSync(candidate)) {
+    candidate = `${base}-${suffix++}`;
+  }
+  return candidate;
+}
+
+async function recoverDatabaseStartup() {
+  const dataDir = path.join(app.getPath("userData"), "data");
+  const databaseDir = path.join(dataDir, "pglite");
+  if (
+    !app.isPackaged ||
+    !fs.existsSync(databaseDir) ||
+    !hasRecoverablePgliteStartupFailure()
+  ) {
+    return null;
+  }
+
+  const backupDir = createDatabaseBackupPath(dataDir);
+  const { response } = await dialog.showMessageBox({
+    type: "error",
+    title: "Local database could not be opened",
+    message:
+      "Circulo could not open this desktop installation’s local database.",
+    detail: `You can quit or move the database to a backup and start a fresh local profile. The backup will be kept at:\n\n${backupDir}\n\nYour existing local account and data will not appear in the fresh profile. The backup will not be deleted.`,
+    buttons: ["Back Up Data & Start Fresh", "Quit"],
+    defaultId: 1,
+    cancelId: 1,
+    noLink: true,
+  });
+  if (response !== 0) return false;
+
+  await stopRuntimeAndWait();
+  fs.renameSync(databaseDir, backupDir);
+  writeDesktopLog(`moved unreadable local database to ${backupDir}`);
+  startLocalRuntime();
+  await waitForUrl(`${apiUrl}/health`);
+  await waitForUrl(webUrl);
+  return true;
+}
+
 ipcMain.handle("circulo:runtime-info", () => ({
   apiUrl,
   webUrl,
@@ -500,8 +590,17 @@ if (hasSingleInstanceLock) {
         },
       );
       startLocalRuntime();
-      await waitForUrl(`${apiUrl}/health`);
-      await waitForUrl(webUrl);
+      try {
+        await waitForUrl(`${apiUrl}/health`);
+        await waitForUrl(webUrl);
+      } catch (error) {
+        const recovered = await recoverDatabaseStartup();
+        if (recovered === false) {
+          app.quit();
+          return;
+        }
+        if (recovered !== true) throw error;
+      }
       runtimeStatus = "ready";
       configureAutoUpdates();
       await createWindow();

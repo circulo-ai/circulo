@@ -1,6 +1,6 @@
 {
   "name": "@circulo-ai/desktop",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "description": "Offline-capable Electron shell for Circulo",
   "homepage": "https://circulo-ai.com",
