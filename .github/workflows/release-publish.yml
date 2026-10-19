@@ -29,7 +29,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -39,13 +39,13 @@ jobs:
           bun-version: "1.4.3"
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: "24"
           package-manager-cache: false
 
       - name: Cache Bun packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
@@ -126,7 +126,7 @@ jobs:
         run: bun run check:release
 
       - name: Setup Go for upload contract backend
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version: "1.25.6"
           cache: false
@@ -154,7 +154,7 @@ jobs:
           bun run test:integration
 
       - name: Publish changed packages with npm trusted publishing
-        uses: changesets/action@v1
+        uses: changesets/action@v2
         with:
           # On master, Changesets either opens the version PR for newly merged
           # changesets or publishes the versions from an already merged one.

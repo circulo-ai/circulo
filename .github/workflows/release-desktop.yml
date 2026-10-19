@@ -35,7 +35,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Verify release tag matches desktop version
         if: startsWith(github.ref, 'refs/tags/desktop-v')
@@ -50,20 +50,20 @@ jobs:
           bun-version: "1.4.3"
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: "22.13.0"
           package-manager-cache: false
 
       - name: Cache Bun packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
           restore-keys: ${{ runner.os }}-bun-
 
       - name: Cache Turborepo outputs
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .turbo
           key: ${{ runner.os }}-turbo-${{ github.sha }}
@@ -71,7 +71,7 @@ jobs:
             ${{ runner.os }}-turbo-
 
       - name: Cache Next.js build data
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: apps/web/.next/cache
           key: ${{ runner.os }}-next-${{ hashFiles('bun.lock') }}-${{ github.sha }}
@@ -79,7 +79,7 @@ jobs:
             ${{ runner.os }}-next-${{ hashFiles('bun.lock') }}-
 
       - name: Cache Electron downloads and builder tools
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ${{ runner.temp }}/electron-cache
@@ -107,7 +107,7 @@ jobs:
           ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/electron-builder-cache
 
       - name: Upload platform installers
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: desktop-${{ runner.os }}-${{ github.sha }}
           path: apps/desktop/dist/*
@@ -123,14 +123,14 @@ jobs:
       contents: write
     steps:
       - name: Download platform installers
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           pattern: desktop-*-${{ github.sha }}
           path: release-assets
           merge-multiple: true
 
       - name: Create release and attach installers
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           generate_release_notes: true
