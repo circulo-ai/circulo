@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.0.3
+
+### Patch Changes
+
+- 5a1d691: Harden file parsing, storage prefix handling, and duration parsing against adversarial input.
+
 ## 3.0.2
 
 ### Patch Changes
