@@ -24,8 +24,6 @@ const UNITS: Readonly<Record<string, number>> = {
   weeks: 604_800_000,
 };
 
-const COMPONENT = /(\d+(?:\.\d+)?|\.\d+)\s*([a-zA-Z]+)/gy;
-
 /**
  * Parses a duration into integer milliseconds.
  *
@@ -46,7 +44,6 @@ export function parseDuration(value: DurationInput): number {
   }
 
   const source = value.trim();
-  COMPONENT.lastIndex = 0;
   let cursor = 0;
   let total = 0;
   let matched = false;
@@ -59,13 +56,34 @@ export function parseDuration(value: DurationInput): number {
       while (cursor < source.length && /\s/.test(source[cursor]!)) cursor += 1;
       if (cursor >= source.length) break;
     }
-    COMPONENT.lastIndex = cursor;
-    const match = COMPONENT.exec(source);
-    if (!match || match.index !== cursor) {
+    const amountStart = cursor;
+    let integerDigits = 0;
+    while (isDigit(source[cursor])) {
+      integerDigits += 1;
+      cursor += 1;
+    }
+    if (source[cursor] === ".") {
+      cursor += 1;
+      let fractionalDigits = 0;
+      while (isDigit(source[cursor])) {
+        fractionalDigits += 1;
+        cursor += 1;
+      }
+      if (fractionalDigits === 0) {
+        throw new RangeError(`Invalid duration "${value}"`);
+      }
+    } else if (integerDigits === 0) {
       throw new RangeError(`Invalid duration "${value}"`);
     }
-    const amount = Number(match[1]);
-    const unit = match[2]!.toLowerCase();
+    const amountEnd = cursor;
+    while (/\s/.test(source[cursor] ?? "")) cursor += 1;
+    const unitStart = cursor;
+    while (isAsciiLetter(source[cursor])) cursor += 1;
+    if (unitStart === cursor) {
+      throw new RangeError(`Invalid duration "${value}"`);
+    }
+    const amount = Number(source.slice(amountStart, amountEnd));
+    const unit = source.slice(unitStart, cursor).toLowerCase();
     const multiplier = UNITS[unit];
     if (multiplier === undefined || !Number.isFinite(amount) || amount < 0) {
       throw new RangeError(`Invalid duration "${value}"`);
@@ -81,12 +99,22 @@ export function parseDuration(value: DurationInput): number {
       );
     }
     matched = true;
-    cursor = COMPONENT.lastIndex;
   }
 
   if (!matched) throw new RangeError(`Invalid duration "${value}"`);
   assertDuration(total);
   return total;
+}
+
+function isDigit(value: string | undefined): boolean {
+  return value !== undefined && value >= "0" && value <= "9";
+}
+
+function isAsciiLetter(value: string | undefined): boolean {
+  return (
+    value !== undefined &&
+    ((value >= "a" && value <= "z") || (value >= "A" && value <= "Z"))
+  );
 }
 
 /** Formats milliseconds into a compact, stable duration string. */

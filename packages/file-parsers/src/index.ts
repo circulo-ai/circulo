@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { open } from "node:fs/promises";
 import path from "node:path";
 import { createLogger, type Logger } from "./logger.js";
 import type { FileParseResult, FileParser } from "./types.js";
@@ -186,15 +186,16 @@ export function createFileParser(config: FileParserConfig = {}) {
       throw new Error("No file path provided");
     }
 
-    if (!existsSync(filePath)) {
-      throw new Error(`File not found: ${filePath}`);
-    }
-
     const extension = normalizeExtension(path.extname(filePath).slice(1));
-    const { readFile, stat } = await import("node:fs/promises");
-    if ((await stat(filePath)).size > 25 * 1024 * 1024)
-      throw new Error("Files must be 25 MB or smaller");
-    return parseBuffer(await readFile(filePath), extension);
+    const file = await open(filePath, "r");
+    try {
+      if ((await file.stat()).size > 25 * 1024 * 1024) {
+        throw new Error("Files must be 25 MB or smaller");
+      }
+      return parseBuffer(await file.readFile(), extension);
+    } finally {
+      await file.close();
+    }
   }
 
   async function parseBuffer(

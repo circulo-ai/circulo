@@ -3,6 +3,7 @@ import type { ParsedAttachmentPreview } from "@/lib/attachment-preview";
 self.onmessage = async (
   event: MessageEvent<{ kind: "document" | "spreadsheet"; bytes: ArrayBuffer }>,
 ) => {
+  if (event.origin !== self.location.origin) return;
   try {
     let result: ParsedAttachmentPreview;
     if (event.data.kind === "document") {

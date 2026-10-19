@@ -43,7 +43,7 @@ class FakeRedis implements RedisPubSubClient {
     ...arguments_: Array<string | number>
   ): Promise<[string, string[]]> {
     if (cursor !== "0") return ["0", []];
-    const match = String(arguments_[1] ?? "*").replace("*", "");
+    const match = String(arguments_[1] ?? "*").replaceAll("*", "");
     return [
       "0",
       [...this.values.keys()].filter((key) => key.startsWith(match)),
