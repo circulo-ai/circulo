@@ -1,5 +1,12 @@
-import { renderMagicLinkEmail, renderOTPEmail } from "@/components/emails";
-import { renderInvitationEmail } from "@/components/emails/render-email";
+import {
+  renderMagicLinkEmail,
+  renderOTPEmail,
+  renderPasswordResetEmail,
+} from "@/components/emails";
+import {
+  getEmailSubject,
+  renderInvitationEmail,
+} from "@/components/emails/render-email";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { canCreateTeamOrg } from "@/lib/billing/autumn";
@@ -36,6 +43,7 @@ import { nanoid } from "nanoid";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { getAuthCookiePolicy } from "./auth/cookie-policy";
+import { storeDesktopPasswordResetLink } from "./auth/desktop-password-reset";
 import { hasGoogleOAuthCredentials } from "./auth/provider-capabilities";
 import { getTrustedAuthOrigins } from "./auth/trusted-origins";
 import {
@@ -487,17 +495,25 @@ const authOptions: BetterAuthOptions = {
     // offline without an email provider or cloud identity.
     enabled: getRuntimeKind() !== "cloud",
     requireEmailVerification: getRuntimeKind() === "cloud",
-    // async sendResetPassword({ user, url }) {
-    //     await sendEmail({
-    //         from,
-    //         to: [user.email],
-    //         subject: "Reset your password",
-    //         react: reactResetPasswordEmail({
-    //             username: user.email,
-    //             resetLink: url,
-    //         }),
-    //     });
-    // },
+    async sendResetPassword({ user, url }) {
+      if (getRuntimeKind() === "desktop") {
+        storeDesktopPasswordResetLink(user.email, url);
+        return;
+      }
+
+      const result = await sendEmail({
+        from: getFromEmailAddress(),
+        to: user.email,
+        subject: getEmailSubject("reset-password"),
+        html: await renderPasswordResetEmail(user.email, url),
+        emailType: "transactional",
+      });
+      if (!result.success) {
+        throw new Error(
+          `Password reset email could not be sent: ${result.message}`,
+        );
+      }
+    },
   },
   emailVerification: {
     // async sendVerificationEmail({ user, url }) {

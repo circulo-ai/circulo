@@ -11,6 +11,7 @@ type NavigationState = {
 
 type DesktopBridge = {
   controlsSide: "left" | "right";
+  runtimeInfo: () => Promise<{ apiUrl: string }>;
   getNavigationState: () => Promise<NavigationState>;
   writeClipboardText: (text: string) => Promise<void>;
   writeClipboardImage: (dataUrl: string) => Promise<void>;

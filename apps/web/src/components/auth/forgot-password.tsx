@@ -8,6 +8,7 @@ import {
   useRequestPasswordReset,
 } from "@better-auth-ui/react";
 import { type SyntheticEvent, useState } from "react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -57,6 +58,9 @@ export function ForgotPassword({ className }: ForgotPasswordProps) {
     {
       onError: () => {
         resetFetchOptions();
+        toast.error(
+          "Unable to send a password reset link. Check email delivery settings and try again.",
+        );
       },
       onSuccess: (_data, { email }) => {
         sessionStorage.setItem(RESET_LINK_SENT_STORAGE_KEY, email);

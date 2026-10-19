@@ -68,7 +68,7 @@ export const ResetPasswordEmail = ({
             <Text style={baseStyles.paragraph}>
               You recently requested to reset your password for your{" "}
               {brand.name} account. Use the button below to reset it. This
-              password reset is only valid for the next 24 hours.
+              password reset is only valid for the next hour.
             </Text>
             <Link href={resetLink} style={{ textDecoration: "none" }}>
               <Text style={baseStyles.button}>Reset Your Password</Text>
