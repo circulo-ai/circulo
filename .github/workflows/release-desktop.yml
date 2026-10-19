@@ -56,6 +56,9 @@ jobs:
           package-manager-cache: false
 
       - name: Cache Bun packages
+        # Windows tag caches are ~700 MiB and are scoped to one release tag;
+        # skip restoring/saving that cache for releases to avoid a long post-job upload.
+        if: runner.os != 'Windows' || github.ref_type != 'tag'
         uses: actions/cache@v6
         with:
           path: ~/.bun/install/cache
