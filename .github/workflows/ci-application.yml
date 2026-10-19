@@ -2,6 +2,8 @@ name: CI - Application Build
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "23 5 * * 1"
   pull_request:
     branches: [master, dev]
   push:
