@@ -10,6 +10,11 @@ user-owned BYOK credentials.
 
 1. Copy `apps/server/.env.example` to `.env` at the repository root.
 2. Set `BETTER_AUTH_SECRET`, `ENCRYPTION_KEY`, and `INTERNAL_API_SECRET`.
+   Keep these values stable across restarts and application upgrades. In
+   particular, `ENCRYPTION_KEY` encrypts provider credentials and other stored
+   secrets; changing it makes existing encrypted values unreadable. Back up the
+   key securely alongside the database and storage volumes, and restore the
+   same key before restoring those backups.
 3. Add at least one model provider key, or run Ollama locally.
 4. Start the stack:
 

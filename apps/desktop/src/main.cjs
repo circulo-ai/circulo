@@ -10,10 +10,10 @@ const {
   shell,
   systemPreferences,
 } = require("electron");
-const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
+const { loadDesktopSecrets } = require("./secrets.cjs");
 
 // Electron itself may be launched from development shells that set Node-only
 // flags. Packaged Electron does not support all NODE_OPTIONS values, and
@@ -88,49 +88,6 @@ function workspaceRoot() {
   );
 }
 
-function secretStorePath() {
-  return path.join(app.getPath("userData"), "secrets.json");
-}
-
-function loadSecrets() {
-  const file = secretStorePath();
-  let stored = {};
-  try {
-    stored = JSON.parse(fs.readFileSync(file, "utf8"));
-  } catch {
-    // First launch.
-  }
-
-  const values = {};
-  for (const name of [
-    "BETTER_AUTH_SECRET",
-    "ENCRYPTION_KEY",
-    "INTERNAL_API_SECRET",
-  ]) {
-    if (stored[name] && safeStorage.isEncryptionAvailable()) {
-      try {
-        values[name] = safeStorage.decryptString(
-          Buffer.from(stored[name], "base64"),
-        );
-        continue;
-      } catch (error) {
-        console.warn(`[desktop] resetting unreadable ${name}:`, error.message);
-        delete stored[name];
-      }
-    }
-    values[name] = crypto.randomBytes(32).toString("hex");
-    if (safeStorage.isEncryptionAvailable()) {
-      stored[name] = safeStorage.encryptString(values[name]).toString("base64");
-    }
-  }
-
-  if (safeStorage.isEncryptionAvailable()) {
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, JSON.stringify(stored), { mode: 0o600 });
-  }
-  return values;
-}
-
 function spawnProcess(command, args, env, cwd, { onStderr } = {}) {
   const child = spawn(command, args, {
     cwd,
@@ -174,7 +131,7 @@ function startLocalRuntime() {
   const root = workspaceRoot();
   const bun = process.env.CIRCULO_DESKTOP_BUN || "bun";
   const node = process.env.CIRCULO_DESKTOP_NODE || "node";
-  const secrets = loadSecrets();
+  const secrets = loadDesktopSecrets({ app, safeStorage });
   const dataDir = path.join(app.getPath("userData"), "data");
   fs.mkdirSync(dataDir, { recursive: true });
   const common = {

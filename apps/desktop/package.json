@@ -1,6 +1,6 @@
 {
   "name": "@circulo-ai/desktop",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "private": true,
   "description": "Offline-capable Electron shell for Circulo",
   "homepage": "https://circulo-ai.com",
@@ -15,7 +15,8 @@
     "build:web": "node scripts/build-web.cjs",
     "prepare-runtime": "node scripts/prepare-runtime.cjs",
     "package": "electron-builder",
-    "package:dir": "electron-builder --dir"
+    "package:dir": "electron-builder --dir",
+    "test": "node --test tests/secrets.test.cjs"
   },
   "build": {
     "appId": "ai.circulo.desktop",
