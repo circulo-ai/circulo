@@ -1,4 +1,4 @@
-import type { DrizzleChatRepository } from "@/infrastructure/drizzle/chat-repository";
+import { createDrizzleRepositories } from "@/infrastructure/drizzle/repository-factory";
 import {
   Guard,
   Identifier,
@@ -6,6 +6,7 @@ import {
   type UnitOfWork,
   type UseCase,
 } from "@circulo-ai/core";
+import type { DbInstance } from "@circulo-ai/db";
 
 export type DeleteChatInput = {
   id: string;
@@ -16,17 +17,15 @@ export type DeleteChatInput = {
 export type DeleteChatOutput = Result<void>;
 
 export class DeleteChat implements UseCase<DeleteChatInput, DeleteChatOutput> {
-  constructor(
-    private readonly chats: DrizzleChatRepository,
-    private readonly uow: UnitOfWork,
-  ) {}
+  constructor(private readonly uow: UnitOfWork<{ client: DbInstance }>) {}
 
   async execute(input: DeleteChatInput): Promise<DeleteChatOutput> {
     const idCheck = Guard.isUuid(input.id, "id");
     if (!idCheck.succeeded) return Result.fail(idCheck.message);
 
-    return this.uow.transaction(async () => {
-      const chat = await this.chats.findById(input.id);
+    return this.uow.transaction(async (scope) => {
+      const { chat: chats } = createDrizzleRepositories(scope.client);
+      const chat = await chats.findById(input.id);
       if (!chat) return Result.fail("Chat not found");
       if (chat.organizationId !== input.organizationId) {
         return Result.fail("Chat does not belong to this organization");
@@ -35,7 +34,8 @@ export class DeleteChat implements UseCase<DeleteChatInput, DeleteChatOutput> {
         return Result.fail("You do not have permission to delete this chat");
       }
 
-      await this.chats.softDeleteById(Identifier.from(input.id));
+      const deleted = await chats.softDeleteById(Identifier.from(input.id));
+      if (!deleted) return Result.fail("Chat not found");
       return Result.ok();
     });
   }

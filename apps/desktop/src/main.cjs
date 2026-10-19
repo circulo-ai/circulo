@@ -11,6 +11,7 @@ const {
   systemPreferences,
 } = require("electron");
 const fs = require("node:fs");
+const net = require("node:net");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
 const { loadDesktopSecrets } = require("./secrets.cjs");
@@ -21,10 +22,12 @@ const { loadDesktopSecrets } = require("./secrets.cjs");
 // starting. Keep the desktop runtime isolated from those shell settings.
 delete process.env.NODE_OPTIONS;
 
-const API_PORT = Number(process.env.CIRCULO_DESKTOP_API_PORT || 3322);
-const WEB_PORT = Number(process.env.CIRCULO_DESKTOP_WEB_PORT || 3310);
-const apiUrl = `http://127.0.0.1:${API_PORT}`;
-const webUrl =
+const preferredApiPort = Number(process.env.CIRCULO_DESKTOP_API_PORT || 3322);
+const preferredWebPort = Number(process.env.CIRCULO_DESKTOP_WEB_PORT || 3310);
+let API_PORT = preferredApiPort;
+let WEB_PORT = preferredWebPort;
+let apiUrl = `http://127.0.0.1:${API_PORT}`;
+let webUrl =
   process.env.CIRCULO_DESKTOP_WEB_URL || `http://127.0.0.1:${WEB_PORT}`;
 // The desktop shell only ever renders the runtime it starts itself. Anything
 // else is treated as an external link.
@@ -79,6 +82,67 @@ function writeDesktopLog(message) {
   }
 }
 
+function probeLocalPort(port) {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    const onError = (error) => {
+      server.removeListener("listening", onListening);
+      if (error.code === "EADDRINUSE" || error.code === "EACCES") {
+        resolve(null);
+      } else {
+        reject(error);
+      }
+    };
+    const onListening = () => {
+      const address = server.address();
+      const availablePort =
+        address && typeof address === "object" ? address.port : null;
+      server.removeListener("error", onError);
+      server.close((error) => {
+        if (error) reject(error);
+        else resolve(availablePort);
+      });
+    };
+
+    server.once("error", onError);
+    server.once("listening", onListening);
+    server.listen(port, "127.0.0.1");
+  });
+}
+
+async function selectRuntimePort(preferredPort, excludedPorts = new Set()) {
+  if (
+    Number.isInteger(preferredPort) &&
+    preferredPort > 0 &&
+    preferredPort <= 65535 &&
+    !excludedPorts.has(preferredPort)
+  ) {
+    const preferred = await probeLocalPort(preferredPort);
+    if (preferred !== null) return preferred;
+  }
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const available = await probeLocalPort(0);
+    if (available !== null && !excludedPorts.has(available)) return available;
+  }
+
+  throw new Error("Could not find available loopback ports for Circulo.");
+}
+
+async function configureRuntimePorts() {
+  API_PORT = await selectRuntimePort(preferredApiPort);
+  WEB_PORT = await selectRuntimePort(preferredWebPort, new Set([API_PORT]));
+  apiUrl = `http://127.0.0.1:${API_PORT}`;
+  webUrl =
+    process.env.CIRCULO_DESKTOP_WEB_URL || `http://127.0.0.1:${WEB_PORT}`;
+
+  if (API_PORT !== preferredApiPort || WEB_PORT !== preferredWebPort) {
+    writeDesktopLog(
+      `desktop runtime ports selected api=${API_PORT} web=${WEB_PORT} (default ports were unavailable)`,
+    );
+  }
+}
+
 function workspaceRoot() {
   return (
     process.env.CIRCULO_DESKTOP_REPO ||
@@ -88,13 +152,14 @@ function workspaceRoot() {
   );
 }
 
-function spawnProcess(command, args, env, cwd, { onStderr } = {}) {
+function spawnProcess(command, args, env, cwd, { onStderr, role } = {}) {
   const child = spawn(command, args, {
     cwd,
     env: { ...process.env, ...env },
     stdio: "pipe",
     windowsHide: true,
   });
+  child.circuloRole = role;
   child.stdout.on("data", (chunk) => {
     const output = String(chunk);
     process.stdout.write(`[desktop:${command}] ${output}`);
@@ -113,13 +178,45 @@ function spawnProcess(command, args, env, cwd, { onStderr } = {}) {
     );
     console.error(`[desktop:${command}] failed to spawn:`, error);
   });
-  child.on("exit", (code) => {
+  child.on("exit", (code, signal) => {
     console.log(`[desktop:${command}] exited with code ${code ?? "null"}`);
-    if (code && runtimeStatus !== "stopping") {
+    const wasReady = runtimeStatus === "ready";
+    if ((code !== 0 || signal) && runtimeStatus !== "stopping") {
       runtimeStatus = "error";
-      writeDesktopLog(`[${command}] exited with code ${code}`);
+      writeDesktopLog(
+        `[${command}] exited unexpectedly with code ${code ?? "null"} signal ${signal ?? "none"}`,
+      );
       if (mainWindow)
         mainWindow.webContents.send("circulo:runtime-status", runtimeStatus);
+
+      if (role === "api" && wasReady && hasRecoverablePgliteStartupFailure()) {
+        void recoverDatabaseStartup()
+          .then(async (recovered) => {
+            if (recovered === true) {
+              apiStderr = "";
+              runtimeStatus = "ready";
+              mainWindow?.webContents.send(
+                "circulo:runtime-status",
+                runtimeStatus,
+              );
+              await mainWindow?.loadURL(webUrl);
+              return;
+            }
+            if (recovered === false) app.quit();
+          })
+          .catch((error) => {
+            const message =
+              error instanceof Error ? error.message : String(error);
+            writeDesktopLog(
+              `database recovery failed: ${error?.stack || message}`,
+            );
+            dialog.showErrorBox(
+              "Circulo local data could not be recovered",
+              message,
+            );
+            app.quit();
+          });
+      }
     }
   });
   children.push(child);
@@ -169,7 +266,7 @@ function startLocalRuntime() {
           PORT: String(API_PORT),
         },
         root,
-        { onStderr: (output) => (apiStderr += output) },
+        { onStderr: (output) => (apiStderr += output), role: "api" },
       );
     } else {
       spawnProcess(
@@ -180,7 +277,7 @@ function startLocalRuntime() {
           PORT: String(API_PORT),
         },
         root,
-        { onStderr: (output) => (apiStderr += output) },
+        { onStderr: (output) => (apiStderr += output), role: "api" },
       );
     }
   }
@@ -197,6 +294,7 @@ function startLocalRuntime() {
           HOSTNAME: "127.0.0.1",
         },
         path.join(root, "web", "apps", "web"),
+        { role: "web" },
       );
     } else {
       spawnProcess(
@@ -217,6 +315,7 @@ function startLocalRuntime() {
           NEXT_PUBLIC_BETTER_AUTH_URL: apiUrl,
         },
         path.join(root, "apps/web"),
+        { role: "web" },
       );
     }
   }
@@ -275,7 +374,7 @@ async function waitForUrl(url, timeoutMs = 60_000) {
   while (Date.now() - started < timeoutMs) {
     try {
       const response = await fetch(url);
-      if (response.ok || response.status < 500) return;
+      if (response.ok) return;
     } catch {
       // Runtime is still starting.
     }
@@ -345,7 +444,19 @@ function createWindow() {
 
 function stopRuntime() {
   runtimeStatus = "stopping";
-  for (const child of children) child.kill();
+  for (const child of children) {
+    if (child.exitCode !== null || child.signalCode !== null) continue;
+    if (
+      child.circuloRole === "api" &&
+      child.stdin &&
+      !child.stdin.destroyed &&
+      !child.stdin.writableEnded
+    ) {
+      child.stdin.end("CIRCULO_DESKTOP_SHUTDOWN\n");
+      continue;
+    }
+    child.kill();
+  }
 }
 
 async function stopRuntimeAndWait() {
@@ -371,7 +482,7 @@ async function stopRuntimeAndWait() {
           forceKillTimeout = setTimeout(() => {
             child.kill("SIGKILL");
             finalTimeout = setTimeout(finish, 5_000);
-          }, 5_000);
+          }, 10_000);
           child.once("exit", () => {
             finish();
           });
@@ -384,7 +495,7 @@ async function stopRuntimeAndWait() {
 function hasRecoverablePgliteStartupFailure() {
   return (
     apiStderr.includes("RuntimeError: Aborted()") &&
-    apiStderr.includes("pglite")
+    apiStderr.includes("wasm://wasm/")
   );
 }
 
@@ -546,10 +657,12 @@ if (hasSingleInstanceLock) {
           callback(permission === "notifications" && trustedMainFrame);
         },
       );
+      await configureRuntimePorts();
       startLocalRuntime();
       try {
         await waitForUrl(`${apiUrl}/health`);
         await waitForUrl(webUrl);
+        apiStderr = "";
       } catch (error) {
         const recovered = await recoverDatabaseStartup();
         if (recovered === false) {
@@ -588,4 +701,14 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-app.on("before-quit", stopRuntime);
+let waitingForRuntimeShutdown = false;
+app.on("before-quit", (event) => {
+  if (waitingForRuntimeShutdown || children.length === 0) {
+    stopRuntime();
+    return;
+  }
+
+  event.preventDefault();
+  waitingForRuntimeShutdown = true;
+  void stopRuntimeAndWait().finally(() => app.quit());
+});

@@ -1,4 +1,4 @@
-import type { DrizzleArtifactRepository } from "@/infrastructure/drizzle/artifact-repository";
+import { createDrizzleRepositories } from "@/infrastructure/drizzle/repository-factory";
 import {
   Guard,
   Identifier,
@@ -7,6 +7,7 @@ import {
   type UnitOfWork,
   type UseCase,
 } from "@circulo-ai/core";
+import type { DbInstance } from "@circulo-ai/db";
 
 export type UpdateArtifactInput = {
   id: string;
@@ -21,17 +22,15 @@ export class UpdateArtifact implements UseCase<
   UpdateArtifactInput,
   UpdateArtifactOutput
 > {
-  constructor(
-    private readonly artifacts: DrizzleArtifactRepository,
-    private readonly uow: UnitOfWork,
-  ) {}
+  constructor(private readonly uow: UnitOfWork<{ client: DbInstance }>) {}
 
   async execute(input: UpdateArtifactInput): Promise<UpdateArtifactOutput> {
     const idCheck = Guard.isUuid(input.id, "id");
     if (!idCheck.succeeded) return Result.fail(idCheck.message);
 
-    return this.uow.transaction(async () => {
-      const artifact = await this.artifacts.getById(Identifier.from(input.id));
+    return this.uow.transaction(async (scope) => {
+      const { artifact: artifacts } = createDrizzleRepositories(scope.client);
+      const artifact = await artifacts.getById(Identifier.from(input.id));
       if (!artifact) throw new NotFoundError("Artifact", input.id);
 
       if (input.title !== undefined) {
@@ -45,7 +44,7 @@ export class UpdateArtifact implements UseCase<
         artifact.bumpVersion();
       }
 
-      await this.artifacts.save(artifact);
+      await artifacts.save(artifact);
       return Result.ok();
     });
   }

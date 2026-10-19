@@ -231,12 +231,9 @@ export function buildRootProvider(): ServiceProvider {
   );
 
   services.addScoped(DI_TOKENS.CreateChatUseCase, (resolver) => {
-    const chats = resolver.resolve(DI_TOKENS.ChatRepository);
-    const chatMembers = resolver.resolve(DI_TOKENS.ChatMemberRepository);
-    const members = resolver.resolve(DI_TOKENS.OrganizationMemberRepository);
     const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
     const publisher = resolver.resolve(DI_TOKENS.DomainEventPublisher);
-    return new CreateChat(chats, chatMembers, members, uow, publisher);
+    return new CreateChat(uow, publisher);
   });
 
   services.addScoped(DI_TOKENS.CreateChatWithMessageUseCase, (resolver) => {
@@ -247,77 +244,63 @@ export function buildRootProvider(): ServiceProvider {
   });
 
   services.addScoped(DI_TOKENS.RenameChatUseCase, (resolver) => {
-    const chats = resolver.resolve(DI_TOKENS.ChatRepository);
     const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
     const publisher = resolver.resolve(DI_TOKENS.DomainEventPublisher);
-    return new RenameChat(chats, uow, publisher);
+    return new RenameChat(uow, publisher);
   });
 
   services.addScoped(DI_TOKENS.ChangeChatVisibilityUseCase, (resolver) => {
-    const chats = resolver.resolve(DI_TOKENS.ChatRepository);
     const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
     const publisher = resolver.resolve(DI_TOKENS.DomainEventPublisher);
-    return new ChangeChatVisibility(chats, uow, publisher);
+    return new ChangeChatVisibility(uow, publisher);
   });
 
   services.addScoped(DI_TOKENS.DeleteChatUseCase, (resolver) => {
-    const chats = resolver.resolve(DI_TOKENS.ChatRepository);
     const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    return new DeleteChat(chats, uow);
+    return new DeleteChat(uow);
   });
 
   services.addScoped(DI_TOKENS.InviteToChatUseCase, (resolver) => {
-    const chats = resolver.resolve(DI_TOKENS.ChatRepository);
-    const invitations = resolver.resolve(DI_TOKENS.ChatInvitationRepository);
-    const members = resolver.resolve(DI_TOKENS.OrganizationMemberRepository);
     const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    return new InviteToChat(chats, invitations, members, uow);
+    return new InviteToChat(uow);
   });
 
   services.addScoped(DI_TOKENS.AcceptChatInvitationUseCase, (resolver) => {
-    const invitations = resolver.resolve(DI_TOKENS.ChatInvitationRepository);
-    const members = resolver.resolve(DI_TOKENS.ChatMemberRepository);
     const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    return new AcceptChatInvitation(invitations, members, uow);
+    return new AcceptChatInvitation(uow);
   });
 
   services.addScoped(DI_TOKENS.AddChatMemberUseCase, (resolver) => {
-    const members = resolver.resolve(DI_TOKENS.ChatMemberRepository);
     const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    return new AddChatMember(members, uow);
+    return new AddChatMember(uow);
   });
 
   services.addScoped(DI_TOKENS.RemoveChatMemberUseCase, (resolver) => {
-    const members = resolver.resolve(DI_TOKENS.ChatMemberRepository);
     const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    return new RemoveChatMember(members, uow);
+    return new RemoveChatMember(uow);
   });
 
   services.addScoped(
     DI_TOKENS.UpdateChatMemberPermissionsUseCase,
     (resolver) => {
-      const members = resolver.resolve(DI_TOKENS.ChatMemberRepository);
       const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-      return new UpdateChatMemberPermissions(members, uow);
+      return new UpdateChatMemberPermissions(uow);
     },
   );
 
   services.addScoped(DI_TOKENS.LinkAgentToChatUseCase, (resolver) => {
-    const links = resolver.resolve(DI_TOKENS.ChatAgentLinkRepository);
     const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    return new LinkAgentToChat(links, uow);
+    return new LinkAgentToChat(uow);
   });
 
   services.addScoped(DI_TOKENS.ToggleAgentLinkUseCase, (resolver) => {
-    const links = resolver.resolve(DI_TOKENS.ChatAgentLinkRepository);
     const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    return new ToggleAgentLink(links, uow);
+    return new ToggleAgentLink(uow);
   });
 
   services.addScoped(DI_TOKENS.UpdateAgentLinkOverridesUseCase, (resolver) => {
-    const links = resolver.resolve(DI_TOKENS.ChatAgentLinkRepository);
     const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    return new UpdateAgentLinkOverrides(links, uow);
+    return new UpdateAgentLinkOverrides(uow);
   });
 
   services.addScoped(DI_TOKENS.PostMessageUseCase, (resolver) => {
@@ -326,33 +309,28 @@ export function buildRootProvider(): ServiceProvider {
   });
 
   services.addScoped(DI_TOKENS.CreateArtifactUseCase, (resolver) => {
-    const artifacts = resolver.resolve(DI_TOKENS.ArtifactRepository);
     const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    return new CreateArtifact(artifacts, uow);
+    return new CreateArtifact(uow);
   });
 
   services.addScoped(DI_TOKENS.UpdateArtifactUseCase, (resolver) => {
-    const artifacts = resolver.resolve(DI_TOKENS.ArtifactRepository);
     const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    return new UpdateArtifact(artifacts, uow);
+    return new UpdateArtifact(uow);
   });
 
   services.addScoped(DI_TOKENS.CreateSuggestionUseCase, (resolver) => {
-    const suggestions = resolver.resolve(DI_TOKENS.SuggestionRepository);
     const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    return new CreateSuggestion(suggestions, uow);
+    return new CreateSuggestion(uow);
   });
 
   services.addScoped(DI_TOKENS.ResolveSuggestionUseCase, (resolver) => {
-    const suggestions = resolver.resolve(DI_TOKENS.SuggestionRepository);
     const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    return new ResolveSuggestion(suggestions, uow);
+    return new ResolveSuggestion(uow);
   });
 
   services.addScoped(DI_TOKENS.SetVoteUseCase, (resolver) => {
-    const votes = resolver.resolve(DI_TOKENS.VoteRepository);
     const uow = resolver.resolve(DI_TOKENS.UnitOfWork);
-    return new SetVote(votes, uow);
+    return new SetVote(uow);
   });
 
   services.addSingleton(

@@ -1,4 +1,4 @@
-import type { DrizzleChatRepository } from "@/infrastructure/drizzle/chat-repository";
+import { createDrizzleRepositories } from "@/infrastructure/drizzle/repository-factory";
 import {
   Guard,
   Identifier,
@@ -8,6 +8,7 @@ import {
   type UnitOfWork,
   type UseCase,
 } from "@circulo-ai/core";
+import type { DbInstance } from "@circulo-ai/db";
 
 export type RenameChatInput = {
   id: string;
@@ -19,8 +20,7 @@ export type RenameChatOutput = Result<void>;
 
 export class RenameChat implements UseCase<RenameChatInput, RenameChatOutput> {
   constructor(
-    private readonly chats: DrizzleChatRepository,
-    private readonly uow: UnitOfWork,
+    private readonly uow: UnitOfWork<{ client: DbInstance }>,
     private readonly publisher: DomainEventPublisher,
   ) {}
 
@@ -30,12 +30,13 @@ export class RenameChat implements UseCase<RenameChatInput, RenameChatOutput> {
     const titleCheck = Guard.againstEmptyString(input.title, "title");
     if (!titleCheck.succeeded) return Result.fail(titleCheck.message);
 
-    return this.uow.transaction(async () => {
-      const chat = await this.chats.getById(Identifier.from(input.id));
+    return this.uow.transaction(async (scope) => {
+      const { chat: chats } = createDrizzleRepositories(scope.client);
+      const chat = await chats.getById(Identifier.from(input.id));
       if (!chat) throw new NotFoundError("Chat", input.id);
 
       chat.rename(input.title);
-      await this.chats.save(chat);
+      await chats.save(chat);
       await Promise.all(
         chat.pullDomainEvents().map((evt) => this.publisher.publish(evt)),
       );

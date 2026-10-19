@@ -1,7 +1,5 @@
 import { Chat } from "@/domain/chat/chat";
-import type { DrizzleChatMemberRepository } from "@/infrastructure/drizzle/chat-member-repository";
-import type { DrizzleChatRepository } from "@/infrastructure/drizzle/chat-repository";
-import type { DrizzleOrganizationMemberRepository } from "@/infrastructure/drizzle/organization-member-repository";
+import { createDrizzleRepositories } from "@/infrastructure/drizzle/repository-factory";
 import {
   Guard,
   Identifier,
@@ -11,6 +9,7 @@ import {
   type UnitOfWork,
   type UseCase,
 } from "@circulo-ai/core";
+import type { DbInstance } from "@circulo-ai/db";
 
 export type CreateChatInput = {
   id: string;
@@ -24,10 +23,7 @@ export type CreateChatOutput = Result<{ chatId: string }>;
 
 export class CreateChat implements UseCase<CreateChatInput, CreateChatOutput> {
   constructor(
-    private readonly chats: DrizzleChatRepository,
-    private readonly chatMembers: DrizzleChatMemberRepository,
-    private readonly members: DrizzleOrganizationMemberRepository,
-    private readonly uow: UnitOfWork,
+    private readonly uow: UnitOfWork<{ client: DbInstance }>,
     private readonly publisher: DomainEventPublisher,
   ) {}
 
@@ -44,8 +40,9 @@ export class CreateChat implements UseCase<CreateChatInput, CreateChatOutput> {
     const titleCheck = Guard.againstEmptyString(input.title, "title");
     if (!titleCheck.succeeded) return Result.fail(titleCheck.message);
 
-    return this.uow.transaction(async () => {
-      const membership = await this.members.findByUserAndOrg(
+    return this.uow.transaction(async (scope) => {
+      const repositories = createDrizzleRepositories(scope.client);
+      const membership = await repositories.organizationMember.findByUserAndOrg(
         input.creatorId,
         input.organizationId,
       );
@@ -62,8 +59,8 @@ export class CreateChat implements UseCase<CreateChatInput, CreateChatOutput> {
         createdAt: new Date(),
       });
 
-      await this.chats.save(chat);
-      await this.chatMembers.createOwner(
+      await repositories.chat.save(chat);
+      await repositories.chatMember.createOwner(
         chat.aggregateId.toString(),
         input.creatorId,
       );

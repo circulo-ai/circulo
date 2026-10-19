@@ -1,4 +1,4 @@
-import type { DrizzleChatRepository } from "@/infrastructure/drizzle/chat-repository";
+import { createDrizzleRepositories } from "@/infrastructure/drizzle/repository-factory";
 import {
   Guard,
   Identifier,
@@ -8,6 +8,7 @@ import {
   type UnitOfWork,
   type UseCase,
 } from "@circulo-ai/core";
+import type { DbInstance } from "@circulo-ai/db";
 
 export type ChangeChatVisibilityInput = {
   id: string;
@@ -21,8 +22,7 @@ export class ChangeChatVisibility implements UseCase<
   ChangeChatVisibilityOutput
 > {
   constructor(
-    private readonly chats: DrizzleChatRepository,
-    private readonly uow: UnitOfWork,
+    private readonly uow: UnitOfWork<{ client: DbInstance }>,
     private readonly publisher: DomainEventPublisher,
   ) {}
 
@@ -32,11 +32,12 @@ export class ChangeChatVisibility implements UseCase<
     const idCheck = Guard.isUuid(input.id, "id");
     if (!idCheck.succeeded) return Result.fail(idCheck.message);
 
-    return this.uow.transaction(async () => {
-      const chat = await this.chats.getById(Identifier.from(input.id));
+    return this.uow.transaction(async (scope) => {
+      const { chat: chats } = createDrizzleRepositories(scope.client);
+      const chat = await chats.getById(Identifier.from(input.id));
       if (!chat) throw new NotFoundError("Chat", input.id);
       chat.changeVisibility(input.visibility);
-      await this.chats.save(chat);
+      await chats.save(chat);
       await Promise.all(
         chat.pullDomainEvents().map((evt) => this.publisher.publish(evt)),
       );

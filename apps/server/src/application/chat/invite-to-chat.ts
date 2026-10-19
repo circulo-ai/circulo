@@ -1,7 +1,5 @@
 import { ChatInvitation } from "@/domain/chat/chat-invitation";
-import type { DrizzleChatInvitationRepository } from "@/infrastructure/drizzle/chat-invitation-repository";
-import type { DrizzleChatRepository } from "@/infrastructure/drizzle/chat-repository";
-import type { DrizzleOrganizationMemberRepository } from "@/infrastructure/drizzle/organization-member-repository";
+import { createDrizzleRepositories } from "@/infrastructure/drizzle/repository-factory";
 import {
   Guard,
   Identifier,
@@ -9,6 +7,7 @@ import {
   type UnitOfWork,
   type UseCase,
 } from "@circulo-ai/core";
+import type { DbInstance } from "@circulo-ai/db";
 import { randomUUID } from "node:crypto";
 
 export type InviteToChatInput = {
@@ -29,12 +28,7 @@ export class InviteToChat implements UseCase<
   InviteToChatInput,
   InviteToChatOutput
 > {
-  constructor(
-    private readonly chats: DrizzleChatRepository,
-    private readonly invitations: DrizzleChatInvitationRepository,
-    private readonly members: DrizzleOrganizationMemberRepository,
-    private readonly uow: UnitOfWork,
-  ) {}
+  constructor(private readonly uow: UnitOfWork<{ client: DbInstance }>) {}
 
   async execute(input: InviteToChatInput): Promise<InviteToChatOutput> {
     const chatCheck = Guard.isUuid(input.chatId, "chatId");
@@ -47,11 +41,14 @@ export class InviteToChat implements UseCase<
       return Result.fail("Invitation expiry must be in the future");
     }
 
-    return this.uow.transaction(async () => {
-      const chat = await this.chats.getById(Identifier.from(input.chatId));
+    return this.uow.transaction(async (scope) => {
+      const repositories = createDrizzleRepositories(scope.client);
+      const chat = await repositories.chat.getById(
+        Identifier.from(input.chatId),
+      );
       if (!chat) return Result.fail("Chat not found");
 
-      const membership = await this.members.findByUserAndOrg(
+      const membership = await repositories.organizationMember.findByUserAndOrg(
         input.inviterId,
         chat.organizationId,
       );
@@ -59,7 +56,7 @@ export class InviteToChat implements UseCase<
         return Result.fail("Inviter is not a member of the organization");
       }
 
-      const existing = await this.invitations.findPendingByEmail(
+      const existing = await repositories.chatInvitation.findPendingByEmail(
         input.email,
         Identifier.from(input.chatId),
       );
@@ -84,7 +81,7 @@ export class InviteToChat implements UseCase<
         createdAt: new Date(),
       });
 
-      await this.invitations.save(invitation);
+      await repositories.chatInvitation.save(invitation);
       return Result.ok({
         invitationId: invitation.getId().toString(),
         token: invitation.snapshot.token,

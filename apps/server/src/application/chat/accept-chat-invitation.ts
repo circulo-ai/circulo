@@ -1,6 +1,5 @@
 import { ChatMember } from "@/domain/chat/chat-member";
-import type { DrizzleChatInvitationRepository } from "@/infrastructure/drizzle/chat-invitation-repository";
-import type { DrizzleChatMemberRepository } from "@/infrastructure/drizzle/chat-member-repository";
+import { createDrizzleRepositories } from "@/infrastructure/drizzle/repository-factory";
 import {
   Identifier,
   NotFoundError,
@@ -8,6 +7,7 @@ import {
   type UnitOfWork,
   type UseCase,
 } from "@circulo-ai/core";
+import type { DbInstance } from "@circulo-ai/db";
 
 export type AcceptChatInvitationInput = {
   token: string;
@@ -23,21 +23,20 @@ export class AcceptChatInvitation implements UseCase<
   AcceptChatInvitationInput,
   AcceptChatInvitationOutput
 > {
-  constructor(
-    private readonly invitations: DrizzleChatInvitationRepository,
-    private readonly members: DrizzleChatMemberRepository,
-    private readonly uow: UnitOfWork,
-  ) {}
+  constructor(private readonly uow: UnitOfWork<{ client: DbInstance }>) {}
 
   async execute(
     input: AcceptChatInvitationInput,
   ): Promise<AcceptChatInvitationOutput> {
-    return this.uow.transaction(async () => {
-      const invitation = await this.invitations.findByToken(input.token);
+    return this.uow.transaction(async (scope) => {
+      const repositories = createDrizzleRepositories(scope.client);
+      const invitation = await repositories.chatInvitation.findByToken(
+        input.token,
+      );
       if (!invitation) throw new NotFoundError("Chat invitation");
       const snap = invitation.snapshot;
       invitation.accept(input.userId, new Date());
-      await this.invitations.save(invitation);
+      await repositories.chatInvitation.save(invitation);
 
       const member = new ChatMember({
         id: Identifier.create(),
@@ -56,7 +55,7 @@ export class AcceptChatInvitation implements UseCase<
         joinedAt: new Date(),
         leftAt: null,
       });
-      await this.members.save(member);
+      await repositories.chatMember.save(member);
 
       return Result.ok({
         chatId: snap.chatId.toString(),

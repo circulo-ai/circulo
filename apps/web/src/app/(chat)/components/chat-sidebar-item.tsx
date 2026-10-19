@@ -169,9 +169,20 @@ export const ChatSidebarItem = forwardRef<HTMLLIElement, ChatSidebarItemProps>(
         if (!response.ok) {
           throw new Error("Unable to delete archived chat");
         }
-        await mutate(isHistoryKey);
+        await mutate(
+          isHistoryKey,
+          (current: GetChatHistoryResponse | undefined) =>
+            current
+              ? {
+                  ...current,
+                  chats: current.chats.filter((chat) => chat.id !== item.id),
+                }
+              : current,
+          { revalidate: false },
+        );
         setDeleteDialogOpen(false);
         toast.success("Archived chat removed");
+        void mutate(isHistoryKey).catch(() => undefined);
         if (currentChatId === item.id) {
           setCurrentChatId(undefined);
           router.push("/chat");

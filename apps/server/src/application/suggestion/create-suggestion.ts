@@ -1,5 +1,5 @@
 import { Suggestion } from "@/domain/suggestion/suggestion";
-import type { DrizzleSuggestionRepository } from "@/infrastructure/drizzle/suggestion-repository";
+import { createDrizzleRepositories } from "@/infrastructure/drizzle/repository-factory";
 import {
   Guard,
   Identifier,
@@ -7,6 +7,7 @@ import {
   type UnitOfWork,
   type UseCase,
 } from "@circulo-ai/core";
+import type { DbInstance } from "@circulo-ai/db";
 
 export type CreateSuggestionInput = {
   id: string;
@@ -23,10 +24,7 @@ export class CreateSuggestion implements UseCase<
   CreateSuggestionInput,
   CreateSuggestionOutput
 > {
-  constructor(
-    private readonly suggestions: DrizzleSuggestionRepository,
-    private readonly uow: UnitOfWork,
-  ) {}
+  constructor(private readonly uow: UnitOfWork<{ client: DbInstance }>) {}
 
   async execute(input: CreateSuggestionInput): Promise<CreateSuggestionOutput> {
     const idCheck = Guard.isUuid(input.id, "id");
@@ -45,7 +43,10 @@ export class CreateSuggestion implements UseCase<
     );
     if (!suggestedCheck.succeeded) return Result.fail(suggestedCheck.message);
 
-    return this.uow.transaction(async () => {
+    return this.uow.transaction(async (scope) => {
+      const { suggestion: suggestions } = createDrizzleRepositories(
+        scope.client,
+      );
       const suggestion = new Suggestion({
         id: Identifier.from(input.id),
         documentId: Identifier.from(input.documentId),
@@ -56,7 +57,7 @@ export class CreateSuggestion implements UseCase<
         isResolved: false,
         createdAt: new Date(),
       });
-      await this.suggestions.save(suggestion);
+      await suggestions.save(suggestion);
       return Result.ok({ suggestionId: suggestion.getId().toString() });
     });
   }
