@@ -1,5 +1,6 @@
 import type { ArtifactKind } from "@/db";
 import { artifactRepo } from "@/db/repositories";
+import type { AgentExecutionMeteringContext } from "@/lib/ai/agent-execution-meter";
 import { documentHandlersByArtifactKind } from "@/lib/artifacts/server";
 import type { ActorContext, ChatMessage } from "@/lib/types";
 import { tool, type Tool, type UIMessageStreamWriter } from "ai";
@@ -8,6 +9,7 @@ import { z } from "zod";
 type UpdateDocumentProps = {
   session: ActorContext;
   dataStream: UIMessageStreamWriter<ChatMessage>;
+  metering?: AgentExecutionMeteringContext;
 };
 
 type UpdateDocumentOutput =
@@ -17,6 +19,7 @@ type UpdateDocumentOutput =
 export const updateDocument = ({
   session,
   dataStream,
+  metering,
 }: UpdateDocumentProps): Tool<
   { id: string; description: string },
   UpdateDocumentOutput
@@ -67,6 +70,7 @@ export const updateDocument = ({
         description,
         dataStream,
         session,
+        metering,
       });
 
       dataStream.write({ type: "data-finish", data: null, transient: true });

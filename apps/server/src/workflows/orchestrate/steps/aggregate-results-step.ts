@@ -1,5 +1,10 @@
 import { db, humanApproval } from "@/db";
 import {
+  isAgentExecutionBudgetError,
+  withAgentExecutionMetering,
+  type AgentExecutionMeteringContext,
+} from "@/lib/ai/agent-execution-meter";
+import {
   getDefaultModelForProvider,
   resolveLanguageModel,
 } from "@/lib/ai/provider-registry";
@@ -39,6 +44,7 @@ export async function aggregateResultsStep(params: {
   triggerMessages: ChatMessage[];
   pendingApprovalId?: string;
   workflowRunId?: string;
+  metering?: AgentExecutionMeteringContext;
   dataStream?: UIMessageStreamWriter<ChatMessage>;
 }): Promise<AggregatedResult> {
   const {
@@ -123,14 +129,24 @@ Duration: ${r.durationMs}ms`,
     .join("\n\n---\n\n");
 
   try {
-    const result = streamText({
-      model: await resolveLanguageModel({
-        userId: params.userId,
-        providerId: params.providerId,
-        modelId:
+    const resolvedModel = await resolveLanguageModel({
+      userId: params.userId,
+      providerId: params.providerId,
+      modelId:
+        params.modelId ??
+        getDefaultModelForProvider(params.providerId ?? "openrouter"),
+    });
+    const model = params.metering
+      ? withAgentExecutionMetering(
+          resolvedModel,
+          params.metering,
+          params.providerId ?? "openrouter",
           params.modelId ??
-          getDefaultModelForProvider(params.providerId ?? "openrouter"),
-      }),
+            getDefaultModelForProvider(params.providerId ?? "openrouter"),
+        )
+      : resolvedModel;
+    const result = streamText({
+      model,
       output: Output.object({ schema: aggregatedResultSchema }),
       system: `You are synthesizing the outputs from multiple AI agents into a coherent final response.
 
@@ -187,22 +203,31 @@ Synthesize these results into a final response.`,
     return output;
   } catch (error) {
     logger.error("Failed to aggregate agent results", error);
+    const budgetReached = isAgentExecutionBudgetError(error);
+    const directOutputs = agentResults
+      .map(
+        (result) =>
+          result.output || result.error || `${result.agentName} completed`,
+      )
+      .join("\n\n");
     return {
-      summary: "Agent execution completed",
-      detailedResponse: agentResults
-        .map(
-          (result) =>
-            result.output || result.error || `${result.agentName} completed`,
-        )
-        .join("\n\n"),
-      actionItems: [],
+      summary: budgetReached
+        ? "Agent execution completed; the workspace token budget prevented final synthesis"
+        : "Agent execution completed",
+      detailedResponse: budgetReached
+        ? `${directOutputs}\n\nFinal synthesis stopped because the workspace token budget was reached. A workspace manager can raise the budget for future runs.`
+        : directOutputs,
+      actionItems: budgetReached
+        ? ["Ask a workspace manager to raise the token budget before retrying."]
+        : [],
       successfulAgents: agentResults
         .filter((result) => result.success)
         .map((result) => result.agentName),
       failedAgents: agentResults
         .filter((result) => !result.success)
         .map((result) => result.agentName),
-      overallSuccess: agentResults.every((result) => result.success),
+      overallSuccess:
+        !budgetReached && agentResults.every((result) => result.success),
       recommendations: [],
     };
   }

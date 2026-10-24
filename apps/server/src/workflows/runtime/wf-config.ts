@@ -111,7 +111,9 @@ async function createRuntime(
     metrics: new InMemoryMetrics(),
     defaultRetries: 2,
     defaultTimeout: 10 * 60 * 1000,
-    workflowTimeout: 30 * 60 * 1000,
+    // Workspace execution limits can span multiple bounded, durable segments.
+    // Seven days is the infrastructure ceiling when a workspace chooses no cap.
+    workflowTimeout: 7 * 24 * 60 * 60 * 1_000,
     lockTTL: 60_000,
     lockRenewInterval: 20_000,
     maxConcurrentWorkflows: 20,

@@ -1,19 +1,15 @@
 import { updateDocumentPrompt } from "@/lib/ai/prompts";
-import { resolveLanguageModel } from "@/lib/ai/provider-registry";
+import { resolveArtifactModel } from "@/lib/artifacts/model";
 import { createDocumentHandler } from "@/lib/artifacts/server";
 import { smoothStream, streamText } from "ai";
 
 export const textDocumentHandler = createDocumentHandler<"text">({
   kind: "text",
-  onCreateDocument: async ({ title, dataStream, session }) => {
+  onCreateDocument: async ({ title, dataStream, session, metering }) => {
     let draftContent = "";
 
     const { fullStream } = streamText({
-      model: await resolveLanguageModel({
-        userId: session.userId,
-        providerId: session.providerId,
-        modelId: session.modelId,
-      }),
+      model: await resolveArtifactModel({ session, metering }),
       system:
         "Write about the given topic. Markdown is supported. Use headings wherever appropriate.",
       experimental_transform: smoothStream({ chunking: "word" }),
@@ -38,15 +34,17 @@ export const textDocumentHandler = createDocumentHandler<"text">({
 
     return draftContent;
   },
-  onUpdateDocument: async ({ document, description, dataStream, session }) => {
+  onUpdateDocument: async ({
+    document,
+    description,
+    dataStream,
+    session,
+    metering,
+  }) => {
     let draftContent = "";
 
     const { fullStream } = streamText({
-      model: await resolveLanguageModel({
-        userId: session.userId,
-        providerId: session.providerId,
-        modelId: session.modelId,
-      }),
+      model: await resolveArtifactModel({ session, metering }),
       system: updateDocumentPrompt(document.content, "text"),
       experimental_transform: smoothStream({ chunking: "word" }),
       prompt: description,

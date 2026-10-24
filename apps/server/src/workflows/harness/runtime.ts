@@ -73,6 +73,7 @@ export interface AgentHarnessRuntime {
     snapshot: HarnessSnapshot;
     output: string;
     awaitingApproval?: boolean;
+    continuationRequired?: boolean;
   }>;
 }
 
@@ -220,6 +221,7 @@ export async function createAgentHarness(options: {
   journal: HarnessJournal;
   publish: (snapshot: HarnessSnapshot) => void;
   limits?: Partial<typeof DEFAULT_HARNESS_LIMITS>;
+  maxWorkerModelSteps?: number;
   now?: () => number;
   resumeAfterApproval?: string;
   signal?: AbortSignal;
@@ -377,6 +379,13 @@ export async function createAgentHarness(options: {
         (total, row) => total + Number(row.payload.pausedDurationMs ?? 0),
         0,
       );
+  const workerStartingSteps = state.modelSteps;
+  const maxWorkerModelSteps = Math.max(
+    1,
+    Math.floor(options.maxWorkerModelSteps ?? 8),
+  );
+  const workerContinuationReason =
+    "This bounded worker segment is complete; the durable run will continue automatically.";
   const timeoutSignal = AbortSignal.timeout(Math.max(1, deadline - now()));
   const signal = options.signal
     ? AbortSignal.any([options.signal, timeoutSignal])
@@ -777,6 +786,12 @@ For multi-step research, file creation, knowledge work, or workflows, use update
           stopReason ??= "The token budget was reached.";
         if (now() >= deadline)
           stopReason ??= "The execution time budget was reached.";
+        if (
+          !stopReason &&
+          state.modelSteps - workerStartingSteps >= maxWorkerModelSteps
+        ) {
+          stopReason = workerContinuationReason;
+        }
         const awaitingApproval = [...records.values()].some(
           (record) =>
             record.output &&
@@ -943,6 +958,18 @@ For multi-step research, file creation, knowledge work, or workflows, use update
           snapshot: state,
           output,
           awaitingApproval: true,
+        };
+      }
+      if (stopReason === workerContinuationReason) {
+        state.status = "paused";
+        state.reason = workerContinuationReason;
+        await save();
+        return {
+          success: false,
+          reason: state.reason,
+          snapshot: state,
+          output,
+          continuationRequired: true,
         };
       }
       output = appendArtifactReferences(output, [...records.values()]);

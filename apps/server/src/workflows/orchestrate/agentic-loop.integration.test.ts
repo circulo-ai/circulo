@@ -109,6 +109,7 @@ const params = () => ({
     timeoutMinutes: 10,
   },
   context: {
+    chat: { organizationId: "organization" },
     agents: [
       {
         agentId: "agent",
@@ -151,6 +152,38 @@ describe("outer agentic loop completion and recovery", () => {
     });
     expect(result.status).toBe("blocked");
     expect(fixture.executions).toBe(0);
+  });
+  it("applies the workspace task cap before starting continuation work", async () => {
+    const input = params() as any;
+    input.context = {
+      ...input.context,
+      chat: { organizationId: "organization" },
+      workflowStartedAt: Date.now(),
+      executionSettings: {
+        agentLoop: {
+          modelSteps: 40,
+          toolCalls: 120,
+          tokens: 250_000,
+          runtimeMs: 600_000,
+        },
+        workflow: {
+          continuationRounds: 4,
+          totalAgentTasks: 1,
+          runtimeMs: 1_500_000,
+        },
+        conversationContextTokens: 30_000,
+        usageBudgets: {
+          rollingFiveHourTokens: null,
+          rollingSevenDayTokens: null,
+        },
+      },
+    } as never;
+
+    const result = await executeAgenticLoop(input);
+
+    expect(result.status).toBe("blocked");
+    expect(result.reason).toContain("workspace agent-task budget");
+    expect(fixture.executions).toBe(1);
   });
   it("reuses durable agent outcomes when the parent step is recovered", async () => {
     fixture.completeAt = 1;

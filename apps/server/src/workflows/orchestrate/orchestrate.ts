@@ -1,4 +1,8 @@
 import { db, humanApproval, taskHandoff } from "@/db";
+import {
+  type AgentExecutionMeteringContext,
+  isAgentExecutionBudgetError,
+} from "@/lib/ai/agent-execution-meter";
 import { assertMcpInvocationAccess, McpClient } from "@/lib/mcp/client";
 import type { WorkflowPlanStepTrace } from "@/lib/types";
 import { getTextFromMessages } from "@/lib/utils";
@@ -23,6 +27,7 @@ import {
   type ExecutionPlan,
   planAgentExecutionStep,
 } from "@/workflows/orchestrate/steps/plan-agent-execution-step";
+import { DEFAULT_AGENT_EXECUTION_SETTINGS } from "@circulo-ai/types";
 import type { WorkflowDefinition } from "@circulo-ai/wf";
 import { complete, defineWorkflow, waitForAndRetry } from "@circulo-ai/wf";
 import { and, asc, eq, sql } from "drizzle-orm";
@@ -70,7 +75,7 @@ export interface OrchestrationWorkflowState {
   selfHandoffCounts?: Record<string, number>;
   /** Durable summary of the model-directed execution loop. */
   agentLoopIteration?: number;
-  agentLoopStatus?: "completed" | "blocked";
+  agentLoopStatus?: "completed" | "blocked" | "continuing";
   agentLoopDecision?: string;
   agentLoopPlanSteps?: WorkflowPlanStepTrace[];
   /** Durable ledger of every planned dynamic task and its observed outcome. */
@@ -79,6 +84,23 @@ export interface OrchestrationWorkflowState {
   failureReason?: string;
   /** A human-only conversation turn completed without an agent response. */
   silent?: boolean;
+}
+
+function executionMetering(
+  state: OrchestrationWorkflowState,
+  feature: AgentExecutionMeteringContext["feature"],
+): AgentExecutionMeteringContext | undefined {
+  if (!state.context || !state.workflowRunId) return undefined;
+  return {
+    organizationId: state.context.chat.organizationId,
+    userId: state.input.actor.userId,
+    workflowRunId: state.workflowRunId,
+    workflowStartedAt: state.context.workflowStartedAt ?? state.startedAt,
+    settings:
+      state.context.executionSettings ??
+      structuredClone(DEFAULT_AGENT_EXECUTION_SETTINGS),
+    feature,
+  };
 }
 
 type OrchestrationWorkflowContext = Record<string, never>;
@@ -94,23 +116,30 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
     .name(ORCHESTRATION_WORKFLOW_NAME)
     .version(1)
     .context({})
-    .maxExecutionTime(30 * 60 * 1000)
+    .maxExecutionTime(7 * 24 * 60 * 60 * 1_000)
     .step<"load-chat-context", OrchestrationInput, OrchestrationWorkflowState>(
       "load-chat-context",
       {
-        run: async (input) => {
+        run: async (input, workflowContext) => {
+          const startedAt = Date.now();
           try {
-            const context = await loadChatContextStep(
+            const loadedContext = await loadChatContextStep(
               input.chatId,
               input.actor.userId,
               getTextFromMessages(input.messages),
               input.actor.apiKeyPermissions,
             );
-            return complete({ input, context, startedAt: Date.now() });
+            return complete({
+              input,
+              context: { ...loadedContext, workflowStartedAt: startedAt },
+              startedAt,
+              workflowRunId: workflowContext.workflow.id,
+            });
           } catch (error) {
             return complete({
               input,
-              startedAt: Date.now(),
+              startedAt,
+              workflowRunId: workflowContext.workflow.id,
               failureReason: toErrorMessage(error),
             });
           }
@@ -149,6 +178,7 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
             orchestrationModel: state.context.chat.orchestrationModel,
             orchestrationFallbackModel:
               state.context.chat.orchestrationFallbackModel,
+            metering: executionMetering(state, "orchestration"),
           });
 
           const explicitEngagement = shouldEngageAgents(
@@ -169,7 +199,13 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
                 }
               : classification,
           });
-        } catch (_error) {
+        } catch (error) {
+          if (isAgentExecutionBudgetError(error)) {
+            return complete({
+              ...state,
+              failureReason: error.message,
+            });
+          }
           return complete({
             ...state,
             classification: createDirectClassification(
@@ -239,6 +275,7 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
             orchestrationModel: state.context.chat.orchestrationModel,
             orchestrationFallbackModel:
               state.context.chat.orchestrationFallbackModel,
+            metering: executionMetering(state, "orchestration"),
           });
 
           return complete({ ...state, plan });
@@ -323,6 +360,17 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
                   inputMessages: state.input.messages,
                   workflowId: workflowContext.workflow.id,
                 });
+                if (directResult.continuationRequired) {
+                  await flushDurableUIChunks(workflowContext.workflow.id);
+                  return waitForAndRetry(250, {
+                    ...state,
+                    workflowRunId: workflowContext.workflow.id,
+                    agentLoopStatus: "continuing",
+                    agentLoopDecision:
+                      "Continuing the checkpointed assistant task in the next worker segment.",
+                    agentTaskLedger: directTaskLedger,
+                  });
+                }
                 await flushDurableUIChunks(workflowContext.workflow.id);
                 await persistDurableAgentResult(
                   workflowContext.workflow.id,
@@ -389,16 +437,41 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
             });
             await flushDurableUIChunks(workflowContext.workflow.id);
 
+            if (loopResult.status === "continuing") {
+              return waitForAndRetry(250, {
+                ...state,
+                workflowRunId: workflowContext.workflow.id,
+                agentLoopIteration: loopResult.iterations,
+                agentLoopStatus: "continuing",
+                agentLoopDecision: loopResult.reason,
+                agentLoopPlanSteps: loopResult.planSteps,
+                agentTaskLedger: loopResult.taskLedger,
+              });
+            }
+
             let finalAgentResults = loopResult.results;
             let finalTaskLedger = loopResult.taskLedger;
-            if (
+            const fallbackNeeded = Boolean(
               state.plan.fallbackAgentId &&
               finalAgentResults.length > 0 &&
               finalAgentResults.every((result) => !result.success) &&
               !finalAgentResults.some(
                 (result) => result.agentId === state.plan?.fallbackAgentId,
-              )
-            ) {
+              ),
+            );
+            const maxAgentTasks =
+              state.context.executionSettings?.workflow.totalAgentTasks ??
+              PLATFORM_MAX_AGENTIC_AGENT_STEPS;
+            const canRunFallback =
+              countStartedAgentTasks(finalAgentResults) < maxAgentTasks;
+            let finalLoopStatus = loopResult.status;
+            let finalLoopDecision = loopResult.reason;
+            if (fallbackNeeded && !canRunFallback) {
+              finalLoopStatus = "blocked";
+              finalLoopDecision =
+                "The workspace agent-task limit was reached before the fallback agent could run.";
+            }
+            if (fallbackNeeded && canRunFallback) {
               const fallbackAgent = state.context.agents.find(
                 (agent) => agent.agentId === state.plan?.fallbackAgentId,
               );
@@ -425,6 +498,16 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
                   durableAgentResults,
                   plan: state.plan,
                 });
+                if (fallbackResult.continuationRequired) {
+                  await flushDurableUIChunks(workflowContext.workflow.id);
+                  return waitForAndRetry(250, {
+                    ...state,
+                    workflowRunId: workflowContext.workflow.id,
+                    agentLoopStatus: "continuing",
+                    agentLoopDecision:
+                      "Continuing the fallback agent task in the next worker segment.",
+                  });
+                }
                 finalAgentResults = [...finalAgentResults, fallbackResult];
                 const fallbackDescriptors = toTaskDescriptors(
                   [fallbackPlan],
@@ -460,8 +543,8 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
               workflowRunId: workflowContext.workflow.id,
               pendingApprovalId: pendingApproval?.approvalId,
               agentLoopIteration: loopResult.iterations,
-              agentLoopStatus: loopResult.status,
-              agentLoopDecision: loopResult.reason,
+              agentLoopStatus: finalLoopStatus,
+              agentLoopDecision: finalLoopDecision,
               agentLoopPlanSteps: loopResult.planSteps,
               agentTaskLedger: finalTaskLedger,
             });
@@ -494,6 +577,10 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
             const seenHandoffIds = new Set(state.processedHandoffIds ?? []);
             const selfHandoffCounts = { ...(state.selfHandoffCounts ?? {}) };
             const maxSelfHandoffsPerAgent = 3;
+            const maxAgentTasks =
+              state.context.executionSettings?.workflow.totalAgentTasks ??
+              PLATFORM_MAX_AGENTIC_AGENT_STEPS;
+            let agentTaskBudgetReached = false;
 
             if (pendingHumanHandoffId) {
               const pendingHandoff = await db.query.taskHandoff.findFirst({
@@ -557,6 +644,23 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
 
               if (!handoff.toAgentId) continue;
               processed += 1;
+
+              if (countStartedAgentTasks(agentResults) >= maxAgentTasks) {
+                agentTaskBudgetReached = true;
+                await db
+                  .update(taskHandoff)
+                  .set({
+                    status: "rejected",
+                    completedAt: new Date(),
+                    context: {
+                      ...handoff.context,
+                      executionError:
+                        "The workspace agent-task limit was reached before this handoff could run.",
+                    },
+                  })
+                  .where(eq(taskHandoff.id, handoff.id));
+                continue;
+              }
 
               const storedResult = deserializeHandoffResult(
                 handoff.context?.executionResult,
@@ -669,6 +773,21 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
                 webhookPayload: state.input.webhookPayload,
                 workflowId: workflowContext.workflow.id,
               });
+              if (result.continuationRequired) {
+                await flushDurableUIChunks(workflowContext.workflow.id);
+                seenHandoffIds.delete(handoff.id);
+                return waitForAndRetry(250, {
+                  ...state,
+                  agentResults,
+                  pendingApprovalId,
+                  processedHandoffIds: [...seenHandoffIds],
+                  selfHandoffCounts,
+                  workflowRunId: workflowContext.workflow.id,
+                  agentLoopStatus: "continuing",
+                  agentLoopDecision:
+                    "Continuing the handed-off task in the next worker segment.",
+                });
+              }
               agentResults.push(result);
               if (!pendingApprovalId) pendingApprovalId = result.approvalId;
 
@@ -720,6 +839,13 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
               pendingHumanHandoffId,
               processedHandoffIds: [...seenHandoffIds],
               selfHandoffCounts,
+              ...(agentTaskBudgetReached
+                ? {
+                    agentLoopStatus: "blocked" as const,
+                    agentLoopDecision:
+                      "The workspace agent-task limit was reached before all handoffs could run.",
+                  }
+                : {}),
             });
           },
         ),
@@ -805,12 +931,18 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
                   await loadDurableAgentResults(workflowContext.workflow.id)
                 ).get(resumeKey);
                 if (!resumed) {
-                  const context = await loadChatContextStep(
+                  const loadedContext = await loadChatContextStep(
                     state.input.chatId,
                     state.input.actor.userId,
                     getTextFromMessages(state.input.messages),
                     state.input.actor.apiKeyPermissions,
                   );
+                  const context = {
+                    ...loadedContext,
+                    executionSettings: state.context?.executionSettings,
+                    workflowStartedAt:
+                      state.context?.workflowStartedAt ?? state.startedAt,
+                  };
                   const resumeOptions = {
                     actor: state.input.actor,
                     context,
@@ -847,6 +979,16 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
                         executionResult,
                       ],
                       webhookPayload: state.input.webhookPayload,
+                    });
+                  }
+                  if (resumed.continuationRequired) {
+                    await flushDurableUIChunks(workflowContext.workflow.id);
+                    return waitForAndRetry(250, {
+                      ...state,
+                      workflowRunId: workflowContext.workflow.id,
+                      agentLoopStatus: "continuing",
+                      agentLoopDecision:
+                        "Continuing the approved task in the next worker segment.",
                     });
                   }
                   await flushDurableUIChunks(workflowContext.workflow.id);
@@ -940,6 +1082,7 @@ export function createOrchestrationWorkflow(): OrchestrationWorkflowDefinition {
           triggerMessages: state.input.messages,
           pendingApprovalId: state.pendingApprovalId,
           workflowRunId: state.workflowRunId,
+          metering: executionMetering(state, "orchestration"),
           dataStream: toUIMessageStreamWriter(workflowContext.workflow.id),
         });
         await flushDurableUIChunks(workflowContext.workflow.id);
@@ -1196,16 +1339,16 @@ function detectCircularDependencies(
   return null;
 }
 
-const MAX_AGENTIC_ITERATIONS = 4;
-const MAX_AGENTIC_AGENT_STEPS = 12;
-const MAX_AGENTIC_RUNTIME_MS = 25 * 60 * 1000;
+const PLATFORM_MAX_AGENTIC_ITERATIONS = 10_000;
+const PLATFORM_MAX_AGENTIC_AGENT_STEPS = 100_000;
+const PLATFORM_MAX_AGENTIC_RUNTIME_MS = 7 * 24 * 60 * 60 * 1_000;
 
 type AgenticLoopResult = {
   results: AgentExecutionResult[];
   planSteps: WorkflowPlanStepTrace[];
   taskLedger: AgentTaskLedgerEntry[];
   iterations: number;
-  status: "completed" | "blocked";
+  status: "completed" | "blocked" | "continuing";
   reason: string;
 };
 
@@ -1224,6 +1367,15 @@ export async function executeAgenticLoop(params: {
   orchestrationModel?: string | null;
   orchestrationFallbackModel?: string | null;
 }): Promise<AgenticLoopResult> {
+  const settings =
+    params.context.executionSettings ??
+    structuredClone(DEFAULT_AGENT_EXECUTION_SETTINGS);
+  const maxIterations =
+    settings.workflow.continuationRounds ?? PLATFORM_MAX_AGENTIC_ITERATIONS;
+  const maxAgentTasks =
+    settings.workflow.totalAgentTasks ?? PLATFORM_MAX_AGENTIC_AGENT_STEPS;
+  const maxRuntimeMs =
+    settings.workflow.runtimeMs ?? PLATFORM_MAX_AGENTIC_RUNTIME_MS;
   const dataStream = toUIMessageStreamWriter(params.workflowId);
   type WorkflowStreamChunk = Parameters<
     ReturnType<typeof toUIMessageStreamWriter>["write"]
@@ -1233,15 +1385,15 @@ export async function executeAgenticLoop(params: {
   const loopDeadline =
     params.startedAt +
     Math.min(
-      MAX_AGENTIC_RUNTIME_MS,
-      Math.max(60_000, params.plan.timeoutMinutes * 60_000),
+      maxRuntimeMs,
+      Math.max(1_000, params.plan.timeoutMinutes * 60_000),
     );
 
   writeLoopEvent({
     type: "data-workflowLoopStarted",
     data: {
       workflowId: params.workflowId,
-      maxIterations: MAX_AGENTIC_ITERATIONS,
+      maxIterations,
       initialStepCount: params.plan.selectedAgents.length,
     },
   });
@@ -1252,7 +1404,7 @@ export async function executeAgenticLoop(params: {
   );
   if (
     Date.now() >= loopDeadline ||
-    params.plan.selectedAgents.length > MAX_AGENTIC_AGENT_STEPS
+    params.plan.selectedAgents.length > maxAgentTasks
   ) {
     const reason = "The execution budget was exceeded before work could start.";
     const taskLedger = markUnfinishedAgentTasksBlocked(
@@ -1310,6 +1462,17 @@ export async function executeAgenticLoop(params: {
     ...params,
     previousResults: [],
   });
+  if (results.some((result) => result.continuationRequired)) {
+    return {
+      results: [],
+      planSteps: [],
+      taskLedger,
+      iterations: 1,
+      status: "continuing",
+      reason:
+        "Continuing the checkpointed agent task in the next worker segment.",
+    };
+  }
   taskLedger = recordAgentTaskResults(taskLedger, results);
   await persistDurableAgentLoopSnapshot(params.workflowId, {
     iteration: 1,
@@ -1325,7 +1488,7 @@ export async function executeAgenticLoop(params: {
   let status: AgenticLoopResult["status"] = "blocked";
   let reason = "The goal has not yet been verified complete.";
 
-  while (iterations <= MAX_AGENTIC_ITERATIONS && Date.now() < loopDeadline) {
+  while (iterations <= maxIterations && Date.now() < loopDeadline) {
     writeLoopEvent({
       type: "data-workflowLoopIteration",
       data: {
@@ -1357,6 +1520,15 @@ export async function executeAgenticLoop(params: {
           orchestrationAgent: params.orchestrationAgent,
           orchestrationModel: params.orchestrationModel,
           orchestrationFallbackModel: params.orchestrationFallbackModel,
+          metering: {
+            organizationId: params.context.chat.organizationId,
+            userId: params.actor.userId,
+            workflowRunId: params.workflowId,
+            workflowStartedAt:
+              params.context.workflowStartedAt ?? params.startedAt,
+            settings,
+            feature: "orchestration",
+          },
         });
       } catch (error) {
         status = "blocked";
@@ -1400,18 +1572,21 @@ export async function executeAgenticLoop(params: {
       break;
     }
 
-    if (iterations >= MAX_AGENTIC_ITERATIONS) {
+    if (iterations >= maxIterations) {
       status = "blocked";
       reason =
         "The agentic iteration budget was exhausted before the goal was verified complete.";
       break;
     }
 
-    const remainingCapacity = MAX_AGENTIC_AGENT_STEPS - results.length;
+    const remainingCapacity = maxAgentTasks - results.length;
     const nextSteps = decision.nextSteps.slice(0, remainingCapacity);
     if (nextSteps.length === 0) {
       status = "blocked";
-      reason = "The agentic step budget has been exhausted.";
+      reason =
+        remainingCapacity <= 0
+          ? "The workspace agent-task budget has been exhausted."
+          : "The agentic step budget has been exhausted.";
       break;
     }
 
@@ -1457,6 +1632,21 @@ export async function executeAgenticLoop(params: {
       plan: nextPlan,
       previousResults: results,
     });
+    if (nextResults.some((result) => result.continuationRequired)) {
+      return {
+        results,
+        planSteps: buildAgenticPlanSteps(
+          params.workflowId,
+          executedPlans,
+          results,
+        ),
+        taskLedger,
+        iterations,
+        status: "continuing",
+        reason:
+          "Continuing the checkpointed agent task in the next worker segment.",
+      };
+    }
     results = [...results, ...nextResults];
     taskLedger = recordAgentTaskResults(taskLedger, nextResults);
     await persistDurableAgentLoopSnapshot(params.workflowId, {
@@ -1951,6 +2141,7 @@ async function executeCheckpointedAgent(params: {
   try {
     const result = await executeAgentTaskStep(params);
     await flushDurableUIChunks(params.workflowId);
+    if (result.continuationRequired) return result;
     await persistDurableAgentResult(params.workflowId, key, result);
     params.durableAgentResults.set(key, result);
     publishPlanStepEvent(
@@ -2079,6 +2270,16 @@ function createHumanHandoffResult(
     endTime,
     durationMs: Math.max(0, endTime.getTime() - startTime.getTime()),
   };
+}
+
+function countStartedAgentTasks(results: AgentExecutionResult[]): number {
+  return results.filter(
+    (result) =>
+      !result.agentId.startsWith("mcp:") &&
+      !result.agentId.startsWith("human:") &&
+      !result.error?.startsWith("Skipped") &&
+      result.error !== "Dependencies not met",
+  ).length;
 }
 
 function deserializeHandoffResult(value: unknown): AgentExecutionResult | null {

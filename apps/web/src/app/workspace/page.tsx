@@ -18,6 +18,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { AgentExecutionSettings } from "@/components/workspace/agent-execution-settings";
 import { WorkspaceAccount } from "@/components/workspace/workspace-account";
 import { WorkspacePermissions } from "@/components/workspace/workspace-permissions";
 import {
@@ -60,6 +61,11 @@ const sectionCopy: Record<
     title: "Permissions",
     description:
       "Understand what each role can do before changing access or sharing a chat.",
+  },
+  "agent-execution": {
+    title: "Agent execution",
+    description:
+      "Choose how long agents can work, how much context they use, and optional local token budgets.",
   },
   agents: {
     title: "Agents",
@@ -156,6 +162,8 @@ function WorkspacePageContent() {
       <OrganizationTeams />
     ) : activeSection === "permissions" ? (
       <WorkspacePermissions />
+    ) : activeSection === "agent-execution" ? (
+      <AgentExecutionSettings />
     ) : activeSection === "tools" ? (
       <WorkspaceTools organization={organization} />
     ) : activeSection === "account" ? (

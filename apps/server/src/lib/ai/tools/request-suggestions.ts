@@ -1,5 +1,9 @@
 import type { ArtifactKind } from "@/db";
 import { artifactRepo, suggestionRepo } from "@/db/repositories";
+import {
+  withAgentExecutionMetering,
+  type AgentExecutionMeteringContext,
+} from "@/lib/ai/agent-execution-meter";
 import type {
   ActorContext,
   ChatMessage,
@@ -19,6 +23,7 @@ import { resolveLanguageModel } from "../provider-registry";
 type RequestSuggestionsProps = {
   session: ActorContext;
   dataStream: UIMessageStreamWriter<ChatMessage>;
+  metering?: AgentExecutionMeteringContext;
 };
 
 type RequestSuggestionsOutput =
@@ -28,6 +33,7 @@ type RequestSuggestionsOutput =
 export const requestSuggestions = ({
   session,
   dataStream,
+  metering,
 }: RequestSuggestionsProps): Tool<
   { documentId: string },
   RequestSuggestionsOutput
@@ -50,12 +56,24 @@ export const requestSuggestions = ({
 
       const suggestions: SuggestionStreamData[] = [];
 
+      const resolvedModel = await resolveLanguageModel({
+        userId: session.userId,
+        providerId: session.providerId,
+        modelId: session.modelId,
+      });
+      if (metering && !session.modelId) {
+        throw new Error("An AI model is required to generate suggestions");
+      }
+      const model = metering
+        ? withAgentExecutionMetering(
+            resolvedModel,
+            metering,
+            session.providerId ?? "openrouter",
+            session.modelId!,
+          )
+        : resolvedModel;
       const { elementStream } = streamText({
-        model: await resolveLanguageModel({
-          userId: session.userId,
-          providerId: session.providerId,
-          modelId: session.modelId,
-        }),
+        model,
         system:
           "You are a help writing assistant. Given a piece of writing, please offer suggestions to improve the piece of writing and describe the change. It is very important for the edits to contain full sentences instead of just words. Max 5 suggestions.",
         prompt: document.content,

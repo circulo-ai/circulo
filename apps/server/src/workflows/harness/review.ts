@@ -1,13 +1,11 @@
-import { estimateProviderCost } from "@/lib/ai/cost";
+import type { AgentExecutionMeteringContext } from "@/lib/ai/agent-execution-meter";
 import { withModelFallback } from "@/lib/ai/providers";
 import { consumeQuota, reserveQuota } from "@/lib/billing/quota";
-import { usageEventForModel } from "@/lib/usage-ledger";
 import type { AiProviderId, HarnessSnapshot } from "@circulo-ai/types";
 import { generateText, Output } from "ai";
 import { z } from "zod";
 import { deterministicWorkflowEventId } from "../orchestrate/agent-loop-state";
 import { planTaskSchema } from "./state";
-import { completedStepCost } from "./usage";
 
 export const completionReviewSchema = z.object({
   complete: z.boolean(),
@@ -25,6 +23,7 @@ export function createCompletionReviewer(options: {
   providerId?: AiProviderId | null;
   tools: string[];
   signal?: AbortSignal;
+  metering?: AgentExecutionMeteringContext;
 }) {
   return async (
     state: HarnessSnapshot,
@@ -42,11 +41,11 @@ export function createCompletionReviewer(options: {
       feature: "api_calls",
       idempotencyKey: `quota:${key}`,
     });
-    const startedAt = Date.now();
     const result = await withModelFallback({
       userId: options.userId,
       providerId: options.providerId,
       modelId: options.modelId,
+      metering: options.metering,
       run: (model) =>
         generateText({
           model,
@@ -58,26 +57,6 @@ export function createCompletionReviewer(options: {
         }),
     });
     const usage = result.totalUsage;
-    await usageEventForModel({
-      organizationId: options.organizationId,
-      userId: options.userId,
-      workflowRunId: options.workflowId,
-      provider: options.providerId ?? "openrouter",
-      model: options.modelId,
-      feature: "orchestration",
-      inputTokens: usage.inputTokens ?? 0,
-      outputTokens: usage.outputTokens ?? 0,
-      providerCost:
-        completedStepCost(result.steps) ??
-        estimateProviderCost({
-          providerId: options.providerId ?? "openrouter",
-          modelId: options.modelId,
-          inputTokens: usage.inputTokens ?? 0,
-          outputTokens: usage.outputTokens ?? 0,
-        }),
-      durationMs: Date.now() - startedAt,
-      idempotencyKey: key,
-    });
     await consumeQuota(quota);
     return {
       ...result.output,

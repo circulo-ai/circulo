@@ -1,7 +1,12 @@
 import { db, workflowRunEvent } from "@/db";
+import {
+  AgentExecutionBudgetError,
+  withAgentExecutionMetering,
+} from "@/lib/ai/agent-execution-meter";
 import { normalizeAttachmentContext } from "@/lib/ai/attachment-context";
 import { estimateProviderCost } from "@/lib/ai/cost";
 import {
+  getProviderModelContextLength,
   redactProviderError,
   resolveLanguageModel,
 } from "@/lib/ai/provider-registry";
@@ -29,7 +34,6 @@ import type {
   WorkflowAgentTrace,
   WorkflowToolTrace,
 } from "@/lib/types";
-import { usageEventForModel } from "@/lib/usage-ledger";
 import { convertToUIMessages, getTextFromMessages } from "@/lib/utils";
 import { getHarnessSignal } from "@/workflows/harness/cancellation";
 import { loadHarnessContinuation } from "@/workflows/harness/continuation";
@@ -43,6 +47,11 @@ import { completedStepCost } from "@/workflows/harness/usage";
 import type { ChatContext } from "@/workflows/orchestrate/steps/load-chat-step";
 import type { OrchestrationInput } from "@/workflows/orchestrate/types";
 import { publishWorkflowChunk } from "@/workflows/runtime/output-channel";
+import {
+  DEFAULT_AGENT_EXECUTION_SETTINGS,
+  type AgentExecutionSettings,
+  type AiProviderId,
+} from "@circulo-ai/types";
 import {
   convertToModelMessages,
   ToolLoopAgent,
@@ -68,6 +77,72 @@ const MAX_PAST_CONTEXT_CHARACTERS = 30_000;
 const MAX_MEMORY_CONTEXT_CHARACTERS = 30_000;
 const MAX_KNOWLEDGE_CONTEXT_CHARACTERS = 70_000;
 const MAX_SKILL_CONTEXT_CHARACTERS = 45_000;
+const MODEL_STEPS_PER_WORKER_SLICE = 8;
+const PLATFORM_MAX_AGENT_RUNTIME_MS = 7 * 24 * 60 * 60 * 1_000;
+const AUTO_CONTEXT_FALLBACK_TOKENS = 30_000;
+const MODEL_CONTEXT_OUTPUT_RESERVE_TOKENS = 8_192;
+
+function executionSettings(context: ChatContext): AgentExecutionSettings {
+  return (
+    context.executionSettings ??
+    structuredClone(DEFAULT_AGENT_EXECUTION_SETTINGS)
+  );
+}
+
+function harnessLimits(
+  settings: AgentExecutionSettings,
+  modelContextLength?: number,
+  workflowStartedAt = Date.now(),
+) {
+  const safeModelContext = modelContextLength
+    ? Math.max(256, modelContextLength - MODEL_CONTEXT_OUTPUT_RESERVE_TOKENS)
+    : undefined;
+  const requestedContext =
+    settings.conversationContextTokens ??
+    safeModelContext ??
+    AUTO_CONTEXT_FALLBACK_TOKENS;
+  const contextTokens = safeModelContext
+    ? Math.min(requestedContext, safeModelContext)
+    : requestedContext;
+  const workflowRuntimeMs =
+    settings.workflow.runtimeMs ?? PLATFORM_MAX_AGENT_RUNTIME_MS;
+  const workflowRemainingMs =
+    workflowStartedAt + workflowRuntimeMs - Date.now();
+  if (workflowRemainingMs <= 0) {
+    throw new AgentExecutionBudgetError(
+      0,
+      "The workspace workflow runtime limit has been reached. Start a new run or ask a workspace manager to raise the limit.",
+    );
+  }
+  return {
+    modelSteps: settings.agentLoop.modelSteps ?? Number.MAX_SAFE_INTEGER,
+    toolCalls: settings.agentLoop.toolCalls ?? Number.MAX_SAFE_INTEGER,
+    tokens: settings.agentLoop.tokens ?? Number.MAX_SAFE_INTEGER,
+    runtimeMs: Math.min(
+      settings.agentLoop.runtimeMs ?? PLATFORM_MAX_AGENT_RUNTIME_MS,
+      workflowRemainingMs,
+    ),
+    contextCharacters: contextTokens * 4,
+  };
+}
+
+async function getModelContextLength(params: {
+  userId: string;
+  providerId: AiProviderId;
+  modelId: string;
+}) {
+  try {
+    return await getProviderModelContextLength({
+      userId: params.userId,
+      providerId: params.providerId,
+      modelId: params.modelId,
+    });
+  } catch {
+    // Model catalogs can be unavailable or omit metadata; the existing
+    // conservative history default still protects requests in that case.
+    return undefined;
+  }
+}
 
 function limitContextLines(lines: string[], maxCharacters: number): string {
   const selected: string[] = [];
@@ -286,9 +361,22 @@ export interface AgentExecutionResult {
   avatarUrl?: string | null;
   toolCalls?: WorkflowToolTrace[];
   approvalId?: string;
+  /** Internal signal used to resume a checkpointed task in the next worker slice. */
+  continuationRequired?: boolean;
 }
 
 export async function executeDirectResponseStep(params: {
+  resumeAfterApproval?: string;
+  executionIdOverride?: string;
+  actor: OrchestrationInput["actor"];
+  context: ChatContext;
+  inputMessages: ChatMessage[];
+  workflowId: string;
+}): Promise<AgentExecutionResult> {
+  return executeDirectResponseSegment(params);
+}
+
+async function executeDirectResponseSegment(params: {
   resumeAfterApproval?: string;
   executionIdOverride?: string;
   actor: OrchestrationInput["actor"];
@@ -305,11 +393,30 @@ export async function executeDirectResponseStep(params: {
   const agentId = orchestrationAgent?.id ?? "circulo-default";
   const agentName = orchestrationAgent?.name?.trim() || "Circulo";
   const model = orchestrationAgent?.model ?? defaultModel;
+  const providerId = orchestrationAgent?.providerId ?? "openrouter";
   const aiSession = {
     ...params.actor,
     chatId: params.context.chat.id,
     providerId: orchestrationAgent?.providerId,
     modelId: model,
+  };
+  const task = getTextFromMessages(params.inputMessages);
+  const executionId =
+    params.executionIdOverride ??
+    getAgentExecutionKey({
+      agentId,
+      order: 0,
+      task,
+    } as ExecutionPlan["selectedAgents"][number]);
+  const settings = executionSettings(params.context);
+  const metering = {
+    organizationId: params.actor.organizationId,
+    userId: params.actor.userId,
+    workflowRunId: params.workflowId,
+    workflowStartedAt: params.context.workflowStartedAt ?? startTime.getTime(),
+    agentExecutionId: `${params.workflowId}:${executionId}`,
+    settings,
+    feature: "orchestration" as const,
   };
   const hasToolAccess = (...ids: string[]) =>
     orchestrationAgent
@@ -319,7 +426,6 @@ export async function executeDirectResponseStep(params: {
           ...ids,
         )
       : true;
-  const task = getTextFromMessages(params.inputMessages);
   const mcpTools = await getMcpToolsForAgent({
     organizationId: params.actor.organizationId,
     chatId: params.context.chat.id,
@@ -369,6 +475,7 @@ export async function executeDirectResponseStep(params: {
           createDocument: createDocument({
             session: aiSession,
             dataStream,
+            metering,
           }),
         }
       : {}),
@@ -377,6 +484,7 @@ export async function executeDirectResponseStep(params: {
           updateDocument: updateDocument({
             session: aiSession,
             dataStream,
+            metering,
           }),
         }
       : {}),
@@ -385,6 +493,7 @@ export async function executeDirectResponseStep(params: {
           requestSuggestions: requestSuggestions({
             session: aiSession,
             dataStream,
+            metering,
           }),
         }
       : {}),
@@ -464,18 +573,16 @@ export async function executeDirectResponseStep(params: {
     ),
     params.context,
   );
-  const executionId =
-    params.executionIdOverride ??
-    getAgentExecutionKey({
-      agentId,
-      order: 0,
-      task,
-    } as ExecutionPlan["selectedAgents"][number]);
   const meteringKey = deterministicWorkflowEventId(
     "harness-usage",
     params.workflowId,
     `${executionId}:${params.resumeAfterApproval ?? "initial"}`,
   );
+  const modelContextLength = await getModelContextLength({
+    userId: params.actor.userId,
+    providerId,
+    modelId: model,
+  });
   const harness = await createAgentHarness({
     continuation: params.resumeAfterApproval
       ? undefined
@@ -494,12 +601,19 @@ export async function executeDirectResponseStep(params: {
       providerId: orchestrationAgent?.providerId,
       tools: Object.keys(tools),
       signal: getHarnessSignal(params.workflowId),
+      metering,
     }),
     signal: getHarnessSignal(params.workflowId),
     resumeAfterApproval: params.resumeAfterApproval,
     executionId,
     agentId,
     goal: task,
+    limits: harnessLimits(
+      settings,
+      modelContextLength,
+      params.context.workflowStartedAt,
+    ),
+    maxWorkerModelSteps: MODEL_STEPS_PER_WORKER_SLICE,
     tools,
     journal: databaseHarnessJournal(params.workflowId, executionId),
     publish: (snapshot) =>
@@ -514,13 +628,19 @@ export async function executeDirectResponseStep(params: {
     feature: "api_calls",
     idempotencyKey: `quota:${meteringKey}`,
   });
+  const resolvedModel = await resolveLanguageModel({
+    userId: params.actor.userId,
+    providerId: orchestrationAgent?.providerId,
+    modelId: model,
+  });
   const result = await new ToolLoopAgent({
     ...harness.settings,
-    model: await resolveLanguageModel({
-      userId: params.actor.userId,
-      providerId: orchestrationAgent?.providerId,
-      modelId: model,
-    }),
+    model: withAgentExecutionMetering(
+      resolvedModel,
+      metering,
+      providerId,
+      model,
+    ),
     maxOutputTokens: orchestrationAgent?.maxTokens ?? 8192,
     temperature: normalizeTemperature(orchestrationAgent?.temperature),
     instructions: buildSharedContextPrompt(
@@ -532,9 +652,14 @@ export async function executeDirectResponseStep(params: {
     messages: [...modelMessages, ...harness.recoveredMessages],
     abortSignal: harness.signal,
   });
-  const streamedMessageId = crypto.randomUUID();
+  const streamedMessageId = deterministicWorkflowEventId(
+    "agent-text",
+    params.workflowId,
+    executionId,
+  );
   let streamedText = "";
-  dataStream.write({ type: "text-start", id: streamedMessageId });
+  if (harness.recoveredMessages.length === 0)
+    dataStream.write({ type: "text-start", id: streamedMessageId });
   const modelStreamError = await consumeAgentText(result.fullStream, (text) => {
     streamedText += text;
     dataStream.write({
@@ -551,7 +676,11 @@ export async function executeDirectResponseStep(params: {
   const response = await result.response;
   const resultText = await result.text;
   const outcome = await harness.finish(resultText, await result.finishReason);
-  if (!outcome.success && !outcome.awaitingApproval) {
+  if (
+    !outcome.success &&
+    !outcome.awaitingApproval &&
+    !outcome.continuationRequired
+  ) {
     const limitation = `\n\nTask incomplete: ${outcome.reason}`;
     streamedText += limitation;
     dataStream.write({
@@ -572,18 +701,21 @@ export async function executeDirectResponseStep(params: {
       delta: references,
     });
   }
-  dataStream.write({ type: "text-end", id: streamedMessageId });
+  if (!outcome.continuationRequired)
+    dataStream.write({ type: "text-end", id: streamedMessageId });
   const responseMessages = steps.flatMap((step) => step.response.messages);
   const allResponseMessages = responseMessages.length
     ? responseMessages
     : response.messages;
-  const toolCalls = extractToolTraces(allResponseMessages);
+  const toolCalls = extractToolTraces([
+    ...harness.recoveredMessages,
+    ...allResponseMessages,
+  ]);
   const approvalId = findPendingApprovalId(toolCalls);
   const usage = await result.totalUsage;
   const inputTokens = usage.inputTokens ?? 0;
   const outputTokens = usage.outputTokens ?? 0;
   const tokenCount = usage.totalTokens ?? inputTokens + outputTokens;
-  const providerId = orchestrationAgent?.providerId ?? "openrouter";
   const cost =
     completedStepCost(steps) ??
     estimateProviderCost({
@@ -592,19 +724,6 @@ export async function executeDirectResponseStep(params: {
       inputTokens,
       outputTokens,
     });
-  await usageEventForModel({
-    organizationId: params.context.chat.organizationId,
-    userId: params.actor.userId,
-    workflowRunId: params.workflowId,
-    provider: providerId,
-    model,
-    feature: "orchestration",
-    inputTokens,
-    outputTokens,
-    providerCost: cost,
-    durationMs: Date.now() - startTime.getTime(),
-    idempotencyKey: meteringKey,
-  });
   await consumeQuota(apiCallReservation);
   dataStream.write({
     type: "data-usage",
@@ -620,6 +739,26 @@ export async function executeDirectResponseStep(params: {
   });
 
   const endTime = new Date();
+  if (outcome.continuationRequired) {
+    return {
+      agentId,
+      agentName,
+      task,
+      success: false,
+      error: outcome.reason,
+      harness: outcome.snapshot,
+      output: streamedText || resultText,
+      startTime,
+      endTime,
+      durationMs: endTime.getTime() - startTime.getTime(),
+      tokenCount,
+      cost,
+      model,
+      avatarUrl: orchestrationAgent?.avatarUrl ?? null,
+      toolCalls,
+      continuationRequired: true,
+    };
+  }
   await sendAgentCompletedEvent(dataStream, {
     agentId,
     agentName,
@@ -820,6 +959,19 @@ export async function executeAgentTaskStep(params: {
   webhookPayload?: OrchestrationInput["webhookPayload"];
   workflowId: string;
 }): Promise<AgentExecutionResult> {
+  return executeAgentTaskSegment(params);
+}
+
+async function executeAgentTaskSegment(params: {
+  resumeAfterApproval?: string;
+  executionIdOverride?: string;
+  actor: OrchestrationInput["actor"];
+  agentPlan: NonNullable<ExecutionPlan["selectedAgents"][number]>;
+  context: ChatContext;
+  previousResults: AgentExecutionResult[];
+  webhookPayload?: OrchestrationInput["webhookPayload"];
+  workflowId: string;
+}): Promise<AgentExecutionResult> {
   params.actor.apiKeyPermissions = await currentAutomationPermissions(
     params.actor,
   );
@@ -857,6 +1009,19 @@ export async function executeAgentTaskStep(params: {
     chatId: context.chat.id,
     providerId: agent.providerId,
     modelId: agent.model,
+  };
+  const executionId =
+    params.executionIdOverride ?? getAgentExecutionKey(agentPlan);
+  const providerId = agent.providerId ?? "openrouter";
+  const settings = executionSettings(context);
+  const metering = {
+    organizationId: actor.organizationId,
+    userId: actor.userId,
+    workflowRunId: workflowId,
+    workflowStartedAt: context.workflowStartedAt ?? startTime.getTime(),
+    agentExecutionId: `${workflowId}:${executionId}`,
+    settings,
+    feature: "agent" as const,
   };
 
   try {
@@ -984,6 +1149,7 @@ Provide a focused response for YOUR specific task. Be concise but complete.`,
             createDocument: createDocument({
               session: aiSession,
               dataStream,
+              metering,
             }),
           }
         : {}),
@@ -992,6 +1158,7 @@ Provide a focused response for YOUR specific task. Be concise but complete.`,
             updateDocument: updateDocument({
               session: aiSession,
               dataStream,
+              metering,
             }),
           }
         : {}),
@@ -1000,6 +1167,7 @@ Provide a focused response for YOUR specific task. Be concise but complete.`,
             requestSuggestions: requestSuggestions({
               session: aiSession,
               dataStream,
+              metering,
             }),
           }
         : {}),
@@ -1072,13 +1240,16 @@ Provide a focused response for YOUR specific task. Be concise but complete.`,
         : {}),
     };
 
-    const executionId =
-      params.executionIdOverride ?? getAgentExecutionKey(agentPlan);
     const meteringKey = deterministicWorkflowEventId(
       "harness-usage",
       workflowId,
       `${executionId}:${params.resumeAfterApproval ?? "initial"}`,
     );
+    const modelContextLength = await getModelContextLength({
+      userId: actor.userId,
+      providerId,
+      modelId: agent.model,
+    });
     const harness = await createAgentHarness({
       continuation: params.resumeAfterApproval
         ? undefined
@@ -1104,12 +1275,19 @@ Provide a focused response for YOUR specific task. Be concise but complete.`,
           ...mcpTools,
         }),
         signal: getHarnessSignal(workflowId),
+        metering: { ...metering, feature: "orchestration" },
       }),
       signal: getHarnessSignal(params.workflowId),
       resumeAfterApproval: params.resumeAfterApproval,
       executionId,
       agentId: agent.id,
       goal: agentPlan.task,
+      limits: harnessLimits(
+        settings,
+        modelContextLength,
+        context.workflowStartedAt,
+      ),
+      maxWorkerModelSteps: MODEL_STEPS_PER_WORKER_SLICE,
       tools: { ...builtinTools, ...connectedAppTools, ...mcpTools },
       journal: databaseHarnessJournal(workflowId, executionId),
       publish: (snapshot) =>
@@ -1118,13 +1296,19 @@ Provide a focused response for YOUR specific task. Be concise but complete.`,
           data: snapshot,
         }),
     });
+    const resolvedModel = await resolveLanguageModel({
+      userId: actor.userId,
+      providerId,
+      modelId: agent.model,
+    });
     const agentLoop = new ToolLoopAgent({
       ...harness.settings,
-      model: await resolveLanguageModel({
-        userId: actor.userId,
-        providerId: agent.providerId,
-        modelId: agent.model,
-      }),
+      model: withAgentExecutionMetering(
+        resolvedModel,
+        metering,
+        providerId,
+        agent.model,
+      ),
       instructions: `${systemPrompt}\n\n${harness.instructions}`,
       maxOutputTokens: agent.maxTokens ?? 8192,
       temperature: normalizeTemperature(
@@ -1196,25 +1380,12 @@ Provide a focused response for YOUR specific task. Be concise but complete.`,
     const cost =
       completedStepCost(steps) ??
       estimateProviderCost({
-        providerId: agent.providerId,
+        providerId,
         modelId: agent.model,
         inputTokens,
         outputTokens,
       });
 
-    await usageEventForModel({
-      organizationId: params.context.chat.organizationId,
-      userId: params.actor.userId,
-      workflowRunId: params.workflowId,
-      provider: agent.providerId,
-      model: agent.model,
-      feature: "agent",
-      inputTokens,
-      outputTokens,
-      providerCost: cost,
-      durationMs: Date.now() - startTime.getTime(),
-      idempotencyKey: meteringKey,
-    });
     await consumeQuota(apiCallReservation);
 
     dataStream.write({
@@ -1251,8 +1422,30 @@ Provide a focused response for YOUR specific task. Be concise but complete.`,
     const endTime = new Date();
     const outcome = await harness.finish(output, await result.finishReason);
     output = outcome.output;
-    const toolCalls = extractToolTraces(allResponseMessages);
+    const toolCalls = extractToolTraces([
+      ...harness.recoveredMessages,
+      ...allResponseMessages,
+    ]);
     const approvalId = findPendingApprovalId(toolCalls);
+
+    if (outcome.continuationRequired) {
+      return {
+        agentId: agent.id,
+        agentName: agent.name,
+        task: agentPlan.task,
+        success: false,
+        error: outcome.reason,
+        harness: outcome.snapshot,
+        output,
+        startTime,
+        endTime,
+        durationMs: endTime.getTime() - startTime.getTime(),
+        model: agent.model,
+        avatarUrl: agent.avatarUrl,
+        toolCalls,
+        continuationRequired: true,
+      };
+    }
 
     // Send agent completed event
     await sendAgentCompletedEvent(dataStream, {

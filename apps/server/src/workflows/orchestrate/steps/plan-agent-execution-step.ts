@@ -1,4 +1,5 @@
 import type { Agent, ChatAgent } from "@/db";
+import type { AgentExecutionMeteringContext } from "@/lib/ai/agent-execution-meter";
 import {
   orchestrationFallbackModel,
   withModelFallback,
@@ -61,6 +62,7 @@ export async function planAgentExecutionStep(params: {
   orchestrationAgent?: OrchestrationAgentProfile | null;
   orchestrationModel?: string | null;
   orchestrationFallbackModel?: string | null;
+  metering?: AgentExecutionMeteringContext;
 }): Promise<ExecutionPlan> {
   const { classification, triggerMessages, webhookPayload } = params;
   const agents = params.agents.filter(
@@ -111,6 +113,7 @@ This is an automated trigger, not a direct user request.`;
     modelId: params.orchestrationAgent?.model ?? params.orchestrationModel,
     fallbackModelId:
       params.orchestrationFallbackModel ?? orchestrationFallbackModel,
+    metering: params.metering,
     run: (model) =>
       generateText({
         model,

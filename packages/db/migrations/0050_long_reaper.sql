@@ -1,0 +1,2 @@
+ALTER TABLE "agent_execution_reservations" ADD COLUMN "agent_execution_id" text;--> statement-breakpoint
+CREATE INDEX "agent_execution_reservations_agent_run_idx" ON "agent_execution_reservations" USING btree ("organization_id","agent_execution_id","created_at");

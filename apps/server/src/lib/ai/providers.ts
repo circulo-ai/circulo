@@ -1,4 +1,9 @@
 import {
+  isAgentExecutionBudgetError,
+  withAgentExecutionMetering,
+  type AgentExecutionMeteringContext,
+} from "@/lib/ai/agent-execution-meter";
+import {
   getDefaultModelForProvider,
   resolveLanguageModel,
   type ResolvedProviderCredential,
@@ -35,6 +40,7 @@ export async function withModelFallback<T>(options: {
   providerId?: import("@circulo-ai/types").AiProviderId | null;
   modelId?: string | null;
   fallbackModelId?: string | null;
+  metering?: AgentExecutionMeteringContext;
   run: (model: LanguageModel) => Promise<T>;
 }): Promise<T> {
   const providerId = options.providerId ?? "openrouter";
@@ -50,14 +56,22 @@ export async function withModelFallback<T>(options: {
 
   for (const modelId of uniqueModelIds) {
     try {
-      return await options.run(
-        await resolveLanguageModel({
-          userId: options.userId,
-          providerId: options.providerId,
+      let model = await resolveLanguageModel({
+        userId: options.userId,
+        providerId: options.providerId,
+        modelId,
+      });
+      if (options.metering) {
+        model = withAgentExecutionMetering(
+          model,
+          options.metering,
+          providerId,
           modelId,
-        }),
-      );
+        );
+      }
+      return await options.run(model);
     } catch (error) {
+      if (isAgentExecutionBudgetError(error)) throw error;
       errors.push(error);
     }
   }

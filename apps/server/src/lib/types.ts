@@ -60,7 +60,7 @@ export type WorkflowTrace = {
   plan?: ExecutionPlan;
   planSteps?: WorkflowPlanStepTrace[];
   agentLoopIteration?: number;
-  agentLoopStatus?: "completed" | "blocked";
+  agentLoopStatus?: "completed" | "blocked" | "continuing";
   agentLoopDecision?: string;
   agents: WorkflowAgentTrace[];
   aggregated?: boolean;

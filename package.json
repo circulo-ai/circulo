@@ -19,7 +19,7 @@
     "db:generate": "bun --env-file=apps/server/.env --filter @circulo-ai/db db:generate",
     "db:check": "bun --env-file=apps/server/.env --filter @circulo-ai/db db:check",
     "db:migrate": "bun --env-file=apps/server/.env --filter @circulo-ai/db db:migrate",
-    "test": "bun ./node_modules/turbo/bin/turbo run test",
+    "test": "bun ./node_modules/turbo/bin/turbo run test --concurrency=4",
     "format": "bun ./node_modules/prettier/bin/prettier.cjs . --write",
     "format:check": "bun ./node_modules/prettier/bin/prettier.cjs . --check",
     "lint": "bun ./node_modules/@biomejs/biome/bin/biome check --formatter-enabled=false --assist-enabled=false --files-ignore-unknown=true apps packages",

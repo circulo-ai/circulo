@@ -1,4 +1,5 @@
 import { db, workflowRunEvent } from "@/db";
+import type { AgentExecutionMeteringContext } from "@/lib/ai/agent-execution-meter";
 import {
   orchestrationFallbackModel,
   withModelFallback,
@@ -100,6 +101,7 @@ export async function evaluateAgentProgressStep(params: {
   orchestrationAgent?: OrchestrationAgentProfile | null;
   orchestrationModel?: string | null;
   orchestrationFallbackModel?: string | null;
+  metering?: AgentExecutionMeteringContext;
 }): Promise<AgentProgressDecision> {
   const availableAgents = params.agents
     .filter((candidate) => candidate.isEnabled)
@@ -129,6 +131,7 @@ export async function evaluateAgentProgressStep(params: {
     modelId: params.orchestrationAgent?.model ?? params.orchestrationModel,
     fallbackModelId:
       params.orchestrationFallbackModel ?? orchestrationFallbackModel,
+    metering: params.metering,
     run: (model) =>
       generateText({
         abortSignal: getHarnessSignal(params.workflowId),

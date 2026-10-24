@@ -657,6 +657,54 @@ describe("durable agent harness", () => {
     });
     expect(recovered.deadline).toBe(first.deadline);
   });
+  it("requests a durable continuation after a bounded worker segment", async () => {
+    const store = journal();
+    const runtime = await createAgentHarness({
+      ...options(store, {
+        lookup: tool({
+          inputSchema: z.object({}),
+          execute: async () => ({ verified: true }),
+        }),
+      }),
+      goal: "Answer this question clearly",
+      maxWorkerModelSteps: 1,
+    });
+    const model = new MockLanguageModelV4({
+      doGenerate: async () => ({
+        content: [
+          {
+            type: "tool-call",
+            toolCallId: "lookup-call",
+            toolName: "lookup",
+            input: "{}",
+          },
+        ],
+        finishReason: { unified: "tool-calls", raw: "tool_calls" },
+        usage: {
+          inputTokens: {
+            total: 10,
+            noCache: 10,
+            cacheRead: 0,
+            cacheWrite: 0,
+          },
+          outputTokens: { total: 5, text: 5, reasoning: 0 },
+        },
+        warnings: [],
+      }),
+    });
+
+    const response = await new ToolLoopAgent({
+      model,
+      tools: runtime.tools,
+      instructions: runtime.instructions,
+      ...runtime.settings,
+    }).generate({ prompt: "Please explain the answer" });
+    const result = await runtime.finish(response.text, response.finishReason);
+
+    expect(result.continuationRequired).toBe(true);
+    expect(result.snapshot.status).toBe("paused");
+    expect(result.reason).toContain("durable run will continue automatically");
+  });
   it("never accepts an approval request as completion evidence", async () => {
     const runtime = await createAgentHarness(
       options(journal(), {

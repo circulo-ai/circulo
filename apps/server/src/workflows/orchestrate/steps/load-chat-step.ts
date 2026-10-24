@@ -18,6 +18,7 @@ import {
 } from "@/db";
 import { chatMemberRepo, chatRepo, messageRepo } from "@/db/repositories";
 import { agent as agentTable, chatAgent } from "@/db/schema";
+import { getAgentExecutionSettings } from "@/lib/agent-execution-settings";
 import {
   getKnowledgeAssetKey,
   isKnowledgeImageDocument,
@@ -37,12 +38,17 @@ import {
 import { ensureInitialSkillCatalog } from "@/lib/skills/initial-catalog";
 import { storageManager } from "@/lib/storage/config";
 import { ensureWorkspaceRoleCatalog } from "@/lib/workspace-role-catalog";
+import type { AgentExecutionSettings } from "@circulo-ai/types";
 import { and, asc, desc, eq, inArray, isNull, not, or, sql } from "drizzle-orm";
 
 const logger = createLogger("LoadChatStep");
 
 export interface ChatContext {
   chat: Chat;
+  /** Start time captured with this workflow's immutable execution snapshot. */
+  workflowStartedAt?: number;
+  /** Immutable execution configuration captured when the logical run starts. */
+  executionSettings?: AgentExecutionSettings;
   orchestrationAgent?: Agent | null;
   agents: Array<ChatAgent & { agent: Agent }>;
   messages: Message[];
@@ -384,6 +390,7 @@ export async function loadChatContextStep(
 
   return {
     chat,
+    executionSettings: await getAgentExecutionSettings(chat.organizationId),
     orchestrationAgent,
     agents: chatAgents,
     messages,

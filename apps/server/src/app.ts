@@ -11,6 +11,7 @@ import {
   securityHeaders,
 } from "@/middleware/security";
 import agent from "@/routes/agent";
+import agentExecutionSettings from "@/routes/agent-execution-settings";
 import aiProviders from "@/routes/ai-providers";
 import artifact from "@/routes/artifact";
 import auth from "@/routes/auth";
@@ -128,6 +129,7 @@ const routes = [
   artifact,
   agent,
   aiProviders,
+  agentExecutionSettings,
   chatAgents,
   chatMembers,
   chatInvitations,

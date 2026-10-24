@@ -337,6 +337,20 @@
       "when": 1791995929085,
       "tag": "0048_material_prima",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1792881837748,
+      "tag": "0049_quick_mephisto",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1792882308640,
+      "tag": "0050_long_reaper",
+      "breakpoints": true
     }
   ]
 }

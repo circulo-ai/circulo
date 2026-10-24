@@ -42,6 +42,8 @@ export type AiProviderModel = {
   id: string;
   name: string;
   description?: string;
+  /** Provider-reported maximum input context, when available. */
+  contextLength?: number;
   supportsTools?: boolean;
   supportsVision?: boolean;
 };

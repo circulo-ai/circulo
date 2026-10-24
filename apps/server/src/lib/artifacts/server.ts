@@ -4,6 +4,7 @@ import { textDocumentHandler } from "@/application/artifact/handlers/text/server
 import { artifactRepo } from "@/db/repositories";
 import type { ArtifactKind, Document } from "@/db/schema";
 import type { UIMessageStreamWriter } from "ai";
+import type { AgentExecutionMeteringContext } from "../ai/agent-execution-meter";
 import type { ActorContext, ChatMessage } from "../types";
 
 export type SaveDocumentProps = {
@@ -19,6 +20,7 @@ export type CreateDocumentCallbackProps = {
   title: string;
   dataStream: UIMessageStreamWriter<ChatMessage>;
   session: ActorContext;
+  metering?: AgentExecutionMeteringContext;
 };
 
 export type UpdateDocumentCallbackProps = {
@@ -26,6 +28,7 @@ export type UpdateDocumentCallbackProps = {
   description: string;
   dataStream: UIMessageStreamWriter<ChatMessage>;
   session: ActorContext;
+  metering?: AgentExecutionMeteringContext;
 };
 
 export type DocumentHandler<T = ArtifactKind> = {
@@ -49,6 +52,7 @@ export function createDocumentHandler<T extends ArtifactKind>(config: {
         title: args.title,
         dataStream: args.dataStream,
         session: args.session,
+        metering: args.metering,
       });
 
       if (args.session?.userId) {
@@ -72,6 +76,7 @@ export function createDocumentHandler<T extends ArtifactKind>(config: {
         description: args.description,
         dataStream: args.dataStream,
         session: args.session,
+        metering: args.metering,
       });
 
       if (args.session?.userId) {

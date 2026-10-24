@@ -18,6 +18,11 @@ const OPENAI_BASE_URL = "https://api.openai.com/v1";
 const ANTHROPIC_BASE_URL = "https://api.anthropic.com/v1";
 const GOOGLE_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 const OLLAMA_BASE_URL = "http://127.0.0.1:11434/v1";
+const MODEL_CATALOG_TTL_MS = 5 * 60 * 1_000;
+const modelCatalogCache = new Map<
+  string,
+  { expiresAt: number; models: AiProviderModel[] }
+>();
 
 export const AI_PROVIDER_DEFINITIONS: readonly AiProviderDefinition[] = [
   {
@@ -212,6 +217,13 @@ export async function resolveLanguageModel(params: {
 export async function listProviderModels(
   query: ProviderModelQuery,
 ): Promise<AiProviderModel[]> {
+  const cacheKey = `${query.providerId}:${query.userId ?? "server"}`;
+  const cached = !query.apiKey ? modelCatalogCache.get(cacheKey) : undefined;
+  if (!query.refresh && cached && cached.expiresAt > Date.now()) {
+    return query.toolsOnly
+      ? cached.models.filter((candidate) => candidate.supportsTools !== false)
+      : cached.models;
+  }
   const credential = query.apiKey
     ? {
         apiKey: query.apiKey,
@@ -220,10 +232,33 @@ export async function listProviderModels(
     : await requireProviderCredential(query.providerId, query.userId);
 
   const models = await fetchProviderModels(query.providerId, credential);
+  if (!query.apiKey) {
+    modelCatalogCache.set(cacheKey, {
+      expiresAt: Date.now() + MODEL_CATALOG_TTL_MS,
+      models,
+    });
+  }
 
   return query.toolsOnly
     ? models.filter((candidate) => candidate.supportsTools !== false)
     : models;
+}
+
+export async function getProviderModelContextLength(query: {
+  providerId: AiProviderId;
+  userId?: string;
+  modelId: string;
+}): Promise<number | undefined> {
+  const models = await listProviderModels({
+    providerId: query.providerId,
+    userId: query.userId,
+  });
+  const contextLength = models.find(
+    (model) => model.id === query.modelId,
+  )?.contextLength;
+  return typeof contextLength === "number" && contextLength > 0
+    ? contextLength
+    : undefined;
 }
 
 async function fetchProviderModels(
@@ -258,6 +293,8 @@ async function fetchProviderModels(
       id?: unknown;
       name?: unknown;
       description?: unknown;
+      context_length?: unknown;
+      top_provider?: { context_length?: unknown };
       architecture?: { input_modalities?: unknown[] };
       supported_parameters?: unknown[];
     }>;
@@ -278,6 +315,13 @@ async function fetchProviderModels(
       ...(typeof candidate.description === "string"
         ? { description: candidate.description }
         : {}),
+      ...(typeof candidate.context_length === "number" &&
+      candidate.context_length > 0
+        ? { contextLength: candidate.context_length }
+        : typeof candidate.top_provider?.context_length === "number" &&
+            candidate.top_provider.context_length > 0
+          ? { contextLength: candidate.top_provider.context_length }
+          : {}),
       supportsTools:
         providerId === "openrouter"
           ? candidate.supported_parameters?.includes("tools") === true ||
@@ -322,6 +366,7 @@ async function fetchAnthropicModels(
     data?: Array<{
       id?: unknown;
       display_name?: unknown;
+      context_length?: unknown;
     }>;
   };
   return (payload.data ?? [])
@@ -332,6 +377,10 @@ async function fetchAnthropicModels(
         typeof candidate.display_name === "string"
           ? candidate.display_name
           : (candidate.id as string),
+      ...(typeof candidate.context_length === "number" &&
+      candidate.context_length > 0
+        ? { contextLength: candidate.context_length }
+        : {}),
       supportsTools: true,
       supportsVision: true,
     }))
@@ -370,6 +419,7 @@ async function fetchGoogleModels(
       displayName?: unknown;
       description?: unknown;
       supportedGenerationMethods?: unknown;
+      inputTokenLimit?: unknown;
     }>;
   };
   return (payload.models ?? [])
@@ -390,6 +440,10 @@ async function fetchGoogleModels(
             : id,
         ...(typeof candidate.description === "string"
           ? { description: candidate.description }
+          : {}),
+        ...(typeof candidate.inputTokenLimit === "number" &&
+        candidate.inputTokenLimit > 0
+          ? { contextLength: candidate.inputTokenLimit }
           : {}),
         supportsTools: true,
         supportsVision: id.includes("gemini"),

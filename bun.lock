@@ -28,7 +28,7 @@
     },
     "apps/desktop": {
       "name": "@circulo-ai/desktop",
-      "version": "0.1.10",
+      "version": "0.1.11",
       "devDependencies": {
         "electron": "^44.9.3",
         "electron-builder": "^26.15.3",

@@ -37,6 +37,7 @@ export type WorkspaceSection =
   | "members"
   | "teams"
   | "permissions"
+  | "agent-execution"
   | "agents"
   | "knowledge"
   | "memory"
@@ -81,6 +82,12 @@ const navigation: Array<{ label: string; items: NavigationItem[] }> = [
         label: "Permissions",
         href: "/workspace?section=permissions",
         icon: ShieldUserIcon,
+      },
+      {
+        id: "agent-execution",
+        label: "Agent execution",
+        href: "/workspace?section=agent-execution",
+        icon: Settings01Icon,
       },
     ],
   },

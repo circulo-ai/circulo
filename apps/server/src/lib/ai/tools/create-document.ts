@@ -1,4 +1,5 @@
 import { artifactRepo } from "@/db/repositories";
+import type { AgentExecutionMeteringContext } from "@/lib/ai/agent-execution-meter";
 import {
   artifactKinds,
   documentHandlersByArtifactKind,
@@ -11,11 +12,13 @@ import { z } from "zod";
 type CreateDocumentProps = {
   session: ActorContext;
   dataStream: UIMessageStreamWriter<ChatMessage>;
+  metering?: AgentExecutionMeteringContext;
 };
 
 export const createDocument = ({
   session,
   dataStream,
+  metering,
 }: CreateDocumentProps): Tool<
   {
     title: string;
@@ -98,6 +101,7 @@ export const createDocument = ({
           title,
           dataStream,
           session,
+          metering,
         });
       }
 

@@ -968,20 +968,27 @@ function traceToEvents(trace: WorkflowTrace): ProcessEvent[] {
       data: {
         workflowId: trace.workflowId,
         iteration: trace.agentLoopIteration,
-        decision: trace.agentLoopStatus === "blocked" ? "blocked" : "complete",
+        decision:
+          trace.agentLoopStatus === "blocked"
+            ? "blocked"
+            : trace.agentLoopStatus === "continuing"
+              ? "continue"
+              : "complete",
         reasoning: trace.agentLoopDecision ?? "",
         nextStepCount: 0,
       },
     });
-    events.push({
-      type: "data-workflowLoopCompleted",
-      data: {
-        workflowId: trace.workflowId,
-        iterations: trace.agentLoopIteration,
-        status: trace.agentLoopStatus ?? "completed",
-        reason: trace.agentLoopDecision ?? "",
-      },
-    });
+    if (trace.agentLoopStatus !== "continuing") {
+      events.push({
+        type: "data-workflowLoopCompleted",
+        data: {
+          workflowId: trace.workflowId,
+          iterations: trace.agentLoopIteration,
+          status: trace.agentLoopStatus ?? "completed",
+          reason: trace.agentLoopDecision ?? "",
+        },
+      });
+    }
   }
 
   for (const agent of trace.agents) {

@@ -1,4 +1,5 @@
 import type { Message } from "@/db";
+import type { AgentExecutionMeteringContext } from "@/lib/ai/agent-execution-meter";
 import {
   orchestrationFallbackModel,
   withModelFallback,
@@ -54,6 +55,7 @@ export async function classifyRequestStep(params: {
   orchestrationAgent?: OrchestrationAgentProfile | null;
   orchestrationModel?: string | null;
   orchestrationFallbackModel?: string | null;
+  metering?: AgentExecutionMeteringContext;
 }): Promise<RequestClassification> {
   const {
     inputMessages: message,
@@ -87,6 +89,7 @@ User Message: ${getTextFromMessages(message)}`;
     modelId: params.orchestrationAgent?.model ?? params.orchestrationModel,
     fallbackModelId:
       params.orchestrationFallbackModel ?? orchestrationFallbackModel,
+    metering: params.metering,
     run: (model) =>
       generateText({
         model,
