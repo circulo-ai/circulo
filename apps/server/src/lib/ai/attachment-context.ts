@@ -9,7 +9,9 @@ import { expandComposerCommand } from "@circulo-ai/types";
 
 const MAX_ATTACHMENT_BYTES_TO_PARSE = 16 * 1024 * 1024;
 const MAX_ATTACHMENT_CONTEXT_CHARACTERS = 40_000;
-const MAX_TOTAL_ATTACHMENT_CONTEXT_CHARACTERS = 160_000;
+// The harness retains at most 120,000 conversation characters. Keep extracted
+// attachment text below that bound so one upload cannot exceed it by itself.
+const MAX_TOTAL_ATTACHMENT_CONTEXT_CHARACTERS = 80_000;
 const MAX_INLINE_BINARY_BYTES = 8 * 1024 * 1024;
 const MAX_INLINE_IMAGES = 4;
 

@@ -8,13 +8,29 @@ import {
 } from "@circulo-ai/types";
 import { eq } from "drizzle-orm";
 import { createHash } from "node:crypto";
+import type {
+  EmbeddingProviderConfig,
+  EmbeddingProviderId,
+} from "./embedding-provider";
+
+const DEFAULT_PROVIDER_BASE_URL: Record<EmbeddingProviderId, string> = {
+  openrouter: "https://openrouter.ai/api/v1",
+  openai: "https://api.openai.com/v1",
+  google: "https://generativelanguage.googleapis.com/v1beta",
+};
+
+export type ResolvedEmbeddingConfig = EmbeddingProviderConfig & {
+  provider: EmbeddingProviderId;
+  identity: string;
+  preferences: EmbeddingPreferences;
+};
 
 export async function getEmbeddingPreferences(
   organizationId?: string,
 ): Promise<EmbeddingPreferences> {
   const seed = embeddingPreferencesSchema.safeParse({
     model:
-      env.CIRCULO_EMBEDDING_MODEL?.replace(/^openai\//, "") ??
+      env.CIRCULO_EMBEDDING_MODEL?.replace(/^(?:openai|google)\//, "") ??
       DEFAULT_EMBEDDING_PREFERENCES.model,
   });
   const defaults = seed.success ? seed.data : DEFAULT_EMBEDDING_PREFERENCES;
@@ -29,14 +45,36 @@ export async function getEmbeddingPreferences(
   return embeddingPreferencesSchema.parse(row?.config ?? defaults);
 }
 
+function serverCredential(provider: EmbeddingProviderId) {
+  switch (provider) {
+    case "openrouter":
+      return env.OPENROUTER_API_KEY
+        ? {
+            apiKey: env.OPENROUTER_API_KEY,
+            baseUrl:
+              env.OPENROUTER_BASE_URL ?? DEFAULT_PROVIDER_BASE_URL.openrouter,
+          }
+        : null;
+    case "openai":
+      return env.OPENAI_API_KEY ? { apiKey: env.OPENAI_API_KEY } : null;
+    case "google":
+      return env.GOOGLE_GENERATIVE_AI_API_KEY
+        ? { apiKey: env.GOOGLE_GENERATIVE_AI_API_KEY }
+        : null;
+  }
+}
+
 export async function resolveEmbeddingConfig(
   userId: string | undefined,
   preferences: EmbeddingPreferences,
-) {
+): Promise<ResolvedEmbeddingConfig | null> {
   if (!preferences.enabled) return null;
-  const providers =
+  const modelUsesGoogle = preferences.model.startsWith("gemini-embedding-");
+  const providers: EmbeddingProviderId[] =
     preferences.provider === "auto"
-      ? (["openrouter", "openai"] as const)
+      ? modelUsesGoogle
+        ? ["google"]
+        : ["openrouter", "openai"]
       : [preferences.provider];
   const credentials = await Promise.all(
     providers.map((provider) =>
@@ -45,34 +83,36 @@ export async function resolveEmbeddingConfig(
         : Promise.resolve(null),
     ),
   );
-  const selectedIndex = credentials.findIndex((credential) =>
+
+  // Prefer a user's explicitly connected provider before using server-level
+  // credentials. Automatic mode preserves the OpenRouter → OpenAI fallback.
+  let selectedIndex = credentials.findIndex((credential) =>
     Boolean(credential?.apiKey),
   );
-  const selectedProvider =
-    selectedIndex >= 0
-      ? providers[selectedIndex]
-      : providers.includes("openrouter") && env.OPENROUTER_API_KEY
-        ? "openrouter"
-        : null;
-  if (selectedProvider) {
-    const provider = selectedProvider;
-    const credential = selectedIndex >= 0 ? credentials[selectedIndex] : null;
-    const apiKey =
-      credential?.apiKey ??
-      (provider === "openrouter" ? env.OPENROUTER_API_KEY : undefined);
-    if (!apiKey) return null;
-    const baseUrl = (
-      credential?.baseUrl ??
-      (provider === "openai"
-        ? "https://api.openai.com/v1"
-        : (env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1"))
-    ).replace(/\/$/, "");
-    const model =
-      provider === "openrouter"
-        ? `openai/${preferences.model}`
-        : preferences.model;
-    const identity = `${provider}:${model}:1536:${createHash("sha256").update(baseUrl).digest("hex").slice(0, 12)}`;
-    return { apiKey, baseUrl, model, identity, preferences };
+  let useServerCredential = false;
+  if (selectedIndex < 0) {
+    selectedIndex = providers.findIndex((provider) =>
+      Boolean(serverCredential(provider)?.apiKey),
+    );
+    useServerCredential = selectedIndex >= 0;
   }
-  return null;
+  if (selectedIndex < 0) return null;
+
+  const provider = providers[selectedIndex]!;
+  const credential = useServerCredential ? null : credentials[selectedIndex];
+  const server = useServerCredential ? serverCredential(provider) : null;
+  const apiKey = credential?.apiKey ?? server?.apiKey;
+  if (!apiKey) return null;
+
+  const baseUrl = (
+    credential?.baseUrl ??
+    server?.baseUrl ??
+    DEFAULT_PROVIDER_BASE_URL[provider]
+  ).replace(/\/$/, "");
+  const model =
+    provider === "openrouter"
+      ? `openai/${preferences.model}`
+      : preferences.model;
+  const identity = `${provider}:${model}:1536:${createHash("sha256").update(baseUrl).digest("hex").slice(0, 12)}`;
+  return { provider, apiKey, baseUrl, model, identity, preferences };
 }

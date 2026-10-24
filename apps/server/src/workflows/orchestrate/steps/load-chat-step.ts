@@ -145,6 +145,7 @@ export async function loadChatContextStep(
     ? await createKnowledgeEmbeddingWithMetadata(queryText.trim(), "", {
         userId,
         organizationId: chat.organizationId,
+        purpose: "query",
       }).catch(() => null)
     : null;
   const queryEmbedding = queryEmbeddingResult?.embedding ?? null;

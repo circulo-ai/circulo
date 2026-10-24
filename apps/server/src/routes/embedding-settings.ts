@@ -146,7 +146,7 @@ router.post(
     );
     if (!config)
       throw new BadRequestError(
-        "Enable semantic indexing and configure an OpenAI or OpenRouter credential in AI providers",
+        "Enable semantic indexing and configure an OpenAI, OpenRouter, or Google AI credential in AI providers",
       );
     await requestEmbeddingVectors(
       config,

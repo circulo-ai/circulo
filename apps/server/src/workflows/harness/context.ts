@@ -1,6 +1,20 @@
 import type { ModelMessage } from "ai";
 
 const MAX_TOOL_RESULT_CHARACTERS = 8_000;
+const BINARY_CONTEXT_PLACEHOLDER = "[binary content budgeted separately]";
+
+function isSerializedBuffer(value: unknown): boolean {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    (value as { type?: unknown }).type === "Buffer" &&
+    Array.isArray((value as { data?: unknown }).data)
+  );
+}
+
+function isInlineDataUrl(value: string): boolean {
+  return /^data:[^,]{1,256},/i.test(value);
+}
 
 /** Keep tool-call/result pairs intact and retain the latest request. Full results
  * remain in the execution journal and can be read in bounded pages. */
@@ -29,12 +43,23 @@ export function boundModelContext(
     };
   });
   const size = (message: ModelMessage) =>
-    JSON.stringify(message, (key, value) =>
-      ["image", "data"].includes(key) &&
-      (typeof value === "string" || value instanceof Uint8Array)
-        ? "[binary content budgeted separately]"
-        : value,
-    ).length;
+    JSON.stringify(message, (key, value) => {
+      // Inline images arrive as data URLs, typed arrays, or Buffers. Buffer's
+      // toJSON runs before this replacer and expands it to a byte array, so
+      // recognize that serialized shape as well as the original binary types.
+      if (
+        ArrayBuffer.isView(value) ||
+        value instanceof ArrayBuffer ||
+        isSerializedBuffer(value)
+      )
+        return BINARY_CONTEXT_PLACEHOLDER;
+      if (
+        typeof value === "string" &&
+        (["image", "data"].includes(key) || isInlineDataUrl(value))
+      )
+        return BINARY_CONTEXT_PLACEHOLDER;
+      return value;
+    }).length;
   const groups: ModelMessage[][] = [];
   for (const message of bounded) {
     if (

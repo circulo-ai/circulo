@@ -291,6 +291,7 @@ router.get(
       {
         userId: c.var.user!.id,
         organizationId,
+        purpose: "query",
       },
     ).catch(() => null);
     const lexicalMatch = sql`to_tsvector('simple', ${knowledgeDocument.title} || ' ' || ${knowledgeDocument.content}) @@ plainto_tsquery('simple', ${query.q})`;

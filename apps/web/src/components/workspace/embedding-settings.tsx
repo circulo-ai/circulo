@@ -225,10 +225,16 @@ function EmbeddingSettingsForm({
     }
   };
   const providers = [
-    { value: "auto", label: "Automatic (OpenRouter, then OpenAI)" },
+    { value: "auto", label: "Automatic (based on model)" },
     { value: "openrouter", label: "OpenRouter" },
     { value: "openai", label: "OpenAI" },
+    { value: "google", label: "Google AI" },
   ];
+  const compatibleModels = EMBEDDING_MODELS.filter(
+    (model) =>
+      draft.provider === "auto" ||
+      model.provider === (draft.provider === "google" ? "google" : "openai"),
+  );
   const strategies = [
     { value: "paragraph", label: "Paragraph boundaries" },
     { value: "fixed", label: "Fixed length" },
@@ -301,14 +307,32 @@ function EmbeddingSettingsForm({
                     <Select
                       items={providers}
                       value={draft.provider}
-                      onValueChange={(provider) =>
-                        provider &&
+                      onValueChange={(provider) => {
+                        if (!provider) return;
+                        const nextProvider =
+                          provider as EmbeddingPreferences["provider"];
+                        const keepsCurrentModel = EMBEDDING_MODELS.some(
+                          (model) =>
+                            model.value === draft.model &&
+                            (nextProvider === "auto" ||
+                              model.provider ===
+                                (nextProvider === "google"
+                                  ? "google"
+                                  : "openai")),
+                        );
                         setDraft({
                           ...draft,
-                          provider:
-                            provider as EmbeddingPreferences["provider"],
-                        })
-                      }
+                          provider: nextProvider,
+                          ...(keepsCurrentModel
+                            ? {}
+                            : {
+                                model:
+                                  nextProvider === "google"
+                                    ? "gemini-embedding-2"
+                                    : "text-embedding-3-small",
+                              }),
+                        });
+                      }}
                       disabled={disabled}
                     >
                       <SelectTrigger id={`${id}-provider`} className="w-full">
@@ -330,7 +354,7 @@ function EmbeddingSettingsForm({
                       Embedding model
                     </FieldLabel>
                     <Select
-                      items={EMBEDDING_MODELS}
+                      items={compatibleModels}
                       value={draft.model}
                       onValueChange={(model) =>
                         model &&
@@ -346,7 +370,7 @@ function EmbeddingSettingsForm({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
-                          {EMBEDDING_MODELS.map((item) => (
+                          {compatibleModels.map((item) => (
                             <SelectItem key={item.value} value={item.value}>
                               {item.label}
                             </SelectItem>
@@ -355,7 +379,7 @@ function EmbeddingSettingsForm({
                       </SelectContent>
                     </Select>
                     <FieldDescription>
-                      Stored at 1,536 dimensions for both models.
+                      Stored at 1,536 dimensions for all supported models.
                     </FieldDescription>
                   </Field>
                   <Field>

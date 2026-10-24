@@ -2,6 +2,7 @@ export const KNOWLEDGE_EMBEDDING_DIMENSIONS = 1536;
 
 const MAX_INPUT_CHARACTERS_PER_CHUNK = 12_000;
 const CHUNK_OVERLAP_CHARACTERS = 400;
+export const MAX_INPUT_BYTES_PER_CHUNK = 7800;
 
 export function chunkKnowledgeText(
   text: string,
@@ -9,14 +10,18 @@ export function chunkKnowledgeText(
     chunkSize?: number;
     overlap?: number;
     strategy?: "fixed" | "paragraph";
+    maxInputBytes?: number;
   } = {},
 ): string[] {
   const size = options.chunkSize ?? MAX_INPUT_CHARACTERS_PER_CHUNK;
   const overlap = options.overlap ?? CHUNK_OVERLAP_CHARACTERS;
+  const maxInputBytes = options.maxInputBytes ?? MAX_INPUT_BYTES_PER_CHUNK;
   if (
     !Number.isInteger(size) ||
     size < 256 ||
     size > 12000 ||
+    !Number.isInteger(maxInputBytes) ||
+    maxInputBytes < 1 ||
     !Number.isInteger(overlap) ||
     overlap < 0 ||
     overlap >= size / 2
@@ -26,7 +31,7 @@ export function chunkKnowledgeText(
   if (!normalized) return [];
   if (
     normalized.length <= size &&
-    Buffer.byteLength(normalized, "utf8") <= 7800
+    Buffer.byteLength(normalized, "utf8") <= maxInputBytes
   )
     return [normalized];
 
@@ -35,9 +40,13 @@ export function chunkKnowledgeText(
   while (start < normalized.length) {
     let end = Math.min(normalized.length, start + size);
     // UTF-8 byte count is a conservative token bound, including CJK and emoji.
-    while (Buffer.byteLength(normalized.slice(start, end), "utf8") > 7800) {
+    while (
+      Buffer.byteLength(normalized.slice(start, end), "utf8") > maxInputBytes
+    ) {
       const bytes = Buffer.byteLength(normalized.slice(start, end), "utf8");
-      end = start + Math.max(1, Math.floor(((end - start) * 7800) / bytes));
+      end =
+        start +
+        Math.max(1, Math.floor(((end - start) * maxInputBytes) / bytes));
     }
     if (options.strategy === "paragraph" && end < normalized.length) {
       const section = normalized.slice(start, end);

@@ -9,7 +9,10 @@ import {
   type EmbeddingPreferences,
 } from "@circulo-ai/types";
 import { and, eq } from "drizzle-orm";
-import { requestEmbeddingVectors } from "./embedding-provider";
+import {
+  requestEmbeddingVectors,
+  type EmbeddingPurpose,
+} from "./embedding-provider";
 import {
   getEmbeddingPreferences,
   resolveEmbeddingConfig,
@@ -17,6 +20,7 @@ import {
 import {
   averageKnowledgeEmbeddings,
   chunkKnowledgeText,
+  MAX_INPUT_BYTES_PER_CHUNK,
 } from "./embedding-utils";
 export {
   averageKnowledgeEmbeddings,
@@ -48,6 +52,7 @@ export async function createKnowledgeEmbeddingWithMetadata(
     userId?: string;
     organizationId?: string;
     preferences?: EmbeddingPreferences;
+    purpose?: EmbeddingPurpose;
     signal?: AbortSignal;
   },
 ): Promise<EmbeddingResult | null> {
@@ -56,23 +61,69 @@ export async function createKnowledgeEmbeddingWithMetadata(
     (await getEmbeddingPreferences(options?.organizationId));
   const config = await resolveEmbeddingConfig(options?.userId, preferences);
   if (!config) return null;
-  const chunks = chunkKnowledgeText(`${title}\n\n${content}`, preferences);
+  const purpose = options?.purpose ?? "document";
+  const normalizedTitle = title.trim();
+  const normalizedContent = content.trim();
+  const sourceText = `${title}\n\n${content}`;
+  const googleEmbedding001 =
+    config.provider === "google" && config.model === "gemini-embedding-001";
+  const googleEmbedding2 =
+    config.provider === "google" && config.model === "gemini-embedding-2";
+  const modelInputLimitBytes = googleEmbedding001
+    ? 1800
+    : MAX_INPUT_BYTES_PER_CHUNK;
+  const titlePrefix = googleEmbedding2
+    ? purpose === "document"
+      ? `title: ${normalizedTitle || "none"} | text: `
+      : "task: search result | query: "
+    : purpose !== "document" || googleEmbedding001
+      ? ""
+      : `${normalizedTitle}\n\n`;
+  const maxChunkBytes = Math.max(
+    1,
+    modelInputLimitBytes - Buffer.byteLength(titlePrefix, "utf8"),
+  );
+  const chunkSize = Math.min(preferences.chunkSize, maxChunkBytes);
+  const chunkingPreferences = {
+    ...preferences,
+    chunkSize,
+    overlap: Math.min(preferences.overlap, Math.floor((chunkSize - 1) / 2)),
+    maxInputBytes: maxChunkBytes,
+  };
+  const chunks =
+    purpose === "query"
+      ? chunkKnowledgeText(sourceText, chunkingPreferences)
+      : chunkKnowledgeText(
+          normalizedContent || normalizedTitle,
+          chunkingPreferences,
+        );
   if (!chunks.length) return null;
+  const storedChunks =
+    purpose === "document" && normalizedTitle && normalizedContent
+      ? chunks.map((chunk) => `${normalizedTitle}\n\n${chunk}`)
+      : chunks;
+  const modelInputs =
+    purpose === "document" &&
+    config.provider === "google" &&
+    (googleEmbedding001 || googleEmbedding2)
+      ? chunks
+      : storedChunks;
   const vectors = await requestEmbeddingVectors(
     config,
-    chunks,
+    modelInputs,
     options?.signal,
+    { purpose, documentTitle: normalizedTitle },
   );
   return {
     embedding: averageKnowledgeEmbeddings(vectors),
     model: config.identity,
-    chunks: chunks.map((content, ordinal) => ({
+    chunks: storedChunks.map((content, ordinal) => ({
       content,
       ordinal,
       embedding: vectors[ordinal]!,
     })),
     preferences,
-    sourceText: `${title}\n\n${content}`,
+    sourceText,
   };
 }
 

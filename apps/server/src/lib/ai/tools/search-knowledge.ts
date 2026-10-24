@@ -40,6 +40,7 @@ export function searchKnowledge(params: {
         {
           userId: params.userId,
           organizationId: params.organizationId,
+          purpose: "query",
         },
       ).catch(() => null);
       const rank = sql<number>`ts_rank(to_tsvector('simple', ${knowledgeDocument.title} || ' ' || ${knowledgeDocument.content}), plainto_tsquery('simple', ${query}))`;

@@ -28,6 +28,7 @@ export async function retrieveMemories(params: {
       ? await createKnowledgeEmbeddingWithMetadata(query, "", {
           userId: params.userId,
           organizationId: params.organizationId,
+          purpose: "query",
         }).catch(() => null)
       : params.queryEmbedding;
   const lexicalRank = sql<number>`ts_rank(
