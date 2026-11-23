@@ -1,14 +1,4 @@
 [[IgnoredVulns]]
-id = "GHSA-vfj7-8cjw-p6xm"
-ignoreUntil = 2026-11-17
-reason = "No fixed braces release exists yet. This is a build-tool transitive dependency; remove this time-limited exception when upstream publishes a patch."
-
-[[IgnoredVulns]]
-id = "GHSA-hp3w-g68c-fv3c"
-ignoreUntil = 2026-11-17
-reason = "No fixed sprintf-js release exists yet. It is pulled in by electron-builder for packaging; remove this time-limited exception when upstream publishes a patch."
-
-[[IgnoredVulns]]
 id = "GHSA-3x9f-74h4-2fqr"
 ignoreUntil = 2026-11-17
 reason = "The lockfile pins SheetJS CE 0.20.3 from its official CDN, which is newer than the upstream fixed versions. OSV maps the CDN tarball URL to the vulnerable npm package without recognizing that release; verify the pinned artifact before removing this time-limited exception."
